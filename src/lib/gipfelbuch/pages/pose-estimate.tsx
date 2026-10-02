@@ -24,7 +24,6 @@ import {
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import {
-	Callout,
 	CodeRef,
 	Eq,
 	Figure,
@@ -273,7 +272,8 @@ function PoseExplorer() {
 		<Figure
 			label="Fig. D3"
 			bleed
-			caption="Schematic. One Pose, two views. Left: the eye at the centre of a compass; yaw points the wedge, vertical FOV sets its width. Right: the image those four numbers produce, computed with the same poseBasis / projectPoint formulas the renderer and every solver share. Pitch slides the horizon, roll tilts it, FOV scales everything. The scene is synthetic; the maths is the code's."
+			source="Skizze"
+			caption="One pose, two views. Left: the camera at the centre of a compass; yaw points the wedge, vertical field of view sets its width. Right: the image those four numbers produce. Pitch slides the horizon, roll tilts it, field of view scales everything. The scene is synthetic."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
@@ -296,7 +296,7 @@ function PoseExplorer() {
 
 					{/* ---- plan ---- */}
 					<HandLabel x={14} y={22} size={11.56} color="var(--gb-secondary)">
-						plan · ENU, eye at centre
+						plan view, camera at centre
 					</HandLabel>
 					{[0.33, 0.66, 1].map((k) => (
 						<PenCircle
@@ -412,7 +412,7 @@ function PoseExplorer() {
 
 					{/* ---- image ---- */}
 					<HandLabel x={FX} y={22} size={11.56} color="var(--gb-secondary)">
-						the image · {ASPECT}:1
+						the image
 					</HandLabel>
 					<g clipPath="url(#pe-clip)">
 						<g clipPath="url(#pe-land)">
@@ -501,8 +501,8 @@ function PoseExplorer() {
 						size={11.56}
 						color="var(--gb-secondary)"
 					>
-						<tspan style={{ fill: "var(--gb-contour)" }}>- - -</tspan> true
-						horizon (elevation 0) · ink: skyline
+						<tspan style={{ fill: "var(--gb-contour)" }}>- - -</tspan> level
+						horizon · ink: skyline
 					</HandLabel>
 					<HandLabel
 						x={FX + FW}
@@ -513,9 +513,6 @@ function PoseExplorer() {
 					>
 						pitch {fmt(pose.pitch)}° · roll {fmt(pose.roll)}°
 					</HandLabel>
-					<HandText x={FX} y={326} size={14} rotate={-1}>
-						pitch slides the horizon, roll tilts it, FOV scales it all
-					</HandText>
 				</svg>
 				<div className="grid gap-x-6 gap-y-1.5 px-4 pb-4 pt-3 sm:grid-cols-2">
 					<Slider
@@ -546,7 +543,7 @@ function PoseExplorer() {
 						onChange={set("roll")}
 					/>
 					<Slider
-						label="vfov"
+						label="field of view"
 						value={pose.vfov}
 						min={15}
 						max={70}
@@ -560,14 +557,14 @@ function PoseExplorer() {
 							onClick={() => setManual(manual ? null : { ...auto })}
 							className="bg-[var(--gb-paper-deep)] px-3 py-1.5 font-mono text-[11px] leading-[12px] text-[var(--gb-ink)] hover:bg-[var(--gb-sign-light)]"
 						>
-							{manual ? "Resume animation" : "Take control"}
+							{manual ? "Play" : "Take control"}
 						</button>
 						<button
 							type="button"
 							onClick={() => setManual({ ...PRIOR })}
 							className="bg-[var(--gb-paper-deep)] px-3 py-1.5 font-mono text-[11px] leading-[12px] text-[var(--gb-ink)] hover:bg-[var(--gb-sign-light)]"
 						>
-							Reset to a phone prior
+							Reset to phone guess
 						</button>
 						<span className="hidden sm:inline">
 							Drag any slider to move the camera.
@@ -589,15 +586,15 @@ const KINDS: {
 	sub: string;
 	w: number;
 }[] = [
-	{ k: "point", label: "point", sub: "finite world point · 2 eqs", w: 1 },
-	{ k: "dir", label: "dir", sub: "az/el at infinity · 2 eqs", w: 1 },
+	{ k: "point", label: "peak pin", sub: "a point on the map", w: 1 },
+	{ k: "dir", label: "far direction", sub: "a direction only", w: 1 },
 	{
 		k: "level",
 		label: "level",
-		sub: "known elevation (shoreline) · 0.5",
+		sub: "known height, e.g. a lake shore",
 		w: 0.5,
 	},
-	{ k: "azimuth", label: "azimuth", sub: "known bearing · 0.5", w: 0.5 },
+	{ k: "azimuth", label: "bearing", sub: "known compass direction", w: 0.5 },
 ];
 const PRESETS: { name: string; c: Corrs }[] = [
 	{ name: "a lake shore", c: { point: 0, dir: 0, level: 1, azimuth: 0 } },
@@ -631,32 +628,32 @@ function DofLadder() {
 		{
 			name: "pitch",
 			on: L.pitch,
-			rule: "n_eff > 0",
-			held: "held at gravity, σ 2°",
+			rule: "needs at least 1 evidence",
+			held: "kept at gravity reading",
 		},
 		{
 			name: "yaw",
 			on: L.yaw,
-			rule: "n_eff ≥ 1 and a bearing-carrying correspondence",
-			held: "held at compass, σ 10°",
+			rule: "needs at least 1 with a direction",
+			held: "kept at compass reading",
 		},
 		{
 			name: "roll",
 			on: L.roll,
-			rule: "n_eff ≥ 2, or two level points",
-			held: "held at gravity, σ 2°",
+			rule: "needs 2, or two level points",
+			held: "kept at gravity reading",
 		},
 		{
-			name: "vfov",
+			name: "field of view",
 			on: L.fov,
-			rule: "n_eff ≥ 3 and solveFov",
-			held: "held at EXIF, σ 3 %",
+			rule: "needs 3",
+			held: "kept at the photo’s lens data",
 		},
 		{
-			name: "eye (dx dy dz)",
+			name: "camera position",
 			on: L.pos,
-			rule: "n_eff ≥ 4, ≥ 3 finite points, observable parallax",
-			held: "held at GPS, σH ≥ 5 m",
+			rule: "needs 4 including 3 peaks, plus parallax",
+			held: "kept at GPS",
 		},
 	];
 	const bump = (k: keyof Corrs, d: number) =>
@@ -664,7 +661,8 @@ function DofLadder() {
 	return (
 		<Figure
 			label="Fig. D4"
-			caption="Schematic (synthetic correspondences). The degrees-of-freedom ladder of solvePose6dof. The solver never solves what the evidence cannot pin down: each unlocked row is fitted, each locked row is held at its sensor prior and its prior variance still feeds the reported σ of the rows above it (the 'consider covariance'). Counts are inliers; n_eff counts point and dir as 1, level and azimuth as 0.5."
+			source="Skizze"
+			caption="Synthetic evidence. The solver only fits what the evidence can pin down: unlocked rows are fitted, locked rows stay at the phone’s reading. Peak pins and far directions count 1; level and bearing count 0.5."
 		>
 			<div className="flex flex-wrap gap-2 pb-3">
 				{PRESETS.map((p) => (
@@ -722,7 +720,7 @@ function DofLadder() {
 						{L.neff.toFixed(1)}
 					</div>
 					<div className="text-[11px] uppercase tracking-wider gb-secondary">
-						n_eff
+						evidence
 					</div>
 				</div>
 				<label className="ml-auto flex items-center gap-2 text-[13px] gb-secondary">
@@ -732,7 +730,7 @@ function DofLadder() {
 						onChange={(e) => setFov(e.target.checked)}
 						style={{ accentColor: "var(--accent)" }}
 					/>
-					solveFov
+					solve field of view
 				</label>
 			</div>
 			<ul className="mt-3 space-y-1.5 !pl-0 !list-none">
@@ -789,38 +787,25 @@ function DofLadder() {
 function ProvenanceCard() {
 	const [conf, setConf] = useState(0.62);
 	const [near, setNear] = useState(true);
-	const state = conf > 0.2 ? "auto" : near ? "near-compass" : "prior";
+	const state = conf > 0.2 ? "auto" : near ? "near compass" : "phone guess";
 	const note = {
 		auto: `Auto-aligned to skyline · confidence ${(conf * 100).toFixed(0)}%`,
-		"near-compass": "Skyline ambiguous: refined near the compass heading",
-		prior: "Using phone compass + gravity (skyline match was weak)",
+		"near compass": "Skyline ambiguous: refined near the compass heading",
+		"phone guess": "Using phone compass + gravity (skyline match was weak)",
 	}[state];
-	const SRC = ["saved", "ground-truth", "solved", "prior"];
+	const SRC = ["saved", "hand-fitted", "solved", "phone guess"];
 	return (
 		<Figure
 			label="Fig. D5"
-			caption="A pose is never bare. Left: the SolvedPose record the roll aligner stores per photo. Right: choosePreview, the three-way rule that decides which pose the workspace shows when a photo opens. Drag the confidence across 0.2 and the state flips. On the 12 demo photos the saved poses carry confidences of 0.63 to 1.00 (public/demo/manifest.json), all above 0.2, so each opens as auto; the saved yaw agrees with a fresh run of the CPU pipeline to within 0.4° on 11 and 1.2° on demo-11."
+			caption="A pose never travels bare. Left: the record stored per photo. Right: the three-way rule that picks which pose to show when a photo opens. Drag the confidence across 0.2 and the state flips. On the 12 demo photos, saved confidences run 0.63 to 1.00, so each opens as auto."
 		>
 			<div className="grid gap-4 md:grid-cols-2">
-				<div className="bg-[var(--gb-paper-deep)] p-3 font-mono text-[13px] leading-relaxed gb-secondary">
-					<div className="gb-secondary">{"// src/lib/roll/types.ts"}</div>
-					<div>
-						<span className="text-[var(--accent)]">SolvedPose</span> {"{"}
-					</div>
-					<div className="pl-4">
-						pose: {"{"} yaw, pitch, roll, vfov {"}"},
-					</div>
-					<div className="pl-4">confidence: 0..1,</div>
-					<div className="pl-4">
-						method: <span className="text-[var(--gb-ink)]">"cascade"</span> |{" "}
-						<span className="text-[var(--gb-ink)]">
-							"propagated-suggestion"
-						</span>
-						,
-					</div>
-					<div className="pl-4">at: ISO time</div>
-					<div>{"}"}</div>
-					<div className="mt-3 gb-secondary">{"// PoseSource, best first"}</div>
+				<div className="bg-[var(--gb-paper-deep)] p-3 text-[13px] leading-relaxed gb-secondary">
+					<p>
+						Stored with each pose: the four angles, a confidence from 0 to 1,
+						the method and the time.
+					</p>
+					<p className="mt-3">Source, best first:</p>
 					<div className="mt-1 flex flex-wrap items-center gap-1">
 						{SRC.map((s, i) => (
 							<span key={s} className="flex items-center gap-1">
@@ -842,7 +827,7 @@ function ProvenanceCard() {
 				</div>
 				<div className="bg-[var(--gb-paper-deep)] p-3">
 					<div className="text-[11px] uppercase tracking-wider gb-secondary">
-						choosePreview (AppAlign)
+						Which pose is shown
 					</div>
 					<div className="mt-2 flex items-center gap-2 text-[13px] gb-secondary">
 						<span className="w-20 shrink-0 font-mono gb-secondary">
@@ -869,10 +854,10 @@ function ProvenanceCard() {
 							onChange={(e) => setNear(e.target.checked)}
 							style={{ accentColor: "var(--accent)" }}
 						/>
-						an alternative lies within 4° yaw / 1.5° pitch of the compass
+						a match exists within 4° yaw / 1.5° pitch of the compass
 					</label>
 					<div className="mt-3 flex gap-1.5">
-						{(["auto", "near-compass", "prior"] as const).map((s) => (
+						{(["auto", "near compass", "phone guess"] as const).map((s) => (
 							<span
 								key={s}
 								className="flex-1 px-2 py-2 text-center font-mono text-[13px] transition-colors duration-300"
@@ -943,10 +928,8 @@ function RealPose({
 			label="Fig. D1"
 			caption={
 				<>
-					<Measured data={d} /> The teal curve is the DEM skyline projected
-					through the solved {"{ yaw, pitch, roll, vfov }"} and the eye;
-					labelled peaks are placed with the same pose. The solved record is the
-					one solvePose returned (refinePose for demo-12).
+					<Measured data={d} /> The teal curve is the terrain horizon projected
+					through the solved pose; labelled peaks use the same pose.
 				</>
 			}
 		>
@@ -963,7 +946,7 @@ function RealPose({
 								color: "var(--gb-paper)",
 							}}
 						>
-							{x.accepted ? "ok" : "rej"}
+							{x.accepted ? "ok" : "rejected"}
 						</span>
 					) : null;
 				}}
@@ -984,47 +967,47 @@ function RealPose({
 						<Row
 							k="yaw"
 							v={`${s.yaw.toFixed(2)}°`}
-							sub={`prior ${d.prior.yaw.toFixed(2)}° (${sgn(s.delta.yaw)})`}
+							sub={`phone ${d.prior.yaw.toFixed(2)}° (${sgn(s.delta.yaw)})`}
 						/>
 						<Row
 							k="pitch"
 							v={`${s.pitch.toFixed(2)}°`}
-							sub={`prior ${d.prior.pitch.toFixed(2)}°`}
+							sub={`phone ${d.prior.pitch.toFixed(2)}°`}
 						/>
 						<Row
 							k="roll"
 							v={`${s.roll.toFixed(2)}°`}
-							sub={`prior ${d.prior.roll.toFixed(2)}°`}
+							sub={`phone ${d.prior.roll.toFixed(2)}°`}
 						/>
 						<Row
-							k="vfov"
+							k="field of view"
 							v={`${s.vfov.toFixed(2)}°`}
-							sub={`prior ${d.prior.vfov.toFixed(2)}° (×${s.delta.focal.toFixed(3)} focal)`}
+							sub={`phone ${d.prior.vfov.toFixed(2)}° (×${s.delta.focal.toFixed(3)} focal)`}
 						/>
 						<Row
-							k="eye"
+							k="camera position"
 							v={`${d.gps.eye.toFixed(0)} m`}
 							sub={`GPS ±${d.gps.hAccuracy.toFixed(0)} m`}
 						/>
 						<div className="col-span-2 my-1.5" />
 						<Row
-							k="stage"
+							k="search"
 							v={`${s.stage} · ${s.search}`}
 							sub={s.accepted ? "accepted" : `rejected: ${s.rejectReason}`}
 						/>
 						<Row k="confidence" v={s.confidence.toFixed(3)} />
 						<Row
-							k="residualPx"
+							k="skyline miss (px)"
 							v={`${s.residualPx.toFixed(2)}`}
 							sub={`median ${d.residual.solved.median.toFixed(1)} px, p90 ${d.residual.solved.p90.toFixed(0)}`}
 						/>
-						<Row k="inlierFraction" v={s.inlierFraction.toFixed(3)} />
-						<Row k="coverage" v={s.coverage.toFixed(3)} />
+						<Row k="matching columns" v={s.inlierFraction.toFixed(3)} />
+						<Row k="columns used" v={s.coverage.toFixed(3)} />
 						<Row k="ambiguity" v={s.ambiguity.toFixed(3)} />
-						<Row k="horizonRelief" v={s.horizonRelief.toFixed(2)} />
+						<Row k="horizon relief" v={s.horizonRelief.toFixed(2)} />
 						<div className="col-span-2 my-1.5" />
 						<Row
-							k="app saved"
+							k="saved in app"
 							v={d.app ? `yaw ${d.app.yaw.toFixed(2)}°` : "none"}
 							sub={
 								d.app
@@ -1065,11 +1048,9 @@ function PoseResiduals({
 			label="Fig. D2"
 			caption={
 				<>
-					Measured on the 12 demo photos by scripts/gipfelbuch/build-data.ts,
-					2026-10-01. Median |detected skyline − DEM skyline| over confident
-					columns, at the sensor-prior pose (red dots) and at the solved pose
-					(navy dots). Hollow navy: the confidence gate rejected the solve.
-					Click a point to load it in Fig. D1.
+					Median gap between detected skyline and terrain horizon, over
+					confident columns. Red: phone’s pose. Navy: solved pose (hollow: solve
+					rejected). Click a point to load it in Fig. D1.
 				</>
 			}
 		>
@@ -1100,7 +1081,7 @@ function PoseResiduals({
 								size={11}
 								color="var(--gb-ink)"
 							>
-								sensor prior
+								phone’s pose
 							</HandLabel>
 							<HandDot
 								x={s.box.x1 - 150}
@@ -1195,9 +1176,9 @@ function PoseResiduals({
 							color="ink"
 							rotate={-2}
 						>
-							demo-{String(worstAt + 1).padStart(2, "0")}:{" "}
+							photo {String(worstAt + 1).padStart(2, "0")}:{" "}
 							{P[worstAt].residual.prior.median.toFixed(0)} px off, then{" "}
-							{P[worstAt].residual.solved.median.toFixed(1)}
+							{P[worstAt].residual.solved.median.toFixed(1)} px
 						</HandText>
 						<PenArrow
 							seed="pe-res-note-arrow"
@@ -1219,15 +1200,15 @@ function PoseResiduals({
 			<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
 				<Stat
 					value={`${P.filter((p) => p.accepted).length} / 12`}
-					label="poses accepted (9 by solvePose, 1 by refinePose)"
+					label="poses accepted"
 				/>
 				<Stat
 					value={`${meds[0].toFixed(1)}–${meds[meds.length - 1].toFixed(1)} px`}
-					label="median residual at the solved pose (accepted)"
+					label="median miss at the solved pose"
 				/>
 				<Stat
 					value={`${Math.min(...P.map((p) => p.residual.prior.median)).toFixed(0)}–${Math.max(...P.map((p) => p.residual.prior.median)).toFixed(0)} px`}
-					label="median residual at the sensor prior"
+					label="median miss at the phone’s pose"
 				/>
 				<Stat
 					value={`${P.map((p) => p.confidence)
@@ -1256,27 +1237,17 @@ function Legacy() {
 	const [id, setId] = useNotebookPhoto();
 	return (
 		<>
-			<Section title="Four angles and an eye" kicker="The object">
+			<Section title="Four angles and a position" kicker="The object">
 				<p>
-					A pose estimate is deliberately small:{" "}
-					<code>{"{ yaw, pitch, roll, vfov }"}</code> in degrees, plus an eye
-					position in a local east-north-up frame. Yaw is the true heading,
-					clockwise from north. Pitch is positive looking up. Roll is positive
-					when the right side of the image goes down. FOV is the vertical field
-					of view. That is the whole camera: <code>poseBasis</code> turns the
-					angles into three axes (forward, right, up), and{" "}
-					<code>projectPoint</code> turns an ENU point into image coordinates,
-					0..1 with y down.
+					A pose is small: yaw, pitch, roll and field of view, in degrees, plus
+					a camera position. Yaw is the heading, clockwise from north. Pitch is
+					positive looking up. Roll is positive when the right side of the image
+					goes down. Field of view is vertical. That is the whole camera.
 				</p>
 				<p>
-					The value of such a small object is that it is{" "}
-					<HandMark type="underline">a single convention</HandMark>. The skyline
-					matcher, the pin solver, the renderer, the roll aligner and the 6-DoF
-					solver all read and write it, and the pose6dof tests check its
-					projection against <code>pose.ts</code> to{" "}
-					<HandMark type="double">7e-15</HandMark> and its angles against{" "}
-					<code>geo/camera.ts</code> to 1e-12 px. A pose from any one of them
-					can be dropped into any other.
+					Small means <HandMark type="underline">one convention</HandMark>. The
+					skyline matcher, pin solver, renderer and position solver all read and
+					write it, so a pose from any one can be dropped into any other.
 				</p>
 			</Section>
 
@@ -1292,12 +1263,9 @@ function Legacy() {
 							title: "Axes from angles",
 							body: (
 								<>
-									Forward is{" "}
-									<code>(sin yaw cos pitch, cos yaw cos pitch, sin pitch)</code>
-									. A level right axis <code>(cos yaw, −sin yaw, 0)</code> is
-									crossed with forward to give the level up axis, then both are
-									rotated about forward by roll. Roll therefore tilts the
-									horizon without moving where the camera points.
+									Yaw and pitch fix where the camera points. Roll then turns the
+									image about that direction, so it tilts the horizon without
+									moving the aim.
 								</>
 							),
 						},
@@ -1305,26 +1273,21 @@ function Legacy() {
 							title: "Project through the pinhole",
 							body: (
 								<>
-									A world vector from the eye has depth{" "}
-									<code>z = v · forward</code>. With{" "}
-									<code>t = tan(vfov / 2)</code>, the image coordinates are{" "}
-									<code>x = v · right / (z · t · aspect)</code> and{" "}
-									<code>y = v · up / (z · t)</code>. Behind the camera (z ≤ 0)
-									is null. This is the dashed horizon and the skyline in Fig.
-									D3.
+									A point in the world lands in the image by simple pinhole
+									geometry. Points behind the camera are not drawn. This gives
+									the dashed horizon and skyline in Fig. D3.
 								</>
 							),
 						},
 						{
-							title: "Phones supply a prior pose",
+							title: "Phones supply a first guess",
 							body: (
 								<>
-									<code>cameraFromGravity</code> reads the accelerometer for
-									pitch and roll (up is minus gravity) and the compass for yaw;
-									focal comes from EXIF. That prior is the starting point that{" "}
-									{link("camera-prior", "Camera Prior")} describes, and where{" "}
-									{link("viewport-inference", "viewport inference")} begins its
-									search.
+									The phone&rsquo;s accelerometer gives pitch and roll, the
+									compass gives yaw, and the lens data gives focal length. That
+									is the starting point described in{" "}
+									{link("camera-prior", "Camera Prior")}, where{" "}
+									{link("viewport-inference", "viewport inference")} begins.
 								</>
 							),
 						},
@@ -1332,10 +1295,8 @@ function Legacy() {
 							title: "Solvers fit what the evidence supports",
 							body: (
 								<>
-									When a person pins points, <code>solvePose6dof</code> runs
-									RANSAC over minimal solvers (P3P, DLT, a 2-point Horn
-									rotation) and polishes with Levenberg-Marquardt under priors.
-									How far it goes is set by the ladder in Fig. D4.
+									When a person pins points, the solver fits as many parameters
+									as the pins support (Fig. D4).
 								</>
 							),
 						},
@@ -1343,9 +1304,9 @@ function Legacy() {
 							title: "Wrap it in provenance",
 							body: (
 								<>
-									The numbers are stored with who produced them, a confidence
-									and a time (Fig. D5), so the UI can tell a hand-fitted pose
-									from a cascade solve from a bare sensor prior.
+									The numbers are stored with who made them, a confidence and a
+									time (Fig. D5), so the app can tell a hand-fitted pose from a
+									solved one or a bare phone guess.
 								</>
 							),
 						},
@@ -1357,46 +1318,31 @@ function Legacy() {
 
 			<Section title="Honest about what is known" kicker="Uncertainty">
 				<p>
-					The 6-DoF solver reports a 1σ for every parameter it touched, from the
-					covariance over its inliers. Parameters it did not solve report their
-					prior σ, so GPS error still shows up in the yaw σ when position is
-					held. Priors come from the photo itself: gravity 2°, compass 10°
-					(unknown if there is no heading), vfov 3 %, and a position σ of{" "}
-					<code>max(hAccuracy, 5)</code> m horizontally. A σ of exactly 0 holds
-					a parameter fixed; <code>Infinity</code> means unknown.
+					The solver reports an uncertainty for every parameter it fits.
+					Parameters it holds fixed keep the phone&rsquo;s uncertainty: gravity
+					2°, compass 10°, field of view 3 %, position at least 5 m.
 				</p>
 				<div className="grid gap-4 py-2 sm:grid-cols-3">
 					<Stat
 						value="99.3 %"
-						label="trials with every angle within 0.5° and vfov within 1°, with six or more points"
+						label="of test runs with 6+ pins land within 0.5° (field of view within 1°)"
 					/>
 					<Stat
 						value="0.008°"
-						label="median yaw error over the 1950 synthetic trials (pitch 0.009°, roll 0.017°)"
+						label="median yaw error, 1,950 synthetic runs (pitch 0.009°, roll 0.017°)"
 					/>
 					<Stat
 						value="1.1 m"
-						label="median eye error after the position solve, against 17 m for the GPS prior"
+						label="median position error after solving, against 17 m from GPS"
 					/>
 				</div>
 				<p className="text-[13px] gb-secondary">
-					Synthetic sweep of 3 to 15 points at 0.5 to 30 km, 0 to 3 px noise, up
-					to 30 % outliers and 0 to 50 m GPS error. Source:{" "}
-					<code>src/lib/pose6dof/README.md</code>.
+					Synthetic test: 3 to 15 pins at 0.5 to 30 km, 0 to 3 px noise, up to
+					30 % outliers, 0 to 50 m GPS error.
 				</p>
 			</Section>
 
 			<ProvenanceCard />
-
-			<Callout tone="lesson" title="One frame, one origin">
-				The solver works in whatever ENU frame the correspondences are in, and
-				the eye prior is absolute in that frame. The renderer's frame has its
-				origin at sea level, with the eye at <code>(0, 0, eyeAlt)</code>. Feed
-				the default <code>[0,0,0]</code> eye and the solve projects from sea
-				level, which a regression test shows costs about 3° of pitch and roll.
-				The result's <code>eyeOffset</code> is the new eye, replacing the old
-				one rather than adding to it.
-			</Callout>
 
 			<Section title="In the code" kicker="Where to look">
 				<ul className="!list-none !pl-0 space-y-2">
@@ -1442,13 +1388,12 @@ function Legacy() {
 			<Section title="Where it fits" kicker="Context">
 				<p>
 					{link("viewport-inference", "Viewport inference")} produces the pose
-					by matching the photo's {link("skyline", "skyline")} to the{" "}
-					{link("dem-horizon", "DEM horizon")}, and{" "}
-					{link("terrain-snapping", "terrain snapping")} fixes the eye height it
-					is measured from. The finished pose feeds the{" "}
-					{link("photo-workspace", "photo workspace")}, where it is drawn over
-					the image, and the {link("camera-roll", "camera roll")}, where many
-					poses stitch into a panorama.
+					by matching the photo skyline to the{" "}
+					{link("dem-horizon", "terrain horizon")};{" "}
+					{link("terrain-snapping", "terrain snapping")} fixes the camera
+					height. The pose then feeds the{" "}
+					{link("photo-workspace", "photo workspace")} and the{" "}
+					{link("camera-roll", "camera roll")}.
 				</p>
 			</Section>
 		</>
@@ -1780,8 +1725,7 @@ function CompassErrors() {
 				)}
 			/>
 			<p className="mt-2 font-mono text-[11px] gb-secondary">
-				Measured on the 12 demo photos by scripts/gipfelbuch/build-data.ts,
-				2026-10-01.
+				Measured on the 12 demo photos.
 			</p>
 		</Figure>
 	);
@@ -1841,10 +1785,11 @@ function CompassShift() {
 		<Figure
 			label="Fig. 3"
 			bleed
+			pinned="demo-09"
 			caption={
 				<>
-					Fixed: demo-09. The same peak names, placed with the phone&rsquo;s
-					heading <Key color={PRIOR_C}>phone</Key> and with the solved one{" "}
+					The same peak names, placed with the phone&rsquo;s heading{" "}
+					<Key color={PRIOR_C}>phone</Key> and with the solved one{" "}
 					<Key color={LAYER_STYLE.peaks.color}>solved</Key>
 					{shift
 						? `. A ${dyaw.toFixed(1)}° compass error moves them ${shift.lo.toFixed(0)} to ${shift.hi.toFixed(0)} px, a quarter of the frame.`
@@ -1904,7 +1849,7 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				<p>
 					So a pose from the phone, a solver or a person can swap in anywhere.
 					<MarginNote mark="a">
-						One convention, so nothing needs translating. I like that.
+						One convention, nothing to translate.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1931,11 +1876,7 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
-			<PhotoStory
-				number="Fig. 2"
-				bleed={false}
-				title="A guess, a correction, a label"
-			/>
+			<PhotoStory number="Fig. 2" bleed={false} title="On a real photo" />
 
 			<Beat
 				kicker="Why the label matters"
@@ -1945,9 +1886,6 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 					Here the phone pointed <HandMark type="double">19° off</HandMark> on
 					two photos. Trust it blindly and every peak name lands on the wrong
 					summit.
-					<MarginNote mark="b">
-						Why do two photos err by the same 19°?
-					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1964,18 +1902,18 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 					<HandMark type="wavy">too weak</HandMark>. The pose stays the phone's
 					own, marked unverified.
 					<MarginNote mark="c">
-						Confidence under 0.5: refused, not trusted. Accepted ✓ on the other
-						ten.
+						Confidence under 0.5: rejected. The other ten pass ✓.
 					</MarginNote>
 				</p>
 			</Beat>
 
 			<Figure
 				label="Fig. 5"
+				pinned="demo-07, demo-11"
 				caption={
 					<>
-						Fixed: demo-07 and demo-11. Both refused: confidence under 0.5.
-						Magenta is the map at the phone's pose, the pose we keep.
+						Both rejected (confidence under 0.5). Magenta is the terrain horizon
+						at the phone's pose, the pose we keep.
 					</>
 				}
 			>
@@ -1992,8 +1930,8 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 					tone={() => "failure"}
 					label={(d) => (
 						<>
-							{d.id} · confidence {d.solved.confidence.toFixed(2)}, below the
-							0.5 bar
+							{d.id.slice(-2)} · confidence {d.solved.confidence.toFixed(2)},
+							below 0.5
 						</>
 					)}
 				/>
@@ -2003,27 +1941,22 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: medDy == null ? "…" : `${medDy.toFixed(1)}°`,
-						label: "median compass error found, accepted demo photos",
+						label: "median compass error, accepted photos",
 					},
 					{
 						value: maxDy == null ? "…" : `${maxDy.toFixed(1)}°`,
-						label: "largest compass error, accepted demo photos",
+						label: "largest compass error, accepted photos",
 					},
 					{
 						value: "0.008°",
-						label: "median yaw error of the pin solver, 1,950 synthetic trials",
+						label: "median yaw error of the pin solver, 1,950 synthetic runs",
 					},
 					{
 						value: "99.3 %",
-						label: "of trials with 6+ pins within 0.5° and 1° vfov",
+						label: "of runs with 6+ pins within 0.5° and 1° field of view",
 					},
 				]}
-				source={
-					<>
-						First two: measured on the 12 demo photos. Last two:
-						src/lib/pose6dof/README.md (synthetic sweep, not real photos).
-					</>
-				}
+				source="First two: measured on the 12 demo photos. Last two: synthetic tests, not real photos."
 			/>
 
 			<Details>

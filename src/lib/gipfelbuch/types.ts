@@ -42,7 +42,7 @@ export interface GipfelbuchNode {
 	status: GipfelbuchStatus;
 	tagline: string; // <= 90 chars, evocative
 	summary: string; // 2-4 sentences, accurate to the code
-	lede?: string; // <= 30 words, plain language, no identifiers; shown as the page lead (summary moves to the rail)
+	lede?: string; // <= 30 words, plain language, no identifiers; shown as the page lead; the summary is set in the colophon as "In short, for engineers"
 	modules: string[]; // repo paths e.g. "src/lib/geo/solve.ts"
 	reports: string[]; // repo paths e.g. "reports/concordance-research.md"
 	related: GipfelbuchEdge[]; // outgoing edges to other node ids

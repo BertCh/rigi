@@ -14,8 +14,8 @@ import {
 	groupColor,
 	outgoing,
 	STATUS_META,
+	signpostKicker,
 } from "#/lib/gipfelbuch/graph-utils";
-import { conceptView, findingsFor } from "#/lib/gipfelbuch/ontology";
 import type { GipfelbuchEdge, GipfelbuchNode } from "#/lib/gipfelbuch/types";
 import { AutoVisual } from "./AutoVisual";
 import { bespokePage, PageBoundary } from "./loadPage";
@@ -41,7 +41,15 @@ import {
 } from "./swiss";
 import { HandRule, ListArrow, MarkerUnderline } from "./swiss/hand";
 import { TYPE } from "./swiss/type";
-import { Ledger, PAGE_HERO, SHEETS, SheetColophon, Tafel } from "./tafel";
+import {
+	DevFold,
+	Ledger,
+	PAGE_HERO,
+	SHEETS,
+	SheetColophon,
+	stepOf,
+	Tafel,
+} from "./tafel";
 import { Figure } from "./viz";
 import { sheetTransition } from "./viz/hooks";
 import { Reveal } from "./viz/Reveal";
@@ -58,15 +66,6 @@ const STAND = "2026-10";
 
 /** The register initials of whoever took the demo photographs and keeps the book. */
 const REGISTER_INITIALS = "R. C.";
-
-/** Wegweiser rule: every sign states a distance, here in sheets along the book. */
-function signpostDistance(fromId: string, toId: string): string {
-	const distance = Math.abs(
-		GIPFELBUCH_NODES.findIndex((n) => n.id === fromId) -
-			GIPFELBUCH_NODES.findIndex((n) => n.id === toId),
-	);
-	return `${distance || 1} Blatt`;
-}
 
 // G5/G6: page grid on named lines (design book). Columns 3-8 carry the text (at most 66 ch); the
 // margin (9-12) is MarginNote's lane beside the prose. The hand pass (reports/gipfelbuch-hand-sketch-
@@ -150,6 +149,7 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 	const data = useGipfelbuchPhoto(photoId);
 	const register = useRegister(data);
 	const figures = SHEETS[node.id];
+	const step = stepOf(node.id);
 	const total = GIPFELBUCH_NODES.length;
 	const sheetNo = String(
 		Math.max(
@@ -163,14 +163,11 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 				north: String(sheet.lv95.ne[1]),
 			}
 		: null;
-	const hasPanel =
-		!!node.ontologyId ||
-		!!node.methodIds?.length ||
-		findingsFor(node).length > 0;
+	const hasPanel = !!node.ontologyId || !!node.methodIds?.length;
 	const fallback = (
 		<Figure
 			label="Constellation"
-			caption={<>Generated from the graph. Planned visual: {node.visual}</>}
+			caption={<>Drawn from this sheet's links.</>}
 			pad={false}
 		>
 			<div className="px-2 py-6">
@@ -196,7 +193,7 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 			<SheetFrame
 				className="mt-4"
 				corners={corners}
-				imprint={`Rigi Gipfelbuch · Blatt ${sheetNo} · Ausgabe 2026 · Stand ${STAND} · Grundlage © swisstopo (OGD) · DEM Mapterhorn`}
+				imprint={`Rigi Gipfelbuch · Blatt ${sheetNo} · Stand ${STAND} · Grundlage © swisstopo · Höhen Mapterhorn`}
 			>
 				<header className="relative grid gap-x-6 gap-y-10 overflow-hidden px-6 pt-10 pb-12 lg:grid-cols-12 lg:items-start">
 					{/* the sheet's own pencil contours behind the title: a different crop on every sheet */}
@@ -215,27 +212,61 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 					<div className="relative min-w-0 lg:col-span-8">
 						<nav
 							aria-label="Breadcrumb"
-							className="flex flex-wrap items-center gap-x-4 gap-y-1.5"
+							className="flex flex-wrap items-center gap-x-2 gap-y-1.5"
 						>
 							<Link
 								to="/gipfelbuch"
 								viewTransition={sheetTransition()}
-								className="nb-num text-[15px] text-[var(--gb-red)] hover:underline"
+								className="nb-label text-[13px] tracking-[0.1em] hover:underline"
 							>
-								Blatt {sheetNo} / {total}
+								Gipfelbuch
 							</Link>
+							<span
+								className="nb-hand text-[var(--gb-secondary)]"
+								aria-hidden="true"
+							>
+								›
+							</span>
 							<Link
 								to="/gipfelbuch"
-								hash={`chapter-${node.id}`}
+								hash={step ? `chapter-${step.chapter.ids[0]}` : undefined}
 								className="nb-label text-[13px] tracking-[0.1em] hover:underline"
 								style={{ color: col }}
 							>
-								{G.label}
+								{step
+									? `Kapitel ${step.chapter.numeral} · ${step.chapter.title}`
+									: G.label}
 							</Link>
+							{step && (
+								<>
+									<span
+										className="nb-hand text-[var(--gb-secondary)]"
+										aria-hidden="true"
+									>
+										›
+									</span>
+									<span
+										aria-current="page"
+										className="nb-num text-[15px] text-[var(--gb-red)]"
+									>
+										{step.label}
+									</span>
+								</>
+							)}
+						</nav>
+						<p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
 							<Waymark variant={waymarkForStatus(node.status)}>
 								{STATUS_META[node.status].label}
 							</Waymark>
-						</nav>
+							{hasPanel && (
+								<a
+									href="#ontology"
+									className={`${TYPE.handLabel} underline decoration-[var(--gb-red)] underline-offset-4 hover:text-[var(--gb-red)]`}
+								>
+									Glossar
+								</a>
+							)}
+						</p>
 						<div className="relative mt-4 inline-block max-w-full">
 							<h1
 								className={`${TYPE.display} m-0 sm:text-[72px] sm:leading-[72px]`}
@@ -263,7 +294,7 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 						{figures && data && (
 							<Ledger
 								items={figures.ledger(data)}
-								note="re-read from this photo's run"
+								note="from this photo's run"
 							/>
 						)}
 						<FieldNotes
@@ -288,8 +319,7 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 						mark={(id) => <PhotoMark id={id} />}
 					/>
 					<p className={`${TYPE.hand} gb-secondary mt-1`}>
-						Follow another photo: every number on this sheet is re-read from its
-						measured run.
+						Pick a photo: every number here comes from its run.
 					</p>
 				</div>
 
@@ -318,22 +348,14 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 
 				<WhereItSits node={node} />
 
-				<SheetColophon
-					node={node}
-					ontologyLabel={
-						hasPanel
-							? node.ontologyId
-								? conceptView(node.ontologyId).domain
-								: "methods"
-							: undefined
-					}
-				/>
+				<SheetColophon node={node} hasGlossary={hasPanel} />
+				<DevFold node={node} />
 			</SheetFrame>
 
 			{(prev || next) && (
 				<nav
 					aria-label="Previous and next sheet"
-					className="mx-auto mt-12 grid max-w-6xl gap-6 px-4 sm:grid-cols-2 sm:px-0"
+					className="mx-auto mt-12 grid max-w-6xl gap-6 px-4 sm:grid-cols-2 sm:px-6 xl:px-0"
 				>
 					{[
 						{ n: prev, dir: "prev" as const },
@@ -349,25 +371,33 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 							>
 								<Signpost
 									direction={dir}
-									kicker={`${dir === "prev" ? "Previous" : "Next"} sheet`}
+									kicker={signpostKicker(
+										dir,
+										step?.chapter.numeral,
+										stepOf(n.id)?.chapter.numeral,
+									)}
 									title={n.title}
-									subtitle={signpostDistance(node.id, n.id)}
+									subtitle={stepOf(n.id)?.label}
 									// one Standortfeld under the post: on the next sign, or on the last sheet's back sign
 									here={dir === "next" || !next ? here : undefined}
-								/>
+								>
+									<span className={`${TYPE.caption} block max-w-[28ch]`}>
+										{n.claim ?? n.tagline}
+									</span>
+								</Signpost>
 							</Link>
 						) : null,
 					)}
 				</nav>
 			)}
 
-			<footer className="mx-auto mt-12 max-w-6xl px-4 sm:px-0">
+			<footer className="mx-auto mt-12 max-w-6xl px-4 sm:px-6 xl:px-0">
 				<Link
 					to="/gipfelbuch"
 					viewTransition={sheetTransition()}
 					className="nb-hand inline-flex items-center gap-2 text-[20px] text-[var(--gb-ink)] hover:text-[var(--gb-red)]"
 				>
-					<ListArrow seed="back-to-book" dir="in" color="ink" /> Back to the
+					<ListArrow seed="back-to-book" dir="in" color="ink" /> Zurück zum
 					Gipfelbuch
 				</Link>
 			</footer>
@@ -447,6 +477,9 @@ export function NodeCard({
 	);
 }
 
+/** A relation slug written with spaces ("seeded-by" becomes "seeded by"). */
+const spaced = (rel: string) => rel.replace(/[-_]/g, " ");
+
 function ConnectionGroup({
 	title,
 	edges,
@@ -472,20 +505,16 @@ function ConnectionGroup({
 				{groupByRel(edges).map(([rel, es]) => (
 					<div key={rel}>
 						<p className="nb-hand m-0 text-[18px] leading-[22px] text-[var(--gb-secondary)]">
-							{dir === "out" ? `this ${rel} …` : `… ${rel} this`}
+							{dir === "out"
+								? `this ${spaced(rel)} …`
+								: `… ${spaced(rel)} this`}
 						</p>
 						<ul className="m-0 list-none p-0">
 							{es.map((e) => {
 								const n = byId.get(e.id);
 								return n ? (
 									<li key={e.id}>
-										<NodeCard
-											node={n}
-											rel={
-												e.origin === "ontology" ? `${rel} · from ontology` : rel
-											}
-											dir={dir}
-										/>
+										<NodeCard node={n} rel={spaced(rel)} dir={dir} />
 									</li>
 								) : null;
 							})}
@@ -505,7 +534,7 @@ function WhereItSits({ node }: { node: GipfelbuchNode }) {
 		<section className="px-6 pt-8 pb-10" aria-labelledby="connections">
 			<Reveal>
 				<p className="nb-hand m-0 text-[20px] leading-[24px] text-[var(--gb-red)]">
-					where it sits
+					Umgebung
 				</p>
 				<div className="relative inline-block">
 					<h2 id="connections" className={`${TYPE.h2} m-0`}>
@@ -520,7 +549,7 @@ function WhereItSits({ node }: { node: GipfelbuchNode }) {
 			{out.length + back.length > 0 && (
 				<div className="mt-10 grid gap-12 lg:grid-cols-2">
 					<ConnectionGroup title="Leads to" edges={out} dir="out" />
-					<ConnectionGroup title="Referenced by" edges={back} dir="in" />
+					<ConnectionGroup title="Comes from" edges={back} dir="in" />
 				</div>
 			)}
 		</section>

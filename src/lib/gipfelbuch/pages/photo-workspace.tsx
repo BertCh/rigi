@@ -35,7 +35,6 @@ import {
 	LAYER_STYLE,
 	LiveReveal,
 	MarginNote,
-	Measured,
 	RealPhoto,
 	Section,
 	Stat,
@@ -116,8 +115,8 @@ const LOOP = 11;
 const SCENARIOS: Scenario[] = [
 	{
 		id: "saved",
-		label: "Saved alignment",
-		sub: "loadSavedPose ?? bundledPose",
+		label: "Saved pose",
+		sub: "no solve needed",
 		loadEnd: 1.6,
 		segs: [{ a: 1.6, b: LOOP, label: "saved", off: 0, tone: "ok" }],
 		lockEnd: 1.6,
@@ -125,78 +124,78 @@ const SCENARIOS: Scenario[] = [
 		notes: [
 			{
 				at: 0,
-				text: "The engine loads terrain and photo; the overlay is held for the reveal.",
+				text: "Terrain and photo load; the overlay waits.",
 			},
 			{
 				at: 1.6,
-				text: "A saved (or bundled sample) pose goes in with setPose(p, false), state saved. Nothing is re-solved and no second opinion runs, so exports unlock the moment loading ends.",
+				text: "A saved or sample pose is used as is. Nothing is re-solved and no second check runs, so export unlocks when loading ends.",
 			},
 		],
 	},
 	{
 		id: "verified",
-		label: "Full metadata, agreed",
-		sub: "autoAlign + cascade, |Δyaw| ≤ 1°",
+		label: "Full metadata, checked",
+		sub: "auto-align + second check, within 1°",
 		loadEnd: 2.4,
 		segs: [
 			{ a: 2.4, b: 6, label: "auto", off: 0.3, tone: "neutral" },
 			{ a: 6, b: LOOP, label: "auto · verified", off: 0.3, tone: "ok" },
 		],
 		lockEnd: 6,
-		workers: [{ a: 2.6, b: 6, label: "skyline cascade in a worker" }],
+		workers: [{ a: 2.6, b: 6, label: "second solver" }],
 		badge: { at: 6, kind: "verified" },
 		notes: [
 			{
 				at: 0,
-				text: "Compass, gravity and lens are all present: engine.autoAlign solves the pose during load.",
+				text: "Compass, gravity and lens are all known, so the pose is solved while the photo loads.",
 			},
 			{
 				at: 2.4,
-				text: "choosePreview shows it at confidence > 0.2 (state auto) and the page paints. A second, independent solver, the CPU cascade, starts in a worker. Exports stay locked while the verdict is pending.",
+				text: "Confidence is above 0.2, so the pose is shown at once. A second, independent solver starts in the background. Export stays locked until it answers.",
 			},
 			{
 				at: 6,
-				text: "Both accepted and |Δyaw| ≤ AGREE_DEG = 1°: keep the app pose, show the Verified badge, unlock exports.",
+				text: "Both accept and agree within 1°: keep the pose, show Verified, unlock export.",
 			},
 		],
 	},
 	{
 		id: "refined",
-		label: "Cascade overrules",
-		sub: "IMG_7130: +2.98° → −0.02°",
+		label: "Second check corrects",
+		sub: "+2.98° → −0.02°",
 		loadEnd: 2.4,
 		segs: [
 			{ a: 2.4, b: 6, label: "auto", off: 2.98, tone: "neutral" },
-			{ a: 6, b: LOOP, label: "accepted · refined", off: -0.02, tone: "ok" },
+			{ a: 6, b: LOOP, label: "refined", off: -0.02, tone: "ok" },
 		],
 		lockEnd: 6,
-		workers: [{ a: 2.6, b: 6, label: "skyline cascade in a worker" }],
+		workers: [{ a: 2.6, b: 6, label: "second solver" }],
 		badge: { at: 6, kind: "refined" },
 		notes: [
 			{
 				at: 2.4,
-				text: "The GPU aligner accepted IMG_7130 at confidence 0.397 and was 2.98° off. That passes the 0.2 preview bar, so it is what you first see (reports/leaderboard.md).",
+				text: "The fast solver accepted this photo at confidence 0.397 and was 2.98° off. That clears the 0.2 bar, so it is shown first.",
 			},
 			{
 				at: 6,
-				text: "The cascade accepts at −0.02° and disagrees by 3.0° > 1°: its pose replaces the preview, state accepted, badge Refined. The cascade made no false accept on the 12-photo set.",
+				text: "The second solver lands at −0.02°, 3.0° away from the first. Its pose replaces the preview and the badge reads Refined. It made no false accept on the 12 test photos.",
 			},
 		],
 	},
 	{
 		id: "unverified",
-		label: "Weak skyline, escalated",
-		sub: "prior → unverified → render-and-match",
+		label: "Weak skyline",
+		sub: "phone guess → unverified → map match",
 		loadEnd: 2.4,
 		segs: [
-			{ a: 2.4, b: 5, label: "prior", off: 4.0, tone: "neutral" },
+			{ a: 2.4, b: 5, label: "phone guess", off: 4.0, tone: "neutral" },
 			{ a: 5, b: 8, label: "unverified", off: 4.0, tone: "warn" },
-			{ a: 8, b: LOOP, label: "accepted · matched", off: 0, tone: "ok" },
+			{ a: 8, b: LOOP, label: "matched", off: 0, tone: "ok" },
 		],
 		lockEnd: 8,
 		workers: [
-			{ a: 2.6, b: 5, label: "cascade" },
-			{ a: 5, b: 8, label: "match service" },
+			{ a: 2.6, b: 5, label: "second solver" },
+			{ a: 5, b: 8, label: "map match" },
 		],
 		badge: { at: 8, kind: "matched" },
 		banner: { a: 5, b: 8 },
@@ -204,15 +203,15 @@ const SCENARIOS: Scenario[] = [
 		notes: [
 			{
 				at: 2.4,
-				text: "Skyline match was weak (confidence ≤ 0.2, no near-compass alternative): the compass + gravity prior is shown, flagged as a candidate.",
+				text: "The skyline match is weak (confidence 0.2 or less), so the phone's own compass and gravity pose is shown as a candidate.",
 			},
 			{
 				at: 5,
-				text: "The cascade rejects and shouldEscalate() is true. State becomes unverified, the amber banner appears, labels soften, and the render-and-match service is asked.",
+				text: "The second solver rejects it. The pose is marked unverified, an amber banner appears, labels soften, and the map-match service is asked.",
 			},
 			{
 				at: 8,
-				text: "Taken only if matchAccepted() passes the product rule (the match request has a 150 s timeout; the code notes 45–77 s when idle, so this step is not to time). If the service is busy the page unlocks exports at once and upgrades later.",
+				text: "Used only if the match passes the accept rule. It takes about 45 to 77 s when idle (not to scale). If the service is busy, export unlocks at once and the pose upgrades later.",
 			},
 		],
 	},
@@ -290,7 +289,8 @@ function PoseJourney() {
 		<Figure
 			label="D2"
 			bleed
-			caption="Schematic: one photo's pose from page load to export. Pick a scenario; it replays, or scrub the timeline. Segment lengths are schematic; the IMG_7130 offsets are measured (reports/leaderboard.md). Every state and verdict is a real value in src/lib/integration/second-opinion.ts."
+			source="Skizze"
+			caption="One photo's pose from page load to export. Pick a scenario or scrub the timeline. Durations are schematic; the +2.98° and −0.02° offsets are measured."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<div className="mb-3 flex flex-wrap gap-2">
@@ -311,7 +311,7 @@ function PoseJourney() {
 					viewBox={`0 0 ${W} 308`}
 					className="block h-auto w-full"
 					role="img"
-					aria-label="Timeline of a photo's pose source, second opinion and export lock"
+					aria-label="Timeline of pose source, second check and export lock"
 				>
 					<defs>
 						<clipPath id="pw-clip">
@@ -381,7 +381,7 @@ function PoseJourney() {
 								/>
 								<HandText x={320} y={94} anchor="middle" size={15}>
 									{T < 1.6
-										? "engine.init: terrain + photo"
+										? "Loading terrain and photo"
 										: "Aligning skyline to terrain"}
 								</HandText>
 							</g>
@@ -424,10 +424,10 @@ function PoseJourney() {
 									opacity={0.45}
 								/>
 								<HandText x={132} y={30} size={15} color="ink">
-									Unverified alignment.
+									Unverified pose.
 								</HandText>
 								<HandNote x={132} y={45} size={FIG_NAME} color="var(--gb-ink)">
-									The skyline solvers disagree: drag, use Heading, or pin a
+									The two solvers disagree. Drag, set the heading, or pin a
 									peak.
 								</HandNote>
 							</g>
@@ -447,10 +447,10 @@ function PoseJourney() {
 						const text =
 							(
 								{
-									saved: "nothing re-solved: exports open at once",
+									saved: "nothing re-solved: export opens at once",
 									verified: "two solvers within 1°: agreed ✓",
-									refined: "first guess +2.98° off, cascade says −0.02°",
-									unverified: "weak skyline: ask the match service",
+									refined: "first guess +2.98° off, second check −0.02°",
+									unverified: "weak skyline: ask the map match",
 								} as Record<string, string>
 							)[sc.id] ?? "";
 						return (
@@ -480,8 +480,8 @@ function PoseJourney() {
 					{/* timeline */}
 					<g>
 						{[
-							["pose", rows.pose, "pose state"],
-							["lock", rows.lock, "exports"],
+							["pose", rows.pose, "pose"],
+							["lock", rows.lock, "export"],
 							["work", rows.work, "solvers"],
 						].map(([k, y, l]) => (
 							<HandNote
@@ -573,7 +573,7 @@ function PoseJourney() {
 							size={FIG_LABEL}
 							color="var(--nb-ink)"
 						>
-							locked: !!status || verify === "pending"
+							locked
 						</HandNote>
 						<Wash
 							d={BOX(xT(sc.lockEnd), rows.lock, xT(LOOP) - xT(sc.lockEnd), 20)}
@@ -659,7 +659,7 @@ function PoseJourney() {
 								anchor="middle"
 								size={FIG_LABEL}
 							>
-								~ not to scale: match ≈ 45–77 s when idle ~
+								~ not to scale: match takes 45–77 s ~
 							</HandNote>
 						)}
 						{/* playhead: sketched once at x = 0, slid along the timeline */}
@@ -686,27 +686,21 @@ function PoseJourney() {
 						)}
 					</g>
 				</svg>
-				<div className="mt-3 flex items-center gap-3">
-					<div className="min-w-0 flex-1">
-						<HandRange
-							value={T}
-							min={0}
-							max={LOOP}
-							step={0.05}
-							label="Scrub the timeline"
-							onChange={setManual}
-						/>
-					</div>
-					<button
-						type="button"
-						onClick={() => {
+				<div className="mt-3">
+					<HandRange
+						value={T}
+						min={0}
+						max={LOOP}
+						step={0.05}
+						label="Scrub the timeline"
+						onChange={setManual}
+						readout={`${T.toFixed(1)} s`}
+						manual={manual != null}
+						onResume={() => {
 							setClock0(t);
 							setManual(null);
 						}}
-						className="bg-[var(--nb-paper-deep)] px-2.5 py-1 font-mono text-[11px] gb-secondary"
-					>
-						{manual == null && !reduce ? "playing" : "play"}
-					</button>
+					/>
 				</div>
 				<p
 					className="!mt-3 min-h-[3.6em] text-[13px] leading-relaxed gb-secondary"
@@ -873,7 +867,8 @@ function PinSolve() {
 		<Figure
 			label="D3"
 			bleed
-			caption="Schematic: pin solver on a small-angle pinhole model (the app's solvePins in src/lib/align.ts uses the full projection). The photo's skyline is fixed; the overlay starts at the sensor prior (yaw +2.4°, pitch −0.9°, roll +1.6°, focal +8%). Click a ring to pin that peak: what it frees follows the real rule, 1 pin yaw and pitch, 2 add roll, 3 or more add focal."
+			source="Skizze"
+			caption="A simplified camera model. The photo's skyline is fixed; the overlay starts at the phone's guess (yaw +2.4°, pitch −0.9°, roll +1.6°, focal +8%). Click a ring to pin that peak. One pin frees yaw and pitch, two add roll, three or more add focal length."
 		>
 			<div className="-m-1 sm:-m-2">
 				<div className="mb-3 flex flex-wrap items-center gap-2">
@@ -993,11 +988,11 @@ function PinSolve() {
 					<HandText x={10} y={26} size={15} rotate={-1.5}>
 						{
 							[
-								"no pins: I only trust the compass",
+								"no pins: compass only",
 								"1 pin: yaw and pitch move",
-								"2 pins: roll comes too",
-								"3 or more: the focal as well",
-								"4 pins: all four parameters solved",
+								"2 pins: roll joins",
+								"3 pins: focal length joins",
+								"4 pins: all four solved",
 							][pinned.length]
 						}
 					</HandText>
@@ -1027,8 +1022,8 @@ function PinSolve() {
 								}}
 							>
 								<div className="flex justify-between gap-2 gb-secondary">
-									<span>{k === "vfov" ? "focal (vfov)" : k}</span>
-									<span>{isFree ? "solved" : "from prior"}</span>
+									<span>{k === "vfov" ? "focal length" : k}</span>
+									<span>{isFree ? "solved" : "from phone"}</span>
 								</div>
 								<div className="mt-0.5 text-[16px] text-[var(--gb-ink)]">
 									{d >= 0 ? "+" : "−"}
@@ -1063,28 +1058,28 @@ const PARTS: {
 		x: 1126,
 		y: 548,
 		title: "Peak label",
-		body: "Name, height and distance from the eye (Stockhorn: 2,190 m, 18.2 km).",
+		body: "Name, height and distance from the camera (Stockhorn: 2,190 m, 18.2 km).",
 	},
 	{
 		n: 2,
 		x: 1105,
 		y: 640,
 		title: "Pin on the summit",
-		body: "The stem ends where the map summit lands in the photo.",
+		body: "The stem ends where the summit lands in the photo.",
 	},
 	{
 		n: 3,
 		x: 1540,
 		y: 655,
 		title: "Far skyline",
-		body: "The map skyline (warm line) hugs the real ridge. That is the proof.",
+		body: "The terrain horizon (warm line) hugs the real ridge: the proof.",
 	},
 	{
 		n: 4,
 		x: 870,
 		y: 720,
 		title: "Nearer ridge lines",
-		body: "White lines trace nearer ridges, so you can tell which is which.",
+		body: "White lines trace nearer ridges.",
 	},
 	{
 		n: 5,
@@ -1098,15 +1093,15 @@ const PARTS: {
 function AnnotatedWorkspace() {
 	return (
 		<Figure
-			label="Fig. 3"
+			label="D4"
 			bleed
-			caption="The app's exported overlay on demo-01. One camera places every numbered part, so a wrong pose moves them all together."
+			caption="The exported overlay for one photo. One camera places every numbered part, so a wrong pose moves them all."
 		>
 			<svg
 				viewBox="0 0 2048 1536"
 				className="block h-auto w-full"
 				role="img"
-				aria-label="The photo workspace output on demo-01 with numbered annotations"
+				aria-label="The photo workspace output for one photo with numbered annotations"
 			>
 				<image
 					href="/demo/shots/demo-01-overlay.jpg"
@@ -1123,7 +1118,7 @@ function AnnotatedWorkspace() {
 					color="#fff"
 					rotate={-2}
 				>
-					the far skyline hugs the ridge: proof ✓
+					the far horizon hugs the ridge
 				</HandText>
 				<PenArrow
 					seed="aw-arrow-far"
@@ -1171,11 +1166,10 @@ function MeasuredWorkspace() {
 			bleed
 			caption={
 				<>
-					What the cockpit has to decide between, on the same photo. Yellow is
-					the skyline detected in the pixels, magenta (dashed) the DEM skyline
-					at the phone's sensor pose, cyan the DEM skyline at the pose the
-					pipeline solved. Toggle them to see the compass error being corrected.{" "}
-					<Measured data={d} />
+					The same photo, three lines. Yellow: skyline detected in the photo.
+					Magenta (dashed): terrain horizon at the phone's pose. Cyan: terrain
+					horizon at the solved pose. Toggle them to see the compass error
+					corrected.
 				</>
 			}
 		>
@@ -1188,13 +1182,13 @@ function MeasuredWorkspace() {
 			{d && (
 				<dl className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3 font-mono text-[11px] gb-secondary sm:grid-cols-4">
 					<div>
-						<dt className="gb-secondary">sensor compass error</dt>
+						<dt className="gb-secondary">compass error</dt>
 						<dd className="text-[18px] sm:text-[20px] gb-ink">
 							{d.solved.delta.yaw.toFixed(1)}°
 						</dd>
 					</div>
 					<div>
-						<dt className="gb-secondary">skyline miss, median</dt>
+						<dt className="gb-secondary">median skyline miss</dt>
 						<dd className="text-[18px] sm:text-[20px] gb-ink">
 							{d.residual.prior.median} → {d.residual.solved.median} px
 						</dd>
@@ -1210,7 +1204,7 @@ function MeasuredWorkspace() {
 						</dd>
 					</div>
 					<div>
-						<dt className="gb-secondary">CPU time: horizon / solve</dt>
+						<dt className="gb-secondary">compute time: horizon / solve</dt>
 						<dd className="text-[18px] sm:text-[20px] gb-ink">
 							{(d.ms.horizon / 1000).toFixed(1)} s / {d.ms.solve} ms
 						</dd>
@@ -1219,17 +1213,14 @@ function MeasuredWorkspace() {
 			)}
 			{d?.app && (
 				<p className="mt-3 text-[13px] gb-secondary">
-					The pose the live app saved for this photo ({d.app.source}, confidence{" "}
-					{d.app.confidence.toFixed(2)}) is yaw {d.app.yaw.toFixed(2)}° against{" "}
-					{d.solved.yaw.toFixed(2)}° here: the two solvers differ by{" "}
+					The live app saved yaw {d.app.yaw.toFixed(2)}° for this photo; this
+					run gives {d.solved.yaw.toFixed(2)}°. The two differ by{" "}
 					{Math.abs(((d.app.yaw - d.solved.yaw + 540) % 360) - 180).toFixed(2)}
 					°,{" "}
 					{Math.abs(((d.app.yaw - d.solved.yaw + 540) % 360) - 180) <= 1
 						? "inside"
 						: "outside"}{" "}
-					the 1° AGREE_DEG that makes a second opinion “verified”. Note that
-					this script's labels are the baseline layoutPeakLabels; the workspace
-					draws its own, richer label set (figure above).
+					the 1° that counts as verified.
 				</p>
 			)}
 		</Figure>
@@ -1279,12 +1270,10 @@ function PeakProjection() {
 			caption={
 				<>
 					The same peak, drawn twice. Phone's yaw:{" "}
-					<Key color={LAYER_STYLE.prior.color} dashed>
-						{d.prior.yaw.toFixed(1)}°
-					</Key>
-					, the label lands on the wrong ground. Solved yaw:{" "}
-					<Key color={LAYER_STYLE.solved.color}>{d.solved.yaw.toFixed(1)}°</Key>
-					, it sits on the summit. <Measured data={d} />
+					<Key layer="prior">{d.prior.yaw.toFixed(1)}°</Key>, the label lands on
+					the wrong ground. Solved yaw:{" "}
+					<Key layer="solved">{d.solved.yaw.toFixed(1)}°</Key>, it sits on the
+					summit.
 				</>
 			}
 		>
@@ -1386,12 +1375,11 @@ function PeakProjection() {
 			</RealPhoto>
 			<p className="mt-3 font-mono text-[11px] leading-relaxed gb-secondary">
 				{peak.name}: {(peak.distance / 1000).toFixed(1)} km away, azimuth{" "}
-				{peak.az.toFixed(1)}°, {peak.el >= 0 ? "+" : "−"}
-				{Math.abs(peak.el).toFixed(1)}° above the eye. Turning the camera{" "}
+				{peak.az.toFixed(1)}°, {Math.abs(peak.el).toFixed(1)}° above the camera.
+				One degree of yaw is about {((fPx * Math.PI) / 180).toFixed(0)} px here
+				(focal length {fPx.toFixed(0)} px). Turning the camera{" "}
 				{(d.solved.yaw - d.prior.yaw).toFixed(1)}° moves the label{" "}
-				{Math.abs(dx).toFixed(0)} px. At this focal length ({fPx.toFixed(0)} px)
-				one degree of yaw is about {((fPx * Math.PI) / 180).toFixed(1)} px near
-				the centre.
+				{Math.abs(dx).toFixed(0)} px.
 			</p>
 		</Figure>
 	);
@@ -1406,21 +1394,16 @@ function HeroJourney() {
 		<Figure
 			label="Fig. 1"
 			bleed
-			caption={
-				<>
-					One photo, four moments: the pose you see changes, the export waits.{" "}
-					<Measured data={d} />
-				</>
-			}
+			caption={<>One photo, four moments. The pose changes; export waits.</>}
 		>
 			<AlignmentStoryProvider initial={0}>
 				<Stages
 					aside={<StoryMap data={d} />}
 					stages={[
 						{
-							label: "Fallback: phone's guess",
+							label: "Phone's guess",
 							pose: 0,
-							caption: `If the first solve is weak, the cockpit opens here. The map skyline misses by ${d?.residual.prior.median ?? "…"} px.`,
+							caption: `If the first solve is weak, the workspace starts here. The terrain horizon misses by ${d?.residual.prior.median ?? "…"} px.`,
 							render: () => (
 								<RealPhoto
 									bleed={0.1}
@@ -1444,9 +1427,9 @@ function HeroJourney() {
 							),
 						},
 						{
-							label: "Second opinion",
+							label: "Second check",
 							pose: 1,
-							caption: `A separate solve runs after first paint. The two yaws agree to ${agree}°.`,
+							caption: `A separate solve runs after the first paint. The two yaws agree within ${agree}°.`,
 							render: () => (
 								<RealPhoto
 									bleed={0.1}
@@ -1511,18 +1494,15 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 		<>
 			<HeroJourney />
 
-			<Beat kicker="The idea" title="Show a pose fast. Certify it later.">
+			<Beat kicker="The idea" title="Show a pose fast. Check it later.">
 				<p>
-					<HandMark type="highlight">
-						The workspace decides where the pose comes from.
-					</HandMark>{" "}
-					It paints a preview at once, then lets a second solver check it.
+					<HandMark type="highlight">It shows a preview at once,</HandMark> then
+					a second solver checks it.
 				</p>
 				<p>
-					Exports stay locked until the pose is{" "}
-					<HandMark type="underline">final</HandMark>. In the stages of{" "}
-					<CircledNumber value={1} />, the last one, “Export unlocked”, is the
-					only thing that waits.
+					Export stays locked until the pose is{" "}
+					<HandMark type="underline">final</HandMark>. Only the last stage in{" "}
+					<CircledNumber value={1} />, “Export unlocked”, waits.
 					<MarginNote mark="a">
 						I would wait 20 s for a pose I can trust.
 					</MarginNote>
@@ -1534,8 +1514,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				title="Every label is a peak pushed through the camera."
 			>
 				<p>
-					The terrain model knows where each summit is. The solved pose says
-					where the camera points.{" "}
+					The terrain knows where each summit is. The solved pose says where the
+					camera points.{" "}
 					<HandMark type="circle">Together they give a pixel.</HandMark>
 					<MarginNote mark="c">
 						Same peak, two yaws: the label moves with the compass error.
@@ -1595,17 +1575,17 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Eq>
 
-			<Beat kicker="How it works" title="Preview, double-check, then unlock.">
+			<Beat kicker="How it works" title="Preview, check, unlock.">
 				<Trio
 					steps={[
 						{
 							title: "Preview",
-							body: "Show the first solve if its confidence tops 0.2.",
+							body: "Show the first solve if confidence is above 0.2.",
 							visual: <MiniLayers layers={["skyline", "solved"]} />,
 						},
 						{
-							title: "Double-check",
-							body: "A second solver runs in the background. Agree within 1°, or it replaces the preview.",
+							title: "Check",
+							body: "A second solver runs in the background. If they differ by more than 1°, it replaces the preview.",
 							visual: <MiniLayers layers={["skyline", "prior", "solved"]} />,
 						},
 						{
@@ -1617,11 +1597,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
-			<AnnotatedWorkspace />
-
 			<LiveReveal
 				photoId="demo-01"
-				number="Fig. 4"
+				number="Fig. 3"
 				title="The overlay, once the pose is final"
 			/>
 
@@ -1635,7 +1613,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						{" "}
 						−0.02°
 					</span>
-					, at confidence 0.40. The second opinion put it within{" "}
+					, at confidence 0.40. The second check put it within{" "}
 					<HandMark type="double">0.02°</HandMark>.
 					<MarginNote mark="b">
 						Confident and wrong: 0.397 passed the 0.2 bar.
@@ -1649,17 +1627,15 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Numbers
 				items={[
-					{ value: "2.98°", label: "fast solve error on IMG_7130" },
-					{ value: "0.02°", label: "same photo after the second opinion" },
+					{ value: "2.98°", label: "fast solve error on one photo" },
+					{ value: "0.02°", label: "same photo after the second check" },
 					{
 						value: "11 / 12",
-						label: "photos accepted correctly by the cascade",
+						label: "photos accepted correctly by the second solver",
 					},
-					{ value: "0", label: "false accepts from the cascade, of 12" },
+					{ value: "0", label: "false accepts, of 12" },
 				]}
-				source={
-					<>Hand-registered ground truth: reports/leaderboard.md (12 photos).</>
-				}
+				source="Checked against 12 hand-registered photos."
 			/>
 
 			<Details>
@@ -1674,111 +1650,58 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<Steps
 						steps={[
 							{
-								title: "Pick the source, in priority order",
-								body: (
-									<>
-										An applied eye move, then a saved pose or a bundled sample
-										pose, then (if compass, gravity or lens is missing, see{" "}
-										<code>photoUnknowns</code>) the unknown-pose cascade,
-										otherwise <code>engine.autoAlign</code>. A pose you chose is
-										never silently replaced by a solver.
-									</>
-								),
+								title: "Pick the source",
+								body: "In order: a pose you set, a saved or sample pose, then, if compass, gravity or lens is missing, a full search, otherwise a fast auto-align. A pose you chose is never replaced by a solver.",
 							},
 							{
-								title: "Preview fast, with a deliberately low bar",
-								body: (
-									<>
-										<code>choosePreview</code> shows autoAlign at confidence
-										&gt; 0.2; else a near-compass alternative within 4° yaw and
-										1.5° pitch of the sensors; else the phone prior. The page
-										paints and <code>[data-ready]</code> fires without waiting
-										for the slow check.
-									</>
-								),
+								title: "Preview fast",
+								body: "Show the auto-align result if confidence is above 0.2. Otherwise show a match within 4° yaw and 1.5° pitch of the compass, or the phone’s own pose. The page paints without waiting for the slow check.",
 							},
 							{
-								title: "A second opinion, after first paint",
-								body: (
-									<>
-										<code>secondOpinion</code> re-solves from the prior with the
-										CPU cascade in a worker (20 s deadline), then returns a
-										verdict:
-										<code> verified</code> (agree within 1°),{" "}
-										<code>refined</code> (cascade replaces the preview),{" "}
-										<code>kept</code>, <code>unverified</code> or{" "}
-										<code>matched</code> (render-and-match, taken only under the
-										product accept rule).
-									</>
-								),
+								title: "A second check, after first paint",
+								body: "A second solver re-solves from the phone’s guess in the background (20 s limit). The result is one of: verified (agrees within 1°), refined (replaces the preview), kept, unverified, or matched (map match, used only if it passes the accept rule).",
 							},
 							{
-								title: "Lock exports until the pose is final",
-								body: (
-									<>
-										<code>exportLocked</code> holds while loading or while the
-										verdict is pending, so a file never bakes in a pose that is
-										about to move. The same flag gates the display-only concord
-										pass and the eye suggestion.
-									</>
-								),
+								title: "Lock export until the pose is final",
+								body: "Export is locked while loading or while the check is pending, so a file never contains a pose that is about to move.",
 							},
 						]}
 					/>
 					<p>
-						The solvers themselves are explained in{" "}
+						The solvers are explained in{" "}
 						{A("viewport-inference", "Viewport Inference")} and{" "}
-						{A("terrain-snapping", "Terrain Snapping")}; this page is about what
-						the cockpit does with their answers.
+						{A("terrain-snapping", "Terrain Snapping")}.
 					</p>
 				</Section>
 
 				<Section kicker="Your hand" title="You always have the last word">
 					<p>
-						Dragging in the align tool turns pixels into angles:{" "}
-						<code>yaw −= dx / width × hfov</code>,{" "}
-						<code>pitch += dy / height × vfov</code>, Shift-drag adds{" "}
-						<code>0.05°</code> of roll per pixel, and the wheel scales vfov by{" "}
-						<code>1 + dy × 0.0006</code> (clamped 5° to 100°). The first edit
-						saves the pose, marks it <code>manual</code> and aborts any pending
-						second opinion, so a late background result cannot move what you
-						set.
+						Drag to turn the camera: sideways changes yaw, up and down changes
+						pitch, Shift-drag rolls, the wheel zooms. Your first edit saves the
+						pose and cancels any pending check, so a late result cannot move
+						what you set.
 					</p>
 					<p>
-						Pins are the precise version: pick a peak from the candidates in
-						frame, click where it is in the photo, and <code>solvePins</code>{" "}
-						fits only as many parameters as the evidence supports. See{" "}
-						{A("tap-a-peak", "Tap a Peak")} for the picker.
+						Pins are the precise version: pick a peak, click where it is in the
+						photo, and the solver fits only as many parameters as the pins
+						support. See {A("tap-a-peak", "Tap a Peak")} for the picker.
 					</p>
 				</Section>
 
 				<PinSolve />
 
-				<Section
-					kicker="Result"
-					title="Why the second opinion is worth its wait"
-				>
+				<AnnotatedWorkspace />
+
+				<Section kicker="Result" title="Why the second check is worth the wait">
 					<div className="!mt-5 grid grid-cols-2 gap-5 sm:grid-cols-4">
-						<Stat
-							value="> 0.2"
-							label="preview confidence bar (choosePreview)"
-						/>
-						<Stat value="≤ 1°" label="agreement for “verified” (AGREE_DEG)" />
-						<Stat
-							value="20 s"
-							label="cascade deadline bounding the export lock"
-						/>
-						<Stat value="0" label="cascade false accepts on 12 GT photos" />
+						<Stat value="> 0.2" label="confidence needed for a preview" />
+						<Stat value="≤ 1°" label="agreement needed for “verified”" />
+						<Stat value="20 s" label="longest export wait" />
+						<Stat value="0" label="false accepts on 12 test photos" />
 					</div>
-					<p className="!mt-4 text-[13px] gb-secondary">
-						The GPU aligner alone made one confident wrong accept (IMG_7130,
-						+2.98° at 0.397); the cascade accepted 11 of 12 correctly and put
-						IMG_7130 at −0.02°. That disagreement is exactly what the Refined
-						badge catches (reports/leaderboard.md).
-					</p>
-					<Callout tone="lesson" title="Fast to show, slow to certify">
-						Showing the preview immediately and certifying later gives a quick
-						first paint without letting an unchecked pose reach an export.
+					<Callout tone="lesson" title="Fast to show, slow to check">
+						Show the preview at once, check it later: a quick first paint, and
+						no unchecked pose reaches an export.
 					</Callout>
 				</Section>
 
@@ -1794,16 +1717,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<CodeRef path="src/components/controls.tsx" />
 						<CodeRef path="reports/leaderboard.md" />
 					</div>
-					<p className="!mt-3 font-mono text-[13px] gb-secondary">
-						PhotoWorkspace, choosePreview, secondOpinion, AGREE_DEG,
-						CASCADE_TIMEOUT_MS, resolveUnknownPose, photoUnknowns, solvePins,
-						ALIGN_STATE, exportLocked
-					</p>
 				</Section>
 
-				<Section kicker="Where it fits" title="Neighbours">
+				<Section kicker="Where it fits" title="Related">
 					<p>
-						The cockpit hosts the pose that{" "}
+						The workspace shows the pose that{" "}
 						{A("viewport-inference", "viewport inference")} produces and the
 						corrections of {A("terrain-snapping", "terrain snapping")}, gated by
 						the {A("accept-rule", "accept rule")} and seeded from the{" "}

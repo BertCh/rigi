@@ -392,7 +392,7 @@ export function SheetMap({
 	const ref = useRef<HTMLDivElement>(null);
 	const width = useElementWidth(ref);
 	const title =
-		"Map sheet of Niederhorn and Lake Thun with 20 metre contours, shaded relief, named summits and the camera positions of the demo photographs";
+		"Map of Niederhorn and Lake Thun with contours, relief, summits and the demo cameras";
 	const box = { aspectRatio: String(SHEET_ASPECT), width: "100%" } as const;
 	if (state.status === "ready")
 		return (
@@ -411,9 +411,7 @@ export function SheetMap({
 			<div
 				role="img"
 				aria-label={
-					state.status === "error"
-						? "Map sheet unavailable"
-						: "Loading map sheet"
+					state.status === "error" ? "Map unavailable" : "Loading map"
 				}
 				style={{
 					...box,

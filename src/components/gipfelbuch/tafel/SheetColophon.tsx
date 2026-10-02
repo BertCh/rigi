@@ -5,10 +5,13 @@
 import type { ReactNode } from "react";
 import { STATUS_META } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { OntologyDevRows } from "../OntologyPanel";
 import { MarkerUnderline } from "../swiss/hand";
 import { TYPE } from "../swiss/type";
 import { Waymark, waymarkForStatus } from "../swiss/Waymark";
 import { CodeRef } from "../viz";
+import { Details } from "../viz/explain";
+import { SheetIndexSketch } from "./Blattuebersicht";
 
 // The sheet's colophon (peak-notebook plan §7.6): the developer facts the old sticky rail carried
 // (status, code, reports, ontology), set once at the foot of the sheet
@@ -28,11 +31,11 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 export function SheetColophon({
 	node,
-	ontologyLabel,
+	hasGlossary,
 }: {
 	node: GipfelbuchNode;
-	/** Shown as a link to #ontology when the sheet has an ontology panel. */
-	ontologyLabel?: string;
+	/** Shown as a link to #ontology when the sheet has a Glossar fold. */
+	hasGlossary?: boolean;
 }) {
 	return (
 		<section
@@ -48,33 +51,55 @@ export function SheetColophon({
 				<p className={`${TYPE.hand} gb-secondary mt-1.5`}>
 					{STATUS_META[node.status].blurb}
 				</p>
-				{ontologyLabel && (
+				{hasGlossary && (
 					<a
 						href="#ontology"
 						className={`${TYPE.handLabel} mt-3 inline-block underline decoration-[var(--gb-red)] underline-offset-4 hover:text-[var(--gb-red)]`}
 					>
-						ontology · {ontologyLabel}
+						Glossar
 					</a>
 				)}
 			</Group>
-			{node.modules.length > 0 && (
-				<Group title="Code">
-					<div className="flex flex-col items-start gap-1.5">
-						{node.modules.map((m) => (
-							<CodeRef key={m} path={m} />
-						))}
-					</div>
+			<div className="sm:col-span-2 lg:col-span-4">
+				<Group title="Standort">
+					<SheetIndexSketch current={node.id} hrefBase="/gipfelbuch" />
 				</Group>
-			)}
-			{node.reports.length > 0 && (
-				<Group title="Reports">
-					<div className="flex flex-col items-start gap-1.5">
-						{node.reports.map((m) => (
-							<CodeRef key={m} path={m} />
-						))}
-					</div>
-				</Group>
-			)}
+			</div>
 		</section>
+	);
+}
+
+/**
+ * The one closed developer fold at the foot of a sheet: the engineering summary, the code and
+ * report files and the ontology's developer rows. Nothing here is reader copy.
+ */
+export function DevFold({ node }: { node: GipfelbuchNode }) {
+	return (
+		<div className="px-6 pb-12">
+			<Details title="Für Entwickler" className="mt-0">
+				<p className={`${TYPE.body} max-w-[66ch]`}>{node.summary}</p>
+				{node.modules.length > 0 && (
+					<div>
+						<h3>Code</h3>
+						<div className="mt-2 flex flex-col items-start gap-1.5">
+							{node.modules.map((m) => (
+								<CodeRef key={m} path={m} />
+							))}
+						</div>
+					</div>
+				)}
+				{node.reports.length > 0 && (
+					<div>
+						<h3>Reports</h3>
+						<div className="mt-2 flex flex-col items-start gap-1.5">
+							{node.reports.map((m) => (
+								<CodeRef key={m} path={m} />
+							))}
+						</div>
+					</div>
+				)}
+				<OntologyDevRows node={node} />
+			</Details>
+		</div>
 	);
 }

@@ -7,19 +7,23 @@
  * strokes on transparency (coverage in alpha; the page tints them --gb-contour on --gb-paper-deep).
  * Contract: src/components/gipfelbuch/tafel/README.md (`TafelBake`).
  *
- *   npx tsx scripts/gipfelbuch/data-tafel.ts [demo-01 demo-02 ...]
+ *   npx tsx scripts/gipfelbuch/data-tafel.ts [--horizon-only] [demo-01 demo-02 ...]
  *
  * The ridgelines are traceViewpoint from the photo's eye (as scripts/demo/bake-surround.ts), projected
  * with the prototype pinhole projector (reports/peak-notebook/prototype/common.js, roll sign -1) at
  * the photo's solved camera (app camera when the solve was rejected), so the strokes leave the photo
  * exactly where `solvedRows` does. The seam check projects `horizon.profile` against `solvedRows`.
  * Writes public/demo/gipfelbuch/tafel/<id>.webp and <id>.json. Run `npx biome check --write` on the
- * JSON afterwards. DEM tiles come from the .cache/dem-mapterhorn disk cache (fetched on a miss).
+ * JSON afterwards. DEM tiles come from the .cache/dem-mapterhorn disk cache (fetched on a miss); the
+ * `horizon` row uses build-data.ts's terrarium DEM. `--horizon-only` rewrites only that row of the JSON
+ * and leaves the strokes and everything else as they are.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { createCanvas, Path2D } from "@napi-rs/canvas";
-import { MAPTERHORN } from "../../src/lib/dem";
+import { DEM_SOURCES, MAPTERHORN } from "../../src/lib/dem";
+import { computeHorizon } from "../../src/lib/geo/horizon";
+import { loadTerrain } from "../../src/lib/geo/terrain";
 import {
 	DEFAULT_RINGS,
 	loadMosaics,
@@ -47,6 +51,10 @@ const MAX_PEAKS = 10;
 const MIN_PEAK_DISTANCE = 1500;
 const MIN_CONTRAST = 3;
 const WEBP_QUALITY = 80;
+/** Azimuth step of the bake's wide horizon (deg). */
+const HORIZON_STEP = 0.25;
+/** build-data.ts's DEM, so the wide horizon matches priorRows / solvedRows. */
+const HORIZON_DEM = DEM_SOURCES.terrarium;
 const OUT = path.join(ROOT, "public", "demo", "gipfelbuch", "tafel");
 const RAD = Math.PI / 180;
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
@@ -443,6 +451,7 @@ async function bake(id: string, floor: { coverage: number; contrast: number }) {
 		band: [Math.round(top * 10) / 10, Math.round(bottom * 10) / 10],
 		ticks,
 		peaks: labels,
+		horizon: await wideHorizon(d.gps, camera.yaw),
 		minContrast: Math.round(floor.contrast * 100) / 100,
 	};
 	fs.writeFileSync(
@@ -453,6 +462,40 @@ async function bake(id: string, floor: { coverage: number; contrast: number }) {
 	console.log(
 		`${id}: ${source}${d.solved.accepted ? "" : " (solve rejected)"}, seam median ${seamMedian.toFixed(2)} p90 ${seamP90.toFixed(2)} px (${seam.length} pts)${source === "solved" && seamMedian >= 0.5 ? " SEAM FAIL" : ""}, minContrast ${bakeJson.minContrast}, coverage floor ${floorCov.toFixed(3)}, ${W}x${H}, ${labels.length} peaks, ${kb.toFixed(0)} kB`,
 	);
+}
+
+/**
+ * The DEM horizon (elevation angle, deg) from yaw - 85° to yaw + 85° in HORIZON_STEP steps, traced as
+ * build-data.ts traces `horizon.profile` (computeHorizon on the terrarium DEM from gps.eye), so it meets
+ * priorRows and solvedRows at the frame's edge, but wider: the spill draws the skyline, the guess and
+ * the solve past the frame at any pose. Pose-free.
+ */
+async function wideHorizon(
+	gps: { lat: number; lon: number; eye: number },
+	yaw: number,
+): Promise<{ az0: number; step: number; el: number[] }> {
+	const terrain = await loadTerrain(
+		gps.lat,
+		gps.lon,
+		demTileLoaderNode(HORIZON_DEM),
+		HORIZON_DEM.levels,
+		new Map<string, Float32Array>(),
+		16,
+		HORIZON_DEM.tileSize,
+	);
+	const h = computeHorizon(terrain, gps.lat, gps.lon, gps.eye, {
+		step: HORIZON_STEP,
+	});
+	const n = h.elevation.length;
+	const az0 = Math.floor((yaw - 85) / HORIZON_STEP) * HORIZON_STEP;
+	const el: number[] = [];
+	for (let az = az0; az <= yaw + 85; az += HORIZON_STEP)
+		el.push(
+			Math.round(
+				h.elevation[((Math.round(az / HORIZON_STEP) % n) + n) % n] * 1000,
+			) / 1000,
+		);
+	return { az0: r4(((az0 % 360) + 360) % 360), step: HORIZON_STEP, el };
 }
 
 type TafelTick = { az: number; x: number; label?: string; cardinal?: boolean };
@@ -476,13 +519,36 @@ interface TafelBake {
 	band: [number, number];
 	ticks: TafelTick[];
 	peaks: TafelPeak[];
+	horizon: { az0: number; step: number; el: number[] };
 	minContrast: number;
 }
 
-const floorCoverage = alphaFloor();
-const ids = process.argv.slice(2);
+/** `--horizon-only`: re-trace the wide horizon into an existing bake JSON, keeping every other field. */
+async function bakeHorizon(id: string) {
+	const d = JSON.parse(
+		fs.readFileSync(
+			path.join(ROOT, "public", "demo", "gipfelbuch", `${id}.json`),
+			"utf8",
+		),
+	) as PhotoJson;
+	const file = path.join(OUT, `${id}.json`);
+	const old = JSON.parse(fs.readFileSync(file, "utf8")) as TafelBake;
+	const horizon = await wideHorizon(d.gps, old.camera.yaw);
+	const { minContrast, ...rest } = old;
+	fs.writeFileSync(
+		file,
+		`${JSON.stringify({ ...rest, horizon, minContrast })}\n`,
+	);
+	console.log(`${id}: horizon ${horizon.el.length} az from ${horizon.az0}°`);
+}
+
+const horizonOnly = process.argv.includes("--horizon-only");
+const floorCoverage = horizonOnly ? null : alphaFloor();
+const ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const all = Array.from(
 	{ length: 12 },
 	(_, i) => `demo-${String(i + 1).padStart(2, "0")}`,
 );
-for (const id of ids.length ? ids : all) await bake(id, floorCoverage);
+for (const id of ids.length ? ids : all)
+	if (floorCoverage) await bake(id, floorCoverage);
+	else await bakeHorizon(id);

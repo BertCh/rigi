@@ -250,7 +250,7 @@ function Hero() {
 	return (
 		<Figure
 			label="D1"
-			caption="Schematic (synthetic ridge, not a photo): one fix, two eyes. Drag the GPS altitude below the ground at the fix and watch the floor rule lift the photographer onto the air while the altitude contour slides them down the hill to where DEM + 1.6 m actually matches."
+			caption="Synthetic ridge, not a photo. Drag the GPS altitude below the ground: the floor rule lifts the eye into the air, the altitude contour slides it downhill to where ground + 1.6 m matches."
 		>
 			<div ref={ref}>
 				<svg
@@ -369,7 +369,7 @@ function Hero() {
 						size={HERO_LABEL}
 						color={SWISS.ink}
 					>
-						max rule {s.floorEye.toFixed(1)} m
+						floor rule {s.floorEye.toFixed(1)} m
 					</HandLabel>
 					{/* MAP eye */}
 					<PencilLayer>
@@ -398,8 +398,8 @@ function Hero() {
 					</HandText>
 					<HandText x={14} y={22} size={15} rotate={-2}>
 						{err == null
-							? "no match on the contour: the old rule stands"
-							: `max rule is ${Math.abs(err).toFixed(1)} m too ${err >= 0 ? "high" : "low"} here`}
+							? "no match: the floor rule stands"
+							: `floor rule is ${Math.abs(err).toFixed(1)} m too ${err >= 0 ? "high" : "low"} here`}
 					</HandText>
 					<HandText
 						x={W - 14}
@@ -437,7 +437,7 @@ function Hero() {
 								size={HERO_LABEL}
 								color={SWISS.red}
 							>
-								contour MAP {s.mapEye.toFixed(1)} m
+								contour eye {s.mapEye.toFixed(1)} m
 							</HandLabel>
 						</g>
 					)}
@@ -445,7 +445,7 @@ function Hero() {
 			</div>
 			<div className="mt-4 flex flex-wrap gap-x-6 gap-y-4">
 				<Slider
-					label="GPS alt vs ground at fix"
+					label="GPS altitude vs ground"
 					value={altRel}
 					min={-30}
 					max={25}
@@ -453,7 +453,7 @@ function Hero() {
 					onChange={setAltRel}
 				/>
 				<Slider
-					label="GPSHPositioningError"
+					label="GPS horizontal error"
 					value={hAcc}
 					min={5}
 					max={70}
@@ -466,13 +466,13 @@ function Hero() {
 					on={noAlt}
 					set={setNoAlt}
 					label={
-						noAlt ? "no altitude (EXIF stripped / pin)" : "altitude present"
+						noAlt ? "no altitude (stripped or pinned)" : "altitude present"
 					}
 				/>
 				<Toggle
 					on={bias}
 					set={setBias}
-					label={bias ? "altBias −7 m applied" : "altBias off"}
+					label={bias ? "−7 m bias applied" : "bias off"}
 				/>
 			</div>
 			<div className="mt-4 flex flex-wrap gap-3">
@@ -483,12 +483,12 @@ function Hero() {
 						noAlt
 							? "no altitude: DEM + 1.6 m"
 							: s.mapEye != null
-								? `iso-band covers ${(100 * s.bandFrac).toFixed(0)}% of the 2σH disk`
-								: "iso-band empty: fall back to the max rule"
+								? `band covers ${(100 * s.bandFrac).toFixed(0)}% of the ±2σH disk`
+								: "no band: floor rule used"
 					}
 				/>
 				<Readout
-					k="Max rule eye"
+					k="Floor-rule eye"
 					v={`${(s.floorEye - ground(0)).toFixed(1)} m`}
 					sub="above the DEM at the fix"
 					color={WARM}
@@ -502,8 +502,8 @@ function Hero() {
 					}
 					sub={
 						err == null
-							? "prior defers to the old rule"
-							: `${err >= 0 ? "max rule is " : "max rule is -"}${Math.abs(err).toFixed(1)} m ${err >= 0 ? "too high" : "too low"}; shifted ${(s.mapX ?? 0).toFixed(0)} m`
+							? "floor rule stands"
+							: `${err >= 0 ? "floor rule is " : "floor rule is -"}${Math.abs(err).toFixed(1)} m ${err >= 0 ? "too high" : "too low"}; shifted ${(s.mapX ?? 0).toFixed(0)} m`
 					}
 					color="var(--nb-red)"
 				/>
@@ -593,12 +593,7 @@ function RealOffsets() {
 					depending on the map; the maps differ by {Math.min(...dd).toFixed(0)}{" "}
 					to {Math.max(...dd).toFixed(0)} m. Left of the black line the rule
 					drops the altitude: {dropM} of 12 photos on Mapterhorn, {dropT} of 12
-					on Terrarium.{" "}
-					<Measured data={demo}>
-						{" "}
-						Rule: floorEye in src/lib/concord/priors/altitude.ts, via{" "}
-						{data.script}.
-					</Measured>
+					on Terrarium. <Measured data={demo} />
 				</>
 			}
 			bleed
@@ -749,7 +744,7 @@ function RealOffsets() {
 						width={1}
 					/>
 					<HandLabel x={x0 + 10} y={H - 5} size={OFFSETS_LABEL}>
-						Terrarium z13
+						Terrarium
 					</HandLabel>
 					<HandDot
 						x={x0 + 140}
@@ -760,18 +755,18 @@ function RealOffsets() {
 						opacity={1}
 					/>
 					<HandLabel x={x0 + 150} y={H - 5} size={OFFSETS_LABEL}>
-						Mapterhorn z15
+						Mapterhorn
 					</HandLabel>
 				</g>
 			</svg>
 			{glitch && (
 				<p className="mt-3 text-[13px] leading-relaxed gb-secondary">
 					Photo {glitch.t.id.slice(5)} recorded {glitch.t.alt.toFixed(0)} m,
-					about 730 m under the ridge. The rule falls back to ground + 1.6 m (
+					about 730 m under the ridge, so the rule uses ground + 1.6 m (
 					{glitch.t.floorEye.toFixed(1)} m on Terrarium,{" "}
-					{glitch.m.floorEye.toFixed(1)} m on Mapterhorn). The other eleven read{" "}
+					{glitch.m.floorEye.toFixed(1)} m on Mapterhorn). The other eleven sit{" "}
 					{sg(median(offT))} m (Terrarium) or {sg(median(offM))} m (Mapterhorn)
-					from the ground.
+					above the ground.
 				</p>
 			)}
 		</Figure>
@@ -797,10 +792,9 @@ function RealContour() {
 			label="Fig. 3"
 			caption={
 				<>
-					Bar: standing-rule eye minus the optional prior's eye, on Mapterhorn.
-					Red, right of centre: the rule stands the photographer higher. Navy,
-					left: the contour eye is higher. Photo 09 finds no match and falls
-					back. <Measured data={data} />
+					Bar: floor-rule eye minus altitude-contour eye, on Mapterhorn. Red,
+					right: the floor rule stands the eye higher. Navy, left: the contour
+					eye is higher. Photo 09 finds no match. <Measured data={data} />
 				</>
 			}
 		>
@@ -891,7 +885,7 @@ function RealContour() {
 								size={11}
 								color="var(--gb-secondary)"
 							>
-								{d == null ? "fallback" : `${d > 0 ? "+" : ""}${d.toFixed(1)}`}
+								{d == null ? "no match" : `${d > 0 ? "+" : ""}${d.toFixed(1)}`}
 							</HandLabel>
 							<HandLabel
 								x={CW - 66}
@@ -924,7 +918,7 @@ function RealContour() {
 								size={14}
 								rotate={-2}
 							>
-								{`photo ${rows[fb].id.slice(5)}: no match, the old rule stands`}
+								{`photo ${rows[fb].id.slice(5)}: no match, floor rule stands`}
 							</HandText>
 							<PenArrow
 								from={[cxm + 66, 22 + fb * CROW + CROW / 2 + 16]}
@@ -937,14 +931,12 @@ function RealContour() {
 				})()}
 			</svg>
 			<p className="mt-3 text-[13px] leading-relaxed gb-secondary">
-				“band” is the fraction of the 2σH disk where DEM + 1.6 m is within σA of
-				the altitude; “shift” is how far the MAP eye moves from the GPS fix.
-				Across the {diffs.length} fixes max rule minus contour eye runs from{" "}
+				band: share of the ±2σH disk where ground + 1.6 m is within σA of the
+				altitude. shift: how far the contour eye moves from the GPS fix. Across
+				the {diffs.length} fixes, floor rule minus contour eye runs from{" "}
 				{Math.min(...diffs).toFixed(1)} to {Math.max(...diffs).toFixed(1)} m
-				(median {median(diffs).toFixed(1)} m). There is no true eye height here
-				to score either against; the skyline cannot tell
-				(reports/concordance-research.md: a 10 m eye shift moves the skyline
-				residual by 0.2 to 2 px).
+				(median {median(diffs).toFixed(1)} m). No true eye height exists to
+				score either; a 10 m shift moves the skyline by only 0.2 to 2 px.
 			</p>
 		</Figure>
 	);
@@ -962,7 +954,7 @@ function DriftPlot() {
 	return (
 		<Figure
 			label="D2"
-			caption="Computed from the pinhole model, not measured: pixel shift of a ridge when the eye moves 0.2 m (1.6 vs 1.8), on a 4000 px frame at the default 26 mm equivalent. Only the foreground cares."
+			caption="Computed, not measured: pixel shift of a ridge when the eye height changes by 0.2 m, on a 4000 px frame at 26 mm equivalent."
 		>
 			<Plot
 				x={[1.7, 4.3]}
@@ -1197,9 +1189,9 @@ function HeroStages() {
 				<>
 					{under == null
 						? "One real fix, far under the ground."
-						: `Fixed: demo-09, the one photo whose phone altitude is far below the ground (the header ledger follows the photo you pick). The phone put the camera ${under} m inside the mountain; the rule lifts it onto the slope.`}{" "}
+						: `Photo 09: the phone put the camera ${under} m inside the mountain; the rule lifts it onto the slope.`}{" "}
 					{underM != null &&
-						`(Drawn on Terrarium. On Mapterhorn, the app's map, the gap is ${underM} m.) `}
+						`(Drawn on Terrarium; on Mapterhorn, which Rigi uses, the gap is ${underM} m.) `}
 					<Measured data={d} />
 				</>
 			}
@@ -1238,7 +1230,7 @@ function EyeEquation() {
 	const g = row?.ground;
 	return (
 		<Eq
-			label="The rule, with demo-09's numbers (metres)"
+			label="The rule with photo 09's numbers (m)"
 			where={[
 				{
 					sym: "alt",
@@ -1249,7 +1241,7 @@ function EyeEquation() {
 				{
 					sym: "eye",
 					c: "var(--nb-forest)",
-					text: "camera height used for the whole solve (accent dot)",
+					text: "camera height used from here on (green dot)",
 				},
 			]}
 		>
@@ -1313,7 +1305,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					The ground cannot move, so it sets a floor.
 					{bad && (
 						<MarginNote mark="a">
-							{`I notice demo-09 says ${bad.t.alt.toFixed(0)} m, ${Math.round(bad.t.ground - bad.t.alt)} m under the ground.`}
+							{`Photo 09 says ${bad.t.alt.toFixed(0)} m, ${Math.round(bad.t.ground - bad.t.alt)} m under the ground.`}
 						</MarginNote>
 					)}
 				</p>
@@ -1332,7 +1324,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							visual: (
 								<NumberCard
 									big={bad ? `${bad.t.alt.toFixed(0)} m` : "…"}
-									small="demo-09 phone altitude"
+									small="photo 09 phone altitude"
 								/>
 							),
 						},
@@ -1376,7 +1368,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					</MarginNote>
 				</p>
 				<p>
-					A second, optional prior treats the altitude as a measurement and
+					A second, optional check treats the altitude as a measurement and
 					looks for where it matches the ground. If it finds nothing, it steps
 					aside.
 				</p>
@@ -1384,12 +1376,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<RealContour />
 
-			{/* Fig. 1 spills this sheet's one photo, so the story stays inside its frame. */}
 			<PhotoStory
 				number="Fig. 4"
 				photoId="demo-09"
-				title="From the eye's guess to the solved view"
-				bleed={false}
+				title="From the phone's guess to the solved view"
 				crop={[0, 40, 800, 360]}
 			/>
 
@@ -1397,27 +1387,20 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: bad ? `${Math.round(bad.t.ground - bad.t.alt)} m` : "…",
-						label: "demo-09 altitude below the ground (Terrarium)",
+						label: "photo 09: altitude below the ground (Terrarium)",
 					},
 					{
 						value: medM == null ? "…" : `${sg(medM)} m`,
-						label: `median phone altitude over Mapterhorn ground, other 11 photos (Terrarium: ${medT == null ? "…" : sg(medT)} m)`,
+						label: `median altitude above ground, other 11 photos (Mapterhorn; Terrarium: ${medT == null ? "…" : sg(medT)} m)`,
 					},
 					{
 						value: bandN == null ? "…" : `${bandN} / 12`,
-						label: "photos where the optional prior finds a match",
-					},
-					{
-						value: "0.2 m",
-						label:
-							"gap between two no-altitude eye heights in the code (1.6 vs 1.8 m)",
+						label: "photos where the altitude contour finds a match",
 					},
 				]}
 				source={
 					<>
-						Fixes and DEMs:{" "}
-						{data?.script ?? "scripts/gipfelbuch/data-eye-rule.ts"}. The 1.6 /
-						1.8 drift: reports/ontology.md.
+						Fixes: the 12 Niederhorn demo photos, on Terrarium and Mapterhorn.
 					</>
 				}
 			/>
@@ -1446,14 +1429,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					photographer stood on. It breaks on summits, cliff lips and slopes:
 					the fix is off by <code>hAcc</code> (6 to 70 m), the DEM there is
 					higher, and the rule puts the eye too high. Phone altitude is reported
-					above mean sea level (the code comment says EGM2008; we did not check
-					this per device) and, where the fix is good, should agree with the DEM
-					to a few metres. A height above the ellipsoid would be about 50 m
-					higher in Switzerland, where the geoid lies 45 to 55 m above it, so
-					mixing the two datums would look like a 50 m altitude error. On the
-					twelve Niederhorn fixes it does against Mapterhorn but not Terrarium
-					(Fig. 2), so the photographer most likely stood where{" "}
-					<code>DEM + 1.6 ≈ alt</code> inside the horizontal error disk.{" "}
+					above mean sea level (we did not check this per device) and, where the
+					fix is good, should agree with the DEM to a few metres. A height above
+					the ellipsoid would be about 50 m higher in Switzerland, where the
+					geoid lies 45 to 55 m above it, so mixing the two datums would look
+					like a 50 m altitude error. On the twelve Niederhorn fixes it does
+					against Mapterhorn but not Terrarium (Fig. 2), so the photographer
+					most likely stood where <code>DEM + 1.6 ≈ alt</code> inside the
+					horizontal error disk.{" "}
 					<HandMark type="strike">Phone altitude is a floor.</HandMark>{" "}
 					<span
 						className="nb-hand"
@@ -1467,10 +1450,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<code>J = |x|²/σH² + ((DEM + 1.6 − alt)/σA)²</code> over the 2σH disk
 					with <code>σA = {SIGMA_A} m</code>; the fitted{" "}
 					<code>altBias = {ALT_BIAS} m</code> says phone altitude reads about 7
-					m below ground + eye on the dev set. It is a prior, never a snap: it
-					returns a Gaussian and a cost term, pipelines opt in through{" "}
-					<code>?concord=eye</code>, and when the band is empty it hands back
-					the old rule, which bounds the damage of a wrong bias.
+					m below ground + eye on the photos it was fitted on. It is a prior,
+					never a snap: it returns a Gaussian and a cost term, and when the band
+					is empty it hands back the floor rule, which bounds the damage of a
+					wrong bias.
 				</p>
 				<Hero />
 				<h3>Why it matters downstream</h3>
@@ -1481,23 +1464,15 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<a href={gipfelbuchHref("exif-prior")}>EXIF prior</a> both start here;{" "}
 					<a href={gipfelbuchHref("eye-refinement")}>eye refinement</a> and the{" "}
 					<a href={gipfelbuchHref("eye-search-gpu")}>GPU eye search</a> search
-					around this height. That is why the 1.6 versus 1.8 drift has survived:
-					0.2 m is about 6 px on a 100 m foreground in a 4000 px frame (D2), and
-					under a pixel beyond 1 km. It is recorded as a finding, not a bug.
+					around this height. Even 0.2 m is about 6 px on a 100 m foreground in
+					a 4000 px frame (D2), and under a pixel beyond 1 km.
 				</p>
 				<DriftPlot />
-				<Callout tone="warning" title="Known drift">
-					With no altitude, <code>deck/scene.ts</code> (<code>eyeAltitude</code>
-					) and the roll ridgelines worker use DEM + 1.8 m, while{" "}
-					<code>geo/pipeline.ts</code> (<code>EYE_ABOVE_GROUND</code>) and the
-					concord prior use DEM + 1.6 m. The ontology marks it for unification
-					in the engine owner's pass.
-				</Callout>
 				<Callout tone="lesson" title="Altitude is evidence, not a floor">
-					The max rule throws altitude away whenever the fix lands on higher
+					The floor rule throws altitude away whenever the fix lands on higher
 					ground than the photographer's. Treating it as a contour recovers it,
-					but the −7 m bias was fitted on 10 dev photos (9 Swiss, 4 days), and
-					no-GT US fixes read near 0, which is why the prior falls back. See{" "}
+					but the −7 m bias was fitted on 10 photos (9 Swiss, 4 days), and fixes
+					from US photos read near 0, which is why the prior falls back. See{" "}
 					<a href={gipfelbuchHref("datum-msl-vs-ellipsoid")}>
 						MSL versus ellipsoid
 					</a>{" "}
@@ -1505,8 +1480,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</Callout>
 				<Callout tone="note" title="Pins carry no altitude">
 					Positions typed in or picked on a map have their altitude nulled on
-					import, so they always take the DEM-floor branch (
-					<code>source: "pin"</code>).
+					import, so they always use ground + 1.6 m.
 				</Callout>
 				<div className="flex flex-wrap gap-2">
 					<CodeRef path="src/lib/concord/priors/altitude.ts">

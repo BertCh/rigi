@@ -304,14 +304,13 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 					<KrokiTitle
 						x={8}
 						y={22}
-						title="Which map answers?"
+						title="Which height map answers?"
 						size={18}
 						seed="ts-rings-title"
-						date="01.10.2026"
 					/>
 					<NorthArrow x={318} y={48} seed="ts-rings-north" />
 					<HandText x={170} y={336} size={14} anchor="middle" color="brown">
-						log-spaced: far rings squeeze
+						log scale: far rings squeeze
 					</HandText>
 					<PencilLayer>
 						<PenLine
@@ -386,7 +385,7 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 							<span className="gb-ink">{fmtM(p.d)}</span>
 						</div>
 						<div className="mt-1 flex items-baseline justify-between gb-secondary">
-							<span>band picks</span>
+							<span>chosen level</span>
 							<span className="gb-ink">z{LEVELS[start].z}</span>
 						</div>
 						<div className="mt-1 flex items-baseline justify-between gb-secondary">
@@ -397,7 +396,7 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 								}
 							>
 								{hit < 0
-									? "NaN (nothing loaded)"
+									? "no height (nothing loaded)"
 									: `z${LEVELS[hit].z} · ${fmtRes(mpp(LEVELS[hit].z))} m/px`}
 							</span>
 						</div>
@@ -405,8 +404,8 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 							<div className={`mt-1 gb-secondary ${TYPE.micro}`}>
 								z{LEVELS[start].z} {missing[start] ? "missing" : "n/a"}
 								{hit >= 0
-									? ` → fell back ${hit - start} level${hit - start > 1 ? "s" : ""} coarser`
-									: " → ran out of levels"}
+									? ` → fell back ${hit - start} level${hit - start > 1 ? "s" : ""}`
+									: " → no level left"}
 							</div>
 						)}
 					</div>
@@ -442,8 +441,8 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 						))}
 					</div>
 					<p className={`mt-2 gb-secondary ${TYPE.micro}`}>
-						{TOTAL_TILES} tiles for a full load here. Click a row to mark that
-						level's tile as missing and watch the probe fall back.
+						{TOTAL_TILES} tiles for a full load here. Click a row to remove that
+						level's tile and watch the probe fall back.
 					</p>
 				</div>
 			</div>
@@ -537,8 +536,7 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 			caption={
 				<>
 					Blend the four nearest pixels, each weighted by the area opposite it.
-					A corner in an unloaded tile makes the whole answer a hole.{" "}
-					<Measured data={data} />
+					One missing corner leaves no answer.
 				</>
 			}
 		>
@@ -589,7 +587,7 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 									</>
 								)}
 								<HandLabel x={cx(gx)} y={cy(gy) + 14} anchor="middle" size={11}>
-									{gone ? "NaN" : h.toFixed(1)}
+									{gone ? "no data" : h.toFixed(1)}
 								</HandLabel>
 							</g>
 						);
@@ -716,13 +714,13 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 				>
 					<div className="bg-[var(--gb-paper-deep)] p-3">
 						<div className="flex justify-between">
-							<span>px, py</span>
+							<span>pixel position</span>
 							<span className="gb-ink">
 								{px.toFixed(2)}, {py.toFixed(2)}
 							</span>
 						</div>
 						<div className="mt-1 flex justify-between">
-							<span>fx, fy</span>
+							<span>offset within pixel</span>
 							<span className="gb-ink">
 								{fx.toFixed(2)}, {fy.toFixed(2)}
 							</span>
@@ -730,8 +728,8 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 						<div className="mt-1 flex justify-between">
 							<span>top / bottom blend</span>
 							<span className="gb-ink">
-								{Number.isNaN(top) ? "NaN" : top.toFixed(1)} /{" "}
-								{Number.isNaN(bot) ? "NaN" : bot.toFixed(1)}
+								{Number.isNaN(top) ? "no data" : top.toFixed(1)} /{" "}
+								{Number.isNaN(bot) ? "no data" : bot.toFixed(1)}
 							</span>
 						</div>
 						<div className="mt-1 flex justify-between">
@@ -741,12 +739,14 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 									bad ? "text-[var(--rigi-trap)]" : "text-[var(--gb-water)]"
 								}
 							>
-								{bad ? "NaN, ask the coarser level" : `${res.toFixed(1)} m`}
+								{bad
+									? "no height, try the coarser level"
+									: `${res.toFixed(1)} m`}
 							</span>
 						</div>
 						<div className="mt-1 flex justify-between gb-secondary">
 							<span>nearest pixel would say</span>
-							<span>{Number.isNaN(nearest) ? "NaN" : `${nearest} m`}</span>
+							<span>{Number.isNaN(nearest) ? "no data" : `${nearest} m`}</span>
 						</div>
 						{data && (
 							<div className="mt-2 flex justify-between pt-1 gb-secondary">
@@ -823,12 +823,12 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 					},
 					{
 						sym: "fx, fy",
-						text: "how far the spot sits right of and below the top-left pixel centre, 0 to 1",
+						text: "how far right of and below the top-left pixel centre, 0 to 1",
 					},
 					{
 						sym: "h",
 						c: ANSWER,
-						text: "the four pixel heights are the numbered dots in the grid; their weights are the shaded rectangles and the bars",
+						text: "the four numbered dots are the pixel heights; weights are the shaded rectangles and bars",
 					},
 				]}
 			>
@@ -878,9 +878,8 @@ function LevelCost({ data }: { data: TerrainData | null }) {
 			bleed
 			caption={
 				<>
-					Black line: what we answer along a real 12 km line, as height minus
-					the finest map&rsquo;s. Orange line: the coarsest map used everywhere.{" "}
-					<Measured data={data} />
+					Black: our answer along a real 12 km line, as height minus the finest
+					map&rsquo;s. Orange: the coarsest map used everywhere.
 				</>
 			}
 		>
@@ -890,7 +889,7 @@ function LevelCost({ data }: { data: TerrainData | null }) {
 				width={620}
 				height={260}
 				xLabel="distance from camera (km)"
-				yLabel="level minus z15 (m)"
+				yLabel="height minus finest map (m)"
 				fmtX={(v) => v.toFixed(0)}
 				fmtY={(v) => v.toFixed(0)}
 			>
@@ -1038,13 +1037,17 @@ function AskTheMap({ d }: { d: TerrainData | null }) {
 		<Figure
 			label="Fig. 1"
 			bleed
+			pinned="demo-01"
 			caption={
 				<>
 					The ground falls {drop.toFixed(0)} m within {dist(midX, y).toFixed(0)}{" "}
-					m north of the camera. Point 1 follows the photo picked above (
-					{eye.id}, Mapterhorn ground; the header ledger reads the coarser
-					Terrarium map). The hillshade and points 2 to 4 are fixed: the demo-01
-					patch. <Measured data={d} />
+					m north of the camera.{" "}
+					<MarginNote mark="d">
+						{
+							"Point 1 follows the photo picked above. The shaded relief and points 2 to 4 are fixed (demo-01 area)."
+						}
+					</MarginNote>{" "}
+					<Measured data={d} />
 				</>
 			}
 		>
@@ -1100,6 +1103,25 @@ function AskTheMap({ d }: { d: TerrainData | null }) {
 						/>
 						{pts.slice(1).map((p) => (
 							<Mark key={p.n} x={PX(p.x - 0.5)} y={PY(p.h)} n={p.n} k={1.1} />
+						))}
+						{[
+							{ v: Math.min(...row), k: "lo" },
+							{ v: Math.max(...row), k: "hi" },
+							{ v: cam, k: "cam" },
+						].map((t) => (
+							<g key={t.k}>
+								<PenLine
+									seed={`ts-hero-tick-${t.k}`}
+									from={[0, PY(t.v)]}
+									to={[6, PY(t.v)]}
+									data
+									color="pencil"
+									width={1}
+								/>
+								<HandLabel x={8} y={PY(t.v) + 4} size={12} italic>
+									{`${fmtN(t.v)} m${t.k === "cam" ? " camera" : ""}`}
+								</HandLabel>
+							</g>
 						))}
 						<HandText x={PX(midX) + 8} y={PY(row[midX]) - 18} size={15}>
 							{`falls ${drop.toFixed(0)} m already`}
@@ -1341,21 +1363,20 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="One question, asked millions of times: how high is the ground here?"
+				title="Asked millions of times: how high is the ground here?"
 			>
 				<p>
-					Give it a spot and how far that spot is from the camera. It answers in
-					metres.
+					Give it a spot and its distance from the camera; it answers in metres.
 				</p>
 				<p>
 					<HandMark type="highlight">
-						Near spots read a sharp map. Far spots read a coarse one.
+						Near spots read a sharp height map, far spots a coarse one.
 					</HandMark>{" "}
-					That keeps the answer fast and the nearby detail intact. In the rings
-					below, the camera is <CircledNumber value={1} seed="ts-prose-1" />.
+					That keeps it fast and keeps nearby detail. In the rings below, the
+					camera is <CircledNumber value={1} seed="ts-prose-1" />.
 					{lv && (
 						<MarginNote mark="a">
-							{`I notice the nearest map is ${lv[0].mPerPx.toFixed(1)} m a pixel and the farthest ${Math.round(lv[lv.length - 1].mPerPx)} m.`}
+							{`The nearest map is ${lv[0].mPerPx.toFixed(1)} m a pixel, the farthest ${Math.round(lv[lv.length - 1].mPerPx)} m.`}
 						</MarginNote>
 					)}
 				</p>
@@ -1394,7 +1415,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					proportion to{" "}
 					<HandMark type="underline">the area opposite it</HandMark>.
 					<MarginNote mark="b">
-						Cross the seam with tile B unloaded and the answer turns NaN.
+						Cross the seam with tile B unloaded and there is no answer.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1416,23 +1437,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</HandMark>
 					{cost && (
 						<MarginNote mark="c">
-							{`First guess: coarse everywhere is fine. Wrong, up to ${cost.coarse.toFixed(0)} m off. Band rule: ${cost.picked.toFixed(0)} m.`}
+							{`Tempting: coarse everywhere is fine. Up to ${cost.coarse.toFixed(0)} m off. With bands: ${cost.picked.toFixed(0)} m.`}
 						</MarginNote>
 					)}
 				</p>
-				{cost && (
-					<p>
-						<HandMark type="strike">
-							The coarse map is off by {cost.coarse.toFixed(0)} m.
-						</HandMark>{" "}
-						<span
-							className="nb-hand"
-							style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
-						>
-							{cost.picked.toFixed(0)} m with the band rule.
-						</span>
-					</p>
-				)}
 				<p>
 					At sea the map reads 0 m, so{" "}
 					<HandMark type="wavy">a coast looks like sea level</HandMark>.
@@ -1444,10 +1452,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			{/* The shell Tafel spills this sheet's one photo: the plate keeps its frame, no surround or line art. */}
 			<LiveDrape
 				number="Fig. 5"
-				title="Heights under the sample roll"
+				title="Heights across the photo"
 				notes={[
 					{
-						text: "every height here is one sampler answer at (lon, lat, distance)",
+						text: "every height here is one sampler answer",
 						at: [0.4, 0.5],
 						side: "left",
 					},
@@ -1463,58 +1471,46 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: lv ? String(lv.length) : "…",
-						label: "maps, sharpest to coarsest",
+						label: "height maps, finest to coarsest",
 					},
 					{
 						value: lv
 							? `${lv[0].mPerPx.toFixed(1)} → ${Math.round(lv[lv.length - 1].mPerPx)} m`
 							: "…",
-						label:
-							"tile pixel width, near to far, at the Niederhorn camera (the grid, not the data's detail)",
+						label: "pixel size, near to far, at the Niederhorn camera",
 					},
 					{
 						value: lv ? String(lv.reduce((a, l) => a + l.tiles, 0)) : "…",
-						label: "tiles for one full load there",
+						label: "tiles for one full load",
 					},
 					{
 						value: cost ? `${cost.picked.toFixed(0)} m` : "…",
-						label:
-							"worst gap between the band rule and the finest map, 12 km line",
+						label: "worst gap to the finest map, 12 km line",
 					},
 				]}
-				source={
-					<>
-						Measured by scripts/gipfelbuch/data-terrain.ts: Mapterhorn tiles run
-						through the real sampler.
-					</>
-				}
+				source="Measured with the Mapterhorn terrain tiles."
 			/>
 
 			<Details>
-				<h3>The contract</h3>
+				<h3>What it answers</h3>
 				<p>
-					Everything that needs ground truth on the CPU (the horizon ray march,
-					peak visibility, the solvers) asks the same question: how high is the
-					terrain at this longitude and latitude, seen from a camera this far
-					away? <code>TerrainSampler</code> answers it from a stack of preloaded
-					tiles at several zoom levels. It does no I/O of its own: tiles arrive
-					as decoded <code>Float32Array</code> heights, so the same class runs
-					in the page, in workers and in Node scripts.
+					The horizon, summit visibility and the solvers all ask the same
+					question: how high is the terrain at this longitude and latitude, from
+					a camera this far away? A stack of preloaded tiles at several zoom
+					levels answers it. It loads nothing itself, so it runs the same in the
+					page and in scripts.
 				</p>
 				<p>
-					The Mapterhorn level table pairs a zoom with a{" "}
-					<code>maxDistance</code>: z15 to 1 km, z14 to 2.5 km, z12 to 6 km, z11
-					to 15 km, z10 to 40 km, z9 to 150 km. Because Mapterhorn tiles are 512
-					px, each zoom matches a 256 px tile one level deeper, so the table
-					sits one zoom below the Terrarium default (z13 / 11 / 10 at 4 / 40 /
-					150 km) with two finer near-field levels on top. See{" "}
+					Each zoom level covers a distance band: z15 to 1 km, z14 to 2.5 km,
+					z12 to 6 km, z11 to 15 km, z10 to 40 km, z9 to 150 km. Mapterhorn
+					tiles are 512 px, so the table sits one zoom below the 256 px
+					Terrarium table, plus two finer near levels. See{" "}
 					{A("dem-source", "DEM Source")}.
 				</p>
 				<p>
-					<code>sampleAt</code> finds the first level whose band contains the
-					distance, and if that level has no data at the point it walks outward
-					through the coarser ones. That is what lets the finest zoom exist only
-					where a national lidar DEM does.
+					The sampler takes the first level whose band holds the distance. If
+					that level has no data there, it tries coarser ones. So the finest
+					zoom needs to exist only where a national lidar model does.
 				</p>
 				<h3>From a GPS fix to a ready sampler</h3>
 				<Steps
@@ -1523,12 +1519,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Plan the tiles",
 							body: (
 								<>
-									<code>loadTerrain(lat, lon, loadTile, levels)</code> asks{" "}
-									<code>tilesAround</code> for every tile at every level that
-									touches a circle of that level&rsquo;s{" "}
-									<code>maxDistance</code>. Tiles already in the shared{" "}
-									<code>Map</code> are filtered out, so a second call near the
-									same spot only loads the difference.
+									For every level, list the tiles inside that level&rsquo;s
+									distance band, skipping any already loaded.
 								</>
 							),
 						},
@@ -1536,11 +1528,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Load in batches, check the size",
 							body: (
 								<>
-									Tiles load 16 at a time through the injected loader (browser
-									or Node). A tile whose length is not <code>tileSize²</code>{" "}
-									throws: a wrong size would silently scramble heights, so it
-									fails loudly. A loader that returns <code>undefined</code>{" "}
-									just leaves a hole.
+									Tiles load 16 at a time. A tile of the wrong size is rejected
+									loudly, because it would silently scramble heights. A tile
+									that fails to load leaves a hole.
 								</>
 							),
 						},
@@ -1548,12 +1538,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Where a tile does not exist",
 							body: (
 								<>
-									The page-side loader, <code>fetchDemBytes</code>, goes the
-									other way: a 404 or 204 is remembered for the session, and the
-									request walks up the pyramid to the nearest ancestor that
-									exists. <code>ancestorCrop</code> upsamples that
-									ancestor&rsquo;s quadrant to full tile size, so the sampler
-									still sees a normal tile.
+									A 404 or empty reply is remembered for the session, and the
+									request walks up to the nearest tile that exists and enlarges
+									its quadrant, so the sampler still sees a normal tile.
 								</>
 							),
 						},
@@ -1561,11 +1548,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Sample",
 							body: (
 								<>
-									<code>sample</code> converts to fractional tile pixels,
-									offsets by half a pixel, and does the bilinear blend.{" "}
-									<code>pixel</code> finds the right tile even when the four
-									corners straddle a seam. Any missing corner gives NaN, and{" "}
-									<code>sampleAt</code> moves on to the next level.
+									Convert to fractional tile pixels, shift by half a pixel,
+									blend bilinearly. Any missing corner gives no value and the
+									next level is tried.
 								</>
 							),
 						},
@@ -1573,31 +1558,28 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				/>
 				<Flow
 					nodes={[
-						{ label: "tilesAround", sub: "per level, per radius" },
-						{ label: "loadTile", sub: "×16, size-checked" },
-						{ label: "Map<z/x/y>", sub: "Float32Array heights" },
-						{ label: "sampleAt", sub: "band → bilinear → coarser" },
+						{ label: "Plan", sub: "per level" },
+						{ label: "Load", sub: "16 at a time, size-checked" },
+						{ label: "Store", sub: "height grids by z/x/y" },
+						{ label: "Sample", sub: "band, blend, fall back" },
 					]}
 				/>
 				<p>
-					Sea is clamped to 0 at decode (src/lib/dem/decode.ts), so a coast
-					reads as sea level, not bathymetry. Tile size 512 px, z17 deepest; 16
-					tiles fetched in parallel (src/lib/geo/terrain.ts).
+					Sea is set to 0 when tiles are decoded, so a coast reads as sea level.
+					Tiles are 512 px, up to z17.
 				</p>
-				<Callout tone="note" title="Same tile policy, CPU read side">
-					The 3D mesh (<code>src/lib/deck-webgpu/terrain.ts</code>) loads
-					Mapterhorn through the same <code>fetchDemBytes</code> policy as the
-					CPU sampler, so both see the same ancestor fallback. The sampler is
-					the synchronous read side: plain arrays, no GPU round trip.
+				<Callout tone="note" title="Same tiles as the 3D view">
+					The 3D terrain loads the same tiles with the same fallback, so both
+					see the same ground.
 				</Callout>
 				<h3>Where it fits</h3>
 				<p>
-					<code>ground()</code> gives the camera&rsquo;s own elevation, and the
-					ray march in {A("dem-horizon", "the DEM horizon")} calls{" "}
-					<code>sampleAt</code> along every azimuth, which the{" "}
-					{A("viewport-inference", "viewport solver")} matches against the
-					photo&rsquo;s skyline. {A("terrain-snapping", "Terrain snapping")} and{" "}
-					{A("dem-anchoring", "DEM anchoring")} read it too.
+					It gives the camera&rsquo;s own ground height.{" "}
+					{A("dem-horizon", "The DEM horizon")} calls it along every direction,
+					and the {A("viewport-inference", "viewport solver")} matches that
+					horizon to the photo&rsquo;s skyline.{" "}
+					{A("terrain-snapping", "Terrain snapping")} and{" "}
+					{A("dem-anchoring", "DEM anchoring")} use it too.
 				</p>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">
@@ -1608,11 +1590,6 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					<CodeRef path="src/lib/dem/decode.ts" />
 					<CodeRef path="src/lib/deck-webgpu/terrain.ts" />
 				</div>
-				<p className={`font-mono gb-secondary ${TYPE.caption}`}>
-					TerrainSampler.sample, sampleAt, ground, pixel, loadTerrain,
-					TERRAIN_LEVELS, MAPTERHORN.levels, tilesAround, lonLatToTile,
-					fetchDemBytes, ancestorCrop, decodeTerrarium
-				</p>
 			</Details>
 		</>
 	);

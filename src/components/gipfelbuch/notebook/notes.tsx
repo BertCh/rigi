@@ -205,33 +205,33 @@ export function stepNote(
 				<>
 					traced in <Value>{traced}</Value> of{" "}
 					<Value>{data.skyline.rows.length}</Value> columns;{" "}
-					<Value>{data.residual.solved.n}</Value> confident enough to score
+					<Value>{data.residual.solved.n}</Value> used for scoring
 				</>
 			);
 		}
 		case "baseline-pipeline":
 			return (
 				<>
-					slide the terrain's skyline onto the photo's: median miss{" "}
+					slide the terrain horizon onto the photo skyline: median miss{" "}
 					<Value>{data.residual.prior.median.toFixed(1)} px</Value> →{" "}
 					<Value>{data.residual.solved.median.toFixed(1)} px</Value>
-					{solved.search === "full" ? " (after a full 360° retry)" : ""}
+					{solved.search === "full" ? " (after a full 360° search)" : ""}
 				</>
 			);
 		case "accept-rule":
 			return solved.accepted ? (
 				<>
 					confidence <Value>{solved.confidence.toFixed(2)}</Value> ·{" "}
-					<span className="nb-mark">shown as solved</span>
-					{solved.stage === "refine" ? " after a refine pass" : ""}
+					<span className="nb-mark">solved</span>
+					{solved.stage === "refine" ? ", after refinement" : ""}
 				</>
 			) : (
 				<>
 					confidence <Value>{solved.confidence.toFixed(2)}</Value> ·{" "}
 					<span className="nb-mark">
-						refused ({solved.rejectReason ?? "below the bar"})
+						refused ({solved.rejectReason ?? "low confidence"})
 					</span>
-					: never shown as certain
+					: not shown as solved
 				</>
 			);
 		case "pose-estimate":
@@ -241,7 +241,7 @@ export function stepNote(
 					<Value>{degrees(solved.yaw)}</Value> (
 					{signedDegrees(solved.delta.yaw)}), pitch{" "}
 					<Value>{degrees(solved.pitch)}</Value>, roll{" "}
-					<Value>{degrees(solved.roll)}</Value>, field{" "}
+					<Value>{degrees(solved.roll)}</Value>, field of view{" "}
 					<Value>{degrees(solved.hfov)}</Value>
 				</>
 			) : (
@@ -249,27 +249,26 @@ export function stepNote(
 					<Struck>
 						yaw {degrees(solved.yaw)}, pitch {degrees(solved.pitch)}
 					</Struck>{" "}
-					stays the sensor guess until a person helps
+					stays the phone's guess until you tap a peak
 				</>
 			);
 		case "tap-a-peak":
 			return solved.accepted ? (
-				<>not needed here: only when the gate refuses</>
+				<>not needed here; only when a photo is refused</>
 			) : (
 				<>
-					<span className="nb-mark">needed for this photo</span>: tap one known
-					peak for the direction, three for the lens too
+					<span className="nb-mark">needed here</span>: tap one peak for
+					direction, three for the lens
 				</>
 			);
 		case "dem-source": {
 			const levels = terrain?.levels[data.dem];
 			return levels ? (
 				<>
-					{data.dem} tiles,{" "}
+					{data.dem} height tiles (
 					<Value>{levels.reduce((sum, level) => sum + level.tiles, 0)}</Value>{" "}
-					of them at zooms{" "}
-					<Value>{levels.map((level) => level.z).join("/")}</Value>;{" "}
-					<Value>{levels[0].mPerPx.toFixed(0)} m</Value> pixels near the eye,{" "}
+					at zoom <Value>{levels.map((level) => level.z).join("/")}</Value>);{" "}
+					<Value>{levels[0].mPerPx.toFixed(0)} m</Value> pixels nearby,{" "}
 					<Value>{levels[levels.length - 1].mPerPx.toFixed(0)} m</Value> far out
 				</>
 			) : (
@@ -279,15 +278,14 @@ export function stepNote(
 		case "terrain-sampler":
 			return (
 				<>
-					one question, asked everywhere: the ground under the camera is{" "}
-					<Value>{data.gps.ground.toFixed(1)} m</Value>
+					ground under the camera: <Value>{data.gps.ground.toFixed(1)} m</Value>
 				</>
 			);
 		case "eye-rule":
 			return (
 				<>
 					GPS says <Value>{data.gps.alt.toFixed(1)} m</Value> (±
-					<Value>{data.gps.hAccuracy.toFixed(0)} m</Value> across); eye ={" "}
+					<Value>{data.gps.hAccuracy.toFixed(0)} m</Value>); camera height ={" "}
 					max(GPS, ground + 1.6 m) = <Value>{data.gps.eye.toFixed(1)} m</Value>
 				</>
 			);
@@ -298,8 +296,8 @@ export function stepNote(
 			);
 			return (
 				<>
-					<Value>{data.horizon.profile.length}</Value> directions every{" "}
-					<Value>{data.horizon.step}°</Value>; straight ahead the skyline is a
+					<Value>{data.horizon.profile.length}</Value> directions, every{" "}
+					<Value>{data.horizon.step}°</Value>; straight ahead the horizon is a
 					ridge <Value>{(sample.d / 1000).toFixed(1)} km</Value> away
 				</>
 			);
@@ -309,19 +307,13 @@ export function stepNote(
 			const labelled = data.peaks.filter((peak) => peak.labelled).length;
 			return (
 				<>
-					<Value>{data.peaks.length}</Value> mapped summits nearby →{" "}
-					<Value>{visible}</Value> actually visible → <Value>{labelled}</Value>{" "}
-					labelled
+					<Value>{data.peaks.length}</Value> mapped summits →{" "}
+					<Value>{visible}</Value> visible → <Value>{labelled}</Value> labelled
 				</>
 			);
 		}
 		case "dem-anchoring":
-			return (
-				<>
-					a photo's depth has no scale; the terrain is the ruler that turns it
-					into metres
-				</>
-			);
+			return <>photo depth has no scale; the terrain turns it into metres</>;
 		case "photo-workspace": {
 			const names = data.peaks
 				.filter((peak) => peak.labelled)
@@ -339,11 +331,11 @@ export function stepNote(
 		case "camera-roll":
 			return roll ? (
 				<>
-					<Value>{roll.rows.length}</Value> photos, one viewpoint (within{" "}
+					<Value>{roll.rows.length}</Value> photos, one spot (within{" "}
 					<Value>{roll.viewpointRadiusM} m</Value>), over{" "}
 					<Value>{Math.round(roll.spanS / 60)} min</Value>;{" "}
 					{index
-						? `${index.photos.filter((photo) => photo.accepted).length} posed`
+						? `${index.photos.filter((photo) => photo.accepted).length} solved`
 						: ""}
 				</>
 			) : (
@@ -352,8 +344,8 @@ export function stepNote(
 		case "step-inside":
 			return (
 				<>
-					walk into the photo: near ground rebuilt from the image, far mountains
-					from the DEM
+					walk into the photo: near ground from the image, far mountains from
+					terrain data
 				</>
 			);
 		default:

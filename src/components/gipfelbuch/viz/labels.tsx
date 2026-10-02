@@ -4,6 +4,7 @@
 
 import type { ReactNode } from "react";
 import { HandDot, PenCircle, SketchPath } from "../notebook/Ink";
+import { HandUnderline } from "./hand";
 
 // Figure labels (hand pass, reports/gipfelbuch-hand-sketch-2026-10-01.md): every label in a figure
 // is written by hand. Values and names use the small hand (Shantell Sans, tabular figures); peak and
@@ -97,6 +98,9 @@ export function HandRange({
 	step,
 	label,
 	onChange,
+	readout,
+	onResume,
+	manual,
 }: {
 	value: number;
 	min: number;
@@ -104,9 +108,15 @@ export function HandRange({
 	step: number;
 	label: string;
 	onChange: (v: number) => void;
+	/** The value in hand figures (tabular) after the track, e.g. "12.5°". */
+	readout?: ReactNode;
+	/** With `manual`, a pencil "↻ play" button after the track that hands the slider back to its animation. */
+	onResume?: () => void;
+	/** True while the reader holds the slider (useAutoScrub's `isManual`): shows the resume button. */
+	manual?: boolean;
 }) {
 	const frac = Math.min(1, Math.max(0, (value - min) / (max - min || 1)));
-	return (
+	const track = (
 		<span className="relative mt-1 block h-6 w-full">
 			<svg
 				viewBox="0 0 300 10"
@@ -186,6 +196,33 @@ export function HandRange({
 					opacity={1}
 				/>
 			</svg>
+		</span>
+	);
+	if (readout == null && !onResume) return track;
+	return (
+		<span className="flex items-center gap-3">
+			<span className="min-w-0 flex-1">{track}</span>
+			{readout != null && (
+				<span className="nb-num min-w-[3.5em] shrink-0 text-right text-[14px] leading-[20px] text-[var(--gb-ink)] tabular-nums">
+					{readout}
+				</span>
+			)}
+			{onResume && manual && (
+				<button
+					type="button"
+					onClick={onResume}
+					className="nb-hand relative shrink-0 px-2 text-[17px] leading-[22px] text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]"
+				>
+					↻ play
+					<HandUnderline
+						seed={`range-resume-${label}`}
+						color="pencil"
+						width={1.1}
+						coverage={1}
+						offset={-2}
+					/>
+				</button>
+			)}
 		</span>
 	);
 }

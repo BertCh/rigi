@@ -33,7 +33,6 @@ import {
 	LiveDrape,
 	LivePanorama,
 	MarginNote,
-	Measured,
 	RealPhoto,
 	Steps,
 	StoryMap,
@@ -273,7 +272,8 @@ function RollLinker() {
 		<Figure
 			label="D1"
 			bleed
-			caption="Schematic (invented points). Single-linkage clustering, exactly as clusterPhotos does it: every pair of photos closer than the link distance is joined, and a roll is a connected component. The real threshold is ROLL_LINK_M = 15 km, so a day's hike stays one roll, while a valley 17 km further on opens another. A photo at the pass shows the chain effect: no photo has to be near every other, only near a neighbour."
+			source="Skizze"
+			caption="Invented points. Photos closer than the link distance are joined, and a roll is a connected group. At the real 15 km, a day's hike stays one roll and a valley 17 km further on opens another. A photo at the pass shows the chain effect: each photo only needs one near neighbour."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
@@ -368,7 +368,7 @@ function RollLinker() {
 								size={FIG_LABEL}
 								color={inkColor(PAL[k % PAL.length])}
 							>
-								{`roll ${k + 1} · ${r.n} photo${r.n > 1 ? "s" : ""} · r ${r.r.toFixed(1)} km`}
+								{`roll ${k + 1} · ${r.n} photo${r.n > 1 ? "s" : ""}`}
 							</HandLabel>
 						</g>
 					))}
@@ -508,7 +508,8 @@ function ViewpointWalk() {
 	return (
 		<Figure
 			label="D2"
-			caption="Schematic (invented walk). Inside one area, groupViewpoints walks the photos in capture time. A photo joins the first viewpoint whose opening photo is within 250 m (VIEWPOINT_RADIUS_M); otherwise it opens a new one. Photo f is within 250 m of both opening photos and is closer to the second, yet it joins the first: the rule is first match, not nearest. When the walk ends each viewpoint is re-centred on its members (diamonds)."
+			source="Skizze"
+			caption="Invented walk. Photos are taken in time order. A photo joins the first viewpoint whose opening photo is within 250 m; otherwise it opens a new one. Photo f is within 250 m of both opening photos and nearer the second, yet it joins the first: first match, not nearest. At the end each viewpoint is re-centred on its photos (diamonds)."
 		>
 			<div ref={ref}>
 				<svg
@@ -628,31 +629,31 @@ function PoseLadder() {
 			on: saved,
 			set: setSaved,
 			title: "Saved pose",
-			from: "loadSavedPose(meta.id): you placed it in the workspace",
-			conf: "no confidence",
+			from: "you placed it in the workspace",
+			conf: "not scored",
 		},
 		{
 			k: "gt",
 			on: gt,
 			set: setGt,
-			title: "Ground truth",
-			from: "data/ground-truth.json: hand-fitted, quality not none, yaw/pitch/roll/f all present",
-			conf: "no confidence",
+			title: "Hand-fitted pose",
+			from: "fitted by hand",
+			conf: "not scored",
 		},
 		{
 			k: "solved",
 			on: solved,
 			set: setSolved,
 			title: "Solved pose",
-			from: "loadSolvedPose(meta.id): the roll aligner's cascade accepted it",
-			conf: "confidence from the cascade",
+			from: "an automatic solve was accepted",
+			conf: "scored by the solve",
 		},
 		{
 			k: "prior",
 			on: true,
 			set: () => {},
-			title: "EXIF prior",
-			from: "priorPose(meta): compass heading (0 if none), gravity pitch and roll, lens vfov",
+			title: "Phone guess",
+			from: "phone compass (0 if none), tilt from gravity, lens field of view",
 			conf: "unverified",
 		},
 	];
@@ -660,7 +661,8 @@ function PoseLadder() {
 	return (
 		<Figure
 			label="D3"
-			caption="Schematic. resolvePose is a ladder, not a solver. Switch what a photo has on file and the first rung that exists wins; the roll never runs a solve just to be drawn. Nothing here is stored on the roll itself: it is rebuilt on every load from the photos and whatever the browser remembers."
+			source="Skizze"
+			caption="This is a ladder, not a solver: switch what a photo has on file and the first rung that exists wins. The roll never solves just to draw itself, and stores nothing: it is rebuilt on every load."
 		>
 			<ol className="list-none space-y-2">
 				{rungs.map((r, i) => {
@@ -796,14 +798,15 @@ function CompassBias() {
 	return (
 		<Figure
 			label="D4"
-			caption="Schematic, the best case (invented numbers; the real roll above is messier). If a phone carries one compass bias for a whole stop, then once any photo at a viewpoint is anchored, the median of its yaw offsets (within 45 minutes) shifts the starting prior for its neighbours. The solver's ±25° yaw window then lands on the heading instead of missing it. The prior is only a starting point; the cascade still decides acceptance."
+			source="Skizze"
+			caption="Best case, invented numbers (the real roll is messier). If a phone's compass is off by the same amount all stop, one solved photo shifts the starting guess for its neighbours by the median offset of photos within 45 minutes. The solver's ±25° yaw window then lands on the heading. The guess is only a start; the solve still decides acceptance."
 		>
 			<div className="grid items-center gap-5 md:grid-cols-[minmax(0,300px)_1fr]">
 				<svg
 					viewBox="0 0 300 300"
 					className="mx-auto block h-auto w-full max-w-[300px]"
 					role="img"
-					aria-label="Compass dial: EXIF heading, biased prior, solver window and true yaw"
+					aria-label="Compass dial: phone heading, shifted guess, solver window and true yaw"
 				>
 					<title>Compass bias and the solver window</title>
 					<PenCircle
@@ -837,7 +840,7 @@ function CompassBias() {
 						R - 24,
 						"cb-exif",
 						"pencil",
-						`EXIF ${heading}°`,
+						`compass ${heading}°`,
 						-6,
 						"3 4",
 					)}
@@ -847,7 +850,7 @@ function CompassBias() {
 							R - 8,
 							"cb-prior",
 							"ink",
-							`prior ${(((centre % 360) + 360) % 360).toFixed(0)}°`,
+							`guess ${(((centre % 360) + 360) % 360).toFixed(0)}°`,
 							-6,
 							undefined,
 							0.36,
@@ -926,7 +929,7 @@ function CompassBias() {
 					/>
 					<div className="flex flex-wrap gap-2">
 						<Chip on={use} onClick={() => setUse(!use)}>
-							viewpoint bias {use ? "on" : "off"}
+							neighbour correction {use ? "on" : "off"}
 						</Chip>
 						<Chip on={wrong} onClick={() => setWrong(!wrong)}>
 							add a wrong anchor
@@ -935,12 +938,12 @@ function CompassBias() {
 					<p className={`font-mono ${TYPE.micro} gb-secondary`}>
 						median {fmt(med, 1)}° ·{" "}
 						{applicable
-							? `prior shifted to ${(((centre % 360) + 360) % 360).toFixed(0)}°`
+							? `guess shifted to ${(((centre % 360) + 360) % 360).toFixed(0)}°`
 							: use
-								? "below 1° or above 90°: prior left alone"
-								: "prior = raw compass"}{" "}
+								? "below 1° or above 90°: guess left alone"
+								: "guess = raw compass"}{" "}
 						· true yaw is {Math.abs(miss).toFixed(1)}° from the window centre.
-						Dashed pencil = EXIF, black = shifted prior, red = truth.
+						Dashed = phone compass, black = shifted guess, red = truth.
 					</p>
 				</div>
 			</div>
@@ -1121,7 +1124,8 @@ function PanoramaStrip() {
 		<Figure
 			label="D5"
 			bleed
-			caption="Schematic (synthetic scene, real mapping maths). Photos from one viewpoint stitch without feature matching. buildMesh turns each photo into a grid of rays (u, v), and its pose sends every ray to a true azimuth and elevation on a shared canvas, so roll rotates the image and wide lenses bend. The DEM ridgelines traced from the viewpoint eye (red) sit behind here; the app overlays them as the match cue. Each photo's own skyline (black) lies on the terrain only when its pose is right: the middle photo starts with a compass and roll error and settles as the pose is found."
+			source="Skizze"
+			caption="Invented scene, real mapping. Photos from one viewpoint stitch without feature matching: each photo is a grid of rays, and its pose sends every ray to an azimuth and elevation on a shared canvas, so roll turns the image and wide lenses bend. Terrain ridges from the viewpoint (red) lie behind; the app overlays them as the match cue. Each photo's own skyline (black) lies on them only when its pose is right: the middle photo starts with a compass and roll error and settles as the pose is found."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
@@ -1333,9 +1337,8 @@ function RealRoll() {
 			bleed
 			caption={
 				<>
-					Click a photo or a dot. Dashed magenta is the phone's compass, teal
-					the solved direction. Brown marks are the two photos the solve
-					rejected. Grouping uses the code's real rules. <Measured data={d} />
+					Click a photo or a dot. Dashed: the phone's compass. Teal: the solved
+					direction. Brown: the two photos the solve rejected.
 				</>
 			}
 		>
@@ -1582,7 +1585,7 @@ function RealRoll() {
 					<div className="bg-[var(--nb-paper-deep)] p-3 text-[var(--gb-ink)]">
 						<div className="mb-1 gb-ink">
 							{cur.id} · +{mmss(cur.t)} ·{" "}
-							{cur.accepted ? "accepted" : "rejected by the cascade"}
+							{cur.accepted ? "accepted" : "rejected"}
 						</div>
 						GPS ±{cur.hAccuracy.toFixed(0)} m
 						<br />
@@ -1593,18 +1596,17 @@ function RealRoll() {
 						<span className="text-[var(--gb-ink)]">
 							{d.clusters.length} roll
 						</span>{" "}
-						({d.clusters[0]} photos within 15 km of a neighbour),{" "}
+						({d.clusters[0]} photos, each within 15 km of a neighbour),{" "}
 						<span className="text-[var(--gb-ink)]">
 							{d.viewpoints.length} viewpoint
 						</span>
 						: every photo is within {maxFromFirst.toFixed(0)} m of the first,
-						well inside the 250 m rule.
+						inside the 250 m radius.
 					</p>
 					<p>
 						Captured over{" "}
 						<span className="text-[var(--gb-ink)]">{mmss(d.spanS)} min</span>,
-						in {bursts} bursts. {acc} of {rows.length} are accepted by the
-						cascade.
+						in {bursts} bursts. {acc} of {rows.length} were solved.
 					</p>
 					<p>
 						The GPS accuracy circles ({Math.min(...hs).toFixed(0)}–
@@ -1647,9 +1649,7 @@ function RealBias() {
 			caption={
 				<>
 					Dots: solved yaw minus compass, per photo in shooting order (hollow =
-					rejected). Teal ticks: what the earlier photos would have predicted.
-					This replays the real bias estimate over the CPU run's accepted poses.{" "}
-					<Measured data={d} />
+					rejected). Teal ticks: what the earlier photos predicted.
 				</>
 			}
 		>
@@ -1746,19 +1746,16 @@ function RealBias() {
 				))}
 			</svg>
 			<p className={`mt-3 font-mono ${TYPE.micro} gb-secondary`}>
-				Across the {accOff.length} accepted photos the compass error runs from{" "}
+				Across the {accOff.length} solved photos the compass error runs from{" "}
 				<span className="text-[var(--gb-ink)]">
 					{fmt(Math.min(...accOff), 1)}° to {fmt(Math.max(...accOff), 1)}°
 				</span>{" "}
-				within {mmss(d.spanS)} min at one spot. The estimate from earlier
-				anchors tracks the first five photos, then misses once the heading
-				changes: on the {used.length} accepted photos that had an estimate it
-				lowers the error for {better}, leaves it for{" "}
-				{used.length - better - worse}, raises it for {worse}. The code's own
-				consistency check (
-				<span className="text-[var(--gb-ink)]">OUTLIER_DEG</span> = 8°, against
-				all the other anchors) flags {outliers} of {looRows.length} accepted
-				photos here.
+				within {mmss(d.spanS)} min at one spot. The estimate from earlier photos
+				tracks the first five, then misses once the heading changes: of{" "}
+				{used.length} photos with an estimate it lowers the error for {better},
+				leaves it for {used.length - better - worse}, raises it for {worse}. A
+				check against all other photos (8° limit) flags {outliers} of{" "}
+				{looRows.length}.
 			</p>
 		</Figure>
 	);
@@ -1830,13 +1827,11 @@ function HeroStages() {
 		<Figure
 			label="Fig. 1"
 			plate
+			pinned="demo-03"
 			caption={
-				<>
-					{spread == null
-						? "Twelve photos become one place."
-						: `All 12 photos were taken within ${Math.round(spread)} m of the first, so their views fan out from one spot (terrain patch fixed: demo-03).`}{" "}
-					<Measured data={roll} />
-				</>
+				spread == null
+					? "Twelve photos become one place."
+					: `All 12 photos were taken within ${Math.round(spread)} m of the first, so their views fan out from one spot.`
 			}
 		>
 			<Stages
@@ -1980,7 +1975,7 @@ function RollNumbers() {
 					value: `${acc.length} / ${d.rows.length}`,
 					label: "photos aimed automatically",
 				},
-				{ value: mmss(d.spanS), label: "minutes of shooting, all at one spot" },
+				{ value: mmss(d.spanS), label: "of shooting, all at one spot" },
 				{
 					value: `${fmt(lo)}° to ${fmt(hi)}°`,
 					label: "compass error across the accepted photos",
@@ -1990,12 +1985,7 @@ function RollNumbers() {
 					label: "link distance that joins photos into a roll",
 				},
 			]}
-			source={
-				<>
-					Measured on the 12 demo photos ({d.script}, {d.generated}). Link
-					distance: src/lib/roll/roll.ts.
-				</>
-			}
+			source="Measured on the 12 demo photos."
 		/>
 	);
 }
@@ -2014,17 +2004,24 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 		<>
 			<HeroStages />
 
-			<Beat kicker="The idea" title="A day of photos is a place, not a pile.">
+			<Beat kicker="The idea" title="Photos are grouped by where they were taken.">
 				<p>
-					Photos from one spot share one eye. Each only needs a heading to land
-					in the right place.
+					Each photo already has a{" "}
+					<HandMark type="underline">
+						time, position and compass reading
+					</HandMark>
+					. Rigi uses them to group the photos and aim each one. Nothing is
+					stored: the roll is worked out again each time.
+				</p>
+				<p>
+					Photos from one spot share one camera position. Each only needs a
+					heading to land in the right place.
 				</p>
 				<p>
 					<HandMark type="highlight">
 						The phone's compass is the weak part.
 					</HandMark>{" "}
-					Slide it below and watch every photo settle onto the terrain's
-					skyline.
+					Slide it below and watch every photo settle onto the terrain.
 				</p>
 			</Beat>
 
@@ -2034,9 +2031,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<p>
 					Each photo sits on the plan at its true GPS time and place. The big
 					circles are how far the phone's GPS could be off.
-					<MarginNote mark="a">
-						all 12 positions lie within about 110 m, so the pins pile up
-					</MarginNote>
+					<MarginNote mark="a">all 12 lie within about 110 m</MarginNote>
 				</p>
 			</Beat>
 
@@ -2047,7 +2042,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				where={[
 					{
 						sym: "ψ",
-						text: "yaw, the way the camera points: the phone's compass at first, the solved value after the slider moves",
+						text: "yaw, where the camera points (phone compass at first, solved value after the slider moves)",
 					},
 					{
 						sym: "u",
@@ -2055,7 +2050,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					},
 					{
 						sym: "hfov",
-						text: "the lens's horizontal field of view. Written for a level camera; pitch and roll tilt the rays first",
+						text: "horizontal field of view of the lens (formula for a level camera)",
 					},
 				]}
 			>
@@ -2078,7 +2073,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						},
 						{
 							title: "Aim",
-							body: "Red is the compass, teal the solved direction.",
+							body: "Phone compass, then the solved direction.",
 							visual: <MiniAim />,
 						},
 						{
@@ -2118,12 +2113,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Details>
 				<p>
-					A <code>Roll</code> is derived on the fly from photo metadata plus
-					whatever poses the browser already remembers. Two small distance rules
-					structure it, and a <HandMark type="underline">pose ladder</HandMark>{" "}
-					aims each photo. Solving a pose from scratch is the job of{" "}
-					{A("viewport-inference", "viewport inference")}, so the roll never
-					repeats it just to draw a screen.
+					A roll is rebuilt on every load from photo metadata plus any poses the
+					browser remembers. Two distance rules group the photos, and a{" "}
+					<HandMark type="underline">pose ladder</HandMark> picks each
+					photo&rsquo;s direction. Solving from scratch is the job of{" "}
+					{A("viewport-inference", "viewport inference")}; the roll never
+					repeats it.
 				</p>
 
 				<RollLinker />
@@ -2131,17 +2126,13 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<h3>Areas, then viewpoints</h3>
 				<div className="space-y-3">
 					<p>
-						<code>clusterPhotos</code> is single-linkage with{" "}
-						<code>ROLL_LINK_M = 15&nbsp;000&nbsp;m</code>: photos closer than 15
-						km to a neighbour share a roll, transitively. A day's hike stays one
-						roll even when its ends are far apart, and uploads from two trips
-						split naturally. Within a roll, <code>groupViewpoints</code> walks
-						the photos in capture time and files each under the first viewpoint
-						whose opening photo is within{" "}
-						<code>VIEWPOINT_RADIUS_M = 250&nbsp;m</code>. Each viewpoint is then
-						re-centred on its members. A viewpoint matters because the photos
-						taken there are close enough to share one eye, which is what makes a
-						panorama and a shared compass bias possible.
+						Photos closer than 15 km to a neighbour share a roll, transitively.
+						A day's hike stays one roll even when its ends are far apart; two
+						trips split apart. Within a roll, photos are taken in time order and
+						filed under the first viewpoint whose opening photo is within 250 m,
+						then each viewpoint is re-centred on its photos. Photos at one
+						viewpoint share a camera position, which is what makes a panorama
+						and a shared compass bias possible.
 					</p>
 				</div>
 
@@ -2150,13 +2141,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<h3>The best pose we already have</h3>
 				<div className="space-y-3">
 					<p>
-						Each photo gets a pose from <code>resolvePose</code> with no solver
-						run. The first of four sources wins. The ladder keeps the roll fast
-						and honest: a photo shows as <code>prior</code> until something
-						better, a person's pin or an accepted solve, replaces it. The{" "}
-						{A("camera-prior", "EXIF prior")} is the floor: compass heading (0
-						if there is none), gravity pitch and roll, and the lens field of
-						view.
+						Each photo gets a pose with no solver run: the first of four sources
+						wins. A photo stays a phone guess until something better, a person's
+						pin or an accepted solve, replaces it. The{" "}
+						{A("camera-prior", "phone guess")} is the floor: compass heading (0
+						if none), tilt from gravity, and the lens field of view.
 					</p>
 				</div>
 
@@ -2165,22 +2154,18 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<h3>Anchors teach their neighbours</h3>
 				<div className="space-y-3">
 					<p>
-						<code>alignRoll</code> runs the frozen single-photo cascade, one
-						photo at a time in capture order, on every photo that still has only
-						its prior. It stores a pose only when the cascade accepts, so a
-						rejected photo stays visibly "needs review". The roll adds one idea:
-						photos at the same viewpoint, within minutes, often share the
-						phone's compass bias, so every anchored photo gives its neighbours a
-						better starting prior (the real roll below shows where that holds
-						and where it does not). The estimate is the median of the anchors'
-						yaw offsets,{" "}
-						<HandMark type="double">
-							so a single wrong anchor cannot drag it
-						</HandMark>
-						. It is used only between 1° and 90°, and only for anchors within 45
-						minutes (<code>BIAS_WINDOW_S</code>). A photo rejected before its
-						spot had an anchor gets one retry when the new bias differs by at
-						least 2°.
+						The solver runs on each photo that still has only its phone guess,
+						one at a time in capture order, and stores a pose only when it
+						accepts; a rejected photo stays marked &ldquo;needs review&rdquo;.
+						The roll adds one idea: photos at one viewpoint, within minutes,
+						often share the phone&rsquo;s compass error, so each solved photo
+						gives its neighbours a better starting guess (the real roll below
+						shows where that holds). The estimate is the median of the solved
+						photos&rsquo; yaw offsets,{" "}
+						<HandMark type="double">so one wrong pin cannot drag it</HandMark>.
+						It is used only between 1° and 90°, and only for photos within 45
+						minutes. A photo rejected before its spot had a solved neighbour
+						gets one retry when the new estimate differs by at least 2°.
 					</p>
 				</div>
 
@@ -2190,15 +2175,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<div className="space-y-3">
 					<p>
 						With poses in hand the strip needs no matching. Every photo is a
-						subdivided mesh whose vertices are the rays of a (u, v) grid;
-						unprojecting each through the photo's pose puts it on an azimuth ×
-						elevation canvas, so roll turns the picture and a wide lens bends
-						correctly. Meshes repeat every 360° so a full circle wraps. The{" "}
-						<code>traceViewpoint</code> worker traces the viewpoint's 360° DEM
-						ridgelines in depth slabs (log-spaced from 40 m to 120 km), from the
-						same eye as the {A("dem-horizon", "DEM horizon")}, and the strip
-						draws them over each photo as a match cue. Only aligned photos get
-						it, never prior-only ones, because a prior pose is only a guess.
+						mesh of rays; each ray goes through the photo&rsquo;s pose to a spot
+						on an azimuth by elevation canvas, so roll turns the picture and a
+						wide lens bends correctly. The canvas repeats every 360° so a full
+						circle wraps. A worker traces the terrain ridges all round the
+						viewpoint, in distance bands from 40 m to 120 km, from the same
+						camera position as the {A("dem-horizon", "DEM horizon")}, and the
+						strip draws them over each photo as a match cue. Only solved photos
+						get it, because a phone guess is only a guess.
 					</p>
 				</div>
 
@@ -2207,18 +2191,15 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<h3>Many photos, one drape</h3>
 				<div className="space-y-3">
 					<p>
-						The roll map refines the DEM quadtree around every viewpoint rather
-						than one centre (<code>roll-terrain.ts</code>), then drapes all
-						photos in a single fragment pass (<code>multi-drape-layer.ts</code>
-						). Each tile lists the photos whose frustum reaches it and that are
-						not hidden from it; a fragment weighs candidates by incidence,
-						distance and a feather at the frame edge, and keeps the best{" "}
-						<code>TOP_K = 4</code>. Visibility comes from each photo's range
-						map, with a 2×2 filtered test so silhouettes fade instead of
-						stair-stepping. Because every photo competes in one blend, the
-						result does not depend on draw order or roll size. Photos live in up
-						to four mip-mapped atlases (the first 16 at 1024 px cells) so a
-						large roll stays inside a GPU memory budget.
+						The roll map refines the terrain tiles around every viewpoint, then
+						drapes all photos in one pass. Each tile lists the photos that reach
+						it and can see it; each pixel weighs those photos by viewing angle,
+						distance and distance from the frame edge, and keeps the best four.
+						Visibility comes from each photo&rsquo;s depth map, with a filtered
+						test so silhouettes fade instead of stair-stepping. Because all
+						photos compete in one blend, the result does not depend on draw
+						order or roll size. Photos are packed into up to four texture
+						atlases so a large roll fits in GPU memory.
 					</p>
 				</div>
 
@@ -2226,7 +2207,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					label="D6"
 					bleed
 					pad={false}
-					caption="The same 12-photo roll in the live roll map (screenshot of the app, public/demo/shots/drape.jpg): every photo draped at once on the DEM. All 12 camera positions lie within about 110 m of each other, so the orange pins pile up at one spot and the photos fan out from it over the Niederhorn ridge and the valley."
+					caption="The same 12-photo roll in the roll map: every photo draped at once on the terrain. All 12 camera positions lie within about 110 m, so the orange pins pile up and the photos fan out from one spot over the Niederhorn ridge and the valley."
 				>
 					<img
 						src="/demo/shots/drape.jpg"
@@ -2237,8 +2218,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 				<Callout tone="result" title="Derived, never stored">
 					Rolls, viewpoints and pose sources are recomputed from metadata every
-					time, with stable upload ids (<code>local-roll-&lt;hash&gt;</code>{" "}
-					from the earliest photo). Delete a photo and the roll simply re-forms.
+					time. Delete a photo and the roll simply re-forms.
 				</Callout>
 
 				<h3>Where to look</h3>
@@ -2255,10 +2235,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<CodeRef path="src/lib/roll/import/interpolate.ts" />
 						<CodeRef path="src/lib/roll/mosaic/loadRoll.ts" />
 					</div>
-					<p className={`!mt-3 font-mono ${TYPE.caption} gb-secondary`}>
-						clusterPhotos, groupViewpoints, makeRoll, resolvePose, priorPose,
-						alignRoll, viewpointBias, biasedPrior, buildMesh, traceViewpoint
-					</p>
 				</div>
 
 				<h3>From file to draped roll</h3>
@@ -2267,23 +2243,23 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						steps={[
 							{
 								title: "Import",
-								body: "Photos are read for EXIF; a photo with no GPS gets a position interpolated between two neighbours within 20 minutes (interpolate.ts), with a growing accuracy estimate.",
+								body: "Photos are read for EXIF. A photo with no GPS gets a position interpolated between neighbours within 20 minutes, with a growing error estimate.",
 							},
 							{
 								title: "Cluster and group",
-								body: "Single-linkage at 15 km gives the rolls; the 250 m first-match rule gives the viewpoints, re-centred on their members.",
+								body: "Photos within 15 km of a neighbour form a roll; the first match within 250 m gives the viewpoints, re-centred on their photos.",
 							},
 							{
-								title: "Resolve poses",
-								body: "Saved, then ground truth, then the roll aligner's accepted pose, then the EXIF prior. Each photo carries its source and confidence.",
+								title: "Pick poses",
+								body: "Saved, then hand-fitted, then an accepted solve, then the phone guess. Each photo carries its source and confidence.",
 							},
 							{
-								title: "Align (optional)",
-								body: "The cascade runs on prior-only photos in capture order, with viewpoint-bias priors. Only accepted poses are stored.",
+								title: "Solve (optional)",
+								body: "The solver runs on phone-guess photos in capture order, starting from the neighbour-corrected guess. Only accepted poses are stored.",
 							},
 							{
 								title: "Show",
-								body: "Mosaic and panorama strip from poses; terrain drape on the map from the same poses.",
+								body: "Mosaic, panorama strip and terrain drape all come from the same poses.",
 							},
 						]}
 					/>
@@ -2292,14 +2268,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<h3>Rolls reuse, they do not re-solve</h3>
 				<div className="space-y-3">
 					<p>
-						The aligner calls straight into the cascade described under{" "}
+						Alignment reuses the solver from{" "}
 						{A("viewport-inference", "viewport inference")}, and its accepted
-						poses obey the {A("accept-rule", "accept rule")}. The terrain under
-						the drape comes from the {A("dem-source", "DEM")}; the same photos
-						can then {A("step-inside", "step inside")} for a near-field view,
-						and each opens in the {A("photo-workspace", "photo workspace")}.
-						Snapping to terrain is covered in{" "}
-						{A("terrain-snapping", "terrain snapping")}.
+						poses follow the {A("accept-rule", "accept rule")}. The terrain
+						under the drape comes from the {A("dem-source", "DEM")}; the same
+						photos can then {A("step-inside", "step inside")} for a near-field
+						view, and each opens in the{" "}
+						{A("photo-workspace", "photo workspace")}. Snapping to terrain is
+						covered in {A("terrain-snapping", "terrain snapping")}.
 					</p>
 				</div>
 			</Details>

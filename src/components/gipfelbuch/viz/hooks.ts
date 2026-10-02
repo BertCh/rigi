@@ -125,3 +125,111 @@ export function sheetTransition(): boolean {
 		!window.matchMedia("(prefers-reduced-motion: reduce)").matches
 	);
 }
+
+/**
+ * Pen draw-on for a figure's strokes (notebook.css `nb-armed` / `nb-on`, the effect the notebook map
+ * uses). Attach `ref` to the figure's root and `className` to it; give each stroke `draw` (and a `delay`
+ * to stagger it) on SketchPath / PenArrow. Armed only on the client, so a static render, reduced motion,
+ * webdriver automation and print all show every stroke. `on` is true once the figure has been in view.
+ *   const { ref, className } = useDrawOn(); <div ref={ref} className={className}> ...
+ */
+export function useDrawOn<T extends Element = HTMLDivElement>(): {
+	ref: RefObject<T | null>;
+	armed: boolean;
+	on: boolean;
+	className: string;
+} {
+	const [ref, on] = useInView<T>();
+	const reduce = useReducedMotion();
+	const [armed, setArmed] = useState(false);
+	useEffect(() => {
+		setArmed(!reduce && !revealsImmediately());
+	}, [reduce]);
+	return {
+		ref,
+		armed,
+		on,
+		className: armed ? (on ? "nb-armed nb-on" : "nb-armed") : "",
+	};
+}
+
+/** The value of a ping-pong scrub (min to max and back, linear) `elapsedMs` into a cycle of `period` ms. */
+export function scrubValue(
+	elapsedMs: number,
+	{ min, max, period }: { min: number; max: number; period: number },
+): number {
+	const phase = (((elapsedMs / period) % 1) + 1) % 1;
+	const u = phase < 0.5 ? 2 * phase : 2 - 2 * phase;
+	return min + u * (max - min);
+}
+
+/**
+ * A slider that plays itself until the reader takes it: `value` ping-pongs between `min` and `max` over
+ * `period` ms while the figure is on screen; `setManual(v)` (call it from the slider's onChange) freezes
+ * it at v; `resume()` plays on from where the reader left it. Under reduced motion and webdriver it holds
+ * at `still` (default `max`, the solved end). Attach `ref` to the figure to pause it off screen.
+ */
+export function useAutoScrub({
+	min,
+	max,
+	period,
+	still = max,
+}: {
+	min: number;
+	max: number;
+	/** Milliseconds for one there-and-back cycle. */
+	period: number;
+	/** Where it rests when nothing animates (default `max`). */
+	still?: number;
+}): {
+	value: number;
+	setManual: (value: number) => void;
+	isManual: boolean;
+	resume: () => void;
+	ref: RefObject<HTMLDivElement | null>;
+} {
+	const reduce = useReducedMotion();
+	const frozen =
+		reduce || (typeof window !== "undefined" && !!navigator.webdriver);
+	const ref = useRef<HTMLDivElement>(null);
+	const [visible, setVisible] = useState(true);
+	const [manual, setManualValue] = useState<number | null>(null);
+	const [auto, setAuto] = useState(still);
+	// where the cycle would be when playing starts: a manual stop resumes from its own value
+	const startFrac = useRef(0);
+	useEffect(() => {
+		const el = ref.current;
+		if (!el || typeof IntersectionObserver === "undefined") return;
+		const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), {
+			rootMargin: "80px",
+		});
+		io.observe(el);
+		return () => io.disconnect();
+	}, []);
+	const playing = !frozen && manual === null && visible;
+	useEffect(() => {
+		if (!playing) return;
+		const t0 = performance.now() - (startFrac.current / 2) * period;
+		let raf = 0;
+		const tick = (now: number) => {
+			setAuto(scrubValue(now - t0, { min, max, period }));
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	}, [playing, min, max, period]);
+	const setManual = (v: number) => {
+		startFrac.current = Math.min(1, Math.max(0, (v - min) / (max - min || 1)));
+		setManualValue(v);
+	};
+	return {
+		value: manual ?? (frozen ? still : auto),
+		setManual,
+		isManual: manual !== null,
+		resume: () => {
+			if (manual !== null) setAuto(manual);
+			setManualValue(null);
+		},
+		ref,
+	};
+}

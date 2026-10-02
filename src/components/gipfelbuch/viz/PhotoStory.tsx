@@ -175,7 +175,7 @@ function Annotations({ d, step }: { d: GipfelbuchPhotoData; step: Step }) {
 						size={LABEL - 1}
 						color={INK}
 					>
-						traced by the eye
+						traced skyline
 					</HandLabel>
 				</g>
 			)}
@@ -275,9 +275,9 @@ function stepCaption(d: GipfelbuchPhotoData, step: Step): ReactNode {
 	const traced = d.skyline.rows.filter((r) => r != null).length;
 	switch (step) {
 		case 0:
-			return `The phone's guess: yaw ${d.prior.yaw.toFixed(1)}°, pitch ${d.prior.pitch.toFixed(1)}°. The DEM skyline (dashed) and the names are drawn where that pose puts them.`;
+			return `The phone's guess: yaw ${d.prior.yaw.toFixed(1)}°, pitch ${d.prior.pitch.toFixed(1)}°. The terrain horizon (dashed) and the names sit where that pose puts them.`;
 		case 1:
-			return `The eye traces the real skyline across ${traced} columns. Against the guess the gap is ${d.residual.prior.median.toFixed(1)} px (median).`;
+			return `The real skyline, traced across ${traced} columns. Gap to the guess: ${d.residual.prior.median.toFixed(1)} px (median).`;
 		case 2:
 			return (
 				<>
@@ -290,15 +290,15 @@ function stepCaption(d: GipfelbuchPhotoData, step: Step): ReactNode {
 						{`${d.prior.yaw.toFixed(1)}°`}
 					</Struck>{" "}
 					({signedDegrees(d.solved.delta.yaw)} yaw,{" "}
-					{signedDegrees(d.solved.delta.pitch)} pitch): the DEM line drops onto
-					the trace.
+					{signedDegrees(d.solved.delta.pitch)} pitch): the horizon drops onto
+					the skyline.
 				</>
 			);
 		default:
-			return `Snapped: the gap is ${d.residual.solved.median.toFixed(1)} px (was ${d.residual.prior.median.toFixed(1)}), and ${named} peaks are named at their summits. ${
+			return `Snapped: gap ${d.residual.solved.median.toFixed(1)} px (was ${d.residual.prior.median.toFixed(1)}); ${named} peaks named at their summits. ${
 				d.solved.accepted
-					? `Accepted at confidence ${d.solved.confidence.toFixed(2)}.`
-					: `Not accepted (${d.solved.rejectReason ?? "low confidence"}): the app asks instead.`
+					? `Confidence ${d.solved.confidence.toFixed(2)}.`
+					: `Refused (${d.solved.rejectReason ?? "low confidence"}): the app asks you to tap a peak instead.`
 			}`;
 	}
 }
@@ -392,8 +392,8 @@ function PhotoStoryInner({
 
 	const seed = `photo-story-${id}`;
 	const defaultCaption = data
-		? `${data.id}: the alignment written on the photo. The phone's guess is struck in red; the skyline and the summits are measured (${data.solved.stage}, ${data.dem} DEM).`
-		: "The alignment written on the photo …";
+		? `${data.id}: the solved pose written on the photo. The phone's guess is struck in red.`
+		: "The solved pose written on the photo.";
 	return (
 		<Figure
 			number={number}

@@ -44,7 +44,7 @@ function SheetBody({ node, number }: { node: GipfelbuchNode; number: string }) {
 				sheet={number}
 				total={TOTAL}
 				title={node.title}
-				imprint={`Rigi Gipfelbuch · Blatt ${number} · Ausgabe 2026 · Stand ${STAND} · Grundlage © swisstopo (OGD) · DEM Mapterhorn`}
+				imprint={`Rigi Gipfelbuch · Blatt ${number} · Stand ${STAND} · Grundlage © swisstopo · Höhen Mapterhorn`}
 			>
 				<header className="relative px-6 pt-12 pb-6">
 					<div className="absolute top-10 right-6">
@@ -118,10 +118,10 @@ function GipfelbuchPrint() {
 
 			<section className="mx-auto max-w-6xl px-6 pt-12">
 				<Cartouche
-					kicker="Gipfelbuch · Band 1 · 2026–"
+					kicker="Gipfelbuch · 2026"
 					title="Gipfelbuch, printed edition"
-					subtitle="Nineteen sheets on how a photograph of a mountain finds its place on the earth."
-					edition={`Blatt 1208 Beatenberg · Niederhorn 1963 m · Ausgabe 2026 · Stand ${STAND}`}
+					subtitle="Nineteen sheets on how a photo of a mountain finds its place on the map."
+					edition={`Blatt 1208 Beatenberg · Niederhorn 1963 m · Stand ${STAND}`}
 				/>
 			</section>
 
@@ -130,9 +130,8 @@ function GipfelbuchPrint() {
 					sheet="00"
 					total={TOTAL}
 					title="Übersicht"
-					imprint="Rigi Gipfelbuch · Blatt 00 · Relief © swisstopo · DEM Mapterhorn"
+					imprint="Rigi Gipfelbuch · Blatt 00 · Relief © swisstopo, Mapterhorn"
 					stand={STAND}
-					edition="2026"
 				>
 					<div className="px-6 py-12">
 						<SheetMap className="w-full" />

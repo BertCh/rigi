@@ -368,8 +368,8 @@ function detect(mult: number): Detection {
 type Mode = "photo" | "sky" | "cost";
 const MODES: { id: Mode; label: string }[] = [
 	{ id: "photo", label: "Photo" },
-	{ id: "sky", label: "Sky probability" },
-	{ id: "cost", label: "Cost volume" },
+	{ id: "sky", label: "Sky" },
+	{ id: "cost", label: "Cost" },
 ];
 const SWEEP = 4.2;
 const BACK = 2.4;
@@ -477,16 +477,16 @@ function ViterbiScan() {
 	const lobeD = lobe.map((q, i) => `${i ? "L" : "M"}${q[0]} ${q[1]}`).join("");
 
 	const stateLabel = sweeping
-		? "forward pass: cost-to-reach each row"
+		? "sweeping: cheapest way to each row"
 		: backK < 1
-			? "backtrack: argmin pointers snap the path"
-			: "boundary + weights";
+			? "walking back: the best path snaps in"
+			: "boundary and weights";
 
 	return (
 		<Figure
 			label="Fig. 3"
 			bleed
-			caption="Synthetic scene, real algorithm. Brighter = cheaper row for the boundary. The lobe is the best cost so far; the walk back draws the winner. Red dots are columns zeroed as spikes."
+			caption="Synthetic scene, real algorithm. Brighter means a cheaper row for the boundary. The lobe is the best cost so far; the walk back draws the winner. Red marks are columns dropped as spikes."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<div
@@ -656,12 +656,9 @@ function ViterbiScan() {
 						<span
 							className={`flex justify-between font-mono gb-secondary ${TYPE.micro}`}
 						>
-							<span>
-								jump cost between columns (the path barely moves: sky evidence
-								dominates)
-							</span>
+							<span>jump cost between columns</span>
 							<span className="gb-ink">
-								{mult === 1 ? "× 1.0 shipped" : `× ${mult.toFixed(2)}`}
+								{mult === 1 ? "× 1.0 (default)" : `× ${mult.toFixed(2)}`}
 							</span>
 						</span>
 						<HandRange
@@ -780,7 +777,7 @@ const SECONDARY: Sky2 = (() => {
 })();
 
 type Stage = 0 | 1 | 2;
-const STAGES = ["raw primary", "+ rejectSpikes", "+ fuseSkylines"];
+const STAGES = ["raw", "no spikes", "cross-checked"];
 
 function CleanAndFuse() {
 	const [stage, setStage] = useState<Stage>(0);
@@ -825,7 +822,7 @@ function CleanAndFuse() {
 	return (
 		<Figure
 			label="Fig. D1"
-			caption="Synthetic strip. Spike rejection drops the post; fusion keeps only columns both detectors agree on, so the chalet, the cloud edge and the gap drop out."
+			caption="Synthetic strip. Dropping spikes removes the post; cross-checking keeps only columns both detectors agree on, so the chalet, cloud edge and gap drop out."
 		>
 			<div
 				className="flex flex-wrap gap-2"
@@ -963,8 +960,8 @@ function CleanAndFuse() {
 				className={`mt-1 flex justify-between font-mono gb-secondary ${TYPE.micro}`}
 			>
 				<span>
-					<span className="text-[var(--nb-forest)]">●</span> vouched &nbsp;
-					<span className="text-[var(--nb-red)]">✕</span> weight 0 &nbsp;
+					<span className="text-[var(--nb-forest)]">●</span> kept &nbsp;
+					<span className="text-[var(--nb-red)]">✕</span> dropped &nbsp;
 					<span className="gb-secondary">╌ second detector</span>
 				</span>
 				<span className="gb-ink">
@@ -993,13 +990,12 @@ function bandCrop(d: GipfelbuchPhotoData): [number, number, number, number] {
 
 const HARD: Partial<Record<GipfelbuchPhotoId, string>> = {
 	"demo-02":
-		"Sun glare and haze: the two ends of the frame have no reliable boundary, so those columns are silent (weight 0, no row).",
+		"Sun glare and haze: the two ends have no reliable boundary, so those columns stay silent.",
 	"demo-06":
-		"Portrait with a dark foreground and a thin sunlit ridge: only the central ridge is vouched for, the rest of the width abstains.",
+		"Dark foreground, thin sunlit ridge: only the central ridge votes.",
 	"demo-11":
-		"A person's head and hair sit on the skyline here; confidence dips where the boundary jumps onto them.",
-	"demo-12":
-		"Same person, same dip in confidence: occluders are where weights fall, which is what the weighting is for.",
+		"A head on the skyline: confidence dips where the line jumps onto it.",
+	"demo-12": "Same person, same dip: occluders are where weights fall.",
 };
 
 function WeightStrip({ d }: { d: GipfelbuchPhotoData }) {
@@ -1090,6 +1086,7 @@ function RealSkyline() {
 	return (
 		<Figure
 			label="Fig. 2"
+			bleed
 			caption={
 				<>
 					Pick any of the 12 photos. Line: the boundary. Ticks and strip: how
@@ -1112,6 +1109,7 @@ function RealSkyline() {
 				}}
 			/>
 			<RealPhoto
+				bleed
 				data={d}
 				layers={["skyline", "weight"]}
 				toggles={["sky", "skyline", "weight"]}
@@ -1130,7 +1128,7 @@ function RealSkyline() {
 						mean weight <span className="gb-ink">{meanW.toFixed(2)}</span>
 					</span>
 					<span>
-						detectSkyline <span className="gb-ink">{d.ms.skyline} ms</span>
+						detected in <span className="gb-ink">{d.ms.skyline} ms</span>
 					</span>
 				</div>
 			)}
@@ -1222,7 +1220,7 @@ function HardCases() {
 	return (
 		<Figure
 			label="Fig. 5"
-			caption="Fixed: demo-02, 06, 11, 12. Four hard frames, same view and scale. Gaps are columns that abstain; the head (bottom row) is the failure no weighting fully fixes."
+			caption="Four hard frames, same view and scale. Gaps are columns that abstain; the head (bottom row) is the failure weighting cannot fully fix."
 		>
 			<Gallery
 				ids={HARD_SHORT.map((h) => h.id)}
@@ -1271,7 +1269,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					The pose search never sees the photo. It gets one number per column,
-					the height of the sky line, plus how much to trust it.
+					the skyline height, plus how far to trust it.
 				</p>
 				<p>
 					<HandMark type="highlight">
@@ -1280,7 +1278,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					</HandMark>
 					{skMed != null && (
 						<MarginNote mark="a">
-							{`I notice the median is ${Math.round(skMed)} ms a photo on the CPU, with no model download.`}
+							{`Median ${Math.round(skMed)} ms per photo on the CPU, no model download.`}
 						</MarginNote>
 					)}
 				</p>
@@ -1314,7 +1312,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Beat
-				kicker="Step 2, slowed down"
+				kicker="Step 2, in slow motion"
 				title="The path is chosen for the whole image at once."
 			>
 				<p>
@@ -1375,8 +1373,8 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 				title="The traced line is what the map is slid against."
 			>
 				<p>
-					The pose search starts from the phone's guess, draws the terrain's
-					skyline there, and{" "}
+					The pose search starts from the phone's guess, draws the terrain
+					horizon there, and{" "}
 					<HandMark type="underline">
 						turns the camera until that line sits on the traced one
 					</HandMark>
@@ -1384,7 +1382,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
-			<PhotoStory bleed={false} number="4" />
+			<PhotoStory number="4" />
 
 			<Beat
 				kicker="Where it fails"
@@ -1394,12 +1392,12 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					Glare and dark foregrounds just remove votes. A person on the ridge is
 					worse: it looks like a real edge.{" "}
 					<HandMark type="wavy">
-						On 100 wild photos, no method found the right pose for 8 of 10 dusk
-						shots or 21 of 36 hazy ones.
+						On 100 unseen photos, no method found the right pose for 8 of 10
+						dusk shots or 21 of 36 hazy ones.
 					</HandMark>
 				</p>
 				<p>
-					Median yaw error after alignment on the 11 curated photos:{" "}
+					Median yaw error on 11 hand-picked photos:{" "}
 					<HandMark type="strike">3.0°</HandMark>{" "}
 					<span
 						className="nb-hand"
@@ -1407,10 +1405,9 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					>
 						0.30°
 					</span>
-					. A small curated set, not a held-out one.
+					. A small set, not a held-out one.
 					<MarginNote mark="c">
-						Why does the head on the ridge fool it? It looks exactly like a real
-						edge.
+						A head on the ridge looks exactly like an edge.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1425,12 +1422,11 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					},
 					{
 						value: "0.30°",
-						label:
-							"median yaw error after alignment, 11 curated photos (3.0° before)",
+						label: "median yaw error on 11 hand-picked photos (3.0° before)",
 					},
 					{
 						value: "39 / 60",
-						label: "accepted alignments that were right, 100 wild photos",
+						label: "accepted poses that were right, 100 unseen photos",
 					},
 					{
 						value: "0",
@@ -1439,74 +1435,65 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 				]}
 				source={
 					<>
-						Timing: 12 demo photos, measured. Yaw error: skyline-auto row,
-						reports/leaderboard.md; that is a small curated set, not a held-out
-						one. Wild: the app&rsquo;s skyline aligner, precision 0.64 with 19
-						gross errors, reports/bench-wild.md. The report advises never
-						auto-accepting it on uploads.
+						Timing: 12 demo photos. Yaw error: 11 hand-picked photos, not a
+						held-out set. Last row: the app&rsquo;s skyline aligner on 100
+						unseen photos, precision 0.64 with 19 gross errors; we advise
+						against auto-accepting it on uploads.
 					</>
 				}
 			/>
 
 			<Details>
-				<h3>The five steps, exactly</h3>
+				<h3>The five steps</h3>
 				<ol>
 					<li>
-						<strong>Sky colour field.</strong> <code>fitSkyModel</code> fits an
-						8-term polynomial in image coordinates (
+						<strong>Sky colour field.</strong> A smooth sky colour field is
+						fitted: an 8-term polynomial in image coordinates (
 						<code>1, u, v, u², uv, v², v³, uv²</code>) per channel by
 						iteratively reweighted least squares (4 passes, Cauchy weights,
 						sampled every 4 px), seeded with sky-looking pixels weighted by{" "}
 						<code>(1 − y/h)⁶</code>.
 					</li>
 					<li>
-						<strong>Sky probability.</strong> <code>modelSky</code> scores each
-						pixel against the field: close in colour is sky; brighter and greyer
-						is cloud (also sky); darker or more saturated is terrain, which is
-						what catches aerial haze. Smooth texture is required; green zeroes
-						the score.
+						<strong>Sky probability.</strong> Each pixel is scored against the
+						field: close in colour is sky; brighter and greyer is cloud (also
+						sky); darker or more saturated is terrain, which catches haze.
+						Smooth texture is required; green scores zero.
 					</li>
 					<li>
-						<strong>Viterbi over rows.</strong> Per-column unary cost: non-sky
-						just above the boundary (full within a band, 0.2 beyond), sky just
-						below, minus a capped colour-step edge bonus discounted when the
-						image brightens downward. Columns chain by a truncated-L1 jump
-						penalty solved with a two-sweep distance transform. Row 0 = "no sky
-						at the top of this column".
+						<strong>Best path over rows.</strong> Per-column cost: non-sky just
+						above the boundary (full within a band, 0.2 beyond), sky just below,
+						minus a capped colour-step edge bonus discounted when the image
+						brightens downward. Jumps between columns cost extra, capped. Row 0
+						means no sky at the top of the column.
 					</li>
 					<li>
 						<strong>Refit and repeat.</strong> The sky model is refitted to the
-						sky just above the first boundary and Viterbi runs again (
-						<code>refinePasses = 1</code>). Sub-pixel row from a parabola
-						through the edge response.
+						sky just above the first boundary and the path runs again. Sub-pixel
+						rows come from the edge response.
 					</li>
 					<li>
 						<strong>Weight, then clean up.</strong> Weight = edge contrast ×
 						polarity × sky above × terrain below. Runs are cut at jumps; short
 						runs are down-weighted, short runs poking above both neighbours go
-						to 0, columns well above their local median lose weight. Weight &lt;
-						0.1 becomes <code>NaN</code> (no vote).
+						to 0, columns well above their neighbours lose weight. Under 0.1
+						means no vote.
 					</li>
 				</ol>
-				<h3>Second detector and fusion</h3>
+				<h3>Second detector and cross-check</h3>
 				<p>
-					<code>skylineFromSky</code> (src/lib/sky/skyline.ts) reads the same{" "}
-					<code>SkylineObservation</code> from a learned sky mask: first sky run
-					per column, stepping over non-sky runs under 1.5% of the height
-					(wires), the 0.5 crossing for a sub-pixel row, weighted by edge
-					sharpness, sky above and terrain below (×0.7 when sky does not reach
-					the top). A CPU ONNX mask once produced a false accept, so it stays
-					secondary. <code>rejectSpikes</code> and <code>fuseSkylines</code>{" "}
-					(src/lib/refine/skyline-clean.ts) let one detector vouch for the
-					other:
+					A second detector reads a learned sky mask and gives its own skyline:
+					first sky run per column, stepping over thin non-sky runs (wires),
+					weighted by edge sharpness, sky above and terrain below. It once
+					produced a false accept, so it only checks the first. Each detector
+					can vouch for the other:
 				</p>
 				<CleanAndFuse />
 				<p>
-					Read the figure with its keys:{" "}
-					<CircledNumber value={1} seed="sk-p1" /> the post is a spike, so{" "}
-					<code>rejectSpikes</code> drops it;{" "}
-					<CircledNumber value={2} seed="sk-p2" /> only one detector vouches for
-					the chalet, so <HandMark type="double">fusion drops it too</HandMark>.
+					In the figure: <CircledNumber value={1} seed="sk-p1" /> the post is a
+					spike, so it is dropped; <CircledNumber value={2} seed="sk-p2" /> only
+					one detector vouches for the chalet, so{" "}
+					<HandMark type="double">cross-checking drops it too</HandMark>.
 				</p>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">

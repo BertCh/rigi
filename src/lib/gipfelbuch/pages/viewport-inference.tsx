@@ -59,6 +59,7 @@ import {
 } from "#/components/gipfelbuch/viz/explain";
 import { Eq, Op, Sym } from "#/components/gipfelbuch/viz/math";
 import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
+import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Viewport inference: how a photo's yaw / pitch / roll / focal are solved against the DEM horizon.
@@ -327,7 +328,7 @@ const LockScene = memo(function LockScene() {
 				size={13 * (W / 720)}
 				color="var(--gb-secondary)"
 			>
-				roof · no sky · no vote
+				roof: no sky, no vote
 			</HandLabel>
 			<HandLabel
 				x={TREE_X0 - 4}
@@ -336,7 +337,7 @@ const LockScene = memo(function LockScene() {
 				color="var(--gb-red)"
 				size={13 * (W / 720)}
 			>
-				tree · outliers
+				tree: outliers
 			</HandLabel>
 		</g>
 	);
@@ -376,7 +377,7 @@ function HorizonLock() {
 	const phaseLabel = manual
 		? "manual"
 		: auto.phase === "prior"
-			? "sensor prior"
+			? "phone's guess"
 			: auto.phase === "search"
 				? "searching"
 				: "solved";
@@ -385,81 +386,104 @@ function HorizonLock() {
 		<Figure
 			label="Fig. D3"
 			bleed
-			caption="Schematic (synthetic scene). The core move. The photo's skyline (ink trace, one dot per column) is fixed; the DEM horizon (brown) is projected through a hypothesised camera and slid in yaw and pitch. Stems are per-column pixel residuals: blue and bold when inside the 4 px Cauchy scale, red and faded when the robust loss stops listening (the tree, an occluder the DEM does not know). Columns under the roof have no sky and no vote."
+			caption="Synthetic scene. The photo's skyline (ink, one dot per column) stays fixed; the modelled horizon (brown) slides in yaw and pitch. Stems show the gap per column: blue when it fits, red and faded when the fit ignores it (the tree). Columns under the roof have no sky and no vote."
 		>
 			<div ref={ref}>
-				<svg
-					viewBox={`0 0 ${W} 300`}
-					className="block h-auto w-full"
-					role="img"
-					aria-label="Photo skyline and the projected DEM horizon with per-column residuals"
+				{/* the scene runs on past the frame: the photo's ridge stays, the modelled horizon slides */}
+				<SketchSpill
+					seed="vi-lock"
+					bearing={(u) => u * HFOV - HFOV / 2}
+					ridges={[
+						{
+							at: (u) =>
+								yOf(horizon(TRUTH.dy + u * HFOV - HFOV / 2) - TRUTH.dp) / 300,
+							color: SWISS.ink,
+							width: 1.8,
+							depth: true,
+						},
+						{
+							at: (u) =>
+								(yOf(horizon(u * HFOV - HFOV / 2 + pose.dy)) + pose.dp * PPD) /
+								300,
+							color: SWISS.contour,
+							width: 1.8,
+						},
+					]}
 				>
-					<LockScene />
-					{/* residual stems: plain segments, length is the exact residual */}
-					<g fill="none" strokeLinecap="round">
-						{VALID.map((v, k) => {
-							const r = res[k];
-							const w = 1 / (1 + (r / CAUCHY) ** 2);
-							const inlier = Math.abs(r) < CAUCHY;
-							return (
-								<PenLine
-									key={v.i}
-									data
-									seed={`vi-stem-${v.i}`}
-									from={[xOf(v.o), yOf(v.e)]}
-									to={[xOf(v.o), yOf(v.e) + r]}
-									color={inlier ? "blue" : "red"}
-									opacity={0.3 + 0.7 * w}
-									width={inlier ? 2.2 : 1.4}
-								/>
-							);
-						})}
-					</g>
-					{/* projected DEM horizon: one sketched curve, slid by the pose */}
-					<g
-						transform={`translate(${(-pose.dy * (W / HFOV)).toFixed(2)} ${(pose.dp * PPD).toFixed(2)})`}
+					<svg
+						viewBox={`0 0 ${W} 300`}
+						className="block h-auto w-full"
+						role="img"
+						aria-label="Photo skyline and modelled horizon, with the gap per column"
 					>
-						<path
-							d={HORIZON_SKETCH_D}
-							fill="none"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							strokeWidth={5.5}
-							style={{
-								stroke: "color-mix(in srgb, var(--gb-paper) 70%, transparent)",
-							}}
+						<LockScene />
+						{/* residual stems: plain segments, length is the exact residual */}
+						<g fill="none" strokeLinecap="round">
+							{VALID.map((v, k) => {
+								const r = res[k];
+								const w = 1 / (1 + (r / CAUCHY) ** 2);
+								const inlier = Math.abs(r) < CAUCHY;
+								return (
+									<PenLine
+										key={v.i}
+										data
+										seed={`vi-stem-${v.i}`}
+										from={[xOf(v.o), yOf(v.e)]}
+										to={[xOf(v.o), yOf(v.e) + r]}
+										color={inlier ? "blue" : "red"}
+										opacity={0.3 + 0.7 * w}
+										width={inlier ? 2.2 : 1.4}
+									/>
+								);
+							})}
+						</g>
+						{/* projected DEM horizon: one sketched curve, slid by the pose */}
+						<g
+							transform={`translate(${(-pose.dy * (W / HFOV)).toFixed(2)} ${(pose.dp * PPD).toFixed(2)})`}
+						>
+							<path
+								d={HORIZON_SKETCH_D}
+								fill="none"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								strokeWidth={5.5}
+								style={{
+									stroke:
+										"color-mix(in srgb, var(--gb-paper) 70%, transparent)",
+								}}
+							/>
+							<SketchPath
+								d={HORIZON_SKETCH_D}
+								seed="vi-dem-horizon"
+								data
+								color="brown"
+								width={2.8}
+								passes={1}
+							/>
+						</g>
+						<HandText x={W - 10} y={20} anchor="end" color="pencil" size={16}>
+							{phaseLabel}
+						</HandText>
+						<HandText x={14} y={24} color="pencil" size={15}>
+							{`true offset: compass ${TRUTH.dy}°, gravity ${TRUTH.dp}°`}
+						</HandText>
+						<HandText
+							x={Math.min(W - 150, TREE_X1 + 26)}
+							y={TREE_TOP - 34}
+							color="red"
+							size={15}
+						>
+							the tree: ignored by the fit
+						</HandText>
+						<PenArrow
+							from={[Math.min(W - 150, TREE_X1 + 26) + 10, TREE_TOP - 28]}
+							to={[(TREE_X0 + TREE_X1) / 2 + 6, TREE_TOP - 4]}
+							seed="vi-note-tree"
+							color="red"
+							width={1.3}
 						/>
-						<SketchPath
-							d={HORIZON_SKETCH_D}
-							seed="vi-dem-horizon"
-							data
-							color="brown"
-							width={2.8}
-							passes={1}
-						/>
-					</g>
-					<HandText x={W - 10} y={20} anchor="end" color="pencil" size={16}>
-						{phaseLabel}
-					</HandText>
-					<HandText x={14} y={24} color="pencil" size={15}>
-						{`truth here: compass ${TRUTH.dy}° off, gravity ${TRUTH.dp}°`}
-					</HandText>
-					<HandText
-						x={Math.min(W - 150, TREE_X1 + 26)}
-						y={TREE_TOP - 34}
-						color="red"
-						size={15}
-					>
-						the tree: the loss stops listening
-					</HandText>
-					<PenArrow
-						from={[Math.min(W - 150, TREE_X1 + 26) + 10, TREE_TOP - 28]}
-						to={[(TREE_X0 + TREE_X1) / 2 + 6, TREE_TOP - 4]}
-						seed="vi-note-tree"
-						color="red"
-						width={1.3}
-					/>
-				</svg>
+					</svg>
+				</SketchSpill>
 			</div>
 
 			<div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
@@ -489,26 +513,26 @@ function HorizonLock() {
 							disabled={!manual}
 							className="bg-[var(--gb-paper-deep)] px-3 py-1 font-sans text-[13px] leading-[18px] text-[var(--gb-ink)] transition hover:brightness-95 disabled:opacity-60"
 						>
-							{manual ? "↻ replay the solve" : "auto-playing"}
+							{manual ? "↻ replay" : "playing"}
 						</button>
 						<button
 							type="button"
 							onClick={() => setManual({ ...TRUTH })}
 							className="bg-[var(--gb-paper-deep)] px-3 py-1 font-sans text-[13px] leading-[18px] text-[var(--gb-ink)] transition hover:brightness-95 disabled:opacity-60"
 						>
-							snap to optimum
+							snap to solution
 						</button>
 					</div>
 				</div>
 				<dl
 					className={`grid min-w-0 grid-cols-2 md:min-w-[220px] gap-x-5 gap-y-2 font-mono ${TYPE.micro}`}
 				>
-					<Read k="Δ yaw" v={`${fmt(pose.dy)}°`} />
-					<Read k="Δ pitch" v={`${fmt(pose.dp, 2)}°`} />
-					<Read k="inliers < 4 px" v={`${inl} / ${VALID.length}`} />
-					<Read k="coverage" v={`${Math.round(COVERAGE * 100)} %`} />
+					<Read k="yaw offset" v={`${fmt(pose.dy)}°`} />
+					<Read k="pitch offset" v={`${fmt(pose.dp, 2)}°`} />
+					<Read k="columns within 4 px" v={`${inl} / ${VALID.length}`} />
+					<Read k="sky coverage" v={`${Math.round(COVERAGE * 100)} %`} />
 					<div className="col-span-2">
-						<dt className="gb-secondary">robust cost</dt>
+						<dt className="gb-secondary">fit cost</dt>
 						<dd className="mt-1">
 							<svg
 								viewBox="0 0 220 12"
@@ -783,14 +807,14 @@ function CostLandscape() {
 		<Figure
 			label="Fig. D4"
 			bleed
-			caption={`Schematic (synthetic scene). Coarse then fine. The heat map is solve.ts's coarse cost over the ±25° × ±3° window around the prior (truncated L1 at 12 px plus the prior term); paper is cheapest and the brown tint deepens with cost. Below it, the best cost per yaw. Up to three local minima more than 1.5° apart become seeds (rings); Levenberg–Marquardt with a Cauchy loss descends from each, and the cheapest end wins. Ambiguity for this scene: ${ambiguity.toFixed(2)} (how close the runner-up minimum comes to the best, relative to the median).`}
+			caption={`Synthetic scene. Coarse search, then fine. The map shows the cost of each yaw and pitch shift within ±25° and ±3° of the phone's guess; darker is worse. Below: the best cost per yaw. Up to three separate valleys become starting points (rings); a fine fit runs from each and the cheapest wins. Ambiguity here: ${ambiguity.toFixed(2)} (how close the runner-up valley comes to the best).`}
 		>
 			<div ref={ref}>
 				<svg
 					viewBox="0 0 640 332"
 					className="block h-auto w-full"
 					role="img"
-					aria-label="Coarse yaw-pitch cost landscape with seeds and LM paths"
+					aria-label="Yaw-pitch cost map with starting points and fit paths"
 				>
 					{cells}
 					{/* legend: three steps of the cost scale */}
@@ -810,7 +834,7 @@ function CostLandscape() {
 						size={9.78}
 						color="var(--gb-secondary)"
 					>
-						cheaper → dearer
+						lower cost → higher cost
 					</HandLabel>
 					{/* open map corner instead of a box */}
 					<PenLine
@@ -842,7 +866,7 @@ function CostLandscape() {
 						size={11.56}
 						color="var(--gb-secondary)"
 					>
-						prior
+						phone's guess
 					</HandLabel>
 					{/* LM paths */}
 					{paths.map((p, k) => {
@@ -890,7 +914,7 @@ function CostLandscape() {
 								color="var(--gb-ink)"
 								size={11.56}
 							>
-								{`seed ${k + 1}`}
+								{`start ${k + 1}`}
 							</HandLabel>
 						</g>
 					))}
@@ -973,7 +997,7 @@ function CostLandscape() {
 						/>
 					))}
 					<HandText x={x0 + 8} y={p0 + 8} size={15} color="red">
-						{`runner-up minimum: ambiguity ${ambiguity.toFixed(2)}`}
+						{`runner-up valley: ambiguity ${ambiguity.toFixed(2)}`}
 					</HandText>
 				</svg>
 			</div>
@@ -1023,7 +1047,7 @@ function FullCircle() {
 	return (
 		<Figure
 			label="Fig. D5"
-			caption="Schematic. The same scene scored all the way round (yaw prior switched off). Radius grows as the cost falls. The local search only ever sees the shaded ±25° wedge around the compass. When it rejects, solvePose retries over 360°, but repetitive ridges make aliases (the faded spike), so the retry must clear a stricter 0.75 confidence instead of 0.5."
+			caption="Synthetic scene, scored over the full circle. Distance from centre grows as the cost falls. The normal search only sees the shaded ±25° wedge around the compass. If it fails, the solver retries over 360°; repeating ridges create look-alikes (the faded spike), so the retry needs 0.75 confidence instead of 0.5."
 		>
 			<div
 				ref={ref}
@@ -1120,7 +1144,7 @@ function FullCircle() {
 						dash="3 3"
 					/>
 					<HandText x={8} y={300} size={14} color="red">
-						IMG_7053: this alias won at the 0.5 bar
+						IMG_7053: this look-alike passed at 0.5
 					</HandText>
 					<PenCircle
 						center={[ax, ay]}
@@ -1145,21 +1169,16 @@ function FullCircle() {
 					<p>
 						<span className={`font-mono gb-ink ${TYPE.caption}`}>best</span>{" "}
 						lies at <span className="font-mono gb-ink">{fmt(best.dy, 0)}°</span>{" "}
-						from the compass. The strongest alias (
+						from the compass. The strongest look-alike (
 						<span className="font-mono text-[var(--rigi-trap)]">
 							{fmt(alias.dy, 0)}°
 						</span>
-						) is a different stretch of ridge whose silhouette happens to rhyme.
+						) is a different stretch of ridge with a similar outline.
 					</p>
 					<p>
-						The wild benchmark found this for real: a 360° first pass at the
-						local 0.5 bar accepted IMG_7053 at −123.7°. Hence{" "}
-						<code
-							className={`whitespace-nowrap bg-[var(--gb-paper-deep)] px-1 font-mono gb-ink ${TYPE.caption}`}
-						>
-							FULL_SEARCH_CONFIDENCE = 0.75
-						</code>
-						.
+						This happened on a real photo: a 360° search at the normal 0.5 bar
+						accepted IMG_7053 at −123.7°. So the full-circle retry requires
+						0.75.
 					</p>
 				</div>
 			</div>
@@ -1203,7 +1222,7 @@ const SCENES: Scene[] = [
 		relief: SCENE_RELIEF,
 		tiltDeg: Math.abs(TRUTH.dp),
 		search: "local",
-		note: "Computed from Fig. D3–D4: a jagged ridge, a tree and a roof.",
+		note: "Computed from the scene in the figures above: jagged ridge, a tree, a roof.",
 	},
 	{
 		id: "flat",
@@ -1214,7 +1233,7 @@ const SCENES: Scene[] = [
 		relief: 0.18,
 		tiltDeg: 0.4,
 		search: "local",
-		note: "Sea or plain: every column fits, but a flat line cannot pin yaw. Relief vetoes it.",
+		note: "Sea or plain: every column fits, but a flat line cannot fix yaw. Low relief vetoes it.",
 	},
 	{
 		id: "forest",
@@ -1225,7 +1244,7 @@ const SCENES: Scene[] = [
 		relief: 1.6,
 		tiltDeg: 0.8,
 		search: "local",
-		note: "Little sky meets terrain; most edges are branches. Coverage and inliers both drag.",
+		note: "Little sky meets terrain, and most edges are branches. Coverage and fit both suffer.",
 	},
 	{
 		id: "rhyme",
@@ -1236,7 +1255,7 @@ const SCENES: Scene[] = [
 		relief: 1.4,
 		tiltDeg: 0.6,
 		search: "full",
-		note: "Would pass at 0.5. The full-circle retry demands 0.75, so it falls back to a suggestion.",
+		note: "Would pass at 0.5, but the full-circle retry needs 0.75, so it stays a suggestion.",
 	},
 	{
 		id: "tilt",
@@ -1247,7 +1266,7 @@ const SCENES: Scene[] = [
 		relief: 1.9,
 		tiltDeg: 4.2,
 		search: "local",
-		note: "The fit moved pitch/roll > 3° from gravity: it locked onto the wrong edge. Hard zero.",
+		note: "The fit tilted more than 3° from gravity, so it locked onto the wrong edge. Automatic reject.",
 	},
 ];
 
@@ -1259,19 +1278,19 @@ function factors(s: Scene) {
 			raw: `${s.tiltDeg.toFixed(1)}°`,
 		},
 		{
-			k: "inliers",
+			k: "fit",
 			v: clamp01((s.inlierFraction - 0.3) / 0.5),
 			raw: `${Math.round(s.inlierFraction * 100)} %`,
 		},
 		{
-			k: "coverage",
+			k: "sky coverage",
 			v: clamp01(s.coverage / 0.4),
 			raw: `${Math.round(s.coverage * 100)} %`,
 		},
 		{
 			k: "distinctness",
 			v: clamp01((1 - s.ambiguity) / 0.4 + 0.1),
-			raw: `amb ${s.ambiguity.toFixed(2)}`,
+			raw: `ambiguity ${s.ambiguity.toFixed(2)}`,
 		},
 		{ k: "relief", v: clamp01(s.relief / 0.5), raw: `${s.relief.toFixed(2)}°` },
 	];
@@ -1422,7 +1441,7 @@ function ConfidenceGate() {
 							: "rejected · low confidence"}
 				</span>
 				<span className={`font-mono gb-secondary ${TYPE.micro}`}>
-					bar {bar.toFixed(2)} ({s.search === "full" ? "360° retry" : "local"})
+					bar {bar.toFixed(2)} ({s.search === "full" ? "360° retry" : "normal"})
 				</span>
 				<p className={`basis-full gb-secondary ${TYPE.caption}`}>{s.note}</p>
 			</div>
@@ -1457,8 +1476,8 @@ function skyBand(d: GipfelbuchPhotoData): [number, number, number, number] {
 }
 
 const STAGES: { name: string; layers: PhotoLayer[] }[] = [
-	{ name: "1 · sensor prior", layers: ["prior", "priorPeaks"] },
-	{ name: "2 · observed skyline", layers: ["prior", "skyline", "weight"] },
+	{ name: "1 · phone's guess", layers: ["prior", "priorPeaks"] },
+	{ name: "2 · photo skyline", layers: ["prior", "skyline", "weight"] },
 	{ name: "3 · solved", layers: ["skyline", "prior", "solved"] },
 	{ name: "4 · labelled", layers: ["solved", "peaks"] },
 ];
@@ -1482,10 +1501,10 @@ function RealStory({
 		const s = d.solved;
 		const lab = d.peaks.filter((p) => p.labelled).length;
 		line = [
-			`The phone says yaw ${d.prior.yaw.toFixed(1)}°, pitch ${d.prior.pitch.toFixed(1)}°, roll ${d.prior.roll.toFixed(1)}°, vfov ${d.prior.vfov.toFixed(1)}°. The DEM skyline drawn from that guess is ${d.residual.prior.median.toFixed(1)} px off the real one (median over ${d.residual.prior.n} confident columns).`,
-			`detectSkyline returns one boundary row per column (yellow) with an evidence weight (ticks above it, longer = surer). The prior curve (dashed) is visibly not on it.`,
-			`solvePose (${s.stage}, ${s.search} search) moves yaw ${sgn(s.delta.yaw)}°, pitch ${sgn(s.delta.pitch)}°, roll ${sgn(s.delta.roll)}° and focal ×${s.delta.focal.toFixed(3)}. Median error ${d.residual.prior.median.toFixed(1)} → ${d.residual.solved.median.toFixed(1)} px, confidence ${s.confidence.toFixed(2)}, ${s.accepted ? "accepted" : `rejected (${s.rejectReason})`}.`,
-			`With the solved pose the ${lab} labelled peaks (of ${d.peaks.filter((p) => p.visible).length} visible in the DEM) land on their summits.`,
+			`The phone says yaw ${d.prior.yaw.toFixed(1)}°, pitch ${d.prior.pitch.toFixed(1)}°, roll ${d.prior.roll.toFixed(1)}°, field of view ${d.prior.vfov.toFixed(1)}°. The modelled horizon from that guess is ${d.residual.prior.median.toFixed(1)} px off the photo's skyline (median over ${d.residual.prior.n} columns).`,
+			`The skyline is found per column (yellow), with a confidence tick above it (longer = surer). The horizon from the phone's guess (dashed) is visibly off it.`,
+			`The solver (${s.stage}, ${s.search} search) moves yaw ${sgn(s.delta.yaw)}°, pitch ${sgn(s.delta.pitch)}°, roll ${sgn(s.delta.roll)}° and focal ×${s.delta.focal.toFixed(3)}. Median gap ${d.residual.prior.median.toFixed(1)} → ${d.residual.solved.median.toFixed(1)} px, confidence ${s.confidence.toFixed(2)}, ${s.accepted ? "accepted" : `rejected (${s.rejectReason})`}.`,
+			`With the solved view, ${lab} labelled peaks (of ${d.peaks.filter((p) => p.visible).length} in view) land on their summits.`,
 		][i];
 	}
 	return (
@@ -1494,9 +1513,8 @@ function RealStory({
 			bleed
 			caption={
 				<>
-					<Measured data={d} /> Auto-steps; click a stage to hold it, a
-					thumbnail (badge = compass error found) to switch photo. Cropped to
-					the skyline band.
+					<Measured data={d} /> Steps play automatically; click a stage to hold
+					it, a thumbnail (badge = compass error) to switch photo.
 				</>
 			}
 		>
@@ -1531,6 +1549,7 @@ function RealStory({
 				</div>
 				<RealPhoto
 					key={`${id}-${i}`}
+					bleed
 					data={d}
 					layers={st.layers}
 					crop={d ? skyBand(d) : undefined}
@@ -1561,13 +1580,11 @@ function RealGrid({
 			label="Fig. D2"
 			caption={
 				<>
-					Measured on the 12 demo photos by scripts/gipfelbuch/build-data.ts,
-					2026-10-01. Each tile: compass error found (solved yaw − EXIF
-					heading), median skyline error prior → solved. Every correction fits
-					inside the ±25° yaw window (largest{" "}
-					{Math.max(...P.map((p) => Math.abs(p.delta.yaw))).toFixed(1)}°). A red
-					badge = not accepted by solvePose: demo-07 and demo-11 are rejected
-					outright; demo-12 was rescued by refinePose.
+					The 12 demo photos. Each tile: compass error found, median skyline gap
+					guess → solved. Every correction fits inside the ±25° search window
+					(largest {Math.max(...P.map((p) => Math.abs(p.delta.yaw))).toFixed(1)}
+					°). Red badge = not accepted: demo-07 and demo-11 are rejected;
+					demo-12 passed only through a second solver.
 				</>
 			}
 		>
@@ -1606,8 +1623,8 @@ function RealGrid({
 									{sgn(p.delta.yaw)}° yaw ·{" "}
 									{p.accepted
 										? p.stage === "solve"
-											? "solve"
-											: "refine"
+											? "solved"
+											: "2nd solver"
 										: "rejected"}
 								</div>
 								<div>
@@ -1620,7 +1637,7 @@ function RealGrid({
 				})}
 			</div>
 			<p className={`mt-3 font-mono gb-secondary ${TYPE.micro}`}>
-				{acc} / 12 accepted by the cascade; median skyline error{" "}
+				{acc} / 12 accepted; median skyline gap{" "}
 				{median(P.map((p) => p.residual.prior.median)).toFixed(1)} →{" "}
 				{median(P.map((p) => p.residual.solved.median)).toFixed(1)} px.
 			</p>
@@ -1638,12 +1655,10 @@ function RealGate() {
 			label="Fig. D6"
 			caption={
 				<>
-					Measured on the 12 demo photos (scripts/gipfelbuch/build-data.ts,
-					2026-10-01): the confidence solvePose assigned to each, against the
-					0.5 accept bar of the local search. The two rejects (demo-07, demo-11)
-					fall just under it, 0.46 and 0.44; demo-08 clears it with 0.56. The
-					cross-hatched bar is demo-12, where the number is refinePose&apos;s
-					own confidence after solvePose was rejected.
+					Confidence for each of the 12 demo photos against the 0.5 accept bar.
+					The two rejects (demo-07, demo-11) fall just under, at 0.46 and 0.44;
+					demo-08 clears it at 0.56. Cross-hatched demo-12 passed through the
+					second solver, which has its own confidence.
 				</>
 			}
 		>
@@ -1732,7 +1747,7 @@ function RealGate() {
 							size={11}
 							color={SWISS.ink}
 						>
-							accept bar 0.5 (local)
+							accept bar 0.5
 						</HandLabel>
 					</g>
 				)}
@@ -1752,25 +1767,24 @@ function MeasuredStats() {
 			<div className="!mt-6 grid grid-cols-2 gap-5 sm:grid-cols-4">
 				<Stat
 					value={`${median(A.map((p) => Math.abs(p.delta.yaw))).toFixed(1)}°`}
-					label="median compass error corrected, accepted demo photos"
+					label="median compass error found, accepted demo photos"
 				/>
 				<Stat
 					value={`${median(A.map((p) => p.residual.prior.median)).toFixed(1)} → ${median(A.map((p) => p.residual.solved.median)).toFixed(1)} px`}
-					label="median skyline error, prior → solved, accepted demo photos"
+					label="median skyline gap, guess → solved, accepted demo photos"
 				/>
 				<Stat
 					value={`${P.filter((p) => p.accepted).length} / 12`}
-					label={`accepted (${P.filter((p) => p.accepted && p.stage === "solve").length} by solvePose, ${P.filter((p) => p.accepted && p.stage !== "solve").length} by refinePose)`}
+					label={`accepted (${P.filter((p) => p.accepted && p.stage === "solve").length} first solver, ${P.filter((p) => p.accepted && p.stage !== "solve").length} second solver)`}
 				/>
 				<Stat
 					value={`${(median(P.map((p) => p.ms.horizon)) / 1000).toFixed(1)} s`}
-					label={`median computeHorizon; solvePose ${median(P.map((p) => p.ms.solve)).toFixed(0)} ms`}
+					label={`median time to model the horizon; fit ${median(P.map((p) => p.ms.solve)).toFixed(0)} ms`}
 				/>
 			</div>
 			<p className={`!mt-3 gb-secondary ${TYPE.caption}`}>
-				The 12 bundled Niederhorn photos on this page, CPU pipeline, Terrarium
-				DEM (scripts/gipfelbuch/build-data.ts, {idx.generated}). The corrections
-				are the pipeline&apos;s own solved pose, not hand-registered truth.
+				The 12 Niederhorn demo photos, Terrarium terrain model. Corrections come
+				from the solver, not hand registration.
 			</p>
 		</>
 	);
@@ -1792,13 +1806,11 @@ function Legacy() {
 		<>
 			<Section kicker="The question" title="Where was the camera looking?">
 				<p>
-					A photo arrives with a GPS fix and, usually, a compass heading, a
-					gravity vector and a 35 mm focal length. Those give a{" "}
-					<em>viewport guess</em>: yaw, pitch, roll and field of view. It is
-					close but not right. Phone compasses are often several degrees off,
-					and an overlay drawn from it puts every peak label on the wrong
-					summit. Viewport inference turns that guess into a pose good to a
-					fraction of a degree, or says honestly that it cannot.
+					A photo arrives with GPS, usually a compass heading, gravity and a 35
+					mm focal length. That gives a first guess for yaw, pitch, roll and
+					field of view. It is close but not right: phone compasses are often
+					several degrees off. The solver corrects it to a fraction of a degree,
+					or says it cannot.
 				</p>
 				<p>
 					With the eye held at the GPS fix, the problem collapses to{" "}
@@ -1814,42 +1826,38 @@ function Legacy() {
 
 			<HorizonLock />
 
-			<Section kicker="The two curves" title="Observed and predicted">
+			<Section kicker="The two curves" title="Skyline and horizon">
 				<ul>
 					<li>
-						<strong>Observed:</strong> {A("skyline", "the photo skyline")}. A
-						smooth sky colour field is fitted, then a Viterbi pass finds one
-						boundary row per column, with a truncated-L1 penalty on jumps. Each
-						column gets a weight for edge contrast, polarity (darker below) and
-						sky above / terrain below. Columns with no sky at the top are NaN
-						and cast no vote.
+						<strong>Skyline</strong> ({A("skyline", "in the photo")}): the sky
+						colour is fitted, then one boundary row is found per column. Each
+						column gets a weight for edge contrast and for sky above, terrain
+						below. Columns with no sky have no vote.
 					</li>
 					<li>
-						<strong>Predicted:</strong> {A("dem-horizon", "computeHorizon")}{" "}
-						ray-marches 7,200 azimuths from the eye across the DEM, with earth
-						curvature and refraction. It returns the skyline elevation angle
-						(plus ridge crests) at every 0.05°. A pinhole camera maps each photo
-						column back to an azimuth and elevation through{" "}
-						<code>unproject</code>.
+						<strong>Horizon</strong> (
+						{A("dem-horizon", "from the terrain model")}
+						): rays are cast in 7,200 directions from the camera across the
+						terrain, with earth curvature and refraction. This gives the horizon
+						angle every 0.05°. A pinhole camera maps each photo column to a
+						direction.
 					</li>
 				</ul>
 			</Section>
 
-			<Section kicker="Search" title="Coarse grid, then robust least squares">
+			<Section kicker="Search" title="Coarse grid, then fine fit">
 				<p>
-					A good optimiser started in the wrong valley still lands in the wrong
-					valley. So <code>solvePose</code> first scores every small shift on a
-					grid. Yaw is searched ±25° around the compass and pitch ±3° around
-					gravity, in steps of about 1.5 px. The cost is a <em>truncated</em>{" "}
-					L1, so a column more than 12 px off counts the same however far it is.
-					The yaw-cost curve's local minima become up to three seeds, at least
-					1.5° apart.
+					An optimiser that starts in the wrong valley stays there. So the
+					solver first scores every small shift on a grid. Yaw is searched ±25°
+					around the compass and pitch ±3° around gravity, in steps of about 1.5
+					px. A column more than 12 px off counts the same however far off it
+					is. The best valleys, up to three and at least 1.5° apart, become
+					starting points.
 				</p>
 				<p>
-					From each seed, a Levenberg–Marquardt fit refines yaw, pitch, roll and
-					log focal against a Cauchy loss at 4 px. Gaussian priors on each
-					parameter (σ yaw 15°, pitch 1.5°, roll 1.5°, focal 6 %) are scaled so
-					a one-sigma departure costs as much as every column being 1 px off.
+					From each start, a fine fit adjusts yaw, pitch, roll and focal,
+					ignoring columns far off (beyond about 4 px). Soft limits keep the
+					result near the sensors (yaw 15°, pitch 1.5°, roll 1.5°, focal 6 %).
 					The cheapest result wins.
 				</p>
 			</Section>
@@ -1859,63 +1867,61 @@ function Legacy() {
 
 			<Section kicker="Gate" title="Knowing when not to answer">
 				<p>
-					The fitted pose then has to earn a confidence. The tilt gate catches
-					fits that moved pitch or roll more than 3° from gravity. That only
-					happens when the fit has locked onto the wrong edge. The other factors
-					ask: did enough columns agree, was there enough skyline, was the
-					winning yaw distinct from the runner-up, and does the horizon have
-					enough relief in view to pin yaw at all?
+					The result must then earn a confidence. The tilt check rejects fits
+					that moved more than 3° from gravity, which only happens on the wrong
+					edge. The other factors ask: did enough columns agree, was there
+					enough skyline, was the winner clearly better than the runner-up, and
+					is there enough relief to fix yaw?
 				</p>
 			</Section>
 
 			<RealGate />
 			<ConfidenceGate />
 
-			<Section kicker="Cascade" title="Escalation, never guessing">
+			<Section kicker="If it fails" title="Escalate, never guess">
 				<p>
-					A rejection is not a dead end. It is a hand-off to a different method
-					with independent failure modes. The app runs the{" "}
-					{A("cascade", "cascade")}:
+					A rejection is a hand-off to a different method that fails
+					differently. The steps, in order:
 				</p>
 				<Flow
 					nodes={[
-						{ label: "Sensor prior", sub: "EXIF compass · gravity · 35 mm" },
-						{ label: "solvePose", sub: "grid → LM → gate" },
+						{ label: "Phone's guess", sub: "compass · gravity · 35 mm" },
+						{ label: "Solver", sub: "grid → fit → check" },
 						{ label: "360° retry", sub: "bar 0.75" },
-						{ label: "refinePose", sub: "FFT yaw → IRLS" },
-						{ label: "Tap a peak", sub: "user control points" },
+						{ label: "Second solver", sub: "FFT yaw → robust fit" },
+						{ label: "Tap a peak", sub: "your control points" },
 					]}
 				/>
 				<Steps
 					steps={[
 						{
-							title: "solvePose (local)",
-							body: "The grid, seeds, Cauchy LM and gate described above. Accepted means done.",
+							title: "Normal search",
+							body: "Grid, fine fit and check, as above. If accepted, done.",
 						},
 						{
 							title: "Full-circle retry",
-							body: "On a low-confidence reject, the yaw prior is dropped (σ → 10⁶), the window becomes ±180° and the bar rises to 0.75. With no heading in the file, this is the first pass.",
+							body: "After a low-confidence reject, the compass limit is dropped, the search covers ±180°, and the bar rises to 0.75. With no heading in the file, this is the first pass.",
 						},
 						{
-							title: "refinePose",
+							title: "Second solver",
 							body: (
 								<>
-									{A("fft-yaw-refine", "A second, independent solver")}. The
-									photo profile is binned on a 2¹³-sample azimuth ring. Four
-									circular correlations by FFT score every yaw shift at once,
-									with a free pitch offset and roll tilt. The top modes go
-									through robust coarse-to-fine IRLS, with its own confidence.
+									{A("fft-yaw-refine", "A second, independent solver")}. It
+									compares the photo&rsquo;s skyline with the full-circle
+									horizon and scores every yaw shift at once, with free pitch
+									and roll. The best candidates are refined and get their own
+									confidence.
 								</>
 							),
 						},
 						{
-							title: "Manual control points",
+							title: "Tap a peak",
 							body: (
 								<>
-									If nothing accepts, the prior pose is shown as unverified and
-									the user can {A("tap-a-peak", "tap a peak")}. One tap fixes
-									yaw and pitch, two add roll, three or more add focal (
-									{A("gcp-solver", "control-point solver")}).
+									If nothing is accepted, the phone&rsquo;s guess is shown as
+									unverified and you can {A("tap-a-peak", "tap a peak")}. One
+									tap fixes yaw and pitch, two add roll, three or more add focal
+									({A("gcp-solver", "control-point solver")}).
 								</>
 							),
 						},
@@ -1923,34 +1929,31 @@ function Legacy() {
 				/>
 				<p>
 					Uploads with no compass, gravity or lens take the{" "}
-					{A("unknown-pose", "unknown-pose")} path instead. It runs the same
-					cascade with the unknowns declared, then the matcher service, and it
-					never auto-accepts a guess.
+					{A("unknown-pose", "unknown-pose")} path: the same steps, then terrain
+					matching, and it never auto-accepts a guess.
 				</p>
 			</Section>
 
-			<Section kicker="Result" title="What it buys">
+			<Section kicker="Result" title="What it achieves">
 				<div className="!mt-5 grid grid-cols-2 gap-5 sm:grid-cols-4">
 					<Stat
 						value="4.0° → 0.22°"
-						label="median yaw error, sensor prior → cascade"
+						label="median yaw error, phone's guess → solved"
 					/>
-					<Stat value="45 → 5 px" label="median skyline error" />
+					<Stat value="45 → 5 px" label="median skyline gap" />
 					<Stat value="11 / 12" label="photos accepted" />
-					<Stat value="0" label="false accepts" />
+					<Stat value="0" label="wrong answers accepted" />
 				</div>
 				<MeasuredStats />
 				<p className={`!mt-4 gb-secondary ${TYPE.caption}`}>
-					12 hand-registered photos, classic skyline + cascade
-					(src/lib/geo/README.md, 2026-09-24). The worst accepted yaw error was
+					Checked against 12 hand-registered photos. Worst accepted yaw error:
 					0.47°.
 				</p>
-				<Callout tone="lesson" title="Precision beats recall">
-					A wrong pose shown as certain is worse than no pose. Every threshold
-					here is set so the solver says &ldquo;don&rsquo;t know&rdquo; before
-					it says something false. The ONNX sky model fitted more photos in
-					isolation, but it was dropped from the default because it produced the
-					one false accept (IMG_7053, 5.6°). See the{" "}
+				<Callout tone="lesson" title="A wrong answer is worse than none">
+					A wrong view shown as certain is worse than no view. Every threshold
+					makes the solver say &ldquo;don&rsquo;t know&rdquo; before it says
+					something false. A neural sky model fitted more photos but was dropped
+					because it produced one false accept (IMG_7053, 5.6° off). See the{" "}
 					{A("accept-rule", "accept rule")}.
 				</Callout>
 			</Section>
@@ -1968,11 +1971,6 @@ function Legacy() {
 					<CodeRef path="src/lib/integration/unknown-pose.ts" />
 					<CodeRef path="src/lib/geo/README.md" />
 				</div>
-				<p className={`!mt-3 font-mono gb-secondary ${TYPE.caption}`}>
-					solvePose, coarseStage, coarseCost, fineStage, DEFAULT_SIGMA,
-					FULL_SEARCH_CONFIDENCE, computeHorizon, detectSkyline, refinePose,
-					solveFromControlPoints
-				</p>
 			</Section>
 		</>
 	);
@@ -2009,7 +2007,7 @@ function ResidualStrip({ d }: { d: GipfelbuchPhotoData }) {
 			viewBox={`0 0 ${n} 64`}
 			className="mt-2 block h-auto w-full"
 			role="img"
-			aria-label="Gap between detected and predicted skyline, column by column, at the prior and the solved pose"
+			aria-label="Gap between photo skyline and modelled horizon per column, at the phone's guess and solved"
 		>
 			<PenLine
 				seed="vi-strip-base"
@@ -2066,13 +2064,13 @@ function HeroCompare() {
 				<>
 					{d
 						? d.solved.accepted
-							? `The phone's compass was ${Math.abs(d.solved.delta.yaw).toFixed(1)}° off here. Slide the wipe: the map's skyline snaps onto the ridge.`
-							: `The solver's best guess moved the compass ${Math.abs(d.solved.delta.yaw).toFixed(1)}°, but the fit was rejected (confidence ${d.solved.confidence.toFixed(2)}), so the app keeps the phone's pose. Slide the wipe to see why.`
-						: "Slide the wipe between the guess and the solved pose."}{" "}
+							? `The phone's compass was ${Math.abs(d.solved.delta.yaw).toFixed(1)}° off here. Slide to snap the map's horizon onto the ridge.`
+							: `The solver moved the compass ${Math.abs(d.solved.delta.yaw).toFixed(1)}°, but the fit was rejected (confidence ${d.solved.confidence.toFixed(2)}), so the app keeps the phone's guess. Slide to see why.`
+						: "Slide between the phone's guess and the solved view."}{" "}
 					<Key color={PRIOR_C} dashed>
-						map at the phone's guess
+						horizon at the phone's guess
 					</Key>{" "}
-					<Key color={SOLVED_C}>map at the solved pose</Key>{" "}
+					<Key color={SOLVED_C}>horizon at the solved view</Key>{" "}
 					<Key color={LAYER_STYLE.skyline.color}>skyline in the photo</Key>.{" "}
 					<Measured data={d} />
 				</>
@@ -2223,7 +2221,7 @@ function Verdicts() {
 			bleed
 			caption={
 				<>
-					All 12 photos at the solved pose. Under each: compass error found,
+					All 12 photos at the solved view. Under each: compass error found,
 					then skyline gap in px, guess → solved. A tag over the label marks
 					result and failure; photo 12 passed only through a second solver.
 				</>
@@ -2265,13 +2263,13 @@ function ViewportStoryCaption() {
 	const [photoId] = useNotebookPhoto();
 	const d = useGipfelbuchPhoto(photoId);
 	if (!d)
-		return <>The phone's guess, the traced skyline, then the solved pose.</>;
+		return <>The phone's guess, the traced skyline, then the solved view.</>;
 	const yaw = Math.abs(d.solved.delta.yaw).toFixed(1);
 	return (
 		<>
 			{d.solved.accepted
 				? `The search turned the view ${yaw}° and snapped the names onto their summits: skyline gap ${d.residual.prior.median.toFixed(0)} → ${d.residual.solved.median.toFixed(1)} px.`
-				: `The search moved the view ${yaw}°, but the fit was rejected (confidence ${d.solved.confidence.toFixed(2)}), so the app keeps the phone's pose.`}{" "}
+				: `The search moved the view ${yaw}°, but the fit was rejected (confidence ${d.solved.confidence.toFixed(2)}), so the app keeps the phone's guess.`}{" "}
 			<Measured data={d} />
 		</>
 	);
@@ -2292,7 +2290,7 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 
 			<SolveEquation />
 
-			<Beat kicker="The idea" title="The compass guesses. The ridge does not.">
+			<Beat kicker="The idea" title="The skyline corrects the compass.">
 				<p>
 					A phone knows where it stands. Its compass is often several degrees
 					off.{" "}
@@ -2305,15 +2303,14 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 						</>
 					)}
 					<MarginNote mark="a">
-						Compass first guess, then the ridge. Which one do I trust when they
-						disagree?
+						Compass first, then the ridge. Which wins when they disagree?
 					</MarginNote>
 				</p>
 				<p>
-					The photo has a skyline. The map predicts the same skyline from that
-					spot.{" "}
+					The photo has a skyline. The terrain model predicts the same line (the
+					horizon) from that spot.{" "}
 					<HandMark type="highlight">
-						We slide the map's line until it lands on the photo's.
+						We slide the horizon until it lands on the skyline.
 					</HandMark>
 				</p>
 				<p>
@@ -2355,7 +2352,6 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<PhotoStory
-				bleed={false}
 				number="2"
 				title="Guess, search, snap"
 				caption={<ViewportStoryCaption />}
@@ -2372,8 +2368,8 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 					We reject the photo and keep the phone's guess.{" "}
 					<HandMark type="double">We do not show it as certain.</HandMark>
 					<MarginNote mark="c">
-						0 false accepts on 12 hand-registered photos, 0.22° median yaw
-						error. Accepted ✓, but only when it earns it.
+						No wrong answers accepted on 12 hand-registered photos; median yaw
+						error 0.22°.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -2403,21 +2399,14 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 					},
 				]}
 				source={
-					<>
-						First two: measured on the 12 demo photos. Last:
-						src/lib/geo/README.md (12 hand-registered photos, cascade, 0 false
-						accepts).
-					</>
+					<>First three: the 12 demo photos. Last: 12 hand-registered photos.</>
 				}
 			/>
 
 			<Details>
 				<p>
-					The loss <code>ρ</code> is a truncated L1 (12 px) on the grid and a
-					Cauchy loss (4 px) in the polish; <code>w</code> is the skyline
-					weight. Everything below is the full mechanism: the grid search,
-					robust least squares, confidence gate and the escalation cascade, with
-					measured and synthetic figures.
+					Everything below is the full mechanism: grid search, fine fit,
+					confidence check and fallbacks, with real and synthetic figures.
 				</p>
 				<Legacy />
 			</Details>

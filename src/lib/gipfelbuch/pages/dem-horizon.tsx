@@ -254,7 +254,7 @@ function RayMarch() {
 		<Figure
 			label="Fig. D1"
 			bleed
-			caption="Synthetic scene, real algorithm (the real ray is Fig. 2). One azimuth, marched exactly as computeHorizon does (the demo samples every 1 % of distance instead of 0.4 %). Top: ground height, with curvature and refraction applied, and the eye's best sight line so far. Bottom: the elevation angle of every sample, and the running maximum that becomes the skyline. Drag the slider to scrub; toggle the Earth to watch the skyline jump."
+			caption="Invented terrain, real method (the real ray is Fig. 2). One bearing, marched step by step (here every 1 % of distance, in the app 0.4 %). Top: ground height with Earth curvature and refraction, and the best sight line so far. Bottom: the elevation angle of each sample; the running maximum becomes the horizon. Scrub the slider; toggle the Earth to watch the horizon jump."
 		>
 			<div ref={ref}>
 				<svg
@@ -410,7 +410,7 @@ function RayMarch() {
 						size={RM_LABEL}
 						color={SWISS.ink}
 					>
-						eye
+						camera
 					</HandLabel>
 					<HandLabel
 						x={PX1 - 4}
@@ -419,7 +419,7 @@ function RayMarch() {
 						size={RM_LABEL}
 						color={SWISS.secondary}
 					>
-						{curv ? "height minus d²/2R′" : "height (flat earth)"}
+						{curv ? "height minus Earth drop" : "height (flat earth)"}
 					</HandLabel>
 					{/* bottom panel */}
 					{[0, 2, 4].map((a) => (
@@ -469,7 +469,7 @@ function RayMarch() {
 						size={14}
 						color="red"
 					>
-						running max = skyline
+						running max = horizon
 					</HandText>
 					<PenArrow
 						from={[xD(S.bestD) + 46, TOP.y0 + 34]}
@@ -561,15 +561,15 @@ function RayMarch() {
 						v={curv ? `${drop(S.d).toFixed(0)} m` : "0 m (off)"}
 					/>
 					<Read
-						k="skyline so far"
+						k="horizon so far"
 						v={`${sgn(S.best, 2)}° at ${(S.bestD / 1000).toFixed(1)} km`}
 					/>
-					<Read k="crests kept" v={String(crests.length)} />
+					<Read k="ridges behind" v={String(crests.length)} />
 				</dl>
 				{done && (
 					<p className={`mt-3 ${TYPE.caption} gb-secondary`}>
 						{curv ? "With" : "Without"} the Earth bending away, this ray&rsquo;s
-						skyline is{" "}
+						horizon is{" "}
 						<span className="text-[var(--gb-ink)]">
 							{(finalBest.bestD / 1000).toFixed(1)} km
 						</span>{" "}
@@ -837,7 +837,7 @@ function Sweep() {
 		<Figure
 			label="Fig. D2"
 			bleed
-			caption={`Synthetic scene, real algorithm. Every azimuth gets its own ray. Left: the terrain from above, the sweeping ray, and where each ray's skyline actually sits (the trail). Right: the same rays unrolled into the 360° profile; brighter means nearer, rings are the ridge crests behind the skyline. The real thing does ${"7,200"} azimuths at 0.05° and up to 150 km; this demo does ${NAZ} at 1° and ${MAXKM} km.`}
+			caption={`Invented terrain, real method. Every bearing gets its own ray. Left: the terrain from above, the sweeping ray and where each horizon point sits (the trail). Right: the same rays unrolled into the 360° profile; brighter is nearer, rings are ridges behind the horizon. The app uses ${"7,200"} bearings at 0.05° out to 150 km; this demo uses ${NAZ} at 1° out to ${MAXKM} km.`}
 		>
 			<div ref={ref}>
 				<div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
@@ -944,9 +944,9 @@ function Sweep() {
 						<span
 							className={`flex justify-between font-mono ${TYPE.micro} gb-secondary`}
 						>
-							<span>azimuth</span>
+							<span>bearing</span>
 							<span className="text-[var(--gb-ink)]">
-								{k}&deg; &middot; skyline {sgn(S.elev[k], 1)}&deg; at{" "}
+								{k}&deg; &middot; horizon {sgn(S.elev[k], 1)}&deg; at{" "}
 								{S.dist[k].toFixed(1)} km
 							</span>
 						</span>
@@ -1160,7 +1160,7 @@ function ProfilePlot({ d }: { d: GipfelbuchPhotoData }) {
 			y={[ymin, ymax]}
 			width={640}
 			height={250}
-			xLabel="azimuth (deg from north)"
+			xLabel="bearing (° from north)"
 			yLabel="elevation (deg)"
 			fmtX={(v) => `${Math.round(v) % 360}`}
 			fmtY={(v) => `${Math.round(v)}`}
@@ -1257,7 +1257,7 @@ function RealHorizon({
 			bleed
 			caption={
 				<>
-					Try any of the 12 photos. Line and dots: the map&rsquo;s skyline and
+					Try any of the 12 photos. Line and dots: the map&rsquo;s horizon and
 					the ridges behind it, coloured by distance. Below, the same curve as
 					angle against bearing; the shaded band is what the photo sees.{" "}
 					<Measured data={d} />
@@ -1278,14 +1278,14 @@ function RealHorizon({
 					) : null;
 				}}
 			/>
-			<RealPhoto data={d} layers={[]} crop={crop}>
+			<RealPhoto bleed data={d} layers={[]} crop={crop}>
 				{(dd) => <HorizonOverlay d={dd} cam={cam} k={k} />}
 			</RealPhoto>
 			<div className="mt-3 flex flex-wrap items-center justify-between gap-2">
 				<DistLegend />
 				{d && (
 					<span className={`font-mono ${TYPE.micro} gb-secondary`}>
-						in view: skyline from{" "}
+						in view: horizon from{" "}
 						<span className="gb-ink">{km(nearest)} km</span> to{" "}
 						<span className="gb-ink">{km(farthest)} km</span>, {nRidge} inner
 						crests
@@ -1296,8 +1296,8 @@ function RealHorizon({
 			{d && (
 				<p className={`mt-1 font-mono ${TYPE.micro} gb-secondary`}>
 					The full 360° took{" "}
-					<span className="gb-ink">{(d.ms.horizon / 1000).toFixed(1)} s</span>{" "}
-					on CPU; the plot keeps {d.horizon.profile.length} of 7,200 bearings.
+					<span className="gb-ink">{(d.ms.horizon / 1000).toFixed(1)} s</span>.
+					The plot shows {d.horizon.profile.length} of 7,200 bearings.
 				</p>
 			)}
 		</Figure>
@@ -1327,8 +1327,8 @@ function HeroStages() {
 			caption={
 				<>
 					{d
-						? `The map's skyline, seen from the solved camera, lands within ${d.residual.solved.median.toFixed(1)} px of the photo's (median, 800 px wide). At the compass guess it was ${d.residual.prior.median.toFixed(0)} px off.`
-						: "The map's skyline, seen from the solved camera, lands on the photo's."}{" "}
+						? `The map's horizon, seen from the solved camera, lands within ${d.residual.solved.median.toFixed(1)} px of the photo's skyline (median, 800 px wide). At the compass guess it was ${d.residual.prior.median.toFixed(0)} px off.`
+						: "The map's horizon, seen from the solved camera, lands on the photo's skyline."}{" "}
 					<Measured data={d} />
 				</>
 			}
@@ -1341,9 +1341,9 @@ function HeroStages() {
 						render: () => <RealPhoto bleed data={d} layers={[]} crop={crop} />,
 					},
 					{
-						label: "Terrain's skyline",
+						label: "Terrain's horizon",
 						caption:
-							"We draw the skyline the map predicts. Warm is near, cool is far.",
+							"We draw the horizon the map predicts. Warm is near, cool is far.",
 						render: () => (
 							<RealPhoto bleed data={d} layers={[]} crop={crop}>
 								{(dd) => <HorizonOverlay d={dd} cam={cam} k={k} />}
@@ -1429,6 +1429,7 @@ function Ladder() {
 		<>
 			<Figure
 				label="Fig. 2"
+				bleed
 				caption={
 					<>
 						Curvature, less refraction, lowers this crest by{" "}
@@ -1437,7 +1438,14 @@ function Ladder() {
 					</>
 				}
 			>
-				<RealPhoto data={d} layers={[]} crop={crop}>
+				<RealPhoto
+					bleed
+					data={d}
+					layers={[]}
+					crop={crop}
+					// the profiled bearing, on the compass ruler over the photo
+					spillCursor={q ? { x: q[0], az: tp.azimuth } : null}
+				>
 					{(dd) => (
 						<>
 							<HorizonOverlay d={dd} cam={cam} k={k} />
@@ -1600,9 +1608,9 @@ function Ladder() {
 							<>
 								how far the Earth&rsquo;s curve sinks the ground, net of
 								refraction: {Math.round(drop(live.d))} m at {km(live.d)} km.
-								Here <Sym>R′</Sym> = <Sym>R</Sym>/(1 − <Sym>k</Sym>),{" "}
-								<Sym>R</Sym> = 6,371 km and <Sym>k</Sym> = 0.13, a typical value
-								for bent light.
+								<Sym>R′</Sym> = <Sym>R</Sym>/(1 − <Sym>k</Sym>), with Earth
+								radius <Sym>R</Sym> = 6,371 km and <Sym>k</Sym> = 0.13 for
+								refraction.
 							</>
 						),
 					},
@@ -1730,7 +1738,7 @@ function Misses() {
 	return (
 		<Figure
 			label="Fig. 5"
-			caption="Fixed: demo-08, demo-07, demo-12. The median gap stays small, but a head on the ridge puts the worst tenth of columns 100 px or more off."
+			caption="The median gap stays small, but a head on the ridge puts the worst tenth of columns 100 px or more off."
 		>
 			<Gallery
 				ids={MISS}
@@ -1759,10 +1767,10 @@ function Misses() {
 				)}
 			/>
 			<p className={`mt-2 ${TYPE.caption} gb-secondary`}>
-				<Key color={LAYER_STYLE.solved.color}>map</Key> and{" "}
-				<Key color={LAYER_STYLE.skyline.color}>photo</Key> skylines, solved
-				pose. Red stems: the worst tenth of columns, where the two skylines sit
-				at least the p90 gap apart.
+				<Key color={LAYER_STYLE.solved.color}>map</Key> horizon and{" "}
+				<Key color={LAYER_STYLE.skyline.color}>photo</Key> skyline, solved pose.
+				Red stems: the worst tenth of columns, where the two lines are furthest
+				apart.
 			</p>
 		</Figure>
 	);
@@ -1796,7 +1804,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="The map can draw the skyline before we look at the photo."
+				title="The map can draw the horizon before we look at the photo."
 			>
 				<p>
 					From the camera, we shoot a ray at every compass bearing. Each ray
@@ -1805,8 +1813,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					flatter hides behind that crest.
 				</p>
 				<p>
-					Together the angles form a 360° skyline curve. Distant ground sinks
-					below the line of sight, so we lower it first. Then we slide the curve
+					Together the angles form a 360° horizon curve. Distant ground sinks
+					below the line of sight, so we lower it first. Then we slide it
 					against the photo.
 					<MarginNote mark="a">
 						{`At 50 km the ground has sagged ${drop(50_000).toFixed(0)} m. Not a rounding error.`}
@@ -1840,7 +1848,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<RealHorizon id={id} setId={setId} d={d} />
 
-			<Beat kicker="Why it works" title="Far ridges are the fingerprint.">
+			<Beat kicker="Why it works" title="Distant ridges identify the location.">
 				<p>
 					A 25 m GPS error shifts a ridge 2 km away by up to{" "}
 					<HandMark type="double">0.7°, about 10 px</HandMark> at this
@@ -1883,21 +1891,19 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: gap == null ? "…" : `${gap.toFixed(1)} px`,
-						label: `median gap, map vs photo skyline (${nAcc} accepted photos, 800 px wide)`,
+						label: `median gap, map horizon vs photo skyline (${nAcc} solved photos, 800 px wide)`,
 					},
 					{
 						value: hm ? `${(median(hm) / 1000).toFixed(1)} s` : "…",
-						label: "to draw the full 360° skyline on CPU (12 photos)",
+						label: "to compute the full 360° horizon (12 photos)",
 					},
-					{ value: "7,200", label: "bearings, 0.05° apart, per skyline" },
+					{ value: "7,200", label: "bearings, 0.05° apart, per horizon" },
 					{ value: "0.3 s", label: "with the fast marcher in the browser" },
 				]}
 				source={
 					<>
-						Gap and time: measured on the 12 demo photos
-						(scripts/gipfelbuch/build-data.ts). Bearings: src/lib/geo/horizon.ts
-						defaults. Fast marcher: src/lib/geo/README.md. Gap uses the solved
-						pose, so it measures fit, not accuracy.
+						Gap and time: measured on the 12 demo photos. The gap uses the
+						solved pose, so it measures fit, not accuracy.
 					</>
 				}
 			/>
@@ -1905,12 +1911,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			<Details>
 				<h3>The mechanism, exactly</h3>
 				<p>
-					<code>computeHorizon</code> builds a 360° curve: for every azimuth,
-					the highest elevation angle at which land meets sky. It marches a ray
-					along each azimuth, steps outward over the DEM, and keeps the steepest
-					angle; everything flatter is hidden behind it. The real horizon on a
-					real photo is Fig. 3. The two synthetic figures below use
-					deterministic terrain and the same loop as the code.
+					The horizon is a 360° curve: for every bearing, the highest elevation
+					angle at which land meets sky. A ray marches outward over the terrain
+					and keeps the steepest angle; everything flatter is hidden behind it.
+					Fig. 3 shows it on a real photo. The two figures below use invented
+					terrain and the same method.
 				</p>
 				<Steps
 					steps={[
@@ -1918,10 +1923,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							title: "A distance ladder per ray",
 							body: (
 								<>
-									Samples start at 20 m and step by{" "}
-									<code>max(10 m, 0.4 % of d)</code> out to 150 km. With those
-									defaults that is about 1,270 samples per azimuth, and about 9
-									million per full horizon.
+									Samples start at 20 m and step by the larger of 10 m and 0.4 %
+									of the distance, out to 150 km: about 1,270 per bearing, about
+									9 million per full horizon.
 								</>
 							),
 						},
@@ -1957,10 +1961,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							title: "Keep the running maximum",
 							body: (
 								<>
-									A sample that beats the best angle so far becomes the skyline
-									for this azimuth (<code>elevation[i]</code>, and{" "}
-									<code>distance[i]</code>, the metres to the point that draws
-									it). Ties keep the nearer point.
+									A sample that beats the best angle so far becomes the horizon
+									for this bearing, with the distance to the point that draws
+									it. Ties keep the nearer point.
 								</>
 							),
 						},
@@ -1970,9 +1973,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 								<>
 									When a new best appears after a stretch of hidden samples, and
 									the previous crest is more than 8 % of its own distance
-									behind, that crest was an inner silhouette. It goes into{" "}
-									<code>ridges[i]</code>, nearest first: the layered ridge lines
-									behind the {A("skyline", "skyline")} that the overlay draws.
+									behind, that crest is kept as an inner ridge, nearest first.
+									These are the layered ridge lines the overlay draws behind the{" "}
+									{A("skyline", "horizon")}.
 								</>
 							),
 						},
@@ -1980,35 +1983,31 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 				<h3>Output</h3>
 				<p>
-					A <code>HorizonProfile</code>: one 0.05° step, then{" "}
-					<code>elevation</code> and <code>distance</code> as{" "}
-					<code>Float32Array</code>s of 7,200 entries, plus the crest lists.
-					Each ray is independent, so the work parallelises by azimuth sector.
-					The fast marcher (src/lib/horizon-fast/march.ts) skips a block of
-					terrain when its max-mipmap height cannot beat the current best angle,
-					and follows the same geometry as the classic one.
+					The result: 7,200 elevations and distances, 0.05° apart, plus the
+					ridge lists. Each ray is independent, so the work splits by bearing.
+					The fast version skips a block of terrain when its highest point
+					cannot beat the current best angle; the geometry is the same.
 				</p>
 				<RayMarch />
 				<Sweep />
 				<p>
-					<CircledNumber value={1} /> First run: flat Earth, skyline on the{" "}
+					<CircledNumber value={1} /> First run: flat Earth, horizon on the{" "}
 					<HandMark type="strike">50 km summit</HandMark>{" "}
 					<span className="nb-hand text-[var(--gb-red)]">26 km ridge</span> once
 					the Earth drops.
 				</p>
 				<Callout tone="result" title="Why curvature earns its place">
-					In the synthetic ray the same eye puts the skyline on the 26 km ridge
-					with the Earth&rsquo;s drop and on a 50 km summit without it. On the
-					real photo in Fig. 2 the curve moves the skyline by about 1.5 px. The
-					angular shift is d/2R&prime;, linear in distance (about 0.004° per
-					km), so far skylines and long lenses are where it bites.
+					In the invented ray, the horizon sits on the 26 km ridge with the
+					Earth&rsquo;s drop and on a 50 km summit without it. On the real photo
+					in Fig. 2 the curve moves it by about 1.5 px. The angular shift is
+					d/2R&prime;, linear in distance (about 0.004° per km), so far horizons
+					and long lenses are where it bites.
 				</Callout>
 				<p>
-					The refraction coefficient k = 0.13 is an average; real air varies. By
-					the formula, k = 0.18 instead changes the drop by 4 m at 33 km (0.1 px
-					at this photo&rsquo;s focal length) and by 39 m at 100 km (0.3 px).
-					This is arithmetic, not a measurement. Radio engineers use an
-					effective radius of 4/3 R, a different convention and a stronger bend.
+					k = 0.13 is an average; real air varies. With k = 0.18 the drop
+					changes by 4 m at 33 km (0.1 px at this photo&rsquo;s focal length)
+					and by 39 m at 100 km (0.3 px). Radio engineers use an effective
+					radius of 4/3 R, a stronger bend.
 				</p>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">
@@ -2019,20 +2018,15 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<CodeRef path="src/lib/geo/pipeline.ts" />
 					<CodeRef path="src/lib/geo/README.md" />
 				</div>
-				<p className={`font-mono ${TYPE.caption} gb-secondary`}>
-					computeHorizon, HorizonProfile, Ridge, HorizonOptions,
-					TerrainSampler.sampleAt, EARTH_R, REFRACTION_K,
-					computeHorizonFastCompat
-				</p>
 				<h3>Where it fits</h3>
 				<p>
-					This is the predicted half of the skyline match in{" "}
+					This is the predicted half of the horizon match in{" "}
 					{A("viewport-inference", "viewport inference")}. Its input is the{" "}
 					{A("terrain-sampler", "terrain sampler")} over the{" "}
-					{A("dem-source", "DEM source")}, seen from the eye height the{" "}
+					{A("dem-source", "DEM source")}, seen from the camera height the{" "}
 					{A("eye-rule", "eye rule")} sets; the{" "}
-					{A("baseline-pipeline", "baseline pipeline")} runs it first. The same
-					DEM is what {A("terrain-snapping", "terrain snapping")} snaps to.
+					{A("baseline-pipeline", "baseline pipeline")} runs it first.{" "}
+					{A("terrain-snapping", "Terrain snapping")} snaps to the same DEM.
 				</p>
 			</Details>
 		</>

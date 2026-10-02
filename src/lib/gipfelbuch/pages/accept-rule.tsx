@@ -24,7 +24,6 @@ import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
 	Callout,
-	CodeRef,
 	Eq,
 	Figure,
 	Frac,
@@ -80,7 +79,7 @@ function solveFactors(d: GipfelbuchPhotoData) {
 		Math.abs(s.delta.pitch) > 3 || Math.abs(s.delta.roll) > 3 ? 0 : 1;
 	const f = [
 		{
-			k: "inlier fraction",
+			k: "columns that fit",
 			v: clamp01((s.inlierFraction - 0.3) / 0.5),
 			raw: `${(100 * s.inlierFraction).toFixed(0)}% of columns within 4 px`,
 		},
@@ -92,10 +91,10 @@ function solveFactors(d: GipfelbuchPhotoData) {
 		{
 			k: "ambiguity",
 			v: clamp01((1 - s.ambiguity) / 0.4 + 0.1),
-			raw: `rival dip ${s.ambiguity.toFixed(2)} (0 = clear winner; bites above 0.64)`,
+			raw: `rival ${s.ambiguity.toFixed(2)} (0 = clear winner)`,
 		},
 		{
-			k: "horizon relief",
+			k: "skyline relief",
 			v: clamp01(s.horizonRelief / 0.5),
 			raw: `skyline varies ${s.horizonRelief.toFixed(2)}° (needs 0.5° to pin yaw)`,
 		},
@@ -276,12 +275,11 @@ function RealDecisions() {
 			label="Fig. 2"
 			caption={
 				<>
-					The accept decision on 12 real photos: the CPU solve at the app's
-					local bar of 0.5 (src/lib/geo/solve.ts, acceptConfidence ). Bars are
-					the confidence of the accepted pose (amber: rejected by solvePose,
-					rescued by refinePose) or of the rejected one (red). Tap one. Photos
-					07, 11 and 12 are shown whole because the person in the frame is the
-					reason the skyline fit is weak. <Measured data={d ?? index} />
+					The accept decision on 12 real photos, bar 0.5. Bars show the
+					confidence of the accepted pose (amber: rescued by the second solver)
+					or of the rejected one (red). Tap one. Photos 07, 11 and 12 are shown
+					whole: the person in the frame is why the skyline fit is weak.{" "}
+					<Measured data={d ?? index} />
 				</>
 			}
 			bleed
@@ -343,7 +341,7 @@ function RealDecisions() {
 							>
 								{d.solved.accepted
 									? d.solved.stage === "refine"
-										? "accepted by refine"
+										? "accepted by second solver"
 										: "accepted"
 									: "rejected"}
 							</span>
@@ -373,36 +371,32 @@ function RealDecisions() {
 						<p className={`mt-3 ${TYPE.caption} gb-secondary`}>
 							{id === "demo-12" ? (
 								<>
-									solvePose multiplies these to {fx.product.toFixed(2)}: only{" "}
-									{(100 * d.solved.inlierFraction).toFixed(0)}% of the skyline
-									columns fit, because hair crosses the ridge. So it rejects.
-									The fallback refinePose scores the same skyline{" "}
-									{d.solved.confidence.toFixed(3)} (bar 0.5, inlier floor 0.3)
-									and accepts. Two solvers, one photo, a verdict that flips on a
-									different weighting: that is why the pose is not shown as
-									certain on this evidence alone.
+									The first solver multiplies these to {fx.product.toFixed(2)}:
+									only {(100 * d.solved.inlierFraction).toFixed(0)}% of the
+									skyline columns fit, because hair crosses the ridge. It
+									rejects. The second solver scores the same skyline{" "}
+									{d.solved.confidence.toFixed(3)} and accepts. The verdict
+									flips with the weighting, so this evidence alone is not enough
+									to call the pose certain.
 								</>
 							) : d.solved.accepted ? (
 								<>
-									Product {fx.product.toFixed(2)} clears 0.5. Skyline residual{" "}
-									falls from {d.residual.prior.median.toFixed(1)} px at the
-									sensor prior to {d.residual.solved.median.toFixed(1)} px
-									(median) at the solved pose.
+									Score {fx.product.toFixed(2)} clears 0.5. Median skyline gap{" "}
+									falls from {d.residual.prior.median.toFixed(1)} px (phone
+									sensors) to {d.residual.solved.median.toFixed(1)} px (solved).
 								</>
 							) : (
 								<>
-									Product {fx.product.toFixed(2)} &lt; 0.5, and the whole gap is
-									the inlier fraction:{" "}
-									{(100 * d.solved.inlierFraction).toFixed(0)}% of columns
+									Score {fx.product.toFixed(2)}, under 0.5. The shortfall is the
+									fit: {(100 * d.solved.inlierFraction).toFixed(0)}% of columns
 									within 4 px. A head and hair are not terrain. The pose stays
 									unconfirmed and the user is asked.
 									{d.app && (
 										<>
 											{" "}
-											Rejected is not the same as wrong: the live app's saved
-											pose for this photo has yaw {d.app.yaw.toFixed(1)}°
-											against {d.solved.yaw.toFixed(1)}° here. The rule only
-											refuses to call it certain.
+											Rejected is not wrong: the app's saved yaw is{" "}
+											{d.app.yaw.toFixed(1)}°, here {d.solved.yaw.toFixed(1)}°.
+											The rule only refuses to call it certain.
 										</>
 									)}
 								</>
@@ -450,14 +444,12 @@ function ConfidenceVsError() {
 			label="Fig. 3"
 			caption={
 				<>
-					Why the bar sits at 0.5: confidence of the CPU cascade against its yaw
-					error from a hand-registered pose, {rows.length} photos of the 19 in
-					data/ground-truth.json that have a registration
-					(out/eval-classic-cascade/report.json, via
-					scripts/gipfelbuch/build-data.ts). Filled: accepted. Hollow: rejected,
-					plotted at the pose the solver would have shown. Every accepted pose
-					is within 0.5°; the rejected ones include 6.8° and 19.8° errors, and
-					one correct pose (IMG_7063, 0.48) that the bar costs.
+					{best
+						? `No pose the bar accepts is more than ${Math.abs(best.solvedError?.yaw ?? 0).toFixed(1)}° off, which is why the bar sits at 0.5.`
+						: "Confidence against yaw error is why the bar sits at 0.5."}
+					<MarginNote mark="d">
+						{`Solver confidence against yaw error from a hand-fitted pose, ${rows.length} photos with a fit. Filled: accepted. Hollow: rejected, drawn at the pose it would have shown. Every accepted pose is within 0.5°.`}
+					</MarginNote>
 				</>
 			}
 		>
@@ -503,7 +495,7 @@ function ConfidenceVsError() {
 									size={13}
 									color="red"
 								>
-									{`refused, ${Math.abs(worst.solvedError?.yaw ?? 0).toFixed(1)}° off`}
+									{`${rows.filter((r) => !r.accepted).length} refused, the worst ${Math.abs(worst.solvedError?.yaw ?? 0).toFixed(1)}° off`}
 								</HandText>
 								<PenArrow
 									from={[
@@ -528,7 +520,7 @@ function ConfidenceVsError() {
 									size={13}
 									color="pencil"
 								>
-									{`${costly.name.replace(".jpg", "")} ${costly.confidence}: right, but the bar costs it`}
+									{`${costly.name.replace(".jpg", "")} ${costly.confidence}: right, but refused`}
 								</HandText>
 								<PenArrow
 									from={[
@@ -553,7 +545,7 @@ function ConfidenceVsError() {
 								size={13}
 								color="forest"
 							>
-								{`worst accepted: ${Math.abs(best.solvedError?.yaw ?? 0).toFixed(2)}° ✓`}
+								{`every accepted pose within ${Math.abs(best.solvedError?.yaw ?? 0).toFixed(2)}° on ${rows.filter((r) => r.accepted).length} photos ✓`}
 							</HandText>
 						)}
 						{rows.map((r) => {
@@ -598,7 +590,7 @@ function ConfidenceVsError() {
 			</Plot>
 			<div className={`mt-2 h-4 font-mono ${TYPE.micro} gb-secondary`}>
 				{hov
-					? `${hov.name}: confidence ${hov.confidence}, yaw error ${Math.abs(hov.solvedError?.yaw ?? 0).toFixed(2)}°, ${hov.accepted ? "accepted" : "rejected"} (ground truth: ${hov.gtQuality})`
+					? `${hov.name}: confidence ${hov.confidence}, yaw error ${Math.abs(hov.solvedError?.yaw ?? 0).toFixed(2)}°, ${hov.accepted ? "accepted" : "rejected"} (reference: ${hov.gtQuality})`
 					: "hover a point"}
 			</div>
 		</Figure>
@@ -622,17 +614,17 @@ const RULES: Rule[] = [
 	{
 		id: "app",
 		name: "App aligner",
-		rule: "autoAlign accepts",
+		rule: "app aligner accepts",
 		right: 39,
 		wrong: 19,
 		unsure: 2,
 		precision: "0.64",
-		note: "60 accepted poses on the 100-photo wild set: 39 correct, 19 confidently wrong, 2 unsure (grey). Precision is correct over accepted. This is the baseline the later rules are measured against.",
+		note: "60 accepted poses on 100 photos checked by hand: 39 correct, 19 confidently wrong, 2 unsure (grey). Precision = correct over accepted. The baseline for the later rules.",
 	},
 	{
 		id: "c50",
-		name: "Cascade ≥ 0.5",
-		rule: "local-search bar",
+		name: "Full solve ≥ 0.5",
+		rule: "bar with trusted compass",
 		right: 25,
 		wrong: 2,
 		precision: "0.93",
@@ -640,30 +632,30 @@ const RULES: Rule[] = [
 	},
 	{
 		id: "c75",
-		name: "Cascade ≥ 0.75",
-		rule: "yaw-unknown gate",
+		name: "Full solve ≥ 0.75",
+		rule: "bar when heading unknown",
 		right: 22,
 		wrong: 0,
 		precision: "1.00",
-		note: "The two wrong accepts sat in the 0.5 to 0.75 band. Raising the bar removes them and costs 3 correct poses; escalation recovers 2 of those 3.",
+		note: "The two wrong accepts sat between 0.5 and 0.75. Raising the bar removes them and loses 3 correct poses; a second look recovers 2.",
 	},
 	{
 		id: "fused",
-		name: "Fused HIGH",
+		name: "Match HIGH",
 		rule: "render-and-match, HIGH",
 		right: 30,
 		wrong: 1,
 		precision: "0.97",
-		note: "One gross error in 31 HIGH poses, and it had no GPS fix and no independent agreement.",
+		note: "One gross error in 31 HIGH poses; it had no GPS fix and no second solver agreeing.",
 	},
 	{
 		id: "product",
 		name: "Product rule",
-		rule: "HIGH and (GPS or cascade within 0.5°)",
+		rule: "HIGH and (GPS or full solve within 0.5°)",
 		right: 20,
 		wrong: 0,
 		precision: "1.00",
-		note: "20 of 20 correct (16 of 16 before the cascade re-run on Mapterhorn). Recall is the price: fused HIGH alone had 30 correct against 1 wrong, and the rule gives up 10 of those correct accepts (14 in the first v2 run) to avoid the one wrong one. Everything else becomes “please confirm”.",
+		note: "20 of 20 correct. The price is recall: HIGH alone had 30 correct and 1 wrong; this rule gives up 10 correct poses to avoid that one. The rest become “please confirm”.",
 	},
 ];
 
@@ -729,7 +721,7 @@ function PrecisionLadder() {
 		<Figure
 			label="Fig. 6"
 			bleed
-			caption="Five accept rules on the same 100 blind-verified photos (reports/bench-wild.md; rows come from the v2 verification and the Mapterhorn cascade re-run, so each is a count of accepted poses under that rule). Accent dots are correct accepts, red are confident wrong ones, grey are unsure. Tighten the rule and the red disappears; the cost is how many dots remain."
+			caption="Five accept rules on the same 100 checked photos. Each dot is an accepted pose: green correct, red confidently wrong, grey unsure. Tighten the rule and the red disappears; fewer dots remain."
 		>
 			<div ref={ref}>
 				<style>{`
@@ -755,7 +747,7 @@ function PrecisionLadder() {
 							onClick={() => setManual(null)}
 							className={`nb-hand px-2 py-0.5 ${TYPE.body} gb-secondary underline decoration-dotted`}
 						>
-							autoplay
+							auto
 						</button>
 					)}
 				</div>
@@ -899,12 +891,12 @@ const SCENARIOS: { name: string; inp: Inp }[] = [
 ];
 
 const TOGGLES: { k: keyof Inp; label: string }[] = [
-	{ k: "cascade", label: "cascade accepted" },
-	{ k: "agree", label: "app accepted, Δyaw ≤ 1°" },
-	{ k: "escalate", label: "shouldEscalate" },
-	{ k: "high", label: "matcher HIGH" },
-	{ k: "gps", label: "EXIF GPS trusted" },
-	{ k: "near", label: "cascade within 0.5°" },
+	{ k: "cascade", label: "full solve accepted" },
+	{ k: "agree", label: "app accepted, within 1°" },
+	{ k: "escalate", label: "skyline weak" },
+	{ k: "high", label: "match HIGH" },
+	{ k: "gps", label: "GPS trusted" },
+	{ k: "near", label: "full solve within 0.5°" },
 ];
 
 type NodeDef = {
@@ -922,25 +914,25 @@ const NODES: NodeDef[] = [
 		x: 14,
 		y: 58,
 		w: QW,
-		text: "cascade accepted?",
-		sub: "re-solve from compass + gravity",
+		text: "full solve accepted?",
+		sub: "re-solve from compass and gravity",
 	},
-	{ id: "q2", x: 232, y: 58, w: QW, text: "app accepted and |Δyaw| ≤ 1°?" },
+	{ id: "q2", x: 232, y: 58, w: QW, text: "app accepted, within 1°?" },
 	{
 		id: "q3",
 		x: 14,
 		y: 150,
 		w: QW,
-		text: "shouldEscalate?",
+		text: "second look needed?",
 		sub: "skyline < 0.5, or solvers differ",
 	},
-	{ id: "q4", x: 14, y: 232, w: QW, text: "matcher confidence HIGH?" },
+	{ id: "q4", x: 14, y: 232, w: QW, text: "match HIGH?" },
 	{
 		id: "q5",
 		x: 232,
 		y: 232,
 		w: QW,
-		text: "GPS trusted or cascade within 0.5°?",
+		text: "GPS trusted or full solve within 0.5°?",
 	},
 ];
 const OUT: {
@@ -956,7 +948,7 @@ const OUT: {
 		v: "refined",
 		x: 470,
 		y: 86,
-		label: "refined: cascade pose",
+		label: "refined: full-solve pose",
 	},
 	{ id: "kept", v: "kept", x: 232, y: 150, label: "kept: app pose, no badge" },
 	{
@@ -1109,7 +1101,7 @@ function VerdictTree() {
 		<Figure
 			label="Fig. D1"
 			bleed
-			caption="The verdict table at the top of src/lib/integration/second-opinion.ts, with the matcher branch from matchAccepted() in src/lib/matcher-client.ts. It cycles through typical cases; switch any input to trace your own path. Only matched, verified and refined poses are shown as certain (picker/candidates.ts isAutoHigh): every other branch ends in a pose the user is asked to confirm, or the app pose with no badge. (A cascade that has not finished within 20 s also keeps the app pose, with no badge.)"
+			caption="How a pose gets its verdict. It cycles through typical cases; switch any input to trace your own path. Only matched, verified and refined poses are shown as certain. Every other branch ends in a pose the user is asked to confirm, or the app pose with no badge. (A full solve not done within 20 s also keeps the app pose.)"
 		>
 			<div ref={ref}>
 				<div className="mb-4 flex flex-wrap gap-2">
@@ -1130,7 +1122,7 @@ function VerdictTree() {
 							onClick={() => setCustom(null)}
 							className={`nb-hand px-2 py-0.5 ${TYPE.body} gb-secondary underline decoration-dotted`}
 						>
-							autoplay
+							auto
 						</button>
 					)}
 				</div>
@@ -1302,7 +1294,7 @@ function VerdictTree() {
 						);
 					})()}
 					<HandText x={14} y={30} color="pencil" size={15}>
-						after first paint: second opinion
+						after first draw: second opinion
 					</HandText>
 					<HandText x={470} y={170} color="forest" size={15}>
 						only these three ever show as certain
@@ -1325,68 +1317,17 @@ function VerdictTree() {
 
 // ---------------------------------------------------------------------------------------------
 
-const GATES: [string, string, string][] = [
-	["acceptConfidence 0.5", "src/lib/geo/solve.ts", "local ±yaw search"],
-	["FULL_SEARCH_CONFIDENCE 0.75", "src/lib/geo/solve.ts", "360° retry bar"],
-	[
-		"YAW_UNKNOWN / FOCAL_UNKNOWN 0.75",
-		"src/lib/integration/unknown-pose-core.ts",
-		"cascade when heading or focal unknown",
-	],
-	[
-		"score ≥ 0.5, inlier ≥ 0.3, slope ≥ 0.015",
-		"src/lib/refine/confidence.ts",
-		"product of six ramps, two hard gates",
-	],
-	[
-		"MIN_CONFIDENCE 0.5",
-		"src/lib/concord/app/confidence.ts",
-		"LOW unless explicitly accepted",
-	],
-	[
-		"AGREE_DEG 1° (verified vs refined)",
-		"src/lib/integration/second-opinion.ts",
-		"app pose vs cascade pose",
-	],
-	[
-		"MATCH_AGREE_DEG 0.5°",
-		"src/lib/matcher-client.ts",
-		"matcher pose vs cascade pose",
-	],
-	[
-		"isAutoHigh()",
-		"src/lib/picker/candidates.ts",
-		"user picks and pins are never HIGH",
-	],
-	[
-		"TAP_MAX_PX 12, DEDUPE_DEG 0.5°",
-		"src/lib/picker/candidates.ts",
-		"tap-consistent ranking, same-basin merge",
-	],
+const GATES: [string, string][] = [
+	["0.5", "with a trusted compass"],
+	["0.75", "when the heading is unknown"],
+	["score ≥ 0.5, 30% of columns fit", "second solver"],
+	["1°", "app pose against full solve: verified or refined"],
+	["0.5°", "match against full solve"],
 ];
 
 function Legacy() {
 	return (
 		<>
-			<Section title="Fail closed" kicker="The rule">
-				<p>
-					A pose that is wrong and shown as certain is worse than no pose at
-					all: it draws a confident overlay on the wrong mountains. So the
-					product has one policy, applied at every layer: a pose is HIGH only if
-					something <em>explicitly</em> accepted it and its confidence clears a
-					bar, and every other state (missing, rejected, suggested, picked by
-					hand) falls to LOW. The solver’s own gating is on{" "}
-					<Link
-						to={gipfelbuchHref("viewport-inference")}
-						className="underline decoration-[var(--gb-red)]"
-					>
-						Viewport Inference
-					</Link>
-					; this page is the layer above it, which decides what the user is
-					allowed to see as certain.
-				</p>
-			</Section>
-
 			<Section title="How it works" kicker="Mechanism">
 				<Steps
 					steps={[
@@ -1394,13 +1335,11 @@ function Legacy() {
 							title: "Soft evidence, hard gates",
 							body: (
 								<>
-									The refine confidence is six smoothstep ramps (yaw-correlation
-									peak, runner-up mode ratio, inlier fraction,
-									correlation-inflated σ, skyline slope, RMS residual)
-									multiplied together. One weak term drags the product down;
-									accept needs <code>score ≥ 0.5</code> and two hard floors
-									(inlier ≥ 0.3, slope ≥ 0.015). Each rejection carries a human
-									reason string.
+									The second solver’s confidence is six ramps multiplied
+									together (yaw peak, runner-up ratio, columns that fit,
+									uncertainty, skyline slope, residual). One weak term drags it
+									down. Accept needs a score of 0.5, at least 30% of columns
+									fitting, and a skyline slope of 0.015.
 								</>
 							),
 						},
@@ -1409,10 +1348,10 @@ function Legacy() {
 							body: (
 								<>
 									With a trusted compass the search is ±25° and 0.5 suffices.
-									When yaw or focal is unknown, the search is over every
-									heading, wrong basins are far likelier, and the bar becomes
-									0.75. On the wild set that single change took the cascade from
-									25 correct and 2 wrong accepts to 22 and 0 (Fig. 6).
+									With heading or focal unknown the search covers every heading,
+									wrong matches are likelier, and the bar becomes 0.75. On 100
+									checked photos that took the solver from 25 correct and 2
+									wrong accepts to 22 and 0 (Fig. 6).
 								</>
 							),
 						},
@@ -1420,24 +1359,22 @@ function Legacy() {
 							title: "Two solvers must not disagree",
 							body: (
 								<>
-									After first paint, the CPU cascade re-solves independently of
-									the GPU aligner. Agreement within 1° keeps the pose
-									(“verified”); a confident cascade that disagrees wins
-									(“refined”). The aligner alone made one confident wrong accept
-									on the ground-truth set; the cascade made none.
+									After first draw, a second solver re-solves on its own.
+									Agreement within 1° keeps the pose (“verified”); a confident
+									solver that disagrees wins (“refined”). The app aligner alone
+									made one confident wrong accept on the reference set; the
+									second solver made none.
 								</>
 							),
 						},
 						{
-							title: "Escalate, then demand independent evidence",
+							title: "Look again, then demand independent evidence",
 							body: (
 								<>
-									If the skyline is weak, <code>shouldEscalate()</code> sends
-									the photo to render-and-match. Even a HIGH match is applied
-									only when the position is a trusted EXIF GPS fix or the
-									cascade lands within 0.5° (<code>matchAccepted</code>). A
-									match that stands alone becomes “unverified”, and the user is
-									asked.
+									If the skyline is weak, the photo goes to render-and-match.
+									Even a HIGH match is applied only with a trusted GPS fix or
+									when the full solve lands within 0.5°. A match that stands
+									alone is “unverified”, and the user is asked.
 								</>
 							),
 						},
@@ -1445,10 +1382,9 @@ function Legacy() {
 							title: "Suggestions are not accepts",
 							body: (
 								<>
-									The top-3 picker and tapped peaks produce candidates, never
-									acceptance: <code>isAutoHigh</code> is true only for an
-									automatic, verified accept. A pose the user picks (“manual”)
-									or pins is never HIGH, and re-solving from taps is the{" "}
+									The top-3 picker and tapped peaks give candidates, never
+									acceptance. Only an automatic, verified accept is HIGH; a pose
+									the user picks or pins never is. Re-solving from taps is the{" "}
 									<Link
 										to={gipfelbuchHref("tap-a-peak")}
 										className="underline decoration-[var(--gb-red)]"
@@ -1465,15 +1401,14 @@ function Legacy() {
 
 			<VerdictTree />
 
-			<Section title="In the code" kicker="Gates">
+			<Section title="The bars" kicker="Gates">
 				<p>
-					About a dozen thresholds, each set by hand against a benchmark and
-					none a likelihood: they are bars chosen so that the measured
-					wrong-accept count on blind-verified photos is zero, not
+					About a dozen thresholds, set by hand so that no wrong pose is
+					accepted on the 100 photos checked by hand. They are bars, not
 					probabilities.
 				</p>
 				<div className="@container my-6">
-					{GATES.map(([gate, path, what]) => (
+					{GATES.map(([gate, what]) => (
 						<div
 							key={gate}
 							className="flex flex-col gap-1 px-4 py-3 odd:bg-[var(--gb-paper-deep)] @[640px]:flex-row @[640px]:items-baseline @[640px]:gap-4"
@@ -1487,44 +1422,14 @@ function Legacy() {
 							<span className={`flex-1 ${TYPE.caption} gb-secondary`}>
 								{what}
 							</span>
-							<span className="max-w-full break-all">
-								<CodeRef path={path} />
-							</span>
 						</div>
 					))}
 				</div>
 				<Callout tone="lesson">
-					Precision first costs recall on purpose. The product rule leaves 10
-					correct poses on the table (14 in the first v2 run) to avoid one wrong
-					one; they go to “please confirm” rather than being lost.
+					Precision first costs recall on purpose. The rule leaves 10 correct
+					poses on the table to avoid one wrong one; they go to “please
+					confirm”.
 				</Callout>
-			</Section>
-
-			<Section title="Where it fits" kicker="Neighbourhood">
-				<p>
-					The accept rule constrains{" "}
-					<Link
-						to={gipfelbuchHref("pose-estimate")}
-						className="underline decoration-[var(--gb-red)]"
-					>
-						Pose Estimate
-					</Link>{" "}
-					and gates{" "}
-					<Link
-						to={gipfelbuchHref("viewport-inference")}
-						className="underline decoration-[var(--gb-red)]"
-					>
-						Viewport Inference
-					</Link>
-					; a rejected solve hands over to{" "}
-					<Link
-						to={gipfelbuchHref("tap-a-peak")}
-						className="underline decoration-[var(--gb-red)]"
-					>
-						Tap a Peak
-					</Link>
-					.
-				</p>
 			</Section>
 		</>
 	);
@@ -1542,7 +1447,7 @@ function reason(d: GipfelbuchPhotoData): string {
 	const s = d.solved;
 	const fit = `${(100 * s.inlierFraction).toFixed(0)}% of columns fit`;
 	if (s.stage === "refine")
-		return `solve refused it; the second solver took it at ${s.confidence.toFixed(2)}, ${fit}`;
+		return `refused by the first solver; accepted by the second at ${s.confidence.toFixed(2)}, ${fit}`;
 	if (!s.accepted)
 		return `confidence ${s.confidence.toFixed(2)}, under 0.5: only ${fit}`;
 	return `confidence ${s.confidence.toFixed(2)}, ${fit}`;
@@ -1559,7 +1464,7 @@ function RejectedStory() {
 			title="A solve the rule refuses"
 			caption={
 				d
-					? `Demo-07: the solve turned the view ${Math.abs(d.solved.delta.yaw).toFixed(1)}° and cut the skyline gap from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} px, but ${reason(d)}. Under the bar of 0.5 the app keeps the phone's pose and asks.`
+					? `Photo 07: the solve turned the view ${Math.abs(d.solved.delta.yaw).toFixed(1)}° and cut the skyline gap from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} px, but ${reason(d)}. Under 0.5 the app keeps the phone’s pose and asks.`
 					: "A solve under the bar is not shown as certain."
 			}
 		/>
@@ -1593,13 +1498,16 @@ function Verdicts() {
 						/>
 						<span
 							className={`absolute top-1 left-1 px-1 font-mono ${TYPE.micro} text-[var(--gb-paper)]`}
-							style={{ background: "var(--gb-ink)" }}
+							style={{
+								background: d.solved.accepted ? "var(--gb-ink)" : SWISS.red,
+							}}
 						>
-							{d.id.slice(-2)}
+							{d.id.slice(-2)} · {d.solved.accepted ? "accepted" : "guess"}
 						</span>
 					</div>
 				)}
 				tone={(d) => (d.solved.accepted ? "result" : "failure")}
+				tag={(d) => (d.solved.accepted ? undefined : "guess")}
 				label={(d) => (
 					<>
 						<span className="font-semibold text-[var(--gb-ink)]">
@@ -1750,11 +1658,11 @@ function ScoreFit() {
 			bleed
 			caption={
 				<>
-					Red ticks mark columns where the photo&rsquo;s skyline sits over 4 px
-					from the map&rsquo;s. Hair and heads make them, and they pull the
-					first check below 1. Tap a photo: <CircledNumber value={1} /> is where
-					the two skylines drift furthest apart, <CircledNumber value={2} />{" "}
-					where they agree. <Measured data={d ?? index} />
+					Red ticks mark columns where the photo&rsquo;s skyline is over 4 px
+					from the modelled horizon. Hair and heads cause them and pull the
+					first check below 1. Tap a photo: <CircledNumber value={1} /> drifts
+					furthest, <CircledNumber value={2} /> agrees.{" "}
+					<Measured data={d ?? index} />
 				</>
 			}
 		>
@@ -1828,8 +1736,8 @@ function ScoreFit() {
 				<MarkList
 					items={[
 						<>
-							The photo&rsquo;s skyline and the map&rsquo;s drift up to{" "}
-							{spots.far.gap.toFixed(0)} px apart here.
+							Skyline and horizon are up to {spots.far.gap.toFixed(0)} px apart
+							here.
 						</>,
 						<>
 							Here they agree within {Math.max(1, Math.ceil(spots.near.gap))}{" "}
@@ -1862,22 +1770,22 @@ function ScoreFit() {
 						c: "var(--gb-water)",
 						text: live(
 							0,
-							"share of columns where the two skylines agree within 4 px",
+							"columns where skyline and horizon agree within 4 px",
 						),
 					},
 					{
 						sym: "κ",
 						c: "skyline",
-						text: live(1, "share of the width that has a skyline at all"),
+						text: live(1, "width that has a skyline"),
 					},
 					{
 						sym: "a",
-						text: live(2, "how close the nearest rival yaw came to the winner"),
+						text: live(2, "how close the nearest rival yaw came"),
 					},
 					{
 						sym: "σ",
 						c: "var(--gb-water)",
-						text: live(3, "how much the map's skyline varies"),
+						text: live(3, "how much the horizon varies"),
 					},
 				]}
 			>
@@ -1956,7 +1864,7 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 
 			<RealDecisions />
 
-			<Beat kicker="Two more guards" title="A bar, then a second opinion.">
+			<Beat kicker="Two more checks" title="A bar, then a second opinion.">
 				<Trio
 					className="sm:grid-cols-2"
 					steps={[
@@ -1984,7 +1892,7 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 					<HandMark type="double">
 						Tighter rules throw away good answers on purpose.
 					</HandMark>{" "}
-					Each dot below is one of 100 photos with a known right answer.
+					Each dot below is one of 100 photos checked by hand.
 				</p>
 				<p>
 					First guess:{" "}
@@ -2019,14 +1927,14 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 					},
 					{
 						value: "30 vs 20",
-						label: "correct poses kept: fused HIGH alone vs product rule",
+						label: "correct poses kept: HIGH alone vs this rule",
 					},
 					{
 						value: acc == null ? "…" : `${acc} / 12`,
-						label: "demo photos accepted by the solve cascade",
+						label: "demo photos accepted by the solver",
 					},
 				]}
-				source="First three: reports/bench-wild.md (100 blind-verified photos, 2026-09-25 re-run). Last: measured on the 12 demo photos."
+				source="First three: 100 photos checked by hand. Last: the 12 demo photos."
 			/>
 
 			<Details>

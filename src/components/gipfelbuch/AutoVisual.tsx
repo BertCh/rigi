@@ -77,7 +77,7 @@ export function AutoVisual({
 			viewBox="-300 -100 600 200"
 			className={`block h-auto w-full ${className ?? ""}`}
 			role="img"
-			aria-label={`${node.title} constellation`}
+			aria-label={`${node.title}: related sheets`}
 		>
 			<Stipple
 				d="M-250 0a250 90 0 1 0 500 0a250 90 0 1 0 -500 0Z"

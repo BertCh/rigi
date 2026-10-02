@@ -20,6 +20,7 @@ import {
 	Wash,
 } from "#/components/gipfelbuch/notebook/marks";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
+import { SWISS } from "#/components/gipfelbuch/swiss/inks";
 import {
 	CodeRef,
 	Figure,
@@ -46,6 +47,8 @@ import {
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
+import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
 import { byId, gipfelbuchHref, groupColor } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -119,152 +122,182 @@ function Registration() {
 
 	return (
 		<div ref={ref}>
-			<div className="relative overflow-hidden">
-				<svg
-					viewBox={`0 0 ${W} ${H}`}
-					className="block h-auto w-full"
-					role="img"
-					aria-label="A photographed skyline and the DEM horizon being aligned"
-				>
-					{/* pencil construction: the guide lines the ridge was laid out on */}
-					<PencilLayer>
-						<PenLine
-							seed="rigi-guide-top"
-							from={[0, BASE - 150]}
-							to={[W, BASE - 150]}
-							color="pencil"
-							width={0.8}
-						/>
-						<PenLine
-							seed="rigi-guide-mid"
-							from={[0, BASE - 92]}
-							to={[W, BASE - 92]}
-							color="pencil"
-							width={0.8}
-						/>
-						{[1, 3, 5, 7, 9, 11].map((i) => (
-							<PenLine
-								key={`guide-${i}`}
-								seed={`rigi-guide-v${i}`}
-								from={[40 + i * 60, BASE - 150]}
-								to={[40 + i * 60, BASE]}
-								color="pencil"
-								width={0.7}
-							/>
-						))}
-					</PencilLayer>
-					<Hachure
-						d={rockPath}
-						seed="rigi-rock"
-						color="pencil"
-						angle={-45}
-						gap={7}
-						opacity={0.3}
-						width={0.7}
-					/>
-					{/* the residual band: a wash, red when off, forest when within 1 degree */}
-					<Wash d={residual} seed="rigi-residual" color={tone} opacity={0.12} />
-					{/* measured lines stay on their pixels: one pen pass each */}
-					<SketchPath
-						d={photoPath}
-						seed="rigi-photo-skyline"
-						data
-						color="ink"
-						width={2.2}
-					/>
-					<SketchPath
-						d={candidatePath}
-						seed="rigi-candidate"
-						data
-						color={LAYER_STYLE.solved.color}
-						width={2.8}
-					/>
-					{/* ground strip: the DEM-side readout */}
-					<PenLine
-						seed="rigi-base"
-						from={[0, BASE]}
-						to={[W, BASE]}
-						color="pencil"
-						width={1.2}
-					/>
-					{/* degree ruler */}
-					{Array.from({ length: 13 }, (_, i) => {
-						const x = 40 + i * 60;
-						return (
-							<g key={x}>
-								<PenLine
-									seed={`rigi-tick-${i}`}
-									from={[x, BASE]}
-									to={[x, BASE + (i % 2 ? 5 : 9)]}
-									color="pencil"
-									width={1}
-								/>
-								{i % 2 === 0 && (
-									<HandLabel
-										x={x}
-										y={BASE + 22}
-										anchor="middle"
-										size={LABEL_SMALL}
-										color={inkColor("faint")}
-									>
-										{`${(((i - 6) * 60) / PX_PER_DEG).toFixed(0)}°`}
-									</HandLabel>
-								)}
-							</g>
-						);
-					})}
-					{/* legend */}
-					<PenLine
-						seed="rigi-key-photo"
-						from={[16, 22]}
-						to={[40, 22]}
-						color="ink"
-						width={2.2}
-					/>
-					<HandLabel x={48} y={27} size={LABEL} color="var(--gb-secondary)">
-						photo skyline (segmented)
-					</HandLabel>
-					<PenLine
-						seed="rigi-key-dem"
-						from={[16, 42]}
-						to={[40, 42]}
-						color={LAYER_STYLE.solved.color}
-						width={2.8}
-					/>
-					<HandLabel x={48} y={47} size={LABEL} color="var(--gb-secondary)">
-						DEM horizon at the candidate pose
-					</HandLabel>
-					{/* verdict */}
-					<HandLabel
-						x={W - 16}
-						y={27}
-						size={LABEL}
-						anchor="end"
-						color={tone === "forest" ? "var(--gb-forest)" : "var(--gb-red)"}
+			{/* the same ridge runs on past the frame, and the DEM line slides with it */}
+			<SketchSpill
+				seed="rigi-registration"
+				bearing={(u) => (u * W - W / 2) / PX_PER_DEG}
+				ridges={[
+					{
+						at: (u) => (BASE - ridge(u * W)) / H,
+						color: SWISS.ink,
+						width: 1.8,
+						depth: true,
+					},
+					{
+						at: (u) => (BASE - ridge(u * W - px)) / H,
+						color: LAYER_INKS.solved.paper,
+						width: 1.8,
+						opacity: 0.8,
+					},
+				]}
+			>
+				<div className="relative overflow-hidden">
+					<svg
+						viewBox={`0 0 ${W} ${H}`}
+						className="block h-auto w-full"
+						role="img"
+						aria-label="A photographed skyline and the DEM horizon being aligned"
 					>
-						{ok ? "within 1°: show it" : "off: don't claim"}
-					</HandLabel>
-					<HandLabel x={16} y={H - 10} size={LABEL} color="var(--gb-secondary)">
-						yaw error {off.toFixed(2)}° ≈ {resid.toFixed(0)} px at this field of
-						view
-					</HandLabel>
-					{/* hand notes with leaders */}
-					<HandText x={470} y={92} size={19} color="pencil" rotate={-2}>
-						the band between the lines is the error
-					</HandText>
-					<PenArrow
-						seed="rigi-note-band"
-						from={[560, 100]}
-						to={[600, BASE - ridge(600) - 6]}
-						color="pencil"
-						width={1.1}
-					/>
-					<HandText x={300} y={H - 12} size={19} color="pencil" rotate={1.5}>
-						{ok ? "lines coincide: accepted ✓" : "why does 3° look so big?"}
-					</HandText>
-					<CircledKey x={W - 30} y={62} value={1} seed="rigi-key-1" />
-				</svg>
-			</div>
+						{/* pencil construction: the guide lines the ridge was laid out on */}
+						<PencilLayer>
+							<PenLine
+								seed="rigi-guide-top"
+								from={[0, BASE - 150]}
+								to={[W, BASE - 150]}
+								color="pencil"
+								width={0.8}
+							/>
+							<PenLine
+								seed="rigi-guide-mid"
+								from={[0, BASE - 92]}
+								to={[W, BASE - 92]}
+								color="pencil"
+								width={0.8}
+							/>
+							{[1, 3, 5, 7, 9, 11].map((i) => (
+								<PenLine
+									key={`guide-${i}`}
+									seed={`rigi-guide-v${i}`}
+									from={[40 + i * 60, BASE - 150]}
+									to={[40 + i * 60, BASE]}
+									color="pencil"
+									width={0.7}
+								/>
+							))}
+						</PencilLayer>
+						<Hachure
+							d={rockPath}
+							seed="rigi-rock"
+							color="pencil"
+							angle={-45}
+							gap={7}
+							opacity={0.3}
+							width={0.7}
+						/>
+						{/* the residual band: a wash, red when off, forest when within 1 degree */}
+						<Wash
+							d={residual}
+							seed="rigi-residual"
+							color={tone}
+							opacity={0.12}
+						/>
+						{/* measured lines stay on their pixels: one pen pass each */}
+						<SketchPath
+							d={photoPath}
+							seed="rigi-photo-skyline"
+							data
+							color="ink"
+							width={2.2}
+						/>
+						<SketchPath
+							d={candidatePath}
+							seed="rigi-candidate"
+							data
+							color={LAYER_STYLE.solved.color}
+							width={2.8}
+						/>
+						{/* ground strip: the DEM-side readout */}
+						<PenLine
+							seed="rigi-base"
+							from={[0, BASE]}
+							to={[W, BASE]}
+							color="pencil"
+							width={1.2}
+						/>
+						{/* degree ruler */}
+						{Array.from({ length: 13 }, (_, i) => {
+							const x = 40 + i * 60;
+							return (
+								<g key={x}>
+									<PenLine
+										seed={`rigi-tick-${i}`}
+										from={[x, BASE]}
+										to={[x, BASE + (i % 2 ? 5 : 9)]}
+										color="pencil"
+										width={1}
+									/>
+									{i % 2 === 0 && (
+										<HandLabel
+											x={x}
+											y={BASE + 22}
+											anchor="middle"
+											size={LABEL_SMALL}
+											color={inkColor("faint")}
+										>
+											{`${(((i - 6) * 60) / PX_PER_DEG).toFixed(0)}°`}
+										</HandLabel>
+									)}
+								</g>
+							);
+						})}
+						{/* legend */}
+						<PenLine
+							seed="rigi-key-photo"
+							from={[16, 22]}
+							to={[40, 22]}
+							color="ink"
+							width={2.2}
+						/>
+						<HandLabel x={48} y={27} size={LABEL} color="var(--gb-secondary)">
+							skyline in the photo
+						</HandLabel>
+						<PenLine
+							seed="rigi-key-dem"
+							from={[16, 42]}
+							to={[40, 42]}
+							color={LAYER_STYLE.solved.color}
+							width={2.8}
+						/>
+						<HandLabel x={48} y={47} size={LABEL} color="var(--gb-secondary)">
+							horizon at the tried pose
+						</HandLabel>
+						{/* verdict */}
+						<HandLabel
+							x={W - 16}
+							y={27}
+							size={LABEL}
+							anchor="end"
+							color={tone === "forest" ? "var(--gb-forest)" : "var(--gb-red)"}
+						>
+							{ok ? "within 1°: show it" : "off: don't claim"}
+						</HandLabel>
+						<HandLabel
+							x={16}
+							y={H - 10}
+							size={LABEL}
+							color="var(--gb-secondary)"
+						>
+							yaw error {off.toFixed(2)}° ≈ {resid.toFixed(0)} px at this field
+							of view
+						</HandLabel>
+						{/* hand notes with leaders */}
+						<HandText x={470} y={92} size={19} color="pencil" rotate={-2}>
+							the band between the lines is the error
+						</HandText>
+						<PenArrow
+							seed="rigi-note-band"
+							from={[560, 100]}
+							to={[600, BASE - ridge(600) - 6]}
+							color="pencil"
+							width={1.1}
+						/>
+						<HandText x={300} y={H - 12} size={19} color="pencil" rotate={1.5}>
+							{ok ? "lines coincide: accepted ✓" : "why does 3° look so big?"}
+						</HandText>
+						<CircledKey x={W - 30} y={62} value={1} seed="rigi-key-1" />
+					</svg>
+				</div>
+			</SketchSpill>
 			<div className="mt-4 flex min-w-0 max-w-full flex-wrap items-center gap-3 font-mono text-[13px] gb-secondary">
 				<div className="flex min-w-0 flex-1 items-center gap-3">
 					<span className="shrink-0">yaw error</span>
@@ -307,7 +340,7 @@ const STAGES: Stage[] = [
 	{
 		key: "solve",
 		label: "2 · Solve",
-		blurb: "Match the photographed skyline to the DEM horizon.",
+		blurb: "Match the skyline in the photo to the horizon from terrain.",
 		ids: [
 			"viewport-inference",
 			"skyline",
@@ -325,7 +358,7 @@ const STAGES: Stage[] = [
 	{
 		key: "show",
 		label: "4 · Look through it",
-		blurb: "Use the pose: labels, drape, roll, near field.",
+		blurb: "Use the pose: labels, drape, camera roll, step inside.",
 		ids: ["photo-workspace", "camera-roll", "step-inside", "dem-anchoring"],
 	},
 ];
@@ -422,6 +455,7 @@ function GuessVsSolved() {
 	return (
 		<Figure
 			label="Fig. 2"
+			bleed
 			caption={
 				<>
 					{d
@@ -436,10 +470,15 @@ function GuessVsSolved() {
 				afterLabel="solved"
 				start={0.5}
 				before={
-					<RealPhoto data={d} layers={["skyline", "prior"]} crop={crop} />
+					<RealPhoto bleed data={d} layers={["skyline", "prior"]} crop={crop} />
 				}
 				after={
-					<RealPhoto data={d} layers={["skyline", "solved"]} crop={crop} />
+					<RealPhoto
+						bleed
+						data={d}
+						layers={["skyline", "solved"]}
+						crop={crop}
+					/>
 				}
 			/>
 		</Figure>
@@ -502,7 +541,7 @@ function Outcomes() {
 				},
 				{
 					title: "Step inside",
-					body: "Step inside: near ground lifted to 3D, seen from the camera's own eye.",
+					body: "Near ground lifted to 3D, seen from the camera's own position.",
 					visual: (
 						<div className="relative">
 							<img
@@ -528,7 +567,7 @@ function Twelve() {
 		<Figure
 			label="Fig. 4"
 			bleed
-			caption="The same search on all 12 photos, solved skyline drawn on each. Two with a person in frame are marked ask."
+			caption="The same search on all 12 photos, solved horizon drawn on each. Two with a person in frame are marked ask."
 		>
 			<Gallery
 				ids={ROLL_IDS}
@@ -567,9 +606,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<p>
 					Every mountain photo has a{" "}
 					<HandMark type="underline">skyline</HandMark>. The terrain model
-					predicts one for any camera pose.
+					predicts a horizon for any camera pose.
 					<MarginNote mark="a">
-						I notice the skyline is the only line both sides can draw.
+						The skyline is the one line both the photo and the terrain can draw.
 					</MarginNote>
 				</p>
 				<p>
@@ -594,7 +633,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<LiveHowItWorks
 				number="Fig. 3"
-				caption="The site's baked demo scene: the six beats of one real solve, on the dark plate. The terrain line is draggable."
+				caption="The six beats of one real solve. Drag the terrain line."
 			/>
 
 			<Beat kicker="What you get" title="One pose unlocks three things.">
@@ -620,7 +659,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</HandMark>
 					, and we ask you to confirm or to tap a peak.
 					<MarginNote mark="c">
-						Better a question than a wrong label: accepted only when sure.
+						Better a question than a wrong label.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -635,50 +674,46 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					},
 					{
 						value: "12 / 14",
-						label: "eval-app photos within 1° of the true heading",
+						label: "test photos within 1° of the true heading",
 					},
-					{ value: "0", label: "false accepts in that eval" },
+					{ value: "0", label: "false accepts in that test" },
 					{
 						value: "17 / 17",
-						label: "HIGH-confidence wild test photos correct (matcher service)",
+						label: "HIGH-confidence photos correct in a blind test",
 					},
 				]}
 				source={
-					<>
-						Demo: measured. Eval and wild test: reports/status.md,
-						reports/test-results.md.
-					</>
+					<>First: measured on the 12 demo photos. Others: Rigi’s own tests.</>
 				}
 			/>
 
 			<Details>
-				<h3>How the core fits</h3>
+				<h3>How it fits</h3>
 				<p>
 					The <A id="photo">photo</A> arrives with sensor metadata that becomes
 					a <A id="camera-prior">camera prior</A>: a guess, never a fact. That
 					prior seeds <A id="viewport-inference">viewport inference</A>, which
-					compares the <A id="skyline">skyline</A> found in the image with the{" "}
-					<A id="dem-horizon">horizon</A> the DEM predicts, in the browser, on
-					the GPU where it is available (
+					compares the <A id="skyline">skyline</A> found in the photo with the{" "}
+					<A id="dem-horizon">horizon</A> predicted from terrain, in the
+					browser, on the GPU where available (
 					<A id="baseline-pipeline">baseline pipeline</A>
 					). Around the solve, <A id="terrain-snapping">terrain snapping</A>{" "}
-					pins the eye (<A id="eye-rule">eye rule</A>), summits (
+					pins the camera position (<A id="eye-rule">eye rule</A>), summits (
 					<A id="peak">peaks</A>) and depth (
 					<A id="dem-anchoring">DEM anchoring</A>) to the ground. The{" "}
-					<A id="accept-rule">accept rule</A> is frozen against a blind-verified
-					benchmark; about a fifth of wild photos auto-accept
-					(reports/status.md). <A id="tap-a-peak">Tapping a peak</A> is the
-					manual route to a pose.
+					<A id="accept-rule">accept rule</A> decides what is safe to show;
+					about a fifth of tested photos are accepted automatically.{" "}
+					<A id="tap-a-peak">Tapping a peak</A> is the manual route to a pose.
 				</p>
-				<h3>Schematic: the registration</h3>
+				<h3>Schematic: aligning the lines</h3>
 				<Figure
 					label="Fig. D1"
-					caption="Synthetic ridge (not a photo). The 1° tick is the app's headline accuracy bar."
+					caption="Synthetic ridge, not a photo. Within 1° counts as aligned."
 					bleed
 				>
 					<Registration />
 				</Figure>
-				<h3>The core nodes, by stage</h3>
+				<h3>Parts, by stage</h3>
 				<Constellation accent={accent} />
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">

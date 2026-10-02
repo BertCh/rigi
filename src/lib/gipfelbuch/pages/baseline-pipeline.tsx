@@ -20,7 +20,6 @@ import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
 	AlignmentStoryProvider,
-	Callout,
 	CodeRef,
 	CrispLine,
 	Eq,
@@ -105,32 +104,32 @@ const path = (pts: [number, number][], dx = 0, dy = 0) =>
 // ======================================================================================
 const STAGES = [
 	{
-		fn: "readPhotoMeta",
-		sub: "cameraFromMeta",
-		out: "prior camera",
-		cost: "EXIF + MakerNote",
+		fn: "Read sensors",
+		sub: "EXIF + gravity",
+		out: "first-guess camera",
+		cost: "",
 	},
 	{
-		fn: "loadTerrain",
-		sub: "sceneHorizon",
+		fn: "Load terrain",
+		sub: "360° horizon",
 		out: "360° horizon",
 		cost: "4.3 s classic",
 	},
 	{
-		fn: "detectSkyline",
-		sub: "per-column Viterbi",
+		fn: "Find skyline",
+		sub: "best row per column",
 		out: "photo skyline",
 		cost: "161 ms",
 	},
 	{
-		fn: "solvePose",
-		sub: "grid → Cauchy LM",
+		fn: "Solve pose",
+		sub: "grid, then fit",
 		out: "yaw pitch roll f",
 		cost: "97 ms",
 	},
 	{
-		fn: "confidence gate",
-		sub: "0.5 local / 0.75 360°",
+		fn: "Confidence gate",
+		sub: "0.5 local, 0.75 full circle",
 		out: "accept or escalate",
 		cost: "",
 	},
@@ -251,7 +250,8 @@ function Conveyor() {
 		<Figure
 			label="Fig. D2"
 			bleed
-			caption="Synthetic panels, exact order. One photo through the five CPU stages, as the code calls them (costs: median over the 12 demo photos, classic horizon, CPU; Fig. D1 has the real artefacts). The fork is exact: solvePose either accepts (run A) or the cascade hands the same prior, horizon and skyline to refinePose (run B). The loop alternates the two."
+			source="Skizze"
+			caption="One photo through the five stages (times: median of the 12 demo photos; Fig. D1 has the real data). The first solver either accepts (run A) or hands the same first guess, horizon and skyline to the second (run B). The loop alternates the two."
 		>
 			<div ref={ref} className="@container -m-1 sm:-m-2">
 				{/* under 560 px of container width the five stages stack as a vertical list */}
@@ -286,21 +286,21 @@ function Conveyor() {
 						className={`px-3 py-2 ${reject && atGate ? "bg-[color-mix(in_srgb,var(--gb-red)_14%,var(--gb-paper))]" : "bg-[var(--gb-paper-deep)]"}`}
 					>
 						<div className={`font-mono ${TYPE.caption}`}>
-							refinePose
+							Second solver
 							<span className={`ml-3 ${TYPE.micro} gb-secondary`}>
 								only if the gate rejects
 							</span>
 						</div>
 						<div className={`${TYPE.micro} gb-secondary`}>
-							FFT yaw ring · robust IRLS · 0.4–1.3 s measured
+							ring search on yaw · robust fit · 0.4–1.3 s
 						</div>
 					</li>
 					<li className={`px-1 pt-2 ${TYPE.micro} gb-secondary`}>
 						{reject
-							? "run B · solvePose rejects, refinePose rescues. "
-							: "run A · solvePose accepts. "}
-						No stage ever returns a pose without a verdict. If both reject, the
-						prior is shown as unverified and the user taps peaks.
+							? "run B · first solver rejects, second rescues. "
+							: "run A · first solver accepts. "}
+						Every stage returns a verdict. If both reject, the first guess is
+						shown as unverified and the user taps peaks.
 					</li>
 				</ol>
 				<svg
@@ -316,8 +316,8 @@ function Conveyor() {
 					</defs>
 					<HandLabel x={0} y={16} size={13} color={SWISS.ink}>
 						{reject
-							? "run B · solvePose rejects, refinePose rescues"
-							: "run A · solvePose accepts"}
+							? "run B · first solver rejects, second rescues"
+							: "run A · first solver accepts"}
 					</HandLabel>
 					{/* rail */}
 					{RAIL_GHOST}
@@ -398,10 +398,10 @@ function Conveyor() {
 							color={reject && atGate ? "ink" : "pencil"}
 						/>
 						<HandLabel x={2} y={31} size={13} color={PAPER}>
-							refinePose
+							Second solver
 						</HandLabel>
 						<HandLabel x={2} y={48} size={13} color={SWISS.secondary}>
-							FFT yaw ring · robust IRLS · 0.4–1.3 s measured
+							ring search on yaw · robust fit · 0.4–1.3 s
 						</HandLabel>
 						{refineT > 0.02 && (
 							<PenLine
@@ -424,8 +424,8 @@ function Conveyor() {
 						a reject is an answer, not a crash
 					</HandText>
 					<HandLabel x={0} y={368} size={11} color={SWISS.secondary}>
-						No stage ever returns a pose without a verdict. If both reject, the
-						prior is shown as unverified and the user taps peaks.
+						Every stage returns a verdict. If both reject, the first guess is
+						shown as unverified and the user taps peaks.
 					</HandLabel>
 					{/* the two outcomes */}
 					<g transform={`translate(0 386)`}>
@@ -445,7 +445,7 @@ function Conveyor() {
 }
 
 function MetaArtefact({ t }: { t: number }) {
-	const chips = ["GPS lat lon alt", "heading", "gravity 0x0008", "35 mm focal"];
+	const chips = ["GPS position", "heading", "gravity", "35 mm focal"];
 	return (
 		<g>
 			{chips.map((c, i) => (
@@ -480,7 +480,7 @@ function MetaArtefact({ t }: { t: number }) {
 				width={1.2}
 			/>
 			<HandLabel x={0} y={84} size={11} color={SWISS.secondary}>
-				pinhole prior
+				first-guess camera
 			</HandLabel>
 		</g>
 	);
@@ -520,7 +520,7 @@ function HorizonArtefact({
 				dash="2 3"
 			/>
 			<HandLabel x={0} y={98} size={11} color={SWISS.secondary}>
-				7,200 azimuths
+				7,200 directions
 			</HandLabel>
 		</g>
 	);
@@ -631,7 +631,7 @@ function GridArtefact({ t, u }: { t: number; u: number }) {
 			</HandLabel>
 			<g opacity={0.65 + 0.3 * Math.sin(t)}>
 				<HandLabel x={0} y={98} size={11} color={SWISS.secondary}>
-					≤ 3 seeds → LM
+					up to 3 starting points
 				</HandLabel>
 			</g>
 		</g>
@@ -685,7 +685,7 @@ function GateArtefact({
 					: ok
 						? "ACCEPT"
 						: reject
-							? "REJECT → refine"
+							? "REJECT → second solver"
 							: "…"}
 			</HandText>
 			<HandLabel x={0} y={66} size={11} color={PAPER}>
@@ -732,25 +732,64 @@ function CascadeFlow() {
 	return (
 		<Figure
 			label="Fig. D4"
-			caption="Schematic routing of the 12 hand-registered photos through the cascade (src/lib/geo/README.md, 2026-09-24; the per-photo rows of the latest eval are in Fig. D5). Nine are accepted by solvePose alone in 0.02 to 0.15 s each on the demo photos. Refine runs only on the rejects and rescues two (IMG_7068, IMG_7155). One ultra-wide shot of a near ridge, with the eye itself off, is left to manual taps. Zero false accepts."
+			source="Skizze"
+			caption="Schematic routing of the 12 hand-registered photos (per-photo rows in Fig. D5). Nine are accepted by the first solver alone in 0.02 to 0.15 s each. The second runs only on rejects and rescues two (IMG_7068, IMG_7155). One ultra-wide shot of a near ridge, with the camera position itself off, is left to manual taps. Zero false accepts."
 		>
 			<div ref={ref}>
 				<svg
 					viewBox={`0 0 ${W} 250`}
 					className="block h-auto w-full"
 					role="img"
-					aria-label="Twelve photos flowing through solvePose, then refinePose, then manual"
+					aria-label="Twelve photos flowing through the first solver, then the second solver, then manual"
 				>
+					<HandLabel
+						x={10}
+						y={22}
+						size={CASCADE_LABEL}
+						color="var(--gb-secondary)"
+					>
+						first solver alone: 0.02 to 0.15 s per demo photo
+					</HandLabel>
+					<HandLabel
+						x={10}
+						y={44}
+						size={CASCADE_LABEL}
+						color="var(--gb-secondary)"
+					>
+						second solver runs on rejects only: rescues two
+					</HandLabel>
+					<HandLabel
+						x={10}
+						y={66}
+						size={CASCADE_LABEL}
+						color="var(--gb-secondary)"
+					>
+						one ultra-wide near ridge: left to manual taps
+					</HandLabel>
 					{/* stage slots */}
 					<Box
 						x={10}
 						y={95}
 						w={120}
 						label="12 photos"
-						sub="prior + horizon + skyline"
+						sub="first guess + horizon + skyline"
 					/>
-					<Box x={200} y={95} w={130} label="solvePose" sub="9 accepted" hot />
-					<Box x={390} y={95} w={110} label="refinePose" sub="+2 rescued" hot />
+					<Box
+						x={200}
+						y={95}
+						w={130}
+						label="first solver"
+						sub="9 accepted"
+						hot
+					/>
+					<Box
+						x={390}
+						y={95}
+						w={110}
+						label="second solver"
+						sub="+2 rescued"
+						hot
+					/>
 					<Box x={555} y={95} w={78} label="manual" sub="1 left" />
 					{/* rails */}
 					<Rail d="M130 120 H200" />
@@ -885,11 +924,11 @@ function Rail({ d, ghost }: { d: string; ghost?: boolean }) {
 // Fig. D6: why this is the default, from the README variants table
 // ======================================================================================
 const VARIANTS = [
-	{ name: "sensor prior only", acc: 0, ok10: 2, med: "4.0° / 45 px" },
-	{ name: "solve alone", acc: 8, ok10: 9, med: "0.27° / 6.7 px" },
-	{ name: "refine alone", acc: 9, ok10: 9, med: "0.22° / 7.0 px" },
+	{ name: "sensors only", acc: 0, ok10: 2, med: "4.0° / 45 px" },
+	{ name: "first solver alone", acc: 8, ok10: 9, med: "0.27° / 6.7 px" },
+	{ name: "second solver alone", acc: 9, ok10: 9, med: "0.22° / 7.0 px" },
 	{
-		name: "solve → refine (cascade)",
+		name: "both solvers",
 		acc: 11,
 		ok10: 11,
 		med: "0.22° / 5.0 px",
@@ -900,7 +939,7 @@ function Variants() {
 	return (
 		<Figure
 			label="Fig. D6"
-			caption="Same 12 photos, same classic skyline (src/lib/geo/README.md). The bar is photos accepted; the tick is photos whose skyline lands within 10 px. Every variant shown has zero false accepts. Differences below about 0.3° in median yaw are inside ground-truth noise."
+			caption="Same 12 photos. The bar is photos accepted; the tick is photos whose skyline lands within 10 px. No variant has a false accept. Differences under about 0.3° median yaw are inside reference noise."
 		>
 			<div className="space-y-3">
 				{VARIANTS.map((v) => {
@@ -993,13 +1032,11 @@ function band(d: GipfelbuchPhotoData): [number, number, number, number] {
 function Panel({
 	n,
 	title,
-	fn,
 	children,
 	foot,
 }: {
 	n: number;
 	title: string;
-	fn: string;
 	children: React.ReactNode;
 	foot: React.ReactNode;
 }) {
@@ -1010,9 +1047,6 @@ function Panel({
 					{n}
 				</span>
 				<span className={`${TYPE.caption} gb-ink`}>{title}</span>
-				<span className={`ml-auto font-mono ${TYPE.micro} gb-secondary`}>
-					{fn}
-				</span>
 			</div>
 			{children}
 			<div className={`mt-1.5 font-mono ${TYPE.micro} gb-secondary`}>
@@ -1122,11 +1156,11 @@ function MeasuredOnePhoto({
 			bleed
 			caption={
 				<>
-					The same four stages, with the real artefacts. 1: the camera the
-					sensors alone imply, and the DEM skyline it predicts. 2: what
-					detectSkyline finds. 3: the pose solvePose settles on and the skyline
-					it predicts. 4: the peaks labelled at that pose. Pick another photo;
-					rejected ones show what a failure looks like. <Measured data={d} />
+					The same four stages on real data. 1: the camera the sensors imply,
+					and the horizon it predicts. 2: the skyline found in the photo. 3: the
+					solved pose and the horizon it predicts. 4: the peaks labelled at that
+					pose. Pick another photo; rejected ones show a failure.{" "}
+					<Measured data={d} />
 				</>
 			}
 		>
@@ -1139,7 +1173,7 @@ function MeasuredOnePhoto({
 						<span
 							className={`bg-[var(--gb-paper)] px-1 font-mono ${TYPE.micro} ${p.accepted ? "text-[var(--gb-water)]" : "text-[var(--gb-red)]"}`}
 						>
-							{p.accepted ? p.stage : "reject"}
+							{p.accepted ? (p.stage === "refine" ? "2nd" : "ok") : "rej"}
 						</span>
 					) : null;
 				}}
@@ -1147,8 +1181,7 @@ function MeasuredOnePhoto({
 			<div className="grid gap-5 sm:grid-cols-2">
 				<Panel
 					n={1}
-					title="Sensors → prior"
-					fn="cameraFromMeta"
+					title="Sensors → first guess"
 					foot={
 						d && (
 							<>
@@ -1164,8 +1197,7 @@ function MeasuredOnePhoto({
 				</Panel>
 				<Panel
 					n={2}
-					title="Skyline in the pixels"
-					fn="detectSkyline"
+					title="Skyline in the photo"
 					foot={
 						d && (
 							<>
@@ -1180,13 +1212,16 @@ function MeasuredOnePhoto({
 				<Panel
 					n={3}
 					title="Slide one onto the other"
-					fn="solvePose"
 					foot={
 						d && (
 							<>
 								{d.solved.accepted ? "accepted" : "rejected"} by{" "}
 								<Num>
-									{d.solved.accepted ? d.solved.stage : "solve and refine"}
+									{d.solved.accepted
+										? d.solved.stage === "refine"
+											? "the second solver"
+											: "the first solver"
+										: "both solvers"}
 								</Num>
 								, confidence <Num>{d.solved.confidence.toFixed(2)}</Num>.
 								Compass was off by <Num>{d.solved.delta.yaw.toFixed(1)}°</Num>,
@@ -1203,17 +1238,13 @@ function MeasuredOnePhoto({
 				<Panel
 					n={4}
 					title="Label what is there"
-					fn="viewPeaks · layoutPeakLabels"
 					foot={
 						d && (
 							<>
 								<Num>{d.peaks.filter((p) => p.visible).length}</Num> visible
 								peaks, <Num>{d.peaks.filter((p) => p.labelled).length}</Num>{" "}
 								labelled
-								{d.solved.accepted
-									? ""
-									: " (at the unconfirmed pose, so do not trust them)"}
-								.
+								{d.solved.accepted ? "" : " (unconfirmed pose: do not trust)"}.
 							</>
 						)
 					}
@@ -1247,11 +1278,11 @@ function AllTwelve({
 			bleed
 			caption={
 				<>
-					All 12 demo photos through the same code. Bars: median skyline error
-					in pixels before (red) and after (navy) the solve. {nAcc} of 12 are
-					accepted, {nAcc - nRefine} by solvePose and {nRefine} only by
-					refinePose; the rest are rejected rather than guessed. Click a row to
-					load it in Fig. D1. <Measured data={idx} />
+					All 12 demo photos. Bars: median skyline gap in pixels before (red)
+					and after (navy) the solve. {nAcc} of 12 accepted, {nAcc - nRefine} by
+					the first solver and {nRefine} only by the second; the rest are
+					rejected, not guessed. Click a row to load it in Fig. D1.{" "}
+					<Measured data={idx} />
 				</>
 			}
 		>
@@ -1263,7 +1294,7 @@ function AllTwelve({
 						<tr className={`text-left ${TYPE.micro} gb-secondary`}>
 							<th className="font-normal" />
 							<th className="font-normal">verdict</th>
-							<th className="text-right font-normal">compass err</th>
+							<th className="text-right font-normal">compass off</th>
 							<th className="pl-3 font-normal">median error, px</th>
 							<th className="text-right font-normal">total</th>
 						</tr>
@@ -1292,7 +1323,11 @@ function AllTwelve({
 												: "text-[var(--gb-red)]"
 										}
 									>
-										{p.accepted ? p.stage : "rejected"}{" "}
+										{p.accepted
+											? p.stage === "refine"
+												? "second"
+												: "first"
+											: "rejected"}{" "}
 										<span className="gb-secondary">
 											{p.confidence.toFixed(2)}
 										</span>
@@ -1378,14 +1413,10 @@ function GroundTruthEval({ idx }: { idx: GipfelbuchIndex | null }) {
 			label="Fig. D5"
 			caption={
 				<>
-					The hand-registered benchmark (data/ground-truth.json) as the latest
-					eval runs left it (out/eval and out/eval-classic-cascade, copied by
-					scripts/gipfelbuch/build-data.ts): {solve.length} photos, solvePose
-					alone accepts {a}, the cascade {b}. Refine rescues{" "}
-					{rescued.join(", ")}. Each cell is one photo; the left half is
-					solvePose alone, the right half the cascade, filled when accepted.
-					These per-photo rows carry the verdict and the correction from the
-					prior but not the ground-truth error; that is in the table below.
+					The hand-fitted benchmark, {solve.length} photos. The first solver
+					alone accepts {a}; both solvers together accept {b}. The second
+					rescues {rescued.join(", ")}. Each cell is one photo: left half first
+					solver, right half both, filled when accepted.
 				</>
 			}
 		>
@@ -1441,7 +1472,7 @@ function GroundTruthEval({ idx }: { idx: GipfelbuchIndex | null }) {
 								</svg>
 								{r.name.replace("IMG_", "")}
 							</div>
-							<div className="mt-0.5 gb-secondary">gt {r.gtQuality}</div>
+							<div className="mt-0.5 gb-secondary">reference {r.gtQuality}</div>
 						</div>
 					);
 				})}
@@ -1458,14 +1489,11 @@ function Deep() {
 		<>
 			<Section kicker="Mechanism" title="One photo, five stages, one verdict">
 				<p>
-					Everything on this page runs in the browser with no network model:
-					read the phone&rsquo;s sensors, draw the 360° skyline the DEM predicts
-					from the GPS fix, find the skyline in the pixels, and slide one onto
-					the other. Each stage hands the next a plain typed artefact, and the
-					last one is a gate that is allowed to say <em>don&rsquo;t know</em>.
-					How the match itself is scored is on{" "}
-					{A("viewport-inference", "Viewport Inference")}; this page is the
-					plumbing around it and the order things happen in.
+					Everything runs in the browser: read the phone&rsquo;s sensors,
+					predict the 360° horizon from the GPS fix, find the skyline in the
+					pixels, slide one onto the other. The last stage is a gate that may
+					say <em>don&rsquo;t know</em>. How the match is scored is on{" "}
+					{A("viewport-inference", "Viewport Inference")}.
 				</p>
 			</Section>
 			<MeasuredOnePhoto id={id} setId={setId} d={d} idx={idx} />
@@ -1476,82 +1504,76 @@ function Deep() {
 				<Steps
 					steps={[
 						{
-							title: "readPhotoMeta → cameraFromMeta",
+							title: "Read the phone’s sensors",
 							body: (
 								<>
-									exifr gives GPS, heading, 35 mm focal and orientation, and a
-									small parser reads Apple&rsquo;s MakerNote tag{" "}
-									<code>0x0008</code>, the gravity vector (three SRATIONALs).
-									Gravity gives pitch and roll, the compass gives yaw, the 35 mm
-									focal gives pixels. A cropped photo keeps its sensor size, so
-									focal is crop-aware. The result is a pinhole{" "}
-									<code>Camera</code>, the {A("camera-prior", "prior")}. It
-									throws if gravity, heading or focal are missing, and those
-									photos take the unknown-pose route instead.
+									From the photo&rsquo;s metadata: GPS, heading, 35 mm focal
+									length and the gravity vector. Gravity gives pitch and roll,
+									the compass gives yaw, the focal length gives pixels. The
+									result is a first-guess camera, the{" "}
+									{A("camera-prior", "prior")}. If gravity, heading or focal
+									length is missing, the photo takes the unknown-pose route.
 								</>
 							),
 						},
 						{
-							title: "loadScene",
+							title: "Load the terrain",
 							body: (
 								<>
-									<code>loadTerrain</code> builds a multi-zoom DEM sampler
-									around the GPS fix ({A("dem-source", "DEM source")},{" "}
-									{A("terrain-sampler", "terrain sampler")}). The eye is{" "}
-									<code>max(GPS altitude, ground + 1.6 m)</code>, so a bad
-									altitude can never bury the camera in the hill.
+									Height tiles around the GPS fix (
+									{A("dem-source", "DEM source")},{" "}
+									{A("terrain-sampler", "terrain sampler")}). The camera sits at
+									the higher of GPS altitude and ground + 1.6 m, so a bad
+									altitude never buries it in the hill.
 								</>
 							),
 						},
 						{
-							title: "sceneHorizon",
+							title: "Predict the horizon",
 							body: (
 								<>
-									The {A("dem-horizon", "DEM horizon")}: for each of 7,200
-									azimuths, the highest elevation angle the terrain reaches,
-									with curvature and refraction. The fast marcher answers in
-									about 0.3 s in a browser (src/lib/geo/README.md); the classic
-									ray-march took 3.9 to 8.1 s per photo on CPU in the measured
-									runs (Fig. D3), and is the automatic fallback.
+									The {A("dem-horizon", "terrain horizon")}: for each of 7,200
+									directions, the highest angle the terrain reaches, with
+									curvature and refraction. The fast method takes about 0.3 s;
+									the classic ray-march took 3.9 to 8.1 s per photo (Fig. D3)
+									and is the fallback.
 								</>
 							),
 						},
 						{
-							title: "detectSkyline",
+							title: "Find the skyline",
 							body: (
 								<>
 									The {A("skyline", "skyline")} in the photo: a sky colour
-									model, then a Viterbi boundary per pixel column, each with a
-									weight. 111 to 255 ms at 800 px in the measured runs (median
-									161 ms). Columns with no sky (a roof, a hand) carry no vote.
+									model, then the best boundary per pixel column, each with a
+									weight. About 160 ms at 800 px. Columns with no sky (a roof, a
+									hand) carry no vote.
 								</>
 							),
 						},
 						{
-							title: "solvePose",
+							title: "Solve the pose",
 							body: (
 								<>
 									GPS stays fixed; yaw, pitch, roll and focal are solved. A
-									coarse grid over the compass window, then Cauchy-loss
-									Levenberg-Marquardt from up to three seeds, then the gate. If
-									the local search is rejected, <code>wantsFull</code> triggers
-									a full-circle retry with a stricter bar, and{" "}
-									<code>pickFull</code> keeps whichever is better. Details on{" "}
-									{A("viewport-inference", "Viewport Inference")}.
+									coarse grid over the compass window, then a robust
+									least-squares fit from up to three starting points, then the
+									gate. If the local search is rejected, a full-circle retry
+									runs with a stricter bar and the better result is kept.
+									Details on {A("viewport-inference", "Viewport Inference")}.
 								</>
 							),
 						},
 						{
-							title: "escalate",
+							title: "Try a second solver",
 							body: (
 								<>
-									<code>cascade()</code> returns the first accepting stage. If
-									solvePose rejects, the same prior, horizon and skyline go to{" "}
-									<code>refinePose</code>, an independent solver on a different
-									principle. Both results ride along as <code>candidates</code>,
-									so the caller can see what each stage believed. If neither
-									accepts, solvePose&rsquo;s result is returned, because with no
-									heading, refine&rsquo;s rejected pose can be 130 to 175° off.
+									The first accepting stage wins. If the first solver rejects,
+									the same first guess, horizon and skyline go to a second
+									solver that works on a different principle. If neither
+									accepts, the first solver&rsquo;s result is kept: with no
+									heading, the second&rsquo;s rejected pose can be 130 to 175°
+									off.
 								</>
 							),
 						},
@@ -1565,37 +1587,27 @@ function Deep() {
 
 			<GroundTruthEval idx={idx} />
 
-			<Section kicker="Why a cascade" title="Cheap first, different second">
+			<Section kicker="Why two solvers" title="Cheap first, different second">
 				<p>
-					solvePose is fast and sound whenever the compass is roughly right. In
-					the measured runs a photo that needs refine costs 0.4 to 1.3 s in
-					total (solve and refine); it does not share its failure modes, so it
-					only runs where solvePose gave up. The pair accepts more photos than
-					either alone and the combined rule still never accepted a wrong pose
-					on the benchmark.
+					The first solver is fast and sound whenever the compass is roughly
+					right. The second costs 0.4 to 1.3 s in total and fails differently,
+					so it only runs where the first gave up. Together they accept more
+					photos than either alone, and never accepted a wrong pose on the
+					benchmark.
 				</p>
 			</Section>
 			<Variants />
 
 			<div className="!mt-8 grid grid-cols-2 gap-5 sm:grid-cols-4">
-				<Stat value="11 / 12" label="photos accepted by the cascade" />
-				<Stat value="0.22°" label="median yaw error (4.0° prior)" />
-				<Stat value="5.0 px" label="median skyline error (45 px prior)" />
+				<Stat value="11 / 12" label="photos accepted by both solvers" />
+				<Stat value="0.22°" label="median yaw error (4.0° from sensors)" />
+				<Stat value="5.0 px" label="median skyline gap (45 px from sensors)" />
 				<Stat value="0" label="false accepts" />
 			</div>
 			<p className={`!mt-3 ${TYPE.caption} gb-secondary`}>
-				src/lib/geo/README.md, 12 hand-registered photos, 2026-09-24. Wild set
-				(100 Commons photos, Mapterhorn, blind-verified): at the 0.75 bar the
-				cascade makes 22 accepts, all correct.
+				12 hand-fitted photos. On 100 photos checked by hand, at the 0.75 bar
+				the solver makes 22 accepts, all correct.
 			</p>
-
-			<Callout tone="lesson" title="Policy lives with the caller">
-				<code>pipeline.ts</code> is shared by the <code>/baseline</code> and
-				unknown-pose workers. It owns the order of operations. The DEM, tile
-				loader, timeouts and solver options stay with whoever calls it, and the
-				GPU coarse grid plugs in through <code>cascadeAsync</code> without
-				changing a single decision.
-			</Callout>
 
 			<Section kicker="In the code" title="Where to look">
 				<div className="flex flex-wrap gap-2">
@@ -1607,20 +1619,13 @@ function Deep() {
 					<CodeRef path="src/lib/geo/skyline.ts" />
 					<CodeRef path="src/lib/geo/README.md" />
 				</div>
-				<p className={`!mt-3 font-mono ${TYPE.caption} gb-secondary`}>
-					loadScene, sceneHorizon, cascade, cascadeAsync, escalate,
-					readPhotoMeta, parseAppleGravity, cameraFromMeta, solvePose,
-					wantsFull, pickFull
-				</p>
 			</Section>
 
 			<Section kicker="Where it fits" title="Around the baseline">
 				<p>
-					The match score is explained on{" "}
-					{A("viewport-inference", "Viewport Inference")}, and the ground the
-					horizon is cast from is snapped on{" "}
-					{A("terrain-snapping", "Terrain Snapping")}. A rejection ends at{" "}
-					{A("tap-a-peak", "Tap-a-Peak")}, and the result is judged by the{" "}
+					See also {A("viewport-inference", "Viewport Inference")},{" "}
+					{A("terrain-snapping", "Terrain Snapping")},{" "}
+					{A("tap-a-peak", "Tap a Peak")} and the{" "}
 					{A("accept-rule", "accept rule")}.
 				</p>
 			</Section>
@@ -1643,8 +1648,8 @@ function HeroStages() {
 			caption={
 				<>
 					{d
-						? `One photo, four steps, ${fmtMs(d.ms.terrain + d.ms.horizon + d.ms.skyline + d.ms.solve)} in total. The map step is most of it.`
-						: "One photo, four steps."}{" "}
+						? `One photo, five steps, ${fmtMs(d.ms.terrain + d.ms.horizon + d.ms.skyline + d.ms.solve)} in total. The horizon step is most of it.`
+						: "One photo, five steps."}{" "}
 					<Measured data={d} />
 				</>
 			}
@@ -1662,17 +1667,17 @@ function HeroStages() {
 							),
 						},
 						{
-							label: "Skyline from the map",
+							label: "Horizon from the map",
 							pose: 0,
-							caption: `From the GPS fix we predict the skyline the terrain should make. This takes ${t(d?.ms.horizon)}.`,
+							caption: `From the GPS fix we predict the horizon the terrain should make. ${t(d?.ms.horizon)}.`,
 							render: () => (
 								<RealPhoto bleed data={d} layers={["prior"]} crop={crop} />
 							),
 						},
 						{
-							label: "Skyline in the pixels",
+							label: "Skyline in the photo",
 							pose: 0,
-							caption: `We find the skyline in the photo itself. This takes ${t(d?.ms.skyline)}.`,
+							caption: `We find the skyline in the photo itself. ${t(d?.ms.skyline)}.`,
 							render: () => (
 								<RealPhoto
 									bleed
@@ -1771,19 +1776,19 @@ function PipelineNumbers() {
 			items={[
 				{
 					value: `${acc.length} / 12`,
-					label: "demo photos accepted, the rest rejected not guessed",
+					label: "demo photos accepted; the rest rejected, not guessed",
 				},
 				{ value: `${first} / 12`, label: "accepted by the first solver alone" },
 				{
 					value: fmtMs(med(idx.photos.map((p) => p.ms.horizon))),
-					label: "median map step per photo, on CPU",
+					label: "median horizon step per photo",
 				},
 				{
 					value: "0",
-					label: "false accepts on 12 hand-registered photos (Terrarium DEM)",
+					label: "false accepts on 12 hand-fitted photos",
 				},
 			]}
-			source="Measured on the 12 demo photos, scripts/gipfelbuch/build-data.ts, 2026-10-01. False accepts: src/lib/geo/README.md (2026-09-24); on the Mapterhorn DEM the same set has one borderline accept, 1.05° off."
+			source="Measured on the 12 demo photos. On a finer terrain model the same set has one borderline accept, 1.05° off."
 		/>
 	);
 }
@@ -1923,7 +1928,7 @@ function YawSearch() {
 					size={YAW_LABEL}
 					color={SWISS.secondary}
 				>
-					typical yaw {cm.toFixed(1)} px
+					typical gap {cm.toFixed(1)} px
 				</HandLabel>
 				{marks.map(
 					(mk) =>
@@ -2051,7 +2056,7 @@ function YawSearch() {
 						{c2.toFixed(1)} px
 					</>
 				) : null}
-				{" · "}ambiguity {a.toFixed(2)}
+				{" · "}rival margin {a.toFixed(2)}
 				{!full && (
 					<>
 						{" · "}compass{" "}
@@ -2068,11 +2073,11 @@ function YawSearch() {
 			bleed
 			caption={
 				<>
-					Cost of every yaw, on a real photo. The{" "}
+					Cost of every yaw on a real photo. The{" "}
 					<span style={{ color: "var(--gb-water)" }}>deepest dip</span> is the
 					answer; the <span style={{ color: RUNNER_C }}>runner-up</span> is the
-					nearest rival. Pick a marker to see the map&rsquo;s skyline at that
-					yaw. <Measured data={d} />
+					nearest rival. Pick a marker to see the horizon at that yaw.{" "}
+					<Measured data={d} />
 				</>
 			}
 		>
@@ -2165,12 +2170,12 @@ function YawSearch() {
 					{
 						sym: "ε",
 						c: "skyline",
-						text: "elevation of the photo's skyline in column x",
+						text: "elevation of the skyline in column x",
 					},
 					{
 						sym: "h",
 						c: "solved",
-						text: "elevation of the map's skyline in that column, after turning the camera by Δψ (yaw) and Δφ (pitch)",
+						text: "elevation of the horizon in that column, after turning the camera by Δψ (yaw) and Δφ (pitch)",
 					},
 					{ sym: "w", text: "how sure we are of that column (0 to 1)" },
 					{
@@ -2211,7 +2216,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="Predict the skyline, find it, slide one onto the other."
+				title="Predict the horizon, find the skyline, slide one onto the other."
 			>
 				<p>
 					Everything runs in the browser, with no neural network. The last step
@@ -2226,10 +2231,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			<LiveHowItWorks
 				number="2"
 				title="Predict, find, slide, snap"
-				caption="The same solve as Fig. 1, replayed live in the browser on the baked demo scene: the predicted skyline, the traced one, the slide, the snap. Drag the terrain line once it has snapped."
+				caption="The same solve as Fig. 1, replayed live: predicted horizon, traced skyline, the slide, the snap. Drag the terrain line once it has snapped."
 				notes={[
 					{
-						text: "no network, no server: the browser does all of it",
+						text: "all in the browser, no server",
 						at: [0.1, 0.1],
 					},
 				]}
@@ -2237,8 +2242,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat kicker="The solve" title="Sliding is a search for the deepest dip.">
 				<p>
-					We try every yaw, the way the camera points, within 25° of the
-					compass. Each one scores how far the two skylines sit apart.
+					We try every yaw (the way the camera points) within 25° of the compass
+					and score how far the skyline and horizon sit apart.
 				</p>
 				<p>
 					<HandMark type="double">The lowest score wins.</HandMark> The nearest
@@ -2256,21 +2261,21 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					steps={[
 						{
 							title: "Accept",
-							body: "Lines overlap and we are sure. Demo-03 reaches 0.87 confidence.",
+							body: "Lines overlap and we are sure. Photo 03 reaches 0.87.",
 							visual: (
 								<OutcomeMini id="demo-03" layers={["skyline", "solved"]} />
 							),
 						},
 						{
 							title: "Try a second solver",
-							body: "A different method rescues demo-12, which the first one rejected.",
+							body: "A different method rescues photo 12, which the first rejected.",
 							visual: (
 								<OutcomeMini id="demo-12" layers={["skyline", "solved"]} />
 							),
 						},
 						{
 							title: "Reject and ask",
-							body: "Demo-07 stays unsure, so we hand over to a manual tap.",
+							body: "Photo 07 stays unsure, so the user taps a peak.",
 							visual: (
 								<OutcomeMini id="demo-07" layers={["skyline", "solved"]} />
 							),
@@ -2281,7 +2286,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="When the skyline is wrong, we reject instead of guess."
+				title="When the skyline is wrong, we reject instead of guessing."
 			>
 				<p>
 					<HandMark type="wavy" color="red">
@@ -2289,15 +2294,16 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</HandMark>{" "}
 					Confidence stays low, so the photo is rejected.
 					<MarginNote mark="a">
-						demo-11 rejected, demo-12 rescued: same head, two verdicts. Why does
-						the second solver cope?
+						11 rejected, 12 rescued: same head, two verdicts. Why does the
+						second solver cope?
 					</MarginNote>
 				</p>
 			</Beat>
 
 			<Figure
 				label="Fig. 4"
-				caption="Fixed: demo-11 and demo-12. Same head on the ridge, two verdicts. Demo-11 is rejected; demo-12 is rescued by the second solver."
+				pinned="demo-11"
+				caption="Same head on the ridge, two verdicts: the first solver rejects it and the second rescues it."
 			>
 				<Gallery
 					ids={["demo-11", "demo-12"]}
@@ -2313,8 +2319,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					label={(d) =>
 						d.solved.accepted ? (
 							<>
-								accepted by {d.solved.stage}, confidence{" "}
-								{d.solved.confidence.toFixed(2)}
+								accepted by the{" "}
+								{d.solved.stage === "refine" ? "second" : "first"} solver,
+								confidence {d.solved.confidence.toFixed(2)}
 							</>
 						) : (
 							<>

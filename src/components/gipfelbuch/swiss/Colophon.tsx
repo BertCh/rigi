@@ -37,7 +37,7 @@ const FACES = [
 	},
 	{
 		name: "GB Hand",
-		source: "Caveat",
+		source: "Architects Daughter",
 		use: "Lettered titles, headings, field notes",
 		family: "var(--gb-font-hand)",
 		print: false,
@@ -79,37 +79,22 @@ const FACES = [
 	},
 ];
 
-const IMPRINT_ROLES = [
-	{
-		term: "Aufnahme",
-		meaning: "Survey: the source photo or DEM tile, with its id and date.",
-	},
-	{
-		term: "Revision",
-		meaning: "The pipeline stage that measured it.",
-	},
-	{
-		term: "Stich",
-		meaning: "Engraving: the Rigi renderer that drew it.",
-	},
-];
-
 // Attribution strings exactly as recorded in NOTICE.md and reports/licences.md.
 const SOURCES = [
 	{
 		name: "Mapterhorn terrain tiles",
 		credit: "© Mapterhorn",
-		note: "mapterhorn.com/attribution. Data under the licence of each underlying national DEM; tile code BSD-3.",
+		note: "mapterhorn.com/attribution. Terrain tiles under the licence of each national source.",
 	},
 	{
 		name: "swisstopo relief shading (swissALTI3D Reliefschattierung)",
-		credit: "Relief © swisstopo · DEM Mapterhorn",
-		note: "Swiss open government data, baked once; contours derived from the Mapterhorn DEM.",
+		credit: "Relief © swisstopo · Höhen Mapterhorn",
+		note: "Swiss open government data. Contours derived from Mapterhorn terrain.",
 	},
 	{
 		name: "swissNAMES3D 2026",
 		credit: "© swisstopo",
-		note: "Peaks and places, via the Thunersee terroir pack. swisstopo OGD (free use, attribution).",
+		note: "Peaks and places. swisstopo open government data (free use, attribution).",
 	},
 ];
 
@@ -168,77 +153,68 @@ export function Colophon({ className }: { className?: string }) {
 				</h1>
 				<MarkerUnderline seed="colophon-title" coverage={0.7} />
 			</div>
-			<p className={`${TYPE.body} mt-6`}>
-				Written by hand after{" "}
-				<code className="gb-num">
-					reports/gipfelbuch-hand-sketch-2026-10-01.md
-				</code>
-				: hand is the form, print only for code and equations.
-			</p>
+			<p className={`${TYPE.body} mt-6`}>Fonts: SIL Open Font License 1.1.</p>
 
-			<Heading>Faces</Heading>
-			<ul className="m-0 list-none space-y-3 p-0">
-				{FACES.map((f) => (
-					<li
-						key={f.name}
-						className="grid gap-x-6 sm:grid-cols-[12rem_minmax(0,1fr)]"
-					>
-						<span
-							className="text-[20px] leading-[26px]"
-							style={{ fontFamily: f.family }}
+			<details className="mt-12">
+				<summary className="nb-hand cursor-pointer text-[22px] leading-[26px]">
+					Für Entwickler
+				</summary>
+				<Heading>Faces</Heading>
+				<ul className="m-0 list-none space-y-3 p-0">
+					{FACES.map((f) => (
+						<li
+							key={f.name}
+							className="grid gap-x-6 sm:grid-cols-[12rem_minmax(0,1fr)]"
 						>
-							{f.name}
-						</span>
-						<span className={TYPE.caption}>
-							{f.source} · {f.use}
-							{f.print ? (
-								<span className="nb-hand ml-2 text-[17px] text-[var(--gb-red)]">
-									(print)
-								</span>
-							) : null}
-						</span>
-					</li>
-				))}
-			</ul>
-			<p className={`${TYPE.caption} mt-3`}>
-				All faces are SIL Open Font License 1.1, self-hosted from
-				public/fonts/gipfelbuch (see its LICENSES.md).
-			</p>
+							<span
+								className="text-[20px] leading-[26px]"
+								style={{ fontFamily: f.family }}
+							>
+								{f.name}
+							</span>
+							<span className={TYPE.caption}>
+								{f.source} · {f.use}
+								{f.print ? (
+									<span className="nb-hand ml-2 text-[17px] text-[var(--gb-red)]">
+										(print)
+									</span>
+								) : null}
+							</span>
+						</li>
+					))}
+				</ul>
+				<p className={`${TYPE.caption} mt-3`}>
+					All faces are SIL Open Font License 1.1.
+				</p>
 
-			<Heading>Inks</Heading>
-			<ul className="m-0 grid list-none gap-x-6 p-0 sm:grid-cols-2">
-				<li className="flex h-6 items-center gap-3">
-					<Dab color={SWISS.paper} seed="paper" />
-					<span className={TYPE.caption}>Paper (W 96 %, YY 4 %)</span>
-					<span className={`${TYPE.micro} ml-auto`}>{SWISS.paper}</span>
-				</li>
-				{INKS.map((ink) => (
-					<li key={ink.code} className="flex h-6 items-center gap-3">
-						<Dab color={ink.hex} seed={ink.code} />
-						<span className={TYPE.caption}>{ink.role}</span>
-						<span className={`${TYPE.micro} ml-auto`}>
-							{ink.code} · {BREZINE[ink.code].name} · {ink.hex}
-						</span>
+				<Heading>Inks</Heading>
+				<ul className="m-0 grid list-none gap-x-6 p-0 sm:grid-cols-2">
+					<li className="flex h-6 items-center gap-3">
+						<Dab color={SWISS.paper} seed="paper" />
+						<span className={TYPE.caption}>Paper</span>
+						<span className={`${TYPE.micro} ml-auto`}>{SWISS.paper}</span>
 					</li>
-				))}
-			</ul>
-			<p className={`${TYPE.caption} mt-3`}>
-				Every ink is a swatch of the Brezine khipu colour chart, named by its
-				Ascher code.
-			</p>
+					{INKS.map((ink) => (
+						<li key={ink.code} className="flex h-6 items-center gap-3">
+							<Dab color={ink.hex} seed={ink.code} />
+							<span className={TYPE.caption}>{ink.role}</span>
+							<span className={`${TYPE.micro} ml-auto`}>
+								{ink.code} · {BREZINE[ink.code].name} · {ink.hex}
+							</span>
+						</li>
+					))}
+				</ul>
+				<p className={`${TYPE.caption} mt-3`}>
+					Every ink is a swatch of the Brezine khipu colour chart, named by its
+					Ascher code.
+				</p>
+			</details>
 
-			<Heading>Imprint</Heading>
+			<Heading>Credits</Heading>
 			<p className={`${TYPE.body} mb-3`}>
-				After the Siegfried map, each figure credits three roles.
+				Each figure carries a small credit line: Aufnahme, the source photo,
+				with its id and date.
 			</p>
-			<dl className="m-0 grid grid-cols-[6.5rem_1fr] gap-y-1.5">
-				{IMPRINT_ROLES.map((r) => (
-					<div key={r.term} className="contents">
-						<dt className={`${TYPE.kicker} pt-0.5`}>{r.term}</dt>
-						<dd className={`${TYPE.body} m-0`}>{r.meaning}</dd>
-					</div>
-				))}
-			</dl>
 
 			<Heading>Data</Heading>
 			<dl className="m-0 space-y-3">
@@ -253,7 +229,7 @@ export function Colophon({ className }: { className?: string }) {
 				))}
 			</dl>
 			<p className={`${TYPE.caption} mt-3`}>
-				Full licence record: NOTICE.md and reports/licences.md.
+				Full licence record in the repository.
 			</p>
 		</section>
 	);

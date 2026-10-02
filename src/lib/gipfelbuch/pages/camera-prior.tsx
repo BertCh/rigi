@@ -31,12 +31,11 @@ import {
 	Callout,
 	CodeRef,
 	Figure,
-	Flow,
 	GIPFELBUCH_PHOTO_IDS,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
 	HandLabel,
-	LAYER_STYLE,
+	HandRange,
 	MarginNote,
 	Measured,
 	PhotoPicker,
@@ -81,10 +80,10 @@ const rad = (d: number) => (d * Math.PI) / 180;
 
 type Key = "gps" | "compass" | "gravity" | "focal";
 const KEYS: { k: Key; label: string; sub: string; params: number }[] = [
-	{ k: "gps", label: "GPS fix", sub: "position E, N (+ alt)", params: 3 },
+	{ k: "gps", label: "GPS fix", sub: "position", params: 3 },
 	{ k: "compass", label: "Compass", sub: "yaw", params: 1 },
 	{ k: "gravity", label: "Gravity", sub: "pitch + roll", params: 2 },
-	{ k: "focal", label: "EXIF focal", sub: "vertical FOV", params: 1 },
+	{ k: "focal", label: "EXIF focal", sub: "field of view", params: 1 },
 ];
 
 const wedge = (cx: number, cy: number, r: number, a0: number, a1: number) => {
@@ -148,11 +147,10 @@ function RealPrior({
 			label="Fig. D1"
 			caption={
 				<>
-					<Measured data={d} /> Dashed magenta: the DEM skyline seen through the
-					phone&apos;s own compass, gravity and focal. Cyan: the same DEM
-					through the solved pose. Amber: the skyline detected in the photo.
-					Map: view cone at the prior (dashed) and solved yaw, hillshade of the
-					DEM.
+					<Measured data={d} /> Dashed magenta: the horizon predicted from the
+					phone&apos;s own compass, gravity and focal length. Cyan: the horizon
+					from the solved pose. Amber: the skyline found in the photo. Map: view
+					cone at the sensor yaw (dashed) and solved yaw.
 				</>
 			}
 		>
@@ -199,7 +197,7 @@ function RealPrior({
 					/>
 					<Stat
 						value={`${d.residual.prior.median.toFixed(0)} → ${d.residual.solved.median.toFixed(1)} px`}
-						label="median skyline error, prior → solved"
+						label="median skyline gap, sensors → solved"
 					/>
 				</div>
 			)}
@@ -439,11 +437,9 @@ function PriorErrors({
 			label="Fig. D2"
 			caption={
 				<>
-					Measured on the 12 demo photos by scripts/gipfelbuch/build-data.ts,
-					2026-10-01 (error = solved − prior; click a dot to load it in Fig.
-					D1). Shaded bands are the widths the MAP solver assumes: compass √(5²
-					+ 5²) = {SIG_YAW.toFixed(1)}° (1σ and 2σ), gravity {SIG_G}°, GPS σH =
-					clamp(hAcc, 5, 100) m.
+					Measured on the 12 demo photos (error = solved − sensors; click a dot
+					to load it in Fig. D1). Shaded bands are the assumed widths: compass{" "}
+					{SIG_YAW.toFixed(1)}° (1σ and 2σ), gravity {SIG_G}°, GPS 5 to 100 m.
 				</>
 			}
 		>
@@ -480,7 +476,7 @@ function PriorErrors({
 				/>
 				{hacc ? (
 					<Strip
-						title="GPS hAccuracy (clamp band shaded)"
+						title="GPS accuracy (clamp band shaded)"
 						unit="metres"
 						vals={GIPFELBUCH_PHOTO_IDS.map((id) => ({ id, v: hacc[id] }))}
 						range={[0, 140]}
@@ -509,7 +505,7 @@ function PriorErrors({
 				/>
 				<Stat
 					value={`${Math.max(...yaw.map((p) => Math.abs(p.v))).toFixed(1)}°`}
-					label="worst compass error (demo-10)"
+					label="worst compass error (photo 10)"
 				/>
 			</div>
 		</Figure>
@@ -633,13 +629,12 @@ function PriorLab(_props: { accent: string }) {
 		const dy = (tilt + k * 8) * 2.8;
 		return `translate(${gx} ${yc.toFixed(2)}) rotate(${((-Math.atan2(dy, 160) * 180) / Math.PI).toFixed(2)})`;
 	};
-	const SLIDER_W = 240;
-	const sliderX = 10 + ((hAcc - 1) / 149) * (SLIDER_W - 20);
 
 	return (
 		<Figure
 			label="Fig. D3"
-			caption="Schematic (synthetic scene, not a photo). A camera prior is a set of Gaussian-ish beliefs, one per evidence family. Toggle each sensor and watch the hypothesis space shrink. Widths use the real defaults: hAcc clamped to [5, 100] m, compass 5 deg noise + 5 deg bias (Student-t, nu 3), gravity 1.5 deg."
+			source="Skizze"
+			caption="Not a photo. A camera prior is one belief per sensor. Toggle each sensor and watch the possibilities shrink. Widths use the real defaults: GPS 5 to 100 m, compass 5° noise + 5° bias, gravity 1.5°."
 		>
 			<div ref={ref} className="p-3 sm:p-5">
 				<div className="flex flex-wrap gap-2">
@@ -863,8 +858,8 @@ function PriorLab(_props: { accent: string }) {
 						/>
 						<HandLabel x={14} y={368} color="var(--gb-secondary)">
 							{on.gps
-								? `sigmaH ${sigH.toFixed(0)} m (hAcc ${hAcc})`
-								: "position: any (no GPS prior)"}
+								? `GPS width ${sigH.toFixed(0)} m`
+								: "position: any (no GPS)"}
 						</HandLabel>
 					</svg>
 
@@ -915,7 +910,7 @@ function PriorLab(_props: { accent: string }) {
 								color="var(--gb-secondary)"
 							>
 								{on.gravity
-									? `pitch, roll +/- ${SIG_G} deg`
+									? `pitch, roll ±${SIG_G}°`
 									: "pitch, roll: unconstrained"}
 							</HandLabel>
 							<HandLabel
@@ -930,41 +925,19 @@ function PriorLab(_props: { accent: string }) {
 						</svg>
 
 						<div className="bg-[var(--gb-paper-deep)] p-3">
-							<label className={`block font-mono ${TYPE.micro} gb-secondary`}>
-								EXIF hAccuracy: {hAcc} m{" "}
-								{hAcc < H_MIN || hAcc > H_MAX ? `(clamped to ${sigH})` : ""}
-								<span className="relative mt-1 block focus-within:outline focus-within:outline-1 focus-within:outline-offset-2">
-									<svg
-										viewBox={`0 0 ${SLIDER_W} 22`}
-										className="block h-auto w-full"
-										aria-hidden="true"
-									>
-										<PenLine
-											seed="lab-slider-track"
-											from={[10, 11]}
-											to={[SLIDER_W - 10, 11]}
-											color="pencil"
-											width={1.3}
-										/>
-										<HandDot
-											x={sliderX}
-											y={11}
-											r={6}
-											seed="lab-slider-thumb"
-											color="ink"
-											opacity={1}
-										/>
-									</svg>
-									<input
-										type="range"
-										min={1}
-										max={150}
-										value={hAcc}
-										onChange={(e) => setHAcc(+e.target.value)}
-										className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-									/>
-								</span>
-							</label>
+							<div className={`block font-mono ${TYPE.micro} gb-secondary`}>
+								GPS accuracy
+								{hAcc < H_MIN || hAcc > H_MAX ? ` (clamped to ${sigH})` : ""}
+								<HandRange
+									value={hAcc}
+									min={1}
+									max={150}
+									step={1}
+									label="GPS accuracy"
+									onChange={setHAcc}
+									readout={`${hAcc} m`}
+								/>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -972,17 +945,17 @@ function PriorLab(_props: { accent: string }) {
 				<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
 					<Stat
 						value={on.gps ? `${sigH.toFixed(0)} m` : "free"}
-						label="position sigma H"
+						label="GPS width"
 					/>
 					<Stat
-						value={on.compass ? `${SIG_YAW.toFixed(1)} deg` : "360 deg"}
+						value={on.compass ? `${SIG_YAW.toFixed(1)}°` : "360°"}
 						label="yaw spread"
 					/>
 					<Stat
-						value={on.gravity ? `${SIG_G} deg` : "free"}
-						label="pitch / roll sigma"
+						value={on.gravity ? `${SIG_G}°` : "free"}
+						label="pitch / roll width"
 					/>
-					<Stat value={`${nOn} / ${total}`} label="parameters with a prior" />
+					<Stat value={`${nOn} / ${total}`} label="unknowns pinned" />
 				</div>
 				<svg
 					viewBox="0 0 600 14"
@@ -1037,20 +1010,13 @@ function Deep({ accent }: { accent: string }) {
 		<>
 			<Section kicker="Capture" title="What it is">
 				<p>
-					Before any matching or solving, the phone has already told us roughly
-					where the camera is and where it points: a GPS fix with an accuracy
-					radius, a compass heading, an accelerometer gravity vector (hence
-					pitch and roll) and an EXIF focal length. Together these form the{" "}
-					<strong>camera prior</strong>.
-				</p>
-				<p>
-					It is a <em>role</em>, not a source: the same number can be a prior in
-					one solve and a held-fixed value or a result in another. In the
-					ontology it is the camera the sensors imply, realised by the pose6dof{" "}
-					<code>Priors</code> type and the geocam <code>PriorPhoto</code>{" "}
-					adapter. It feeds the {A("pose-estimate", "pose estimate")}, and which
-					parts of it are only placeholders is tracked by{" "}
-					{A("prior-unknowns", "prior unknowns")}.
+					The phone already tells us roughly where the camera is and where it
+					points: a GPS fix with an accuracy radius, a compass heading, a
+					gravity vector (giving pitch and roll) and an EXIF focal length.
+					Together these are the <strong>camera prior</strong>. It feeds the{" "}
+					{A("pose-estimate", "pose estimate")};{" "}
+					{A("prior-unknowns", "prior unknowns")} tracks which parts are
+					placeholders.
 				</p>
 			</Section>
 
@@ -1061,73 +1027,36 @@ function Deep({ accent }: { accent: string }) {
 
 			<Section kicker="Mechanism" title="How it works">
 				<p>
-					Each sensor becomes one factor with its own width. In{" "}
-					<code>pose6dof</code> a prior is a{" "}
-					<code>PriorValue = {"{ value, sigma? }"}</code>: sigma undefined or
-					Infinity means unknown and solved freely, sigma 0 pins the value
-					exactly, anything else is a Gaussian. Position takes separate{" "}
-					<code>sigmaH</code> / <code>sigmaV</code> (defaults 15 / 20 m).
+					Each sensor gets its own width: GPS accuracy clamped to 5 to 100 m
+					(default 20), gravity 1.5°, and a compass built from 5° noise plus 5°
+					bias with heavy tails, so one wild reading cannot drag the yaw. A
+					magnetic heading is first corrected to true north.
 				</p>
 				<p>
-					The geocam adapter <code>mapPriorsFromPhoto</code> builds the same set
-					for the {A("map-solver", "MAP solver")} with the numbers shown in Fig.
-					D3: horizontal sigma is the EXIF hAcc clamped to 5 to 100 m (default
-					20), gravity is 1.5 deg, and the compass is a Student-t (nu 3) built
-					from 5 deg noise plus 5 deg bias, so one wild reading cannot drag the
-					yaw. If the EXIF heading is magnetic it is first made true with the
-					WMM2025 declination.
-				</p>
-				<p>
-					Against the real photos (Fig. D2) the compass really is the weak
-					sensor. The median absolute heading error on all 12 demo photos is{" "}
-					<HandMark type="underline">7.9°</HandMark> (9.6° on the ten accepted),
-					six of them sit beyond the assumed 1σ of 7.1° and the worst, demo-10,
-					is <HandMark type="double">19.0° off (2.7σ)</HandMark>, which is
-					exactly why the tails are Student-t rather than Gaussian. Gravity is
-					much tighter: median pitch error 0.76° and roll 0.68°, but three
-					photos exceed the 1.5° σ in pitch (−2.7° on portrait demo-11, +2.6° on
-					ultra-wide demo-02, −2.2° on portrait demo-12).
+					On the real photos (Fig. D2) the compass is the weak sensor. Median
+					heading error is <HandMark type="underline">7.9°</HandMark> on all 12
+					(9.6° on the ten accepted); six sit beyond the assumed 7.1° and the
+					worst, photo 10, is{" "}
+					<HandMark type="double">19.0° off (2.7σ)</HandMark>, hence the heavy
+					tails. Gravity is tighter: median pitch error 0.76°, roll 0.68°,
+					though three photos exceed 1.5° in pitch (−2.7° photo 11, +2.6° photo
+					02, −2.2° photo 12).
 				</p>
 			</Section>
-			<Figure
-				label="Fig. D4"
-				caption="From EXIF to factors. Each family is skipped when its unknown flag is set."
-			>
-				<div className="p-4">
-					<Flow
-						nodes={[
-							{
-								label: "EXIF + sensors",
-								sub: "lat, lon, alt, hAcc, heading, gravity",
-								color: accent,
-							},
-							{
-								label: "PriorPhoto",
-								sub: "local flags: yawUnknown, pitchRollUnknown",
-							},
-							{
-								label: "mapPriorsFromPhoto",
-								sub: "gps, alt, ground, gravity, compass, focal",
-							},
-							{ label: "solve", sub: "whitened factors, LM" },
-						]}
-					/>
-				</div>
-			</Figure>
 			<div className="mt-6">
 				<Steps
 					steps={[
 						{
 							title: "Position",
-							body: "GPS fix at sigmaH = clamp(hAcc, 5, 100) m; altitude as its own factor (sigmaA 3 m) unless the position was pinned by hand.",
+							body: "GPS fix, width set by the phone’s accuracy (5 to 100 m); altitude is a separate hint (±3 m) unless the position was pinned by hand.",
 						},
 						{
 							title: "Attitude",
-							body: "Gravity gives pitch and roll to 1.5 deg; the compass gives yaw, de-biased for declination, with heavy tails.",
+							body: "Gravity gives pitch and roll to 1.5°; the compass gives yaw, corrected for declination, with heavy tails.",
 						},
 						{
 							title: "Lens",
-							body: "An optional focal prior from the EXIF focal table, scaled to the 1600 px basis.",
+							body: "An optional focal length from the EXIF table.",
 						},
 					]}
 				/>
@@ -1135,57 +1064,38 @@ function Deep({ accent }: { accent: string }) {
 
 			<Section kicker="Relevance" title="Why it matters in Rigi">
 				<p>
-					Priors are what make the search finite. Without a compass the yaw is a
-					full circle, without GPS the eye is anywhere. With them, the solvers
-					start in the right basin and the cascade only has to refine. The MAP
-					solver stacks them with skyline and point cues into one posterior with
-					a covariance, in the geometry-first phase (
-					{A("geo-phase-a", "GEO phase A")}).
+					Priors make the search finite. Without a compass, yaw is a full
+					circle; without GPS the camera could be anywhere. With them the
+					solvers start near the answer and only have to refine.
 				</p>
 				<div className="!mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-					<Stat value="5 to 100 m" label="clamped GPS sigma" />
-					<Stat value="1.5 deg" label="gravity sigma" />
-					<Stat value="nu = 3" label="compass tail" />
+					<Stat value="5 to 100 m" label="GPS width" />
+					<Stat value="1.5°" label="gravity width" />
 				</div>
 			</Section>
 
 			<Section kicker="Lessons" title="Gotchas">
 				<ul>
 					<li>
-						<strong>A prior is not evidence to pull on.</strong> In matching v2
-						the priors were switched off, and the altitude-contour eye rule was
-						worse on holdout (median 12.0 to 13.4 px, p90 18 to 36). Eye priors
-						are vetoes and tie-breaks, not pulls. The code stays in{" "}
-						<code>concord/priors/altitude.ts</code>.
+						<strong>A prior is not evidence to pull on.</strong> Switching the
+						priors off helped, and an altitude rule was worse on held-out photos
+						(median 12.0 to 13.4 px). Priors are vetoes and tie-breaks, not
+						pulls.
 					</li>
 					<li>
 						<strong>Missing is not zero.</strong> A photo with no compass or
-						lens carries a placeholder; the{" "}
-						{A("prior-unknowns", "unknown flags")} exist so the{" "}
-						{A("cascade", "cascade")} can raise its accept bar instead of
-						trusting it. Note the bench harness uses the opposite polarity,{" "}
-						<code>focalKnown</code>.
-					</li>
-					<li>
-						<strong>Over-confidence.</strong> MAP sigma is not calibrated yet:
-						rotation (err/sigma)^2 is{" "}
-						<HandMark type="wavy">6.0 against a target of 0.5 to 2</HandMark>.
-						See {A("map-solver", "the MAP solver")}.
+						lens carries a placeholder; unknown flags let the solver raise its
+						accept bar instead of trusting it. See{" "}
+						{A("prior-unknowns", "prior unknowns")}.
 					</li>
 					<li>
 						<strong>Magnetic versus true.</strong> iPhones store true north;
 						others store magnetic. Declination is applied where the heading is{" "}
-						<em>used</em>, never where it is stored (flag <code>geoDecl</code>).
-					</li>
-					<li>
-						<strong>Frame.</strong> <code>Priors.position</code> is the absolute
-						eye in the correspondences&apos; ENU frame, not [0,0,0], unless the
-						frame origin is the eye.
+						<em>used</em>, never where it is stored.
 					</li>
 				</ul>
 				<Callout tone="lesson">
-					Treat the prior as a starting basin and a veto, then let image
-					evidence decide.
+					Treat the prior as a starting point and a veto; let the image decide.
 				</Callout>
 			</Section>
 
@@ -1197,10 +1107,6 @@ function Deep({ accent }: { accent: string }) {
 					<CodeRef path="src/lib/geocam/map/factors.ts" />
 					<CodeRef path="src/lib/concord/priors/altitude.ts" />
 				</div>
-				<p className={`!mt-3 font-mono ${TYPE.caption} gb-secondary`}>
-					Priors, PriorValue, mapPriorsFromPhoto, sigmaHFromHAcc, priorHeading,
-					COMPASS_DEFAULTS, EYE_PRIOR_DEFAULTS
-				</p>
 			</Section>
 		</>
 	);
@@ -1210,8 +1116,6 @@ function Deep({ accent }: { accent: string }) {
 // Explainer front. Everything here is measured (public/demo/gipfelbuch) except the three tiny Trio schematics,
 // which are drawn from the real values of the picked photo.
 // ======================================================================================
-const PRIOR_C = LAYER_STYLE.prior.color;
-const SOLVED_C = LAYER_STYLE.solved.color;
 
 function HeroCompare() {
 	const [photoId] = useNotebookPhoto();
@@ -1226,16 +1130,12 @@ function HeroCompare() {
 					{d
 						? `Sensors alone put the skyline ${d.residual.prior.median.toFixed(0)} px off (yaw ${sgn(d.solved.delta.yaw)}°). After solving, the median gap is ${d.residual.solved.median.toFixed(1)} px.`
 						: "Sensors alone, then solved."}{" "}
-					<ColorKey color={PRIOR_C} dashed>
-						sensors only
-					</ColorKey>
+					<ColorKey layer="prior">sensors only</ColorKey>
 					{", "}
-					<ColorKey color={SOLVED_C}>solved</ColorKey>
+					<ColorKey layer="solved">solved</ColorKey>
 					{", "}
-					<ColorKey color={LAYER_STYLE.skyline.color}>
-						skyline in the photo
-					</ColorKey>
-					. {d ? <Measured data={d} /> : null}
+					<ColorKey layer="skyline">skyline in the photo</ColorKey>.{" "}
+					{d ? <Measured data={d} /> : null}
 				</>
 			}
 		/>
@@ -1302,8 +1202,8 @@ function YawBars() {
 					The compass is off by up to 19° across twelve photos. Shaded: the ±
 					{SOLVE_SIGMA_YAW}° the solver allows for; the search reaches ±
 					{SEARCH_YAW}°. Magnetic declination here is only +3.4° and iPhones
-					already write true north, so it explains little. Red outline: rejected
-					solves. <Measured data={idx} />
+					already write true north. Red outline: rejected solves.{" "}
+					<Measured data={idx} />
 				</>
 			}
 		>
@@ -1338,7 +1238,7 @@ function YawBars() {
 					size={YAWBARS_LABEL}
 					color="var(--gb-secondary)"
 				>
-					solver prior σ = {SOLVE_SIGMA_YAW}°
+					solver allows ±{SOLVE_SIGMA_YAW}°
 				</HandLabel>
 				{photos.map((p, i) => {
 					const v = p.delta.yaw;
@@ -1407,7 +1307,20 @@ function YawBars() {
 function PriorTrio() {
 	const [photoId] = useNotebookPhoto();
 	const d = useGipfelbuchPhoto(photoId);
-	const hacc = useHAcc()?.[photoId];
+	const haccAll = useHAcc();
+	const hacc = haccAll?.[photoId];
+	// rank among the bundled photos by reported horizontal accuracy: 1 = loosest fix
+	const haccValues = haccAll ? Object.values(haccAll) : [];
+	const looseRank =
+		hacc != null ? haccValues.filter((v) => v > hacc).length + 1 : null;
+	const haccRankNote =
+		looseRank == null || haccValues.length === 0
+			? ""
+			: looseRank === 1
+				? `loosest of ${haccValues.length}`
+				: looseRank === haccValues.length
+					? `tightest of ${haccValues.length}`
+					: `${looseRank}${looseRank === 2 ? "nd" : looseRank === 3 ? "rd" : "th"} loosest of ${haccValues.length}`;
 	const ang = (deg: number, r: number) => [
 		50 + r * Math.sin(rad(deg)),
 		50 - r * Math.cos(rad(deg)),
@@ -1452,6 +1365,11 @@ function PriorTrio() {
 							<HandText x={52} y={46} size={5} halo={false}>
 								fix
 							</HandText>
+							{haccRankNote && (
+								<HandText x={4} y={9} size={5} rotate={-2} halo={false}>
+									{haccRankNote}
+								</HandText>
+							)}
 							<HandLabel
 								x={50}
 								y={73}
@@ -1467,7 +1385,7 @@ function PriorTrio() {
 				},
 				{
 					title: "The compass points",
-					body: "Dashed is what it said. Teal is where the camera really faced.",
+					body: "Dashed: the compass. Blue: where the camera faced.",
 					visual: (
 						<svg
 							viewBox="0 0 100 75"
@@ -1589,7 +1507,7 @@ function PriorNumbers() {
 				},
 				{
 					value: `${Math.max(...yaw).toFixed(1)}°`,
-					label: "worst compass error (demo-10)",
+					label: "worst compass error (photo 10)",
 				},
 				{
 					value: `${med(pit).toFixed(1)}°`,
@@ -1600,7 +1518,7 @@ function PriorNumbers() {
 					label: "median skyline gap, sensors → solved",
 				},
 			]}
-			source="Measured on the demo photos accepted by the solve (10 of 12), scripts/gipfelbuch/build-data.ts, 2026-10-01."
+			source="Measured on the 10 of 12 demo photos the solve accepted."
 		/>
 	);
 }
@@ -1652,7 +1570,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						trusting the phone&rsquo;s altitude more
 					</HandMark>
 					<MarginNote mark="b">
-						Scratch that: eye priors are vetoes, not pulls.
+						Scratch that: altitude hints are vetoes, not pulls.
 					</MarginNote>
 					. On held-out photos the skyline gap got worse:{" "}
 					<HandMark type="double">median 12.0 to 13.4 px</HandMark>. So the
@@ -1690,14 +1608,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Details>
 				<Callout tone="note" title="Two different compass widths">
-					The figures below use the geometry-first MAP prior (compass 5° noise
-					plus 5° bias, 7.1° in all; a flag-off path). The production skyline
-					solve is looser: a yaw prior of 15° and a search of ±25° (
-					<code>DEFAULT_SIGMA</code>, <code>yawRange</code> in{" "}
-					<code>geo/solve.ts</code>). Six of the ten accepted photos miss by
-					more than 7.1°. Pitch is only searched within ±3° of gravity, so
-					&ldquo;gravity is tight&rdquo; is partly the window. Lens distortion
-					is not modelled.
+					The figures below assume a compass width of 7.1° (5° noise plus 5°
+					bias). The app&rsquo;s own solve is looser: it allows 15° and searches
+					±25°. Six of the ten accepted photos miss by more than 7.1°. Pitch is
+					searched only within ±3° of gravity, so &ldquo;gravity is tight&rdquo;
+					is partly that window. Lens distortion is not modelled.
 				</Callout>
 				<Deep accent={accent} />
 			</Details>

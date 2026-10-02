@@ -12,7 +12,7 @@ Condensed`, `GB Mono`, `GB Serif`, `GB Hand`, `GB Hand Small`, `GB Hand Body` an
 | GB Sans Condensed | Fira Sans Condensed 500, 600 | `fira-sans-condensed-*` | OFL 1.1, same holders | https://fonts.google.com/specimen/Fira+Sans+Condensed |
 | GB Mono | Fira Mono 400, 500 | `fira-mono-*` | OFL 1.1, same holders | https://fonts.google.com/specimen/Fira+Mono |
 | GB Serif | Source Serif 4 (variable, wght 400-700 with opsz) | `source-serif-4-*` | OFL 1.1, (c) Adobe | https://github.com/adobe-fonts/source-serif, https://fonts.google.com/specimen/Source+Serif+4 |
-| GB Hand | Caveat (variable, wght 400-700) | `caveat-*` | OFL 1.1, (c) The Caveat Project Authors | https://github.com/googlefonts/caveat, https://fonts.google.com/specimen/Caveat |
+| GB Hand | Architects Daughter 400 | `architects-daughter-*` | OFL 1.1, (c) 2010 Kimberly Geswein (kimberlygeswein.com) | https://fonts.google.com/specimen/Architects+Daughter |
 | GB Hand Small | Shantell Sans (variable, wght 300-800; BNCE, INFM, SPAC axes) | `shantell-sans-*` | OFL 1.1, (c) The Shantell Sans Project Authors | https://github.com/arrowtype/shantell-sans, https://fonts.google.com/specimen/Shantell+Sans |
 | GB Hand Body | Playpen Sans (variable, wght 300-700; contextual alternates) | `playpen-sans-*` | OFL 1.1, (c) 2023 The Playpen Sans Project Authors | https://github.com/TypeTogether/Playpen-Sans, https://fonts.google.com/specimen/Playpen+Sans |
 | GB Hand Caps | Patrick Hand SC 400 | `patrick-hand-sc-*` | OFL 1.1, (c) 2010-2012 Patrick Wagesreiter | https://fonts.google.com/specimen/Patrick+Hand+SC |

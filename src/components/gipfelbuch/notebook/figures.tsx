@@ -222,19 +222,19 @@ export function SkylineSketch({ data }: { data: GipfelbuchPhotoData }) {
 		{
 			rows: data.skyline.rows,
 			step: "skyline",
-			text: "traced in the photo",
+			text: "skyline in photo",
 			color: "ink" as InkColor,
 		},
 		{
 			rows: data.priorRows,
 			step: "camera-prior",
-			text: "compass guess",
+			text: "phone's guess",
 			color: "blue" as InkColor,
 		},
 		{
 			rows: data.solvedRows,
 			step: "pose-estimate",
-			text: data.solved.accepted ? "solved pose" : "refused solve",
+			text: data.solved.accepted ? "solved pose" : "refused pose",
 			color: "red" as InkColor,
 		},
 	];
@@ -263,7 +263,7 @@ export function SkylineSketch({ data }: { data: GipfelbuchPhotoData }) {
 			viewBox={`0 ${top} ${width} ${viewHeight}`}
 			className="block w-full"
 			role="img"
-			aria-label={`Photo ${data.id} with three skylines: the one traced in the photo, the terrain's at the compass guess, and the terrain's at the solved pose.`}
+			aria-label={`Photo ${data.id} with the skyline traced in the photo and terrain horizons at the phone's guess and solved pose.`}
 		>
 			<image href={data.photo.src} x={0} y={0} width={width} height={height} />
 			{Number.isFinite(summitRow) ? (
@@ -426,7 +426,7 @@ export function MissSketch({ data }: { data: GipfelbuchPhotoData }) {
 				seed={`${data.id}-miss-step`}
 			/>
 			<HandText x={34} y={20} size={18} color="pencil">
-				gap between the two skylines
+				gap: skyline vs horizon
 			</HandText>
 			<g transform="translate(0 26)">
 				<PenLine
@@ -1049,7 +1049,7 @@ export function TallySketch({
 						key={photo.id}
 						role="button"
 						tabIndex={0}
-						aria-label={`${photo.id}: compass off by ${signed(photo.delta.yaw)}°, ${refused ? "refused" : refined ? "accepted after refine" : "accepted"}`}
+						aria-label={`${photo.id}: compass off by ${signed(photo.delta.yaw)}°, ${refused ? "refused" : refined ? "solved after refinement" : "accepted"}`}
 						aria-pressed={isSelected}
 						className="cursor-pointer"
 						onClick={() => onSelect(photo.id)}

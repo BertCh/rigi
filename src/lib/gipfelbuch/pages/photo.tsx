@@ -132,7 +132,7 @@ const layersFor = (P: Rec, HFOV: number): Layer[] => [
 	{
 		key: "pixels",
 		name: "Pixels",
-		blurb: "Upright JPEG, long side capped at MAX_PX = 2048.",
+		blurb: "Upright JPEG, long side at most 2048 px.",
 		rows: [
 			["width x height", `${P.w} x ${P.h}`],
 			["src", P.src],
@@ -159,11 +159,11 @@ const layersFor = (P: Rec, HFOV: number): Layer[] => [
 	{
 		key: "prior",
 		name: "Derived prior",
-		blurb: "Pure functions turn tags into pitch, roll and a field of view.",
+		blurb: "Tags become pitch, roll and a field of view.",
 		rows: [
-			["pitch", `${P.pitch.toFixed(2)} deg (orientationFromGravity)`],
+			["pitch", `${P.pitch.toFixed(2)} deg`],
 			["roll", `${P.roll.toFixed(2)} deg`],
-			["vfov", `${P.vfov.toFixed(2)} deg (vfovFromF35)`],
+			["vfov", `${P.vfov.toFixed(2)} deg`],
 			["hfov", `${HFOV.toFixed(1)} deg (from aspect)`],
 			["yaw", `${P.heading.toFixed(1)} deg, true north`],
 		],
@@ -176,8 +176,6 @@ const layersFor = (P: Rec, HFOV: number): Layer[] => [
 		rows: [
 			["lat, lon", `${P.lat.toFixed(4)}, ${P.lon.toFixed(4)}`],
 			["hAccuracy", `${P.hAcc.toFixed(0)} m`],
-			["region", "demo-region"],
-			["peaks, trails, water", "RegionData for that area"],
 		],
 	},
 ];
@@ -452,11 +450,9 @@ function RealRecord({ accent }: { accent: string }) {
 			label="Fig. D1"
 			caption={
 				<>
-					<Measured data={d} /> Record fields are the ingest output in
-					public/demo/manifest.json; the horizon and field of view in tab 3 are
-					recomputed by the pure functions named in the Mechanism section.
-					Auto-cycles; click a tab to hold a layer, or a thumbnail (badge = 35
-					mm focal) to switch photo.
+					<Measured data={d} /> The record as the phone wrote it; the horizon
+					and field of view in tab 3 are recomputed. Click a tab to hold a
+					layer, or a thumbnail (badge: 35 mm focal) to switch photo.
 				</>
 			}
 		>
@@ -489,13 +485,13 @@ function FieldRow({ id, m }: { id: GipfelbuchPhotoId; m: ManifestPhoto }) {
 	const diff = d ? m.alt - d.gps.ground : null;
 	const bad = diff != null && Math.abs(diff) > 200;
 	const cells: [string, ReactNode, boolean?][] = [
-		["holding", m.holding === "portrait" ? "portrait" : "landscape"],
-		["f35 → vfov", `${m.f35} mm → ${m.vfov.toFixed(1)}°`],
-		["hAccuracy", `±${m.hAccuracy.toFixed(0)} m`],
-		["GPS alt m", m.alt.toFixed(0)],
-		["DEM m", d ? d.gps.ground.toFixed(0) : "…"],
+		["held", m.holding === "portrait" ? "portrait" : "landscape"],
+		["lens → view", `${m.f35} mm → ${m.vfov.toFixed(1)}°`],
+		["GPS error", `±${m.hAccuracy.toFixed(0)} m`],
+		["GPS alt (m)", m.alt.toFixed(0)],
+		["ground (m)", d ? d.gps.ground.toFixed(0) : "…"],
 		[
-			"alt − DEM",
+			"alt − ground",
 			diff == null
 				? "…"
 				: `${diff > 0 ? "+" : "−"}${Math.abs(diff).toFixed(0)}`,
@@ -527,12 +523,12 @@ const FIELD_GRID =
 	"grid grid-cols-3 gap-x-3 gap-y-1.5 @[640px]:grid-cols-[2rem_5.5rem_8rem_5rem_4.5rem_3.5rem_4.5rem_4rem_1fr] @[640px]:gap-y-0";
 const FIELD_HEADS = [
 	"photo",
-	"holding",
-	"f35 → vfov",
-	"hAccuracy",
-	"GPS alt m",
-	"DEM m",
-	"alt − DEM",
+	"held",
+	"lens → view",
+	"GPS error",
+	"GPS alt (m)",
+	"ground (m)",
+	"alt − ground",
 	"heading",
 	"pitch / roll",
 ];
@@ -544,13 +540,11 @@ function FieldsTable() {
 			label="Fig. 3"
 			caption={
 				<>
-					All 12 bundled photos, real record (public/demo/manifest.json) beside
-					the DEM height at the fix (terrarium DEM,
-					scripts/gipfelbuch/build-data.ts, 2026-10-01). GPSAltitude sits 28 to
-					69 m above the DEM in eleven photos (a fix lands a few tens of metres
-					off the summit track and the DEM is a 30 m model) and 730 m below it
-					in demo-09, which is why the engine uses max(GPSAltitude, DEM + 1.6 m)
-					as the eye rather than trusting the tag.
+					All 12 demo photos: the phone&rsquo;s record beside the Terrarium
+					height at the fix. GPS altitude sits 28 to 69 m above the map in
+					eleven photos (a fix lands tens of metres off the summit track and the
+					map is a 30 m model) and 730 m below it in photo 09, so the engine
+					takes max(GPS altitude, ground + 1.6 m) rather than trusting the tag.
 				</>
 			}
 		>
@@ -578,7 +572,7 @@ const TAGS = [
 		flag: "positionSource",
 		off: "pin",
 		on: "exif",
-		fix: "User pins position on the map; altitude and hAccuracy become null (DEM snaps the eye).",
+		fix: "User pins position on the map; altitude and GPS error are left empty; the engine uses the map's ground for the eye.",
 	},
 	{
 		k: "head",
@@ -594,7 +588,7 @@ const TAGS = [
 		flag: "pitchRollUnknown",
 		off: "true",
 		on: "false",
-		fix: "pitch/roll stay 0 placeholders; solver frees them (wide pitch search).",
+		fix: "pitch and roll stay 0 as placeholders; the solver frees them.",
 	},
 	{
 		k: "focal",
@@ -602,7 +596,7 @@ const TAGS = [
 		flag: "focalUnknown",
 		off: "true",
 		on: "false",
-		fix: "f35 = DEFAULT_F35 (26, iPhone main camera); solver frees focal.",
+		fix: "focal defaults to 26 mm (iPhone main camera); the solver frees it.",
 	},
 ] as const;
 
@@ -678,11 +672,10 @@ function Deep({ accent }: { accent: string }) {
 		<>
 			<Section kicker="Anatomy" title="One file, four layers">
 				<p>
-					Scrub through what a single bundled photo carries. Nothing here is
-					solved yet: it is only what the device recorded and what pure
-					functions can derive from it. All twelve Niederhorn photos are full
-					phone records: every one has GPS, a true-north heading, the Apple
-					gravity vector and a 35 mm focal, so none raises an unknown flag.
+					What one photo carries. Nothing is solved yet: only what the phone
+					recorded and what can be derived from it. All twelve Niederhorn photos
+					are full phone records (GPS, true-north heading, Apple gravity vector,
+					35 mm focal), so none raises an unknown flag.
 				</p>
 			</Section>
 			<RealRecord accent={accent} />
@@ -696,13 +689,6 @@ function Deep({ accent }: { accent: string }) {
 					<A id="region">region</A>. A solved pose is deliberately not part of
 					it: the photo is what the photographer brought.
 				</p>
-				<p>
-					The app record is <code>PhotoMeta</code> in <code>lib/photos.ts</code>
-					: id, src, width, height, takenAt, tzOffset, lat, lon, alt, hAccuracy,
-					heading, f35, vfov, gravity, pitch, roll, holding, region. Uploads
-					wear <code>LocalPhotoMeta</code>, the same record plus a{" "}
-					<code>local</code> block of provenance flags.
-				</p>
 			</Section>
 
 			<Section kicker="Mechanism" title="How it works">
@@ -710,7 +696,7 @@ function Deep({ accent }: { accent: string }) {
 					steps={[
 						{
 							title: "Read the tags",
-							body: "readExif (exifr) returns ExifTags; raw date strings are read separately so no local-zone revival happens. The Apple MakerNote is parsed by hand: tag 0x0008 holds the gravity vector.",
+							body: "Tags are read as written. The Apple gravity vector is parsed by hand from the MakerNote.",
 						},
 						{
 							title: "Gravity to pitch and roll",
@@ -718,15 +704,15 @@ function Deep({ accent }: { accent: string }) {
 						},
 						{
 							title: "Focal to field of view",
-							body: "vfovFromF35 converts the 35 mm-equivalent focal on the diagonal; with sensor and source sizes it is crop-aware. Missing focal falls back to 26 mm.",
+							body: "The 35 mm-equivalent focal, defined on the frame diagonal, gives the field of view. A missing focal falls back to 26 mm.",
 						},
 						{
 							title: "Time and position",
-							body: "captureTime prefers GPS date+time (UTC), then DateTimeOriginal with OffsetTime. A zone-less clock gets round(lon / 15) hours and is flagged tzEstimated.",
+							body: "Capture time prefers GPS date and time (UTC), then the camera clock with its offset. A clock without a zone gets round(lon / 15) hours and is flagged as estimated.",
 						},
 						{
 							title: "Assemble",
-							body: "buildPhotoMeta returns the record. Missing tags never throw: they become placeholders plus a flag, which is the next figure.",
+							body: "The record is built. A missing tag never fails: it becomes a placeholder plus a flag, shown next.",
 						},
 					]}
 				/>
@@ -734,7 +720,7 @@ function Deep({ accent }: { accent: string }) {
 
 			<Figure
 				label="Fig. D2"
-				caption="Interactive schematic. Drop tags from the file and watch which flags buildPhotoMeta raises. Flags mean 'placeholder, not measurement'."
+				caption="Drop tags from the file and watch which flags rise. A flag means 'placeholder, not measurement'."
 			>
 				<Survival accent={accent} />
 			</Figure>
@@ -742,42 +728,34 @@ function Deep({ accent }: { accent: string }) {
 			<Section kicker="Role" title="Why it matters in Rigi">
 				<p>
 					Every pipeline starts here. The record seeds the{" "}
-					<A id="exif-prior">EXIF pose prior</A>, and its flags are how{" "}
-					<A id="prior-unknowns">prior unknowns</A> tell the solver cascade what
-					to search over. <A id="photo-upload">Upload</A> produces the same
-					shape as ingest, so a user photo and a bundled one take identical code
-					paths, and the <A id="camera-roll">camera roll</A> clusters photos by
-					position and time.
+					<A id="exif-prior">EXIF pose prior</A>, and its flags tell the{" "}
+					<A id="prior-unknowns">solver</A> what to search over.{" "}
+					<A id="photo-upload">Upload</A> produces the same shape as ingest, so
+					a user photo and a bundled one take identical code paths, and the{" "}
+					<A id="camera-roll">camera roll</A> clusters photos by position and
+					time.
 				</p>
 				<p>
-					Because gravity pins pitch and roll and focal pins field of view, only
-					the heading remains badly uncertain for a typical iPhone image (GPS
-					fixes the position, and pitch, roll and field of view are free only
-					within tight windows), which is why the compass is the first thing the
-					solvers distrust.
+					Gravity pins pitch and roll and the focal pins the field of view, so
+					only the heading stays badly uncertain on a typical iPhone photo. That
+					is why the compass is the first thing the solver distrusts.
 				</p>
 			</Section>
 
-			<Section kicker="Hazards" title="Gotchas and lessons">
+			<Section kicker="Hazards" title="Pitfalls">
 				<ul>
 					<li>
-						<strong>Two PhotoMeta types.</strong> <code>lib/photos.ts</code> is
-						the app record; <code>lib/geo/photo-meta.ts</code> is raw EXIF with
-						optional fields and <code>focal35</code>. The ontology files the
-						second under raw-exif.
-					</li>
-					<li>
 						<strong>Zeros are not measurements.</strong> Without gravity, pitch
-						and roll are 0 and must be read with <code>pitchRollUnknown</code>.
+						and roll are 0 placeholders and carry a flag.
 					</li>
 					<li>
-						<strong>A pinned position has no altitude.</strong> alt and
-						hAccuracy are null so the engine snaps to the DEM instead of
-						trusting a made-up height.
+						<strong>A pinned position has no altitude.</strong> Altitude and GPS
+						error are empty, so the engine uses the map&rsquo;s ground instead
+						of a made-up height.
 					</li>
 					<li>
-						<strong>Heading may be magnetic.</strong> <code>headingRef</code>{" "}
-						keeps T or M; iPhones write T.
+						<strong>Heading may be magnetic.</strong> The tag says true or
+						magnetic north; iPhones write true.
 					</li>
 				</ul>
 				<Callout tone="warning" title="Compass is a prior, not truth">
@@ -1073,8 +1051,7 @@ function AltitudeCheck() {
 				}}
 			/>
 			<p className="mt-3 font-mono text-[11px] gb-secondary">
-				Ground = Terrarium DEM, the same one the gipfelbuch runs on; the full
-				record table follows.
+				Ground = Terrarium height map. The full record table follows.
 			</p>
 		</Figure>
 	);
@@ -1115,9 +1092,9 @@ function LensEquation() {
 			</Eq>
 			<p className="-mt-3 mb-6 text-[13px] leading-snug gb-secondary">
 				{a.id}: {a.sensor.f35} mm gives f = {a.prior.f.toFixed(0)} px and a{" "}
-				{a.prior.hfov.toFixed(0)}° wide view. Fixed example, demo-02 (the
-				ultra-wide): {b.sensor.f35} mm gives {b.prior.hfov.toFixed(0)}°. We
-				model a straight-line lens, with no distortion term, so the edges of an
+				{a.prior.hfov.toFixed(0)}° wide view. Photo 02 (the ultra-wide):{" "}
+				{b.sensor.f35} mm gives {b.prior.hfov.toFixed(0)}°. We model a
+				straight-line lens, with no distortion term, so the edges of an
 				ultra-wide are the least trustworthy.
 			</p>
 		</>
@@ -1153,14 +1130,14 @@ function PhotoNumbers() {
 				},
 				{
 					value: d9 ? `${signed(d9.gps.alt - d9.gps.ground, 0)} m` : "…",
-					label: "worst altitude error against the map (demo-09)",
+					label: "worst altitude error against the map (photo 09)",
 				},
 				{
 					value: "1.6 m",
 					label: "minimum eye height we assume above the ground",
 				},
 			]}
-			source="Measured: public/demo/manifest.json and gipfelbuch data, 2026-10-01. Eye height: src/lib/geo/pipeline.ts."
+			source="Measured on the 12 Niederhorn demo photos."
 		/>
 	);
 }
@@ -1236,7 +1213,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="A tag can lie, so one tag never decides alone."
 			>
 				<p>
-					Demo-09 says it was{" "}
+					Photo 09 says it was{" "}
 					<HandMark type="wavy">730 m below the ground</HandMark>. We take the
 					higher of the GPS height and the ground plus 1.6 m.
 					<MarginNote mark="b">

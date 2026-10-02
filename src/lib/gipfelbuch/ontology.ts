@@ -138,11 +138,20 @@ export interface ConceptView {
 	storage: StorageView[];
 }
 
-const refOf = (concept: string): ConceptRef => ({
-	concept,
-	label: CONCEPT_MAP[concept]?.label ?? concept,
-	nodeId: isConceptId(concept) ? NODE_OF_CONCEPT.get(concept) : undefined,
-});
+/** A chip that links to a sheet reads as that sheet's title: one name per thing. */
+const refOf = (concept: string): ConceptRef => {
+	const nodeId = isConceptId(concept)
+		? NODE_OF_CONCEPT.get(concept)
+		: undefined;
+	const title = nodeId
+		? GIPFELBUCH_NODES.find((n) => n.id === nodeId)?.title
+		: undefined;
+	return {
+		concept,
+		label: title ?? CONCEPT_MAP[concept]?.label ?? concept,
+		nodeId,
+	};
+};
 
 const storageView = (id: string): StorageView => {
 	const e = (STORAGE as Record<string, (typeof STORAGE)[keyof typeof STORAGE]>)[
@@ -289,21 +298,6 @@ const findingView = (f: (typeof FINDINGS)[number]): FindingView => ({
 	where: [...f.where],
 	action: f.action,
 });
-const wherePath = (w: string) => {
-	const p = w.trim().split(/[\s:]/)[0];
-	return p.startsWith("src/") || p.startsWith("tools/") || p.startsWith("data/")
-		? p
-		: `src/${p}`;
-};
-
-/** Findings whose `where` paths appear in the node's modules. */
-export function findingsFor(node: GipfelbuchNode): FindingView[] {
-	const mods = new Set(node.modules);
-	return FINDINGS.filter((f) =>
-		f.where.some((w) => mods.has(wherePath(w))),
-	).map(findingView);
-}
-
 // ---- search words -------------------------------------------------------------------------------
 
 /** Lower-cased words a graph search should match for this node, drawn from the ontology. */

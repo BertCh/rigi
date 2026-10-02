@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { legendItemsFor } from "#/components/gipfelbuch/legendItems";
 import { NotebookMap } from "#/components/gipfelbuch/notebook";
 import { SketchDefs } from "#/components/gipfelbuch/notebook/Ink";
@@ -25,7 +25,7 @@ import { Blattuebersicht, CHAPTERS } from "#/components/gipfelbuch/tafel";
 import { sheetTransition } from "#/components/gipfelbuch/viz/hooks";
 import { SiteNav } from "#/components/site/SiteNav";
 import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
-import { STATUS_META } from "#/lib/gipfelbuch/graph-utils";
+import { lineageOf, STATUS_META } from "#/lib/gipfelbuch/graph-utils";
 
 // The Rigi Gipfelbuch: the title block, a hand-written table of contents, the Niederhorn sheet map,
 // then the sheet index (Blattübersicht) of the 19 sheets in reading order, every band re-drawn from
@@ -35,6 +35,18 @@ export const Route = createFileRoute("/gipfelbuch/")({
 	head: () => ({ meta: [{ title: "The Rigi Gipfelbuch" }] }),
 	component: GipfelbuchIndex,
 });
+
+/** A red-underlined link to one of the book's two organising ideas, set inside the title block. */
+const IdeaLink = ({ id, children }: { id: string; children: string }) => (
+	<Link
+		to="/gipfelbuch/$concept"
+		params={{ concept: id }}
+		viewTransition={sheetTransition()}
+		className="text-[var(--gb-ink)] underline decoration-[var(--gb-red)] decoration-[1.5px] underline-offset-4 hover:text-[var(--gb-red)]"
+	>
+		{children}
+	</Link>
+);
 
 const LEGEND_ITEMS = legendItemsFor(["contour", "water", "peak", "viewpoint"]);
 
@@ -48,11 +60,15 @@ const BLATT = new Map(
  * sheet a hand-lettered title with its status blaze, a dotted hand leader and the Blatt number.
  */
 function HandContents() {
+	// the sheet the reader hovers or focuses; its lineage is marked with pencil arrows, the rest fades
+	const [active, setActive] = useState<string | null>(null);
+	const lineage = useMemo(() => (active ? lineageOf(active) : null), [active]);
+	const activeNode = active ? NODE_BY_ID.get(active) : undefined;
 	return (
 		<nav aria-labelledby="contents-title" className="px-6 pt-6 pb-6">
 			<div className="relative inline-block">
 				<h2 id="contents-title" className={`${TYPE.h2} m-0`}>
-					Inhalt · Contents
+					Inhalt
 				</h2>
 				<MarkerUnderline seed="index-contents" />
 			</div>
@@ -66,14 +82,37 @@ function HandContents() {
 							{chapter.ids.map((id) => {
 								const node = NODE_BY_ID.get(id);
 								if (!node) return null;
+								const relation = !active
+									? "none"
+									: id === active
+										? "self"
+										: lineage?.upstream.has(id)
+											? "upstream"
+											: lineage?.downstream.has(id)
+												? "downstream"
+												: "unrelated";
 								return (
 									<li key={id}>
 										<Link
+											onMouseEnter={() => setActive(id)}
+											onMouseLeave={() => setActive(null)}
+											onFocus={() => setActive(id)}
+											onBlur={() => setActive(null)}
 											to="/gipfelbuch/$concept"
 											params={{ concept: id }}
 											viewTransition={sheetTransition()}
-											className="group flex items-baseline gap-2 py-0.5 text-[var(--gb-ink)] hover:text-[var(--gb-red)]"
+											className={`group flex items-baseline gap-2 py-0.5 transition-colors hover:text-[var(--gb-red)] motion-reduce:transition-none ${relation === "unrelated" ? "text-[var(--gb-secondary)]" : "text-[var(--gb-ink)]"}`}
 										>
+											<span
+												className="nb-hand w-4 shrink-0 text-center text-[18px] leading-[26px] text-[var(--gb-pencil)]"
+												aria-hidden="true"
+											>
+												{relation === "upstream"
+													? "←"
+													: relation === "downstream"
+														? "→"
+														: ""}
+											</span>
 											<Waymark variant={waymarkForStatus(node.status)}>
 												<span className="sr-only">
 													{STATUS_META[node.status].label}
@@ -94,6 +133,15 @@ function HandContents() {
 					</section>
 				))}
 			</div>
+			{/* one hand caption for the hovered sheet: its claim and status; ← feeds into it, → it feeds */}
+			<p
+				aria-live="polite"
+				className={`${TYPE.hand} gb-secondary mt-6 min-h-[48px] max-w-[66ch]`}
+			>
+				{activeNode
+					? `${activeNode.title}: ${activeNode.claim ?? activeNode.tagline} (${STATUS_META[activeNode.status].label})`
+					: "Point at a sheet to see what feeds it and what it feeds."}
+			</p>
 		</nav>
 	);
 }
@@ -112,9 +160,8 @@ function GipfelbuchIndex() {
 				sheet="00"
 				total="19"
 				title="Übersicht"
-				imprint="Rigi Gipfelbuch · Blatt 00 · Grundlage © swisstopo (OGD) · DEM Mapterhorn"
+				imprint="Rigi Gipfelbuch · Blatt 00 · Grundlage © swisstopo · Höhen Mapterhorn"
 				stand="2026-10"
-				edition="2026"
 				corners={
 					sheet
 						? {
@@ -126,10 +173,23 @@ function GipfelbuchIndex() {
 			>
 				<header className="px-6 pt-12 pb-6">
 					<Cartouche
-						kicker="Gipfelbuch · Band 1 · 2026–"
+						kicker="Gipfelbuch · 2026"
 						title="The Rigi Gipfelbuch"
-						subtitle="How a photograph of a mountain finds its place on the earth: two ideas carry it, inferring the viewport and snapping to the terrain."
-						edition="Blatt 1208 Beatenberg · Niederhorn 1963 m · Ausgabe 2026"
+						subtitle={
+							<>
+								How a photo of a mountain finds its place on the map. Two ideas
+								carry it:{" "}
+								<IdeaLink id="viewport-inference">
+									working out where the camera points
+								</IdeaLink>{" "}
+								and{" "}
+								<IdeaLink id="terrain-snapping">
+									snapping to the terrain
+								</IdeaLink>
+								.
+							</>
+						}
+						edition="Blatt 1208 Beatenberg · Niederhorn 1963 m"
 					/>
 					<p className={`${TYPE.body} gb-secondary mt-6 max-w-[66ch]`}>
 						A Gipfelbuch is the logbook kept in a tin on a Swiss summit. This
@@ -165,7 +225,7 @@ function GipfelbuchIndex() {
 				<section aria-labelledby="sheets-title" className="mt-12 px-6">
 					<div className="relative inline-block">
 						<h2 id="sheets-title" className={`${TYPE.h2} m-0`}>
-							Blattübersicht · Sheet index
+							Blattübersicht
 						</h2>
 						<MarkerUnderline seed="index-sheets" />
 					</div>

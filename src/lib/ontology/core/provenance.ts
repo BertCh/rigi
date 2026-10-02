@@ -24,14 +24,12 @@ import type { IsoTime } from "./quantity";
 // ---- agent -------------------------------------------------------------------------------------
 
 export const AGENTS = {
-	user: "a person, in this app (pin, drag, save, accept, map pin)",
-	sensor: "the capturing device: GPS, compass, gravity, clock, lens/EXIF",
-	solver:
-		"a Rigi algorithm fitting evidence (align, cascade, matcher, propagate, …)",
-	reference:
-		"curated external truth: ground-truth fits, OSM, swisstopo, the DEM, tables",
-	model: "a learned model (sky segmentation, depth, splats, generation)",
-	rule: "a fixed default or deterministic rule (eye = DEM + 1.6 m, f35 = 26 mm, interpolation)",
+	user: "you, in the app",
+	sensor: "the phone's sensors",
+	solver: "a Rigi algorithm",
+	reference: "maps and terrain data",
+	model: "a learned model",
+	rule: "a fixed rule",
 } as const;
 export type Agent = keyof typeof AGENTS;
 
@@ -285,7 +283,7 @@ export const METHODS = {
 		"lib/tiles3d, lib/concord",
 		["geometry"],
 	),
-	"dem-sample": m("reference", "DEM height sample", ["terrain"], "lib/dem", [
+	"dem-sample": m("reference", "Ground height lookup", ["terrain"], "lib/dem", [
 		"eye-height",
 		"geometry",
 	]),
@@ -299,14 +297,14 @@ export const METHODS = {
 	// rules
 	"eye-rule": m(
 		"rule",
-		"Eye = max(GPS alt, DEM + 1.6 m) (DEM + 1.8 m without altitude in the engine)",
+		"Eye at GPS height, at least 1.6 m above ground",
 		["ground", "alt"],
 		"lib/deck/scene.ts, lib/geo/pipeline.ts",
 		["eye-height"],
 	),
 	"alt-contour": m(
 		"rule",
-		"Eye on the GPS-altitude iso-band",
+		"Eye on the GPS height contour",
 		["gps", "alt", "ground"],
 		"lib/concord/priors/altitude.ts",
 		["position", "eye-height"],

@@ -697,7 +697,7 @@ const bandCameraPrior = ({ d, w, h }: BandCtx) => {
 			{arm(d.sensor.heading, ROUTE, "5 4")}
 			{arm(d.solved.yaw, MEASURE)}
 			<Txt x={200} y={56} fill={ROUTE}>
-				{`phone  ${f1(d.sensor.heading)}°`}
+				{`compass ${f1(d.sensor.heading)}°`}
 			</Txt>
 			<Txt x={200} y={76} fill={MEASURE}>
 				{`terrain ${f1(d.solved.yaw)}°`}
@@ -847,7 +847,7 @@ const bandPose = ({ d, w, h }: BandCtx) => {
 				5 px
 			</Txt>
 			<Txt x={0} y={h - 8} fill={SECONDARY}>
-				|photo − terrain| per column, once solved
+				miss per column after solving
 			</Txt>
 		</>
 	);
@@ -893,7 +893,7 @@ const bandAccept = ({ d, all, w, h }: BandCtx) => {
 	}
 	const me = placed.find((q) => q.p.id === d.id);
 	const v = d.solved.confidence;
-	const label = `${d.solved.accepted ? "shown" : "refused"} ${v.toFixed(2)}`;
+	const label = `${d.solved.accepted ? "accepted" : "refused"} ${v.toFixed(2)}`;
 	const half = (monoWidth(label) + 14) / 2;
 	const lx = clamp(X(v), 8 + half, w - 8 - half);
 	return (
@@ -1027,7 +1027,7 @@ const bandPipeline = ({ d, w, h }: BandCtx) => {
 		<>
 			<Ground w={w} h={h} />
 			<Txt x={0} y={14} fill={SECONDARY}>
-				{`${total} ms on one CPU core`}
+				{`${total} ms in total`}
 			</Txt>
 			{stages.map(([name, ms, color], i) => {
 				const y = 34 + i * 27;
@@ -1161,7 +1161,7 @@ const bandSampler = ({ d, w, h }: BandCtx) => {
 				width={1.4}
 			/>
 			<Txt x={cx + 34} y={cy - 4} onPhoto>
-				{`heightAt() = ${f1(d.gps.ground)} m`}
+				{`ground ${f1(d.gps.ground)} m`}
 			</Txt>
 			<Txt x={cx + 34} y={cy + 10} onPhoto>
 				{`one ${cellM} m cell`}
@@ -1187,7 +1187,7 @@ const bandEye = ({ d, w, h }: BandCtx) => {
 	const labelX = w - 104;
 	const rows = [
 		{ y: Y(g), text: `ground ${f1(g)} m`, color: TERRAIN },
-		{ y: Y(g + 1.6), text: "ground +1.6 m", color: SECONDARY },
+		{ y: Y(g + 1.6), text: "ground +1.6 m (eye)", color: SECONDARY },
 		{ y: Y(a), text: `GPS ${f1(a)} m${off(a)}`, color: MEASURE },
 	];
 	const ly = spread(
@@ -1246,7 +1246,7 @@ const bandEye = ({ d, w, h }: BandCtx) => {
 				opacity={1}
 			/>
 			<Txt x={stemX + 10} y={mid + 4} fill={ROUTE}>
-				eye
+				camera
 			</Txt>
 			{rows.map((r, i) => (
 				<Txt key={r.text} x={labelX} y={ly[i]} fill={r.color}>
@@ -1349,7 +1349,7 @@ const bandSnapping = ({ d, w, h }: BandCtx) => {
 				width={1.2}
 			/>
 			<Txt x={10} y={h - 10} onPhoto>
-				{`view cone ${d.solved.hfov.toFixed(0)}° at ${d.solved.yaw.toFixed(0)}°`}
+				{`${d.solved.hfov.toFixed(0)}° wide, facing ${d.solved.yaw.toFixed(0)}°`}
 			</Txt>
 		</>
 	);
@@ -1376,7 +1376,7 @@ const bandAnchoring = ({ d, w, h }: BandCtx) => {
 		<>
 			<Ground w={w} h={h} />
 			<Txt x={left} y={14} fill={SECONDARY}>
-				ground along the view, log distance
+				ground along the view (log scale)
 			</Txt>
 			<PenLine
 				from={[left, axis]}
@@ -1574,12 +1574,12 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: nullLayer,
 		band: bandPhoto,
 		ledger: (d) => [
-			stat(d, "sensor.heading", "compass heading the phone wrote", {
+			stat(d, "sensor.heading", "compass heading", {
 				dec: 1,
 				unit: "°",
 			}),
-			stat(d, "gps.hAccuracy", "GPS accuracy, 1 sigma", { unit: "m" }),
-			stat(d, "sensor.f35", "lens, 35 mm equivalent", { unit: "mm" }),
+			stat(d, "gps.hAccuracy", "GPS accuracy", { unit: "m" }),
+			stat(d, "sensor.f35", "focal length (35 mm equiv.)", { unit: "mm" }),
 		],
 		value: (d) =>
 			`${d.gps.lat.toFixed(3)}, ${d.gps.lon.toFixed(3)} · ±${Math.round(d.gps.hAccuracy)} m`,
@@ -1588,9 +1588,9 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: ({ d, s }) => priorVsSolved(d, s, false),
 		band: bandCameraPrior,
 		ledger: (d) => [
-			stat(d, "sensor.heading", "the phone's compass", { dec: 1, unit: "°" }),
-			stat(d, "solved.yaw", "where the terrain says", { dec: 1, unit: "°" }),
-			stat(d, "solved.delta.yaw", "the compass was off by", {
+			stat(d, "sensor.heading", "compass", { dec: 1, unit: "°" }),
+			stat(d, "solved.yaw", "direction from terrain", { dec: 1, unit: "°" }),
+			stat(d, "solved.delta.yaw", "compass error", {
 				dec: 1,
 				unit: "°",
 				sign: true,
@@ -1603,12 +1603,12 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: tafelSkyline,
 		band: bandSkyline,
 		ledger: (d) => [
-			stat(d, "residual.solved.n", "columns with a vote, of 800"),
-			stat(d, "residual.solved.median", "median miss against the terrain", {
+			stat(d, "residual.solved.n", "columns with a skyline, of 800"),
+			stat(d, "residual.solved.median", "median miss vs terrain", {
 				dec: 1,
 				unit: "px",
 			}),
-			stat(d, "ms.skyline", "to detect it", { unit: "ms" }),
+			stat(d, "ms.skyline", "detection time", { unit: "ms" }),
 		],
 		value: (d) => `${votedColumns(d)}/800 columns · ${d.ms.skyline} ms`,
 	},
@@ -1617,10 +1617,10 @@ export const SHEETS: Record<string, SheetFigures> = {
 		band: bandDemHorizon,
 		ledger: (d) => [
 			stat(d, "horizon.profile.length", "azimuths sampled"),
-			stat(d, "residual.solved.within5", "columns within 5 px of the photo", {
+			stat(d, "residual.solved.within5", "columns within 5 px", {
 				unit: "%",
 			}),
-			stat(d, "ms.horizon", "to cast the horizon", { unit: "ms" }),
+			stat(d, "ms.horizon", "horizon time", { unit: "ms" }),
 		],
 		value: (d) => `${d.horizon.profile.length} azimuths · ${d.ms.horizon} ms`,
 	},
@@ -1628,27 +1628,25 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: ({ d, s }) => priorVsSolved(d, s, true),
 		band: bandViewport,
 		ledger: (d) => [
-			stat(d, "solved.delta.yaw", "yaw corrected", {
+			stat(d, "solved.delta.yaw", "heading corrected by", {
 				dec: 1,
 				unit: "°",
 				sign: true,
 			}),
-			stat(
-				d,
-				"residual.prior.median",
-				"median miss at the prior, px (solved below)",
-				{ dec: 1, unit: "px" },
-			),
+			stat(d, "residual.prior.median", "median miss before solving", {
+				dec: 1,
+				unit: "px",
+			}),
 			stat(d, "solved.confidence", "confidence", { dec: 2 }),
 		],
 		value: (d) =>
-			`Δyaw ${signed(d.solved.delta.yaw)}° · ${f1(d.residual.prior.median)} → ${f1(d.residual.solved.median)} px`,
+			`heading ${signed(d.solved.delta.yaw)}° · miss ${f1(d.residual.prior.median)} → ${f1(d.residual.solved.median)} px`,
 	},
 	"pose-estimate": {
 		tafel: tafelPose,
 		band: bandPose,
 		ledger: (d) => [
-			stat(d, "solved.residualPx", "residual after the solve", {
+			stat(d, "solved.residualPx", "miss after solving", {
 				dec: 1,
 				unit: "px",
 			}),
@@ -1656,15 +1654,15 @@ export const SHEETS: Record<string, SheetFigures> = {
 			stat(d, "ms.solve", "to solve", { unit: "ms" }),
 		],
 		value: (d) =>
-			`residual ${f1(d.solved.residualPx)} px · ${Math.round(d.solved.inlierFraction * 100)}% inliers`,
+			`miss ${f1(d.solved.residualPx)} px · ${Math.round(d.solved.inlierFraction * 100)}% agree`,
 	},
 	"accept-rule": {
 		tafel: tafelAccept,
 		band: bandAccept,
 		ledger: (d) => [
 			stat(d, "solved.confidence", "confidence", { dec: 2 }),
-			stat(d, "solved.inlierFraction", "inlier fraction", { unit: "%" }),
-			stat(d, "solved.ambiguity", "rival dip, 0 is a clear winner", { dec: 2 }),
+			stat(d, "solved.inlierFraction", "columns that agree", { unit: "%" }),
+			stat(d, "solved.ambiguity", "ambiguity (0 = clear winner)", { dec: 2 }),
 		],
 		value: (d) =>
 			`confidence ${d.solved.confidence.toFixed(2)} · ${d.solved.accepted ? "accepted" : "refused"}`,
@@ -1675,45 +1673,41 @@ export const SHEETS: Record<string, SheetFigures> = {
 		ledger: (d) => {
 			const [near, far] = labelledExtremes(d);
 			return [
-				stat(d, "peaks.length", "named summits near the frame"),
-				stat(
-					d,
-					`peaks.${near}.distance`,
-					`nearest named: ${d.peaks[near]?.name}`,
-					{ dec: 1, unit: "km" },
-				),
-				stat(
-					d,
-					`peaks.${far}.distance`,
-					`farthest named: ${d.peaks[far]?.name}`,
-					{ dec: 1, unit: "km" },
-				),
+				stat(d, "peaks.length", "named summits in view"),
+				stat(d, `peaks.${near}.distance`, `nearest: ${d.peaks[near]?.name}`, {
+					dec: 1,
+					unit: "km",
+				}),
+				stat(d, `peaks.${far}.distance`, `farthest: ${d.peaks[far]?.name}`, {
+					dec: 1,
+					unit: "km",
+				}),
 			];
 		},
 		value: (d) =>
-			`${d.peaks.filter((p) => p.labelled).length} named peaks in view`,
+			`${d.peaks.filter((p) => p.labelled).length} named summits in view`,
 	},
 	"baseline-pipeline": {
 		tafel: tafelSolvedOnly,
 		band: bandPipeline,
 		ledger: (d) => [
-			stat(d, "ms.horizon", "horizon, the long stage", { unit: "ms" }),
+			stat(d, "ms.horizon", "horizon", { unit: "ms" }),
 			stat(d, "ms.skyline", "skyline", { unit: "ms" }),
 			stat(d, "ms.solve", "solve", { unit: "ms" }),
 		],
 		value: (d) =>
-			`${d.ms.terrain + d.ms.horizon + d.ms.skyline + d.ms.solve} ms end to end`,
+			`${d.ms.terrain + d.ms.horizon + d.ms.skyline + d.ms.solve} ms in total`,
 	},
 	"dem-source": {
 		tafel: null,
 		band: bandDemSource,
 		ledger: (d) => [
-			stat(d, "demPatch.halfKm", "half-width of the patch", {
+			stat(d, "demPatch.halfKm", "patch half-width", {
 				unit: "km",
 				scale: 1,
 			}),
-			stat(d, "demPatch.min", "lowest ground", { unit: "m" }),
-			stat(d, "demPatch.max", "highest ground", { unit: "m" }),
+			stat(d, "demPatch.min", "lowest point", { unit: "m" }),
+			stat(d, "demPatch.max", "highest point", { unit: "m" }),
 		],
 		value: (d) =>
 			`±${d.demPatch.halfKm} km · ${d.demPatch.min}–${d.demPatch.max} m`,
@@ -1722,13 +1716,13 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: null,
 		band: bandSampler,
 		ledger: (d) => [
-			stat(d, "gps.ground", "heightAt() under the camera", {
+			stat(d, "gps.ground", "ground height under the camera", {
 				dec: 1,
 				unit: "m",
 			}),
 			stat(d, "demPatch.px", "cells across the patch"),
 			// not ms.terrain: it is 0 on photos whose tiles were cached in the bake, which is not a measurement
-			stat(d, "demPatch.halfKm", "half-width of the sampled patch", {
+			stat(d, "demPatch.halfKm", "patch half-width", {
 				unit: "km",
 				scale: 1,
 			}),
@@ -1739,11 +1733,11 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: null,
 		band: bandEye,
 		ledger: (d) => [
-			stat(d, "gps.ground", "DEM ground", { dec: 1, unit: "m" }),
+			stat(d, "gps.ground", "terrain-model ground", { dec: 1, unit: "m" }),
 			stat(d, "gps.alt", "GPS altitude", { dec: 1, unit: "m" }),
-			stat(d, "gps.eye", "eye height used", { dec: 1, unit: "m" }),
+			stat(d, "gps.eye", "camera height used", { dec: 1, unit: "m" }),
 		],
-		value: (d) => `eye ${f1(d.gps.eye)} m · ground ${f1(d.gps.ground)} m`,
+		value: (d) => `camera ${f1(d.gps.eye)} m · ground ${f1(d.gps.ground)} m`,
 	},
 	peak: {
 		tafel: tafelPeak,
@@ -1754,11 +1748,11 @@ export const SHEETS: Record<string, SheetFigures> = {
 				stat(
 					d,
 					`peaks.${i}.dem`,
-					`${d.peaks[i]?.name ?? "highest named"}, height used`,
+					`${d.peaks[i]?.name ?? "highest named"}, height`,
 					{ unit: "m" },
 				),
 				stat(d, `peaks.${i}.distance`, "distance", { dec: 1, unit: "km" }),
-				stat(d, `peaks.${i}.el`, "apparent elevation angle", {
+				stat(d, `peaks.${i}.el`, "angle above horizon", {
 					dec: 1,
 					unit: "°",
 				}),
@@ -1770,12 +1764,12 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: null,
 		band: bandSnapping,
 		ledger: (d) => [
-			stat(d, "solved.hfov", "view cone", { unit: "°" }),
-			stat(d, "solved.yaw", "pointing", { dec: 1, unit: "°" }),
+			stat(d, "solved.hfov", "field of view", { unit: "°" }),
+			stat(d, "solved.yaw", "heading", { dec: 1, unit: "°" }),
 			stat(d, "demPatch.halfKm", "patch half-width", { unit: "km", scale: 1 }),
 		],
 		value: (d) =>
-			`view cone ${d.solved.hfov.toFixed(0)}° at ${d.solved.yaw.toFixed(0)}°`,
+			`${d.solved.hfov.toFixed(0)}° wide, facing ${d.solved.yaw.toFixed(0)}°`,
 	},
 	"dem-anchoring": {
 		tafel: null,
@@ -1783,11 +1777,11 @@ export const SHEETS: Record<string, SheetFigures> = {
 		ledger: (d) => {
 			const n = d.terrainProfile.points.length;
 			return [
-				stat(d, `terrainProfile.points.${n - 1}.0`, "depth along the view", {
+				stat(d, `terrainProfile.points.${n - 1}.0`, "depth", {
 					unit: "km",
 				}),
 				stat(d, "terrainProfile.points.length", "ground samples"),
-				stat(d, "terrainProfile.azimuth", "azimuth", { dec: 1, unit: "°" }),
+				stat(d, "terrainProfile.azimuth", "direction", { dec: 1, unit: "°" }),
 			];
 		},
 		value: (d) => {
@@ -1799,12 +1793,12 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: tafelSolvedOnly,
 		band: bandRigi,
 		ledger: (d) => [
-			stat(d, "solved.residualPx", "aligned to", { dec: 1, unit: "px" }),
+			stat(d, "solved.residualPx", "alignment error", { dec: 1, unit: "px" }),
 			stat(d, "solved.confidence", "confidence", { dec: 2 }),
 			stat(d, "solved.yaw", "heading", { dec: 1, unit: "°" }),
 		],
 		value: (d) =>
-			`aligned to ${f1(d.solved.residualPx)} px · confidence ${d.solved.confidence.toFixed(2)}`,
+			`miss ${f1(d.solved.residualPx)} px · confidence ${d.solved.confidence.toFixed(2)}`,
 	},
 	"photo-workspace": {
 		tafel: tafelSolvedOnly,
@@ -1820,21 +1814,23 @@ export const SHEETS: Record<string, SheetFigures> = {
 		tafel: nullLayer,
 		band: bandRoll,
 		ledger: (d) => [
-			stat(d, "solved.yaw", "this photo's heading", { dec: 1, unit: "°" }),
+			stat(d, "solved.yaw", "heading", { dec: 1, unit: "°" }),
 			stat(d, "gps.hAccuracy", "GPS accuracy", { unit: "m" }),
 			stat(d, "solved.confidence", "confidence", { dec: 2 }),
 		],
-		value: (d) =>
-			`12 photos · one viewpoint · this one at ${f1(d.solved.yaw)}°`,
+		value: (d) => `12 photos · one spot · this one faces ${f1(d.solved.yaw)}°`,
 	},
 	"step-inside": {
 		tafel: null,
 		band: bandStepInside,
 		ledger: (d) => [
-			stat(d, "gps.eye", "eye height above sea level", { dec: 1, unit: "m" }),
-			stat(d, "solved.hfov", "horizontal field of view", { dec: 1, unit: "°" }),
+			stat(d, "gps.eye", "camera height above sea level", {
+				dec: 1,
+				unit: "m",
+			}),
+			stat(d, "solved.hfov", "field of view", { dec: 1, unit: "°" }),
 			stat(d, "solved.f", "focal length", { unit: "px" }),
 		],
-		value: () => "splats on the DEM",
+		value: () => "splats on the terrain",
 	},
 };

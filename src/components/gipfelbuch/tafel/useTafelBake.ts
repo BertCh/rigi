@@ -29,10 +29,18 @@ export interface TafelBake {
 		x: number;
 		y: number;
 	}[];
+	/**
+	 * The DEM horizon from the eye, pose-free: elevation angle (deg) at az0 + i·step, traced as the
+	 * photo JSON's `horizon.profile` but wider (camera yaw ± 85°), so the spill can draw the skyline,
+	 * the guess and the solve past the frame. Absent in bakes before 2026-10-02.
+	 */
+	horizon?: { az0: number; step: number; el: number[] };
 	minContrast: number;
 }
 
 const cache = new Map<string, Promise<TafelBake | null>>();
+/** Bakes already loaded, so a remounted photo (a Stages step) has its spill on the first frame. */
+const loaded = new Map<string, TafelBake | null>();
 function loadBake(id: string): Promise<TafelBake | null> {
 	let p = cache.get(id);
 	if (!p) {
@@ -44,7 +52,11 @@ function loadBake(id: string): Promise<TafelBake | null> {
 					return null;
 				return r.json() as Promise<TafelBake>;
 			})
-			.catch(() => null);
+			.catch(() => null)
+			.then((b) => {
+				loaded.set(id, b);
+				return b;
+			});
 		cache.set(id, p);
 	}
 	return p;
@@ -52,9 +64,11 @@ function loadBake(id: string): Promise<TafelBake | null> {
 
 /** The Tafel bake for a photo: null while loading, with no id, or when the file is missing. */
 export function useTafelBake(id: GipfelbuchPhotoId | null): TafelBake | null {
-	const [bake, setBake] = useState<TafelBake | null>(null);
+	const [bake, setBake] = useState<TafelBake | null>(
+		() => (id && loaded.get(id)) || null,
+	);
 	useEffect(() => {
-		setBake(null);
+		setBake((id && loaded.get(id)) || null);
 		if (!id) return;
 		let live = true;
 		loadBake(id).then((b) => live && setBake(b));

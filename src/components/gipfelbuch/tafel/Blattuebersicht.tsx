@@ -150,7 +150,14 @@ const INDEX_PAD = 10;
  * chapters as rows, Blatt numbers in hand figures. Each rectangle links to its card below; `current`
  * (a sheet id) is hatched in pencil.
  */
-function SheetIndexSketch({ current }: { current?: string }) {
+export function SheetIndexSketch({
+	current,
+	hrefBase = "",
+}: {
+	current?: string;
+	/** Path prefix for the card anchors, e.g. "/gipfelbuch" when drawn on a concept sheet. */
+	hrefBase?: string;
+}) {
 	const columns = Math.max(...CHAPTERS.map((c) => c.ids.length));
 	const width = INDEX_PAD * 2 + 34 + columns * INDEX_CELL_W;
 	const height = INDEX_PAD * 2 + CHAPTERS.length * INDEX_CELL_H;
@@ -162,7 +169,7 @@ function SheetIndexSketch({ current }: { current?: string }) {
 				height={height}
 				className="block max-w-full overflow-visible"
 			>
-				<title>Sheet index: one rectangle per sheet, chapters as rows</title>
+				<title>Sheet index</title>
 				{CHAPTERS.map((chapter, row) => {
 					const y = INDEX_PAD + row * INDEX_CELL_H;
 					return (
@@ -184,8 +191,8 @@ function SheetIndexSketch({ current }: { current?: string }) {
 								return (
 									<a
 										key={id}
-										href={`#chapter-${id}`}
-										aria-label={`Blatt ${blattLabel(id)}: ${node?.title ?? id}`}
+										href={`${hrefBase}#chapter-${id}`}
+										aria-label={`Sheet ${blattLabel(id)}: ${node?.title ?? id}`}
 									>
 										<title>{node?.title ?? id}</title>
 										<rect
@@ -283,7 +290,13 @@ function Card({
 					height={BAND_H}
 					fill="var(--gb-paper-deep, #ebebe6)"
 				/>
-				{d && sheet.band({ d, all, w: BAND_W, h: BAND_H })}
+				{/* the band svg overflows for the frame's overshoot, so clip the band itself (the sampler zooms a 10x DEM) */}
+				<clipPath id={`ix-clip-${id}`}>
+					<rect width={BAND_W} height={BAND_H} />
+				</clipPath>
+				<g clipPath={`url(#ix-clip-${id})`}>
+					{d && sheet.band({ d, all, w: BAND_W, h: BAND_H })}
+				</g>
 				{/* hand-ruled frame, corners overshooting (S29) */}
 				<SketchRect
 					x={0}

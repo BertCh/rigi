@@ -35,9 +35,9 @@ import {
 	type GipfelbuchPhotoId,
 	HandLabel,
 	HandNote,
+	HandRange,
 	LAYER_STYLE,
 	MarginNote,
-	Measured,
 	PhotoPicker,
 	RealPhoto,
 	Section,
@@ -303,7 +303,8 @@ function PinLock() {
 		<Figure
 			label="Fig. D1"
 			bleed
-			caption="Schematic: one synthetic photo, six named summits, so every number is under control. The sensors start the overlay 6.5° off in yaw, 1.4° off in pitch, with no roll and a lens 7 % short. Each tap adds a pin the solver must honour: the ring is your finger, the filled marker is where that summit lands under the current pose, the line between them is the residual. The solid cyan line is the predicted skyline; the dashed pale line is where the real one is."
+			source="Skizze"
+			caption="One made-up photo and six named summits. The phone sensors start the overlay 6.5° off in yaw and 1.4° off in pitch, with a lens 7 % too short. Each tap adds a pin: the ring is your finger, the filled marker is where that summit lands now, the line between them is the miss. Solid cyan: horizon modelled from the terrain. Dashed: the real skyline."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
@@ -424,7 +425,7 @@ function PinLock() {
 						haloColor={PLATE_HALO}
 					>
 						{stage === 0
-							? "sensor prior"
+							? "phone sensors"
 							: `${stage} pin${stage > 1 ? "s" : ""}`}
 					</HandLabel>
 					<HandText
@@ -436,8 +437,8 @@ function PinLock() {
 						halo={false}
 					>
 						{stage === 0
-							? "cyan misses the dashed ridge: 6.5° off in yaw"
-							: "pinned summits now sit on my fingertip"}
+							? "cyan misses the ridge: 6.5° off in yaw"
+							: "pinned summits now sit under the finger"}
 					</HandText>
 					<PenArrow
 						from={[150, 52]}
@@ -456,7 +457,7 @@ function PinLock() {
 							rotate={2}
 							halo={false}
 						>
-							two far pins pin the horizon slope: roll ✓
+							two far-apart pins fix the tilt: roll ✓
 						</HandText>
 					)}
 				</svg>
@@ -532,7 +533,7 @@ function PinLock() {
 					className={`grid min-w-[190px] grid-cols-2 gap-x-5 gap-y-2 self-start font-mono md:grid-cols-1 ${TYPE.micro}`}
 				>
 					<div>
-						<dt className="gb-secondary">pin residual (rms)</dt>
+						<dt className="gb-secondary">pin miss (rms)</dt>
 						<dd className="gb-ink">
 							{pinRms == null ? "n/a" : `${pinRms.toFixed(1)} px`}
 						</dd>
@@ -592,7 +593,7 @@ function PeakChooser() {
 		<Figure
 			label="Fig. D2"
 			bleed
-			caption="Drag the tap across the photo. Under each of the three candidate poses the tap is a ray in a different direction (coloured lines, with their ±15° windows). A summit is offered if it is inside any window, ranked by its angle to the nearest ray minus a prominence bonus of 0.5° per 1000 m, capped at 1°: B and C sit 0.6° apart, so the more prominent C ranks ahead of B. Azimuth-only here; the code uses the full 3D angle."
+			caption="Drag the tap across the photo. Each of the three candidate camera poses turns the tap into a ray in a different direction (coloured, with a ±15° window). A summit inside any window is offered, ranked by angle to the nearest ray minus a small prominence bonus (0.5° per 1000 m, max 1°). B and C are 0.6° apart, so the taller C ranks first. Shown in azimuth only."
 		>
 			<div>
 				<svg
@@ -736,25 +737,15 @@ function PeakChooser() {
 					/>
 					<CircledKey x={X(rays[0]) + 14} y={34} value="1" seed="pc-key-1" />
 				</svg>
-				<label
-					className={`mt-1 flex items-center gap-3 font-mono gb-secondary ${TYPE.micro}`}
-				>
-					<span className="shrink-0">tap x</span>
-					<input
-						type="range"
-						min={0.1}
-						max={0.9}
-						step={0.005}
-						value={u}
-						onChange={(e) => setU(Number(e.target.value))}
-						className="h-1 min-w-0 flex-1"
-						style={{ accentColor: "var(--accent)" }}
-						aria-label="Tap position across the photo"
-					/>
-					<span className="w-10 text-right gb-ink">
-						{(u * 100).toFixed(0)}%
-					</span>
-				</label>
+				<HandRange
+					label="Tap position across the photo"
+					value={u}
+					min={0.1}
+					max={0.9}
+					step={0.005}
+					onChange={setU}
+					readout={`${(u * 100).toFixed(0)}%`}
+				/>
 				<ol
 					className={`mt-3 grid gap-x-6 gap-y-1 font-mono sm:grid-cols-2 ${TYPE.caption}`}
 				>
@@ -990,11 +981,10 @@ function RealTaps() {
 			bleed
 			caption={
 				<>
-					Add taps one by one. Cyan is the map skyline under the current pose;
-					cyan rings mark where each peak should land, white dots where its
-					label is now. Taps are exact. Tap data exists for demo-01, 09 and 10;
-					the picker follows your photo when it is one of them.{" "}
-					<Measured data={tap}>Data: public/demo/gipfelbuch/tap.</Measured>
+					Add taps one by one. Cyan line: the horizon modelled from the terrain
+					at the current pose. Cyan rings: where each summit should land. White
+					dots: where its label is now. Taps are exact. Available for photos 01,
+					09 and 10.{" "}
 				</>
 			}
 		>
@@ -1009,7 +999,7 @@ function RealTaps() {
 						onClick={() => setN(i)}
 						className={`px-3 py-1 transition ${n === i ? "bg-[var(--nb-highlight,var(--accent))] gb-ink underline decoration-[var(--nb-red)] decoration-2 underline-offset-4" : "bg-[var(--nb-paper-deep)] gb-secondary"}`}
 					>
-						{i === 0 ? "sensor prior" : `${i} tap${i > 1 ? "s" : ""}`}
+						{i === 0 ? "phone sensors" : `${i} tap${i > 1 ? "s" : ""}`}
 					</button>
 				))}
 				<span className="gb-secondary">
@@ -1024,13 +1014,13 @@ function RealTaps() {
 					<Cell k="yaw error" v={`${step.err.yaw.toFixed(2)}°`} />
 					<Cell k="pitch error" v={`${step.err.pitch.toFixed(2)}°`} />
 					<Cell k="roll error" v={`${step.err.roll.toFixed(2)}°`} />
-					<Cell k="focal vs solved" v={`×${step.err.fRatio.toFixed(3)}`} />
+					<Cell k="lens vs solved" v={`×${step.err.fRatio.toFixed(3)}`} />
 					<Cell
 						k="labels off (median / max)"
 						v={`${step.peakShift.median} / ${step.peakShift.max} px`}
 					/>
 					<Cell
-						k="solver rms"
+						k="solver miss (rms)"
 						v={step.rmsPx == null ? "n/a" : `${step.rmsPx} px`}
 					/>
 					<Cell k="skyline miss (median)" v={`${step.skyline.median} px`} />
@@ -1085,13 +1075,15 @@ function HeroTaps() {
 		<Figure
 			label="Fig. 1"
 			bleed
+			pinned="demo-10"
 			caption={
 				<>
 					Three taps on known summits pull the labels onto their peaks. The
-					compass started {f(S && Math.abs(S[0].err.yaw))}° off. Taps here are
-					exact, simulated at the pipeline&apos;s solved positions. Fixed:
-					demo-10, the tap bakes cover only three photos.{" "}
-					<Measured data={tap}>Data: public/demo/gipfelbuch/tap.</Measured>
+					compass started {f(S && Math.abs(S[0].err.yaw))}° off.
+					<MarginNote mark="e">
+						Taps are exact, simulated from the solved result. Shown for photo
+						10.
+					</MarginNote>{" "}
 				</>
 			}
 		>
@@ -1161,10 +1153,9 @@ function OneTap() {
 			bleed
 			caption={
 				<>
-					How far the tap sits from the image centre, in pixels, is an angle.
+					A tap&apos;s distance from the image centre, in pixels, is an angle.
 					Subtract it from the summit&apos;s known direction and you have where
 					the camera points.{" "}
-					<Measured data={tap}>Data: public/demo/gipfelbuch/tap.</Measured>
 				</>
 			}
 		>
@@ -1253,7 +1244,7 @@ function OneTap() {
 					{
 						sym: "az, el",
 						c: CYAN_TEXT,
-						text: `known direction of ${t.name}: ${t.az.toFixed(2)}°, ${t.el.toFixed(2)}° (from the map)`,
+						text: `known direction of ${t.name}: ${t.az.toFixed(2)}°, ${t.el.toFixed(2)}° (from the terrain model)`,
 					},
 					{
 						sym: "x, y",
@@ -1275,9 +1266,9 @@ function OneTap() {
 				°
 			</Eq>
 			<p className={`mt-3 font-mono gb-secondary ${TYPE.micro}`}>
-				The real solver, same tap: yaw {s1.cam.yaw.toFixed(1)}°, pitch{" "}
-				{s1.cam.pitch.toFixed(1)}°. The hand formula ignores roll and the pitch
-				tilt of the image axes.
+				The full solver, same tap: yaw {s1.cam.yaw.toFixed(1)}°, pitch{" "}
+				{s1.cam.pitch.toFixed(1)}°. The hand formula ignores roll and image
+				tilt.
 			</p>
 		</Figure>
 	);
@@ -1288,10 +1279,13 @@ function MissBar({
 	seed,
 	fraction,
 	faint,
+	ticks,
 }: {
 	seed: string;
 	fraction: number;
 	faint: boolean;
+	/** Baseline gridlines: a px value, the same log fraction the bars use. */
+	ticks: { px: number; f: number }[];
 }) {
 	const h = Math.round(fraction * 84);
 	const x0 = 8;
@@ -1303,6 +1297,28 @@ function MissBar({
 			role="img"
 			aria-hidden="true"
 		>
+			{ticks.map((t) => (
+				<g key={t.px}>
+					<PenLine
+						from={[0, 87 - Math.round(t.f * 84)]}
+						to={[60, 87 - Math.round(t.f * 84)]}
+						seed={`${seed}-grid-${t.px}`}
+						data
+						color="pencil"
+						width={0.7}
+						opacity={0.35}
+					/>
+					<HandLabel
+						x={1}
+						y={87 - Math.round(t.f * 84) - 2}
+						size={8}
+						halo={0}
+						color="var(--gb-secondary)"
+					>
+						{`${t.px}`}
+					</HandLabel>
+				</g>
+			))}
 			<Wash
 				d={`M${x0} ${87 - h} H${x1} V87 H${x0} Z`}
 				seed={`${seed}-wash`}
@@ -1359,10 +1375,8 @@ function MissBars() {
 			caption={
 				<>
 					After three taps the median label miss is{" "}
-					{worst == null ? "…" : `${worst} px`} or less on all three photos (by
-					construction: the taps are exact and the reference is the pipeline
-					pose). Bars are log scale.{" "}
-					<Measured data={a}>Data: public/demo/gipfelbuch/tap.</Measured>
+					{worst == null ? "…" : `${worst} px`} or less on all three photos.
+					This holds by construction: the taps are exact. Bars are log scale.{" "}
 				</>
 			}
 		>
@@ -1379,6 +1393,9 @@ function MissBars() {
 										seed={`mb-${r.id}-${st.n}`}
 										fraction={Math.max(0.04, lg(st.peakShift.median))}
 										faint={st.n === 0}
+										ticks={[1, 10, 100]
+											.filter((px) => lg(px) <= 1)
+											.map((px) => ({ px, f: lg(px) }))}
 									/>
 									<div className={`mt-1 font-mono gb-ink ${TYPE.micro}`}>
 										{st.peakShift.median}
@@ -1458,7 +1475,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				title="A tap is the snap"
 				caption={
 					S
-						? `The guess is the phone's pose: labels miss their peaks by ${S[0].peakShift.median} px (median). Naming one summit on the photo pulls the labels onto the skyline: ${S[1].peakShift.median} px after one tap on demo-10.`
+						? `The phone's guess: labels miss their summits by ${S[0].peakShift.median} px (median). One named summit pulls them onto the skyline: ${S[1].peakShift.median} px after one tap.`
 						: "The phone's guess, then the names snapped onto their summits."
 				}
 			/>
@@ -1472,23 +1489,23 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				title="One tap fixes direction, not roll or lens."
 			>
 				<p>
-					Labels far from the tap drift:{" "}
+					Labels far from the tap still drift:{" "}
 					<HandMark type="underline">
 						{S ? `${S[1].peakShift.median} px` : "…"} median
 					</HandMark>{" "}
-					after one tap on demo-10.
+					after one tap.
 					{S && (
 						<MarginNote mark="a">
-							{`First guess: one tap fixes everything. Wrong: median miss ${S[0].peakShift.median} px, then ${S[1].peakShift.median} px.`}
+							{`Tempting: one tap fixes everything. It does not: ${S[0].peakShift.median} px, then ${S[1].peakShift.median} px.`}
 						</MarginNote>
 					)}
 				</p>
 				<p>
-					A loose finger counts too. 5 px off is about{" "}
-					{S ? (Math.atan(5 / S[1].cam.f) / DEG).toFixed(1) : "…"}° of yaw. And{" "}
-					<HandMark type="wavy">naming the wrong summit is worse</HandMark>: the
-					picker offers only nearby named peaks and re-checks each against the
-					skyline.
+					A loose finger counts too: 5 px off is about{" "}
+					{S ? (Math.atan(5 / S[1].cam.f) / DEG).toFixed(1) : "…"}° of yaw.{" "}
+					<HandMark type="wavy">Naming the wrong summit is worse</HandMark>, so
+					the picker offers only nearby named summits and checks each against
+					the skyline.
 				</p>
 			</Beat>
 
@@ -1503,7 +1520,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: S ? `${Math.abs(S[0].err.yaw).toFixed(1)}°` : "…",
-						label: "compass error before any tap (demo-10)",
+						label: "compass error before any tap (photo 10)",
 					},
 					{
 						value: S ? `${Math.abs(S[1].err.yaw).toFixed(2)}°` : "…",
@@ -1511,20 +1528,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					},
 					{
 						value: S ? `${S[0].peakShift.median} px` : "…",
-						label: "median label miss before any tap (demo-10)",
+						label: "median label miss before any tap (photo 10)",
 					},
 					{
 						value: S ? `${S[3].peakShift.median} px` : "…",
 						label: "median label miss after three taps",
 					},
 				]}
-				source={
-					<>
-						Measured on demo-10 by scripts/gipfelbuch/data-tap.ts. Taps are
-						exact and the reference pose is the pipeline&apos;s own solution, so
-						three taps recover it by construction. Not an accuracy test.
-					</>
-				}
+				source="Measured on photo 10. Taps are exact and the reference is the solved result, so three taps recover it by construction. This is not an accuracy test."
 			/>
 
 			<Details>
@@ -1532,14 +1543,13 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 				<Section
 					kicker="The ladder"
-					title="One tap, two angles. Three taps, the lens"
+					title="One tap, two angles. Three taps, the lens."
 				>
 					<ul>
 						<li>
-							<strong>1 pin: yaw and pitch.</strong> A single pixel fixes where
-							the optical axis points. Roll and focal keep their sensor values,
-							so the overlay is exact at the pin and tilts or stretches away
-							from it.
+							<strong>1 pin: yaw and pitch.</strong> One pixel fixes where the
+							camera points. Roll and lens keep their sensor values, so the
+							overlay is exact at the pin and tilts or stretches away from it.
 							<MarginNote mark="b">
 								Why does the lens only come with the third pin? Two points give
 								a baseline, not a width.
@@ -1547,41 +1557,32 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						</li>
 						<li>
 							<strong>
-								<HandMark type="double">2 pins: and roll.</HandMark>
+								<HandMark type="double">2 pins: add roll.</HandMark>
 							</strong>{" "}
-							Two points far apart give a baseline: the line between them must
-							have the right slope. Only the focal error remains.
+							Two far-apart points fix the tilt: the line between them must have
+							the right slope. Only the lens error remains.
 						</li>
 						<li>
-							<strong>3 pins: and focal.</strong> A third point makes field of
-							view observable. In <code>solveFromControlPoints</code> it enters
-							with a weak Gaussian prior (σ = 10 % of the starting focal, as
-							Fig. D1 models); the picker's <code>solvePins</code> keeps weak
-							priors on roll and field of view instead. Either way a sloppy tap
-							cannot send the lens somewhere absurd.
+							<strong>3 pins: add the lens.</strong> A third point makes the
+							field of view measurable. A weak prior (10 % of the starting
+							value) keeps a sloppy tap from sending the lens somewhere absurd.
 						</li>
 					</ul>
 					<p>
-						The geo-level solver, <code>solveFromControlPoints</code>, also
-						takes <em>level points</em>: a pixel whose elevation is known but
-						not its azimuth, such as a far lake shore or the sea horizon. Each
-						counts as half a pin towards unlocking roll and focal and
-						contributes a vertical-only residual.
+						<em>Level points</em> also work: a pixel whose height angle is known
+						but not its direction, such as a far lake shore or the sea horizon.
+						Each counts as half a pin for roll and lens.
 					</p>
 				</Section>
 
-				<Section kicker="Disambiguation" title="Which summit did you mean?">
+				<Section kicker="Which summit?" title="Which summit did you mean?">
 					<p>
-						The hard part is not the maths, it is the name. The photo may be
-						tens of degrees off, so the summit under your finger on the screen
-						is not the one in the world. The picker therefore treats the tap as
-						a ray under <em>every</em> candidate pose and lets each one vote.
-						Only named OSM summits inside the window are offered, so a tap never
-						turns into a pin on something unnameable. In Fig. D2 the pose on
-						screen is ray <CircledNumber value={1} seed="tp-prose-1" />.
-						<MarginNote mark="c">
-							I notice the hard part is the name, not the maths.
-						</MarginNote>
+						The hard part is the name, not the maths. The photo may be tens of
+						degrees off, so the summit under your finger is not the one in the
+						world. The picker therefore treats the tap as a ray under{" "}
+						<em>every</em> candidate pose and lets each vote. Only named summits
+						inside the window are offered. In Fig. D2 the pose on screen is ray{" "}
+						<CircledNumber value={1} seed="tp-prose-1" />.
 					</p>
 				</Section>
 
@@ -1592,19 +1593,17 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					title="Every candidate is re-solved, then the skyline decides"
 				>
 					<p>
-						A pin is solved from <em>each</em> starting candidate. One tap fixes
-						yaw and pitch, but roll and focal come from whichever start the
-						solve began at, which is why every candidate is kept: they now all
-						agree about the pin and differ about the rest of the picture. The
-						ranking separates them with evidence the user did not have to
-						supply.
+						Each candidate pose is re-solved with the pin. They now all agree at
+						the pin and differ elsewhere, because roll and lens still depend on
+						where each started. The skyline match separates them, evidence you
+						did not have to supply.
 					</p>
 					<Flow
 						nodes={[
-							{ label: "Re-solve", sub: "pin solver from every start" },
-							{ label: "Tap-consistent", sub: "≤ 12 px at 1000 px wide" },
-							{ label: "Skyline score", sub: "scorePose, fine" },
-							{ label: "Preview", sub: "user confirms" },
+							{ label: "Re-solve", sub: "from every start" },
+							{ label: "Tap-consistent", sub: "within 12 px (of 1000)" },
+							{ label: "Skyline score", sub: "skyline match" },
+							{ label: "Preview", sub: "you confirm" },
 						]}
 					/>
 				</Section>
@@ -1614,48 +1613,43 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						steps={[
 							{
 								title: "Tap the photo",
-								body: "The tap is stored as a normalised (u, v). A crosshair layer over the stage captures it, so both renderers behave the same.",
+								body: "The tap is stored as a position on the image.",
 							},
 							{
 								title: "Name the summit",
-								body: "nearbyPeaks ranks pool peaks by angle to the nearest candidate ray minus a prominence bonus, within 15° and up to 8 shown. Choosing one adds a pin (world point, u, v); re-choosing replaces it.",
+								body: "Nearby summits are ranked by angle to the nearest candidate ray, within 15°, up to 8 shown. Choosing one adds a pin; choosing again replaces it.",
 							},
 							{
 								title: "Solve rotation",
-								body: "Levenberg-Marquardt over the unlocked parameters. The eye is fixed at the GPS point, so a pin is a pure rotation constraint; weak priors keep the under-determined directions sane.",
+								body: "Least squares over the unlocked values. The camera position is fixed at the GPS point, so a pin only constrains rotation; weak priors keep the rest sane.",
 							},
 							{
 								title: "Rank and preview",
-								body: "rerankWithTaps puts tap-consistent poses first, then by skyline score, and the best is previewed over the photo. Nothing is saved yet.",
+								body: "Poses that match your taps come first, then by skyline match. The best is previewed over the photo; nothing is saved yet.",
 							},
 							{
 								title: "Confirm",
-								body: "“Use this” calls setPose with a note that the pose is user-confirmed. Every tap and solve is also written to the correction log, a labelled sample for later work.",
+								body: "“Use this” saves the pose as user-confirmed. Every tap and solve is logged for later study.",
 							},
 						]}
 					/>
 				</Section>
 
 				<Callout tone="result" title="Provenance is part of the result">
-					A pin-solved pose is recorded as user-confirmed, never as an automatic
-					HIGH. It sharpens the overlay immediately, but it does not claim a
-					verification that nobody performed. See the{" "}
-					{A("accept-rule", "accept rule")}.
+					A pose solved from your pins is marked user-confirmed, never as an
+					automatic HIGH. It sharpens the overlay now but claims no verification
+					nobody performed. See the {A("accept-rule", "accept rule")}.
 				</Callout>
 
-				<Section
-					kicker="Where it fits"
-					title="The human-in-the-loop end of the solve"
-				>
+				<Section kicker="Where it fits" title="The human step in the solve">
 					<p>
 						When the {A("baseline-pipeline", "baseline pipeline")} rejects a
-						pose, tap-a-peak is the escalation that does not need another
-						algorithm: the same projection and robust least squares as{" "}
-						{A("viewport-inference", "viewport inference")}, fed by one human
-						correspondence instead of a skyline. The summits it offers are the{" "}
-						{A("peak", "peak")} layer, which{" "}
-						{A("terrain-snapping", "terrain snapping")} has already moved onto
-						the DEM summit.
+						pose, tapping a summit needs no new algorithm: it is the same
+						projection and least squares as{" "}
+						{A("viewport-inference", "viewport inference")}, fed by a tap
+						instead of a skyline. The summits offered come from the{" "}
+						{A("peak", "peak")} layer, already snapped to the terrain summit by{" "}
+						{A("terrain-snapping", "terrain snapping")}.
 					</p>
 				</Section>
 
@@ -1668,30 +1662,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<CodeRef path="src/lib/picker/README.md" />
 					</div>
 					<p>
-						<HandMark type="circle">TAP_MAX_PX = 12</HandMark> on a 1000 px
-						image is the gate for &ldquo;tap-consistent&rdquo;.
+						Within 12 px of 1000 counts as consistent with a tap.
 						<MarginNote mark="d">
-							12 px of 1000 is about 0.7° of a 57.6° view: a finger, not a
-							solver, sets the tolerance.
+							12 px of 1000 is about 0.7° of the view: a finger, not a solver,
+							sets the tolerance.
 						</MarginNote>
 					</p>
-					<ul>
-						<li>
-							<code>solveFromControlPoints(initial, points, opts)</code> returns
-							camera, rms and per-point residuals; <code>solvedFocal</code> says
-							whether f was unlocked.
-						</li>
-						<li>
-							<code>solvePins(prior, aspect, eye, pins, w, h, solveFov)</code>{" "}
-							is the variant the picker reaches through{" "}
-							<code>Renderer.solvePins</code>.
-						</li>
-						<li>
-							<code>nearbyPeaks</code>, <code>rerankWithTaps</code>,{" "}
-							<code>TAP_MAX_PX</code> and <code>isAutoHigh</code> live in{" "}
-							<code>candidates.ts</code>.
-						</li>
-					</ul>
 				</Section>
 			</Details>
 		</>

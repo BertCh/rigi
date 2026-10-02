@@ -86,7 +86,7 @@ export const GROUPS: GroupMeta[] = [
 	{
 		id: "gpu",
 		label: "GPU",
-		blurb: "WebGPU compute and the render lock.",
+		blurb: "GPU compute.",
 		color: "#013a33", // TG
 		icon: Cpu,
 	},
@@ -114,7 +114,7 @@ export const GROUPS: GroupMeta[] = [
 	{
 		id: "research",
 		label: "Research",
-		blurb: "Experiments, positives and graves.",
+		blurb: "Experiments, kept and dropped.",
 		color: "#503d33", // GA
 		icon: FlaskConical,
 	},
@@ -308,3 +308,76 @@ export function groupByRel(
 }
 
 export const gipfelbuchHref = (id: string) => `/gipfelbuch/${id}`;
+
+/**
+ * Transitive lineage of a sheet along the curated edges, in edge direction: `downstream` is every
+ * sheet reached by following `related` edges from `id`, `upstream` every sheet that reaches `id`.
+ * Neither set contains `id` itself.
+ */
+export function lineageOf(id: string): {
+	upstream: Set<string>;
+	downstream: Set<string>;
+} {
+	const walk = (forward: boolean) => {
+		const seen = new Set<string>([id]);
+		const stack = [id];
+		while (stack.length) {
+			const current = stack.pop() as string;
+			for (const l of CURATED_LINKS) {
+				const [a, b] = forward ? [l.from, l.to] : [l.to, l.from];
+				if (a === current && !seen.has(b)) {
+					seen.add(b);
+					stack.push(b);
+				}
+			}
+		}
+		seen.delete(id);
+		return seen;
+	};
+	return { upstream: walk(false), downstream: walk(true) };
+}
+
+/** Levenshtein distance between two short strings. */
+function editDistance(a: string, b: string): number {
+	let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+	for (let i = 1; i <= a.length; i++) {
+		const next = [i];
+		for (let j = 1; j <= b.length; j++)
+			next[j] = Math.min(
+				row[j] + 1,
+				next[j - 1] + 1,
+				row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+			);
+		row = next;
+	}
+	return row[b.length];
+}
+
+/** Up to `limit` sheet ids closest to a mistyped one: substring hits first, then small edit distance. */
+export function closestSheetIds(query: string, limit = 3): string[] {
+	const q = query.trim().toLowerCase();
+	if (!q) return [];
+	const scored = NODES.map((n) => {
+		const id = n.id.toLowerCase();
+		const hit = id.includes(q) || q.includes(id);
+		return { id: n.id, score: hit ? 0 : editDistance(q, id) };
+	});
+	const cutoff = Math.max(3, Math.ceil(q.length / 3));
+	return scored
+		.filter((s) => s.score <= cutoff)
+		.sort((a, b) => a.score - b.score || a.id.localeCompare(b.id))
+		.slice(0, limit)
+		.map((s) => s.id);
+}
+
+/** Kicker of a prev/next signpost: "Weiter", plus "· Kapitel II" when the target is in another chapter. */
+export function signpostKicker(
+	direction: "prev" | "next",
+	fromNumeral: string | undefined,
+	toNumeral: string | undefined,
+): string {
+	const base = direction === "prev" ? "Zurück" : "Weiter";
+	return toNumeral && toNumeral !== fromNumeral
+		? `${base} · Kapitel ${toNumeral}`
+		: base;
+}

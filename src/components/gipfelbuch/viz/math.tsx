@@ -6,32 +6,20 @@ import type { ReactNode } from "react";
 import { PenRule } from "#/components/gipfelbuch/notebook/Ink";
 import { cn } from "#/lib/utils";
 import { HandSideRule } from "./hand";
-import { LAYER_STYLE, type PhotoLayer } from "./real";
+import { inkFor, isPhotoLayer, type PhotoLayer } from "./inks";
 
 // Math kit: small, dependency-free equation typesetting for explainer pages. The point is to tie each
 // symbol to the thing it measures in the figure next to it, so a symbol takes the same colour as its
 // overlay (`c="solved"` is the cyan DEM line, `c="skyline"` the yellow detected one). Keep equations
 // short (one line, a handful of symbols) and always pair them with a real figure and a `where` legend.
 
-// The layer colours are tuned for photos (yellow, cyan); on paper each symbol takes a darker
-// Brezine chart kin of its layer (Ascher codes in comments).
-const PAPER_INK: Partial<Record<PhotoLayer, string>> = {
-	skyline: "var(--gb-contour, #95500c)", // NB
-	weight: "var(--gb-contour, #95500c)", // NB
-	prior: "#ab343a", // RM
-	solved: "var(--gb-water, #30626b)", // GL
-	priorPeaks: "#ab343a", // RM
-	sky: "var(--gb-navy, #002f55)",
-};
+// The layer colours are tuned for photos (yellow, cyan); on paper each symbol takes the darker chart kin
+// of its layer. Both inks come from the one table in ./inks (glyph = paper ink, underline = photo ink).
 /** Math stays in print (the one typeset face on a hand page), not the browser default. */
 const SERIF = "font-[family-name:var(--gb-font-math,serif)]";
 
 const colorOf = (c?: PhotoLayer | string) =>
-	c == null
-		? undefined
-		: c in LAYER_STYLE
-			? (PAPER_INK[c as PhotoLayer] ?? LAYER_STYLE[c as PhotoLayer].color)
-			: c;
+	c == null ? undefined : isPhotoLayer(c) ? inkFor(c, "paper") : c;
 
 /** A math symbol: serif italic, optionally coloured like a figure layer (a `PhotoLayer` key or a CSS colour). */
 export function Sym({
@@ -45,7 +33,7 @@ export function Sym({
 }) {
 	// A layer key also draws an underline in the overlay's own photo colour, so the readable paper ink
 	// still points at the yellow/cyan/magenta line in the figure.
-	const layer = c != null && c in LAYER_STYLE ? (c as PhotoLayer) : undefined;
+	const layer = isPhotoLayer(c) ? c : undefined;
 	return (
 		<span
 			className={cn(
@@ -56,7 +44,7 @@ export function Sym({
 			)}
 			style={{
 				color: colorOf(c),
-				textDecorationColor: layer ? LAYER_STYLE[layer].color : undefined,
+				textDecorationColor: layer ? inkFor(layer, "photo") : undefined,
 			}}
 		>
 			{children}

@@ -625,7 +625,7 @@ function usePhotoClaim(id: GipfelbuchPhotoId, lead: string): ReactNode {
 	const d = useGipfelbuchPhoto(id);
 	if (!d) return `${lead} …`;
 	const named = d.peaks.filter((p) => p.labelled && p.solved).length;
-	return `${lead} ${id}: the solve turned the phone's guess ${signedDegrees(d.solved.delta.yaw)} in yaw and ${signedDegrees(d.solved.delta.pitch)} in pitch; the skyline gap fell from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} px (median of ${d.residual.solved.n} columns); ${named} peaks named.`;
+	return `${lead} ${id}: turned ${signedDegrees(d.solved.delta.yaw)} in yaw, ${signedDegrees(d.solved.delta.pitch)} in pitch; skyline gap ${d.residual.prior.median.toFixed(1)} → ${d.residual.solved.median.toFixed(1)} px; ${named} peaks named.`;
 }
 
 function useRollClaim(): RollData | null {
@@ -693,7 +693,7 @@ export function LiveReveal({
 	const set = LIVE_REVEAL_SETS[photoId];
 	const claim = usePhotoClaim(
 		photoId,
-		"The overlay blooms from the foreground to the skyline.",
+		"Overlay grows from foreground to skyline.",
 	);
 	return (
 		<LivePlate
@@ -709,7 +709,7 @@ export function LiveReveal({
 			notes={
 				notes ?? [
 					{
-						text: "contours and ridges from the DEM, through the solved camera",
+						text: "contours and ridges from the terrain model",
 						at: [0.3, 0.72],
 						side: "left",
 					},
@@ -720,7 +720,7 @@ export function LiveReveal({
 						y: 0.05,
 					},
 					{
-						text: "past the frame: the same ridges, traced from the same eye",
+						text: "past the frame: the same ridges, from terrain data",
 						at: [1.18, 0.34],
 						side: "right",
 						y: 0.55,
@@ -750,7 +750,7 @@ export function LiveReveal({
 export function LiveCompare({
 	photoId = "demo-09",
 	number,
-	title = "Before and after the solve",
+	title = "Before and after",
 	caption,
 	notes,
 	aspect = 4 / 3,
@@ -759,7 +759,7 @@ export function LiveCompare({
 	className,
 }: FigureProps & { photoId?: LiveRevealId }) {
 	const set = LIVE_REVEAL_SETS[photoId];
-	const claim = usePhotoClaim(photoId, "Drag the wipe.");
+	const claim = usePhotoClaim(photoId, "Drag to compare.");
 	return (
 		<LivePlate
 			title={title}
@@ -773,9 +773,9 @@ export function LiveCompare({
 			surround={<PaperSurround bake={set.bake} />}
 			notes={
 				notes ?? [
-					{ text: "the photo as taken", at: [0.2, 0.6], side: "left" },
+					{ text: "as taken", at: [0.2, 0.6], side: "left" },
 					{
-						text: "the same pixels, with the solved pose drawn in",
+						text: "with the solved pose drawn in",
 						at: [0.8, 0.35],
 						side: "right",
 					},
@@ -814,8 +814,8 @@ export function LiveDrape({
 }: FigureProps) {
 	const roll = useRollClaim();
 	const claim = roll
-		? `${roll.rows.length} photos from the sample roll, each draped only onto the slopes it saw, rendered live in this tab. Drag to orbit; a pin flies into its photo.`
-		: "The sample roll draped on the DEM, rendered live in this tab.";
+		? `${roll.rows.length} photos draped on the terrain, live in this tab. Drag to orbit; click a pin to enter its photo.`
+		: "The photos draped on the terrain, live.";
 	return (
 		<LivePlate
 			title={title}
@@ -829,12 +829,12 @@ export function LiveDrape({
 			notes={
 				notes ?? [
 					{
-						text: "a pin is a solved camera; click to fly into it",
+						text: "a pin is a solved camera; click to enter it",
 						at: [0.5, 0.5],
 						side: "left",
 					},
 					{
-						text: "contours through the same orbiting camera",
+						text: "contours follow the same camera",
 						at: [1.15, 0.5],
 						side: "right",
 					},
@@ -843,7 +843,7 @@ export function LiveDrape({
 			poster={
 				<PosterImage
 					src="/demo/shots/drape.jpg"
-					alt="The sample trip's photos draped on the 3D terrain"
+					alt="Photos draped on the 3D terrain"
 				/>
 			}
 		>
@@ -880,7 +880,7 @@ export function LiveStepInside({
 			number={number}
 			caption={
 				caption ??
-				`IMG_7086: ${STEP_BAKE.splats.toLocaleString("en")} splats for the near field, pinned to the DEM by ${STEP_BAKE.anchorPoints.toLocaleString("en")} depth samples (${Math.round(STEP_BAKE.inliers * 100)}% inliers); Google 3D tiles carry the view past the frame.`
+				`Nearby ground rebuilt from the photo (${STEP_BAKE.splats.toLocaleString("en")} splats), anchored to the terrain; Google 3D tiles fill the distance.`
 			}
 			aspect={aspect}
 			frame={frame}
@@ -889,12 +889,12 @@ export function LiveStepInside({
 			notes={
 				notes ?? [
 					{
-						text: "hiker, hut and pylon: 3D splats on the solved pose",
+						text: "hiker, hut and pylon rebuilt in 3D",
 						at: [0.42, 0.62],
 						side: "left",
 					},
 					{
-						text: "the photo's ridgelines, through the step camera",
+						text: "the photo's ridgelines, same camera",
 						at: [1.15, 0.3],
 						side: "right",
 					},
@@ -926,8 +926,8 @@ export function LivePanorama({
 }: Omit<FigureProps, "aspect" | "frame">) {
 	const roll = useRollClaim();
 	const claim = roll
-		? `${roll.rows.length} photos taken within ${roll.viewpointRadiusM} m of one another, each placed at its solved view direction against the DEM skyline; the gaps are rendered terrain.`
-		: "The roll's photos placed at their solved view directions against the DEM skyline.";
+		? `${roll.rows.length} photos from within ${roll.viewpointRadiusM} m, each placed at its solved direction; the gaps are rendered terrain.`
+		: "The photos placed at their solved directions.";
 	return (
 		<LivePlate
 			title={title}
@@ -941,15 +941,13 @@ export function LivePanorama({
 			notes={
 				notes ?? [
 					{
-						text: "the grey between photos is the DEM's own skyline",
+						text: "grey between photos: the terrain's own horizon",
 						at: [0.5, 0.5],
 						side: "left",
 					},
 				]
 			}
-			poster={
-				<ContactStrip note="the stitched strip renders live in the browser" />
-			}
+			poster={<ContactStrip note="the strip renders live in your browser" />}
 		>
 			{() => <PanoramaSection />}
 		</LivePlate>
@@ -972,8 +970,8 @@ export function LiveTopoBoard({
 			layer.current.style.transform = `translate(${p.x}px, ${p.y}px)`;
 	};
 	const claim = roll
-		? `${roll.rows.length} photos at their GPS positions on the swisstopo map, each wedge its solved view direction. Click one to open it.`
-		: "The roll's photos at their GPS positions, each wedge its solved view direction.";
+		? `${roll.rows.length} photos at their GPS positions on the swisstopo map; each wedge is the solved direction. Click to open.`
+		: "Photo positions; each wedge is the solved direction.";
 	return (
 		<LivePlate
 			title={title}
@@ -991,13 +989,13 @@ export function LiveTopoBoard({
 			notes={
 				notes ?? [
 					{
-						text: "the wedge is the solved yaw, not the compass",
+						text: "wedge = solved direction, not the compass",
 						at: [0.45, 0.45],
 						side: "left",
 					},
 				]
 			}
-			poster={<ContactStrip note="the map board loads when in view" />}
+			poster={<ContactStrip note="map loads when in view" />}
 		>
 			{() => <TopoSection onPan={pan} />}
 		</LivePlate>
@@ -1008,7 +1006,7 @@ export function LiveTopoBoard({
 export function LiveHowItWorks({
 	number,
 	title = "Guess, measure, correct, snap",
-	caption = "The six beats of one real solve, from the site's baked demo scene. Drag the terrain line once it has snapped.",
+	caption = "Six steps of one real solve. Drag the terrain line once it has snapped.",
 	notes,
 	date,
 	className,

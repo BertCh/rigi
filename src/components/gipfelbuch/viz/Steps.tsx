@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import { cn } from "#/lib/utils";
 import { PenArrow, SketchPath, StepNumber } from "../notebook/Ink";
-import { useInView } from "./hooks";
+import { useDrawOn } from "./hooks";
 
 export interface FlowNode {
 	label: string;
@@ -26,9 +26,13 @@ export function Flow({
 	nodes: FlowNode[];
 	className?: string;
 }) {
-	const [ref, on] = useInView();
+	// the arrows draw on after each station has faded in (110 ms stagger), where the pen can
+	const { ref, on, className: drawClass } = useDrawOn();
 	return (
-		<div ref={ref} className={cn("[container-type:inline-size]", className)}>
+		<div
+			ref={ref}
+			className={cn("[container-type:inline-size]", drawClass, className)}
+		>
 			<div className="flex flex-col items-stretch gap-0 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:flex-wrap [@container(min-width:560px)]:items-stretch [@container(min-width:560px)]:justify-center [@container(min-width:560px)]:gap-y-3">
 				{nodes.map((n, i) => (
 					<div
@@ -72,6 +76,8 @@ export function Flow({
 										bend={0.08}
 										color={i === nodes.length - 2 ? "red" : "ink"}
 										width={1.4}
+										// the pen arrow fades in (nb-fade) after its station
+										delay={i * 110 + 350}
 									/>
 								</svg>
 								<svg
@@ -88,6 +94,8 @@ export function Flow({
 										bend={0.12}
 										color={i === nodes.length - 2 ? "red" : "ink"}
 										width={1.4}
+										// the pen arrow fades in (nb-fade) after its station
+										delay={i * 110 + 350}
 									/>
 								</svg>
 							</>
@@ -126,8 +134,9 @@ export function Steps({
 	steps: StepItem[];
 	className?: string;
 }) {
+	const { ref, className: drawClass } = useDrawOn<HTMLOListElement>();
 	return (
-		<ol className={cn("my-6 space-y-0", className)}>
+		<ol ref={ref} className={cn("my-6 space-y-0", drawClass, className)}>
 			{steps.map((s, i) => {
 				const last = i === steps.length - 1;
 				return (
@@ -151,6 +160,9 @@ export function Steps({
 										dash={CERTAINTY_DASH[s.certainty ?? "measured"]}
 										passes={s.certainty === "open" ? 1 : 2}
 										tolerance={1.1}
+										// a dashed segment is not drawn on (a dash cannot be a draw-on); solid routes are
+										draw
+										delay={i * 140 + 150}
 									/>
 								</svg>
 							)}

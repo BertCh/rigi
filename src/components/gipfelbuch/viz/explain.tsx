@@ -19,17 +19,21 @@ import {
 	StepNumber,
 } from "../notebook/Ink";
 import { TYPE } from "../swiss/type";
+import { FigureSkeleton } from "./FigureSkeleton";
 import { HandFrame, HandLoop, HandSideRule, HandUnderline } from "./hand";
 import { useInView, useReducedMotion } from "./hooks";
+import { dashFor, inkFor, layerOfColor, type PhotoLayer } from "./inks";
 import {
+	CrispLine,
 	GIPFELBUCH_PHOTO_IDS,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
 	NoImprint,
 	useGipfelbuchPhoto,
+	useLoadFailure,
 } from "./real";
 import { HandHeading, HandKicker } from "./Section";
-import { useAlignmentStory } from "./story";
+import { SpillSideContext, useAlignmentStory } from "./story";
 
 // Explainer kit: the building blocks of a concise, visual-first concept page.
 // The recipe (see README "Explainer pages"): a hero figure on a real photo whose caption is the claim,
@@ -64,9 +68,9 @@ export function Beat({
 	);
 }
 
-/** Collapsed "for engineers" detail. Keeps the precise mechanism on the page without making everyone read it. */
+/** Collapsed in-depth detail. Keeps the precise mechanism on the page without making everyone read it. */
 export function Details({
-	title = "Details for engineers",
+	title = "How it works, in depth",
 	children,
 	className,
 }: {
@@ -118,6 +122,8 @@ export function Details({
  * Before/after on the same frame: drag (or arrow keys) to wipe between two renderings. Sweeps once on first
  * view unless reduced motion. Touch keeps vertical page scroll (touch-action: pan-y).
  */
+const SPILL_OFF = { off: true };
+
 export function Compare({
 	before,
 	after,
@@ -184,12 +190,17 @@ export function Compare({
 					}}
 					onPointerMove={(e) => e.buttons && move(e)}
 				>
-					{before}
+					{/* one geo spill in the margins, carried by the bottom side at the wipe's position */}
+					<SpillSideContext.Provider value={{ t: 1 - x }}>
+						{before}
+					</SpillSideContext.Provider>
 					<div
 						className="pointer-events-none absolute inset-0"
 						style={{ clipPath: `inset(0 0 0 ${x * 100}%)` }}
 					>
-						{after}
+						<SpillSideContext.Provider value={SPILL_OFF}>
+							{after}
+						</SpillSideContext.Provider>
 					</div>
 					<div
 						className="absolute inset-y-0 w-0"
@@ -427,7 +438,12 @@ export function Stages({
 						"grid gap-3 [@container(min-width:720px)]:grid-cols-[minmax(0,1fr)_15rem] [@container(min-width:720px)]:items-start",
 				)}
 			>
-				<div key={i} className="animate-[gipfelbuch-fade_420ms_ease-out]">
+				<div
+					key={i}
+					className="animate-[gipfelbuch-fade_420ms_ease-out]"
+					// a photo's geo spill keeps off the side map
+					data-gb-bleed-bounds={aside ? "right" : undefined}
+				>
 					<NoImprint>{s.render()}</NoImprint>
 				</div>
 				{aside && <NoImprint>{aside}</NoImprint>}
@@ -441,7 +457,10 @@ export function Stages({
 				>
 					<HandArrowIcon seed="stages-prev" dir={-1} />
 				</button>
-				<p className="nb-hand min-h-[2.8em] flex-1 text-[19px] leading-[23px] text-[var(--gb-pencil,var(--gb-ink))]">
+				<p
+					aria-live="polite"
+					className="nb-hand min-h-[2.8em] flex-1 text-[19px] leading-[23px] text-[var(--gb-pencil,var(--gb-ink))]"
+				>
 					{s.caption}
 				</p>
 				<button
@@ -543,6 +562,7 @@ export function Gallery({
 	tile,
 	label,
 	tone,
+	tag,
 	cols = 4,
 	className,
 }: {
@@ -552,6 +572,11 @@ export function Gallery({
 	label?: (d: GipfelbuchPhotoData) => ReactNode;
 	/** KR10: a caps tag over each label, so a failure reads apart from a result at a glance. */
 	tone?: (d: GipfelbuchPhotoData) => GalleryTone;
+	/**
+	 * The verdict written on the tile, circled: "rejected" by default for a `failure` tone. Return a word
+	 * ("ask", "refused", ...) to override it, or undefined for none (a non-failure tone draws no mark).
+	 */
+	tag?: (d: GipfelbuchPhotoData) => string | undefined;
 	cols?: 2 | 3 | 4;
 	className?: string;
 }) {
@@ -565,7 +590,14 @@ export function Gallery({
 			)}
 		>
 			{ids.map((id) => (
-				<GalleryTile key={id} id={id} tile={tile} label={label} tone={tone} />
+				<GalleryTile
+					key={id}
+					id={id}
+					tile={tile}
+					label={label}
+					tone={tone}
+					tag={tag}
+				/>
 			))}
 		</div>
 	);
@@ -579,25 +611,56 @@ const TONE_TAG: Record<GalleryTone, { text: string; color: string } | null> = {
 	neutral: null,
 };
 
+/** The circled hand tag drawn on a tile: a failure tone says "rejected" (or the caller's word); other tones only an explicit word. */
+export function galleryVerdict(
+	tone: GalleryTone,
+	word?: string,
+): { text: string; color: string } | undefined {
+	if (tone === "failure")
+		return { text: word ?? "rejected", color: "var(--gb-red)" };
+	return word ? { text: word, color: "var(--gb-pencil)" } : undefined;
+}
+
 function GalleryTile({
 	id,
 	tile,
 	label,
 	tone,
+	tag: verdictOf,
 }: {
 	id: GipfelbuchPhotoId;
 	tile: (d: GipfelbuchPhotoData) => ReactNode;
 	label?: (d: GipfelbuchPhotoData) => ReactNode;
 	tone?: (d: GipfelbuchPhotoData) => GalleryTone;
+	tag?: (d: GipfelbuchPhotoData) => string | undefined;
 }) {
 	const d = useGipfelbuchPhoto(id);
-	const tag = d && tone ? TONE_TAG[tone(d)] : null;
+	const failedId = useLoadFailure(id);
+	const kind = d && tone ? tone(d) : "neutral";
+	const tag = d && tone ? TONE_TAG[kind] : null;
+	const verdict = d ? galleryVerdict(kind, verdictOf?.(d)) : undefined;
 	return (
 		<div>
 			{d ? (
-				<NoImprint>{tile(d)}</NoImprint>
+				<div className="relative">
+					<NoImprint>{tile(d)}</NoImprint>
+					{verdict && (
+						<span
+							className="nb-hand pointer-events-none absolute top-2 right-2 inline-block rounded-full bg-[var(--gb-paper)]/85 px-2.5 text-[17px] leading-[22px]"
+							style={{ color: verdict.color }}
+						>
+							{verdict.text}
+							<HandLoop
+								seed={`gallery-verdict-${id}`}
+								color={kind === "failure" ? "red" : "pencil"}
+								width={1.5}
+								inset={-2}
+							/>
+						</span>
+					)}
+				</div>
 			) : (
-				<div className="aspect-[4/3] animate-pulse bg-[var(--gb-paper-deep)] motion-reduce:animate-none" />
+				<FigureSkeleton aspect={4 / 3} failedId={failedId} />
 			)}
 			{tag && (
 				<p
@@ -718,16 +781,33 @@ export function MarkList({
 	);
 }
 
-/** Inline colour key for a figure: a dot (or dash) per series, written as part of the caption. */
+/**
+ * Inline colour key for a figure, written as part of the caption. Name a `layer` (a figure layer such as
+ * "prior" or "solved") and the swatch is drawn exactly like that layer's line on a photo (its photo ink,
+ * the same dash and under-stroke) while the words take the layer's paper ink. A raw `color` that is a
+ * layer's ink finds its layer; any other colour keeps the plain swatch.
+ */
 export function Key({
 	color,
+	layer: layerProp,
 	dashed,
 	children,
 }: {
-	color: string;
+	color?: string;
+	layer?: PhotoLayer;
 	dashed?: boolean;
 	children: ReactNode;
 }) {
+	const layer = layerProp ?? (color ? layerOfColor(color) : undefined);
+	const dash =
+		dashed === undefined
+			? layer
+				? dashFor(layer, 0.6)
+				: undefined
+			: dashed
+				? "4 3"
+				: undefined;
+	const swatch = layer ? inkFor(layer, "photo") : (color ?? "var(--gb-ink)");
 	return (
 		<span className="inline-flex items-center gap-1.5 whitespace-nowrap">
 			<svg
@@ -736,19 +816,31 @@ export function Key({
 				className="overflow-visible"
 				aria-hidden="true"
 			>
-				<SketchPath
-					d="M1 3L15 3"
-					seed={`key-${color}-${dashed ? "d" : "s"}`}
-					color={`color-mix(in oklab, ${color} 82%, var(--gb-ink, transparent))`}
-					width={2.2}
-					dash={dashed ? "4 3" : undefined}
-					passes={1}
-					tolerance={0.5}
-				/>
+				{layer ? (
+					<CrispLine
+						d="M1 3L15 3"
+						color={swatch}
+						width={2.2}
+						dash={dash}
+						seed={`key-${layer}`}
+					/>
+				) : (
+					<SketchPath
+						d="M1 3L15 3"
+						seed={`key-${swatch}-${dash ? "d" : "s"}`}
+						color={swatch}
+						width={2.2}
+						dash={dash}
+						passes={1}
+						tolerance={0.5}
+					/>
+				)}
 			</svg>
 			<span
 				style={{
-					color: `color-mix(in oklab, ${color} 55%, var(--gb-ink, ${color}))`,
+					color: layer
+						? inkFor(layer, "paper")
+						: `color-mix(in oklab, ${swatch} 55%, var(--gb-ink, ${swatch}))`,
 				}}
 			>
 				{children}

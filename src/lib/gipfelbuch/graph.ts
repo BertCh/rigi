@@ -12,14 +12,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "photo",
 		title: "Photo",
-		claim: "A photo is pixels plus what the phone knew.",
-		lede: "A photo is more than pixels: the phone also records where it was, which way it faced, how it was tilted, and the lens. That is where every solve starts.",
+		claim: "A photo is an image plus the phone's sensor readings.",
+		lede: "Along with the image, the phone records its GPS position, compass heading, tilt and lens. Rigi starts every solve from these readings.",
 		group: "capture",
 		kind: "concept",
 		status: "live",
-		tagline: "One image plus everything the device recorded about it.",
+		tagline: "One image plus what the phone recorded.",
 		summary:
-			"A Photo is an image with size, time, position, heading, gravity and lens, whether bundled, uploaded, demo or benchmark. It optionally has a geo position, one camera prior and a region. Realized by PhotoMeta in lib/photos.ts and LocalPhotoMeta in upload/exif.ts.",
+			"A photo is an image with its size, time, position, heading, tilt and lens. It optionally has a position, one camera prior and a region.",
 		modules: ["src/lib/photos.ts", "src/lib/upload/exif.ts"],
 		reports: ["reports/ontology.md"],
 		visual:
@@ -39,14 +39,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "camera-prior",
 		title: "Camera Prior",
-		claim: "The sensors get close. The compass drifts.",
-		lede: "Before any solving, the phone's sensors already give a rough guess of the camera. It is close enough to start from, and not good enough to trust.",
+		claim: "The phone's sensors give a first, rough guess of the camera.",
+		lede: "GPS, compass, tilt and lens together give a rough camera position and direction. Rigi uses it as a starting point, but the compass is often off by several degrees.",
 		group: "capture",
 		kind: "concept",
 		status: "live",
 		tagline: "What the phone's sensors imply before any solving.",
 		summary:
-			"Compass yaw, gravity pitch/roll, EXIF focal and GPS position form a prior on the camera. It is a role fed into solves, not a source. Realized by pose6dof Priors and geocam PriorPhoto.",
+			"Compass heading, tilt, lens and GPS position form a first guess of the camera that every solve starts from.",
 		modules: [
 			"src/lib/pose6dof/types.ts",
 			"src/lib/geocam/priors/photo-priors.ts",
@@ -65,14 +65,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "skyline",
 		title: "Skyline Detection",
-		claim: "Where the mountain meets the sky.",
-		lede: "The edge between mountain and sky is the one line a photo reliably shows. Rigi traces it column by column and says how sure it is of each part.",
+		claim: "Rigi finds the skyline in the photo.",
+		lede: "Rigi finds the line where the mountains meet the sky. It traces the line one pixel column at a time and gives each column a confidence score.",
 		group: "evidence",
 		kind: "algorithm",
 		status: "live",
 		tagline: "Find the line where mountain meets sky, one column at a time.",
 		summary:
-			"geo/skyline.ts fits a polynomial sky colour field by robust least squares and traces a Viterbi boundary per column with weights (about 120 ms at 800 px). refine/skyline-clean.ts rejects narrow spikes; sky/skyline.ts derives the same observation from an ML mask. A CPU ONNX mask gave a false accept so stays secondary.",
+			"A fitted sky-colour model and a best-path trace find the skyline column by column, with a weight per column (about 120 ms). Narrow spikes are removed. A learned sky mask is a second source, kept secondary after a false accept.",
 		modules: [
 			"src/lib/geo/skyline.ts",
 			"src/lib/refine/skyline-clean.ts",
@@ -96,15 +96,15 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "dem-horizon",
 		title: "DEM Horizon",
-		claim: "Far ridges are the fingerprint.",
-		lede: "From where you stood, the terrain draws a silhouette against the sky. Rigi computes it in every direction, allowing for the earth's curve and the bending of light.",
+		claim: "Rigi computes the skyline the terrain should show.",
+		lede: "From the camera position, Rigi computes the highest terrain visible in every direction. The result accounts for the earth's curvature and for light bending in the atmosphere.",
 		group: "evidence",
 		kind: "algorithm",
 		status: "live",
 		tagline:
 			"The 360-degree silhouette the terrain would draw, curvature and refraction included.",
 		summary:
-			"geo/horizon.ts ray-marches 7,200 azimuths over the DEM and returns the skyline elevation plus ridge crests (about 3.5 s, run in a Worker). It is the reference curve every skyline match fits against.",
+			"Rays in 7,200 directions find the highest ridge in each (about 3.5 s, off the main thread). Every skyline match fits against this curve.",
 		modules: ["src/lib/geo/horizon.ts", "src/lib/geo/terrain.ts"],
 		reports: ["reports/Mountain photo georeferencing SoTA.md"],
 		visual:
@@ -120,15 +120,15 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "viewport-inference",
 		title: "Viewport Inference",
-		claim: "The compass guesses. The ridge does not.",
-		lede: "The phone's compass is often wrong by many degrees. Rigi fixes it by sliding the skyline the terrain predicts until it sits on the skyline in the photo.",
+		claim: "Matching the two skylines gives the camera's direction.",
+		lede: "Rigi shifts the terrain skyline left, right, up and down until it lines up with the photo's skyline. The best fit gives the camera's heading and tilt.",
 		group: "solve",
 		kind: "concept",
 		status: "live",
 		tagline:
 			"Which way was the camera pointing? Slide the terrain's skyline onto the photo's.",
 		summary:
-			"Rigi infers yaw, pitch, roll and focal length by matching the skyline detected in the photo against the horizon the DEM predicts from the camera's position. The sensor prior seeds a coarse yaw × pitch grid, robust Levenberg–Marquardt refines the best minima, and a confidence product (inliers, coverage, ambiguity, relief, tilt) gates the result, with a full 360° retry under a stricter bar. A rejected solve falls back to the prior and to tapping peaks; it is never shown as certain.",
+			"Rigi matches the photo's skyline to the horizon the terrain predicts. A coarse grid from the sensor guess finds candidates, a robust fit refines them, and a confidence score gates the result, with a full-circle retry under a stricter bar. A rejected solve falls back to the sensors and to tapping peaks.",
 		modules: [
 			"src/lib/geo/solve.ts",
 			"src/lib/geo/skyline.ts",
@@ -172,15 +172,15 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "pose-estimate",
 		title: "Pose Estimate",
-		claim: "One small record is the whole camera.",
-		lede: "The answer: which way the camera pointed, how it was tilted, how wide the lens was, where the eye was, and how we know.",
+		claim: "The solved camera: heading, tilt, lens and position.",
+		lede: "The result of a solve: the camera's heading, tilt, field of view and position, plus a record of the evidence used.",
 		group: "solve",
 		kind: "concept",
 		status: "live",
 		tagline:
 			"Where the camera stood and where it looked, plus how it is known.",
 		summary:
-			"The solved result of georeferencing: orientation (yaw, pitch, roll), vertical FOV and an eye in ENU, together with provenance. Every solver reads and writes this same convention. Realized by roll SolvedPose and second-opinion AppAlign.",
+			"The solved result: direction, tilt, roll, field of view and the camera position in local metres, with how it is known. Every solver reads and writes the same record.",
 		modules: [
 			"src/lib/pose.ts",
 			"src/lib/geo/camera.ts",
@@ -205,15 +205,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "accept-rule",
 		title: "Accept Rule (Precision First)",
-		claim: "A wrong pose is worse than no pose.",
-		lede: "A confidently wrong answer is worse than no answer. Rigi only shows a pose as certain when the evidence clearly agrees, and otherwise says so.",
+		claim: "Rigi only accepts a pose when the evidence agrees.",
+		lede: "Rigi marks a pose as confirmed only when the skyline match is strong. Otherwise it shows the pose as unconfirmed, because a wrong answer is worse than none.",
 		group: "product",
 		kind: "concept",
 		status: "live",
-		tagline:
-			"A wrong pose shown as certain is worse than no pose; fail closed.",
+		tagline: "When unsure, say so.",
 		summary:
-			"Precision beats recall. Poses are HIGH only with explicit acceptance and enough confidence; the unknown-yaw cascade needs 0.75, matcher results need confidenceLevel HIGH, suggestions and user picks never become auto-accept. About a dozen hand-set gates implement it, none a likelihood.",
+			"Precision beats recall. A pose is marked certain only when it is explicitly accepted and confident enough; suggestions and user picks never auto-accept. About a dozen hand-set thresholds implement this.",
 		modules: [
 			"src/lib/picker/candidates.ts",
 			"src/lib/concord/app/confidence.ts",
@@ -238,15 +237,15 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "tap-a-peak",
 		title: "Tap-a-Peak Pins",
-		claim: "A tap is a measurement with a name on it.",
-		lede: "When the automatic match is unsure, you can fix it yourself. Tap one peak you recognise to set the direction; tap three to set the lens too.",
+		claim: "You can tap peaks you recognise to fix the pose by hand.",
+		lede: "If the automatic match is unsure, tap a peak in the photo and pick its name. One peak sets the direction; three also set the lens.",
 		group: "solve",
 		kind: "ui",
 		status: "live",
 		tagline:
 			"Tap known peaks: one pin gives yaw and pitch, three give focal too.",
 		summary:
-			"geo/control-points.ts and align.ts solve pose from user taps: 1 point gives yaw and pitch, 2 add roll, 3 or more add focal. Pins yield user-confirmed provenance, never an automatic HIGH.",
+			"Taps solve the pose: one sets direction and tilt, two add roll, three or more add focal length. A pinned pose is user-confirmed, never auto-accepted.",
 		modules: [
 			"src/lib/geo/control-points.ts",
 			"src/lib/align.ts",
@@ -267,15 +266,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "baseline-pipeline",
 		title: "Baseline Pipeline",
-		claim: "Predict the skyline, find it, slide one onto the other.",
-		lede: "The full path from photo to answer, running in your browser: read the sensors, load the terrain, find both skylines, line them up, then decide.",
+		claim: "The full path from photo to camera pose.",
+		lede: "All steps run in the browser: read the sensors, load the terrain, find the photo skyline, compute the terrain skyline, line them up, then accept or reject.",
 		group: "solve",
 		kind: "subsystem",
 		status: "live",
-		tagline:
-			"Photo, DEM horizon, skyline match, accepted pose: the CPU path end to end.",
+		tagline: "From photo to pose, step by step.",
 		summary:
-			"The CPU-only pipeline in src/lib/geo: readPhotoMeta, cameraFromMeta, loadTerrain, computeHorizon, detectSkyline, then solvePose (coarse yaw/pitch grid, Cauchy LM, confidence gate, 360 degree retry). A rejection escalates to refinePose then manual tap-a-peak.",
+			"Read the sensors, load the terrain, compute the horizon, detect the skyline, then solve: coarse grid, robust fit, confidence gate, full-circle retry. A rejection escalates to refinement, then to tapping peaks.",
 		modules: [
 			"src/lib/geo/pipeline.ts",
 			"src/lib/geo/solve.ts",
@@ -307,15 +305,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "dem-source",
 		title: "DEM Source",
-		claim: "Sharper tiles keep summits sharp.",
-		lede: "The terrain model is a set of map tiles that store height instead of colour. Sharper tiles keep summits sharp, and sharp summits make better matches.",
+		claim: "The terrain model is a grid of ground heights.",
+		lede: "The terrain model is a set of map tiles that store ground height instead of colour. Higher-resolution tiles keep summits sharp, which improves matching.",
 		group: "world",
 		kind: "data",
 		status: "live",
-		tagline:
-			"Mapterhorn 512 px or Terrarium 256 px tiles, zoom chosen by distance.",
+		tagline: "Height tiles, finer near the camera.",
 		summary:
-			"dem/sources.ts defines DemSource records. MAPTERHORN (512 px WebP Terrarium tiles to z17, swissALTI3D in CH) is the approved default; TERRARIUM_AWS (256 px, z15) smooths summits and is kept as comparison. The cascade got 14 correct on Terrarium vs 25 on Mapterhorn.",
+			"Mapterhorn (512 px tiles to zoom 17, swissALTI3D in Switzerland) is the default; Terrarium (256 px, zoom 15) smooths summits and is kept for comparison. On the test photos, 25 solved correctly on Mapterhorn against 14 on Terrarium.",
 		modules: ["src/lib/dem/sources.ts", "src/lib/dem/index.ts"],
 		reports: ["reports/licences.md", "reports/bench-wild.md"],
 		visual:
@@ -331,14 +328,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "terrain-sampler",
 		title: "Terrain Sampler",
-		claim: "One question: how high is the ground here?",
-		lede: "Every part of Rigi asks one question: how high is the ground here? A single function answers it from the downloaded height tiles.",
+		claim: "One function returns the ground height at any point.",
+		lede: "Every part of Rigi that needs a ground height gets it from this function, which reads the downloaded height tiles.",
 		group: "world",
 		kind: "subsystem",
 		status: "live",
-		tagline: "One function, heightAt(lat, lon), backed by a pile of tiles.",
+		tagline: "One function answers: how high is the ground here?",
 		summary:
-			"geo/terrain.ts loadTerrain downloads tiles around a GPS fix at several zoom levels and exposes bilinear sampling with fallback to coarser levels. It is the CPU ground truth that horizon, peak visibility and solvers query.",
+			"Tiles around the GPS fix load at several zooms; heights are interpolated, falling back to coarser tiles. Horizon, peak visibility and the solvers all ask it.",
 		modules: [
 			"src/lib/geo/terrain.ts",
 			"src/lib/dem/load.ts",
@@ -367,14 +364,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "eye-rule",
 		title: "Eye Rule",
-		claim: "The camera never stands inside the mountain.",
-		lede: "GPS altitude can put the camera inside the mountain. Rigi lifts the eye to at least standing height above the ground before drawing anything.",
+		claim: "Rigi keeps the camera above the ground.",
+		lede: "GPS altitude is often too low and can put the camera underground. Rigi raises the camera to at least standing height above the terrain before computing anything.",
 		group: "camera",
 		kind: "algorithm",
 		status: "live",
-		tagline: "max(GPS alt, DEM + 1.6 m), except where the engine says 1.8 m.",
+		tagline: "GPS height, but never below standing height.",
 		summary:
-			"How eye height is set without a solve. A recorded drift: deck/scene.ts (eyeAltitude) and roll ridgelines use DEM+1.8 m while geo/pipeline uses DEM+1.6 m.",
+			"Without a solve, the eye sits at the GPS altitude but at least standing height above the ground.",
 		modules: [
 			"src/lib/concord/priors/altitude.ts",
 			"src/lib/deck/scene.ts",
@@ -399,14 +396,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "peak",
 		title: "Peak",
-		claim: "A summit becomes a label only if the eye can see it.",
-		lede: "A peak is a named summit from OpenStreetMap. Rigi moves it onto the highest real ground nearby and only labels it if it can actually be seen.",
+		claim: "Rigi labels a peak only if it is visible from the camera.",
+		lede: "Peaks are named summits from OpenStreetMap. Rigi moves each one to the highest terrain point nearby and labels it only if nothing blocks the view.",
 		group: "world",
 		kind: "concept",
 		status: "live",
-		tagline: "A named summit with elevation and prominence.",
+		tagline: "A named summit with its height.",
 		summary:
-			"An OSM natural=peak with elevation and prominence. Many shapes exist (Peak, RegionPeak, PoolPeak, PeakLabel x3), unified by the ontology catalogue.",
+			"A named OpenStreetMap summit with height and prominence, moved onto the highest nearby ground and labelled only when visible.",
 		modules: ["src/lib/geo/peaks.ts", "src/lib/photos.ts"],
 		reports: ["reports/ontology.md"],
 		visual:
@@ -422,15 +419,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "terrain-snapping",
 		title: "Terrain Snapping",
-		claim: "The map is the referee for everything we place.",
-		lede: "GPS and maps disagree with the ground. Rigi pins the camera, the summits and nearby depth to the real terrain model, so everything lands where it physically is.",
+		claim: "Rigi places everything on the terrain model.",
+		lede: "GPS positions and map coordinates often disagree with the terrain. Rigi moves the camera, the summits and nearby depth onto the terrain model so they match the ground.",
 		group: "world",
 		kind: "concept",
 		status: "live",
-		tagline:
-			"Eyes, summits and depth, each pinned to the ground the DEM knows.",
+		tagline: "Eyes, summits and depth, each pinned to the ground.",
 		summary:
-			"Everything Rigi places in the world is reconciled with the DEM. The eye is lifted to max(GPS altitude, ground + 1.6 m) and bounded below by a still lake's level; OSM peaks are moved to the highest DEM point within a radius that grows with distance; and monocular depth in Step Inside is anchored to DEM ray lengths with a scored fit. Each one is either a snap, a bound or a prior, chosen on purpose.",
+			"Everything Rigi places is checked against the terrain: the eye sits at least standing height above ground and not below a still lake; peaks move to the highest ground nearby; near-field depth is scaled to terrain distances. Each is a snap, a bound or a prior.",
 		modules: [
 			"src/lib/dem/height-from-tile.ts",
 			"src/lib/deck/scene.ts",
@@ -470,15 +466,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "dem-anchoring",
 		title: "DEM Anchoring",
-		claim: "The map is a ruler the depth model never had.",
-		lede: "A single photo's depth has no scale. Rigi uses the terrain as a ruler, so that nearby rocks and trees land at real distances in metres.",
+		claim: "The terrain gives the depth estimate a real scale.",
+		lede: "Depth estimated from a single photo has no scale. Rigi scales it against the terrain model so nearby rocks and trees sit at their real distances in metres.",
 		group: "nearfield",
 		kind: "algorithm",
 		status: "live",
-		tagline:
-			"The terrain is the ruler: fit a range curve so depth lands in metres.",
+		tagline: "The terrain is the ruler: depth lands in metres.",
 		summary:
-			"anchor.ts calibrates model depth against DEM ray lengths on terrain pixels with a monotone piecewise-linear log-log curve, cutting median log error from 0.34 to 0.13. The residual becomes an anchor quality score: below 0.15 the scene is hidden. Not a good pose verifier (AUC 0.73).",
+			"Model depth is fitted to terrain distances with a monotone curve, cutting the median log error from 0.34 to 0.13. A poor fit (score below 0.15) hides the scene.",
 		modules: ["src/lib/nearfield/anchor.ts", "src/lib/nearfield/geom.ts"],
 		reports: [
 			"reports/step-inside-design.md",
@@ -496,15 +491,15 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "rigi",
 		title: "Rigi in one sheet",
-		claim: "The skyline tells us where the camera stood.",
-		lede: "Point your phone at mountains and take a photo. Rigi works out exactly where the camera stood and looked, names every peak, and lets you step inside the view.",
+		claim: "Rigi finds where a photo was taken and which way it points.",
+		lede: "Take a photo of mountains. Rigi works out where the camera was and which way it pointed, labels the visible peaks, and lets you view the scene in 3D.",
 		group: "product",
 		kind: "concept",
 		status: "live",
 		tagline:
 			"Georeference a mountain photo against real terrain, then look through it.",
 		summary:
-			"Rigi takes a photograph, solves where the camera stood and where it looked against a DEM, and renders overlays, camera rolls and a Step Inside near-field view from that pose. Precision beats recall: a wrong pose shown as certain is worse than none. Everything stays local-first in the browser, with optional Python services for escalation.",
+			"Rigi takes a photograph, solves where the camera stood and looked against the terrain, and renders overlays, camera rolls and a Step Inside view from that pose. Precision beats recall. Everything runs in the browser; optional services help with hard cases.",
 		modules: [
 			"src/lib/geo/pipeline.ts",
 			"src/lib/renderer.ts",
@@ -551,14 +546,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "photo-workspace",
 		title: "Photo Workspace",
-		claim: "Show a pose fast. Certify it later.",
-		lede: "One photo, with everything you can do to it: the peak overlay, alignment, pins, styles and export, all on one screen.",
+		claim: "The main screen for working with one photo.",
+		lede: "One photo with all its tools on one screen: the peak labels, alignment, peak pins, map styles and export.",
 		group: "product",
 		kind: "ui",
 		status: "live",
 		tagline: "The single-photo cockpit: overlay, align, pin, export.",
 		summary:
-			"PhotoWorkspace (route /photo/$id) hosts one photo's engine view with overlay, alignment controls, concord display, ExportMenu, reveal and style panels, picker and eye suggestion. Bundled, demo and local photos load through the same code.",
+			"One screen per photo: overlay, alignment, pins, looks, export and the eye suggestion. Every photo source loads the same way.",
 		modules: [
 			"src/components/PhotoWorkspace.tsx",
 			"src/components/controls.tsx",
@@ -578,15 +573,14 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "camera-roll",
 		title: "Camera Roll",
-		claim: "A day of photos is a place, not a pile.",
-		lede: "A day of photos becomes a place. Rigi groups them by where they were taken, poses each one, and shows them on a map and in 3D.",
+		claim: "Rigi poses a set of photos and shows them on a map.",
+		lede: "Rigi groups a set of photos by where they were taken, solves the pose of each one, and shows them together on a map and in 3D.",
 		group: "roll",
 		kind: "subsystem",
 		status: "live",
-		tagline:
-			"A day's photos become a place: grouped, posed, mapped and stitched.",
+		tagline: "Grouped, posed, mapped, stitched.",
 		summary:
-			"A Roll groups photos into areas (single-linkage, ROLL_LINK_M = 15 km) and viewpoints (VIEWPOINT_RADIUS_M = 250 m). Each photo gets the best pose available without running a solver: saved, hand-fitted ground truth, else the EXIF prior. Derived on the fly, never stored.",
+			"Photos within 15 km form a roll; within 250 m, a viewpoint. Each photo gets the best pose on hand without solving: saved, hand-fitted, else the sensors. Built on the fly, never stored.",
 		modules: [
 			"src/lib/roll/roll.ts",
 			"src/lib/roll/types.ts",
@@ -612,15 +606,15 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 	{
 		id: "step-inside",
 		title: "Step Inside",
-		claim: "Far mountains are measured. Only near things are rebuilt.",
-		lede: "Walk into your own photo. The near ground is rebuilt from the image, the far mountains come from the terrain model, and the terrain anchors the two together.",
+		claim: "A view of the photo in depth that you can move around in.",
+		lede: "Move around inside your photo. The near ground is rebuilt from the image, the distant mountains come from the terrain model, and the two are aligned to the terrain.",
 		group: "nearfield",
 		kind: "subsystem",
 		status: "live",
 		tagline:
 			"Step into your photo: true camera, true mountains, reconstructed foreground.",
 		summary:
-			"Fuses a learned near-field reconstruction with the DEM far field, anchored by the solved metric pose. controller.ts orchestrates depth, anchoring, split and scene build; both engines render it with the camera starting exactly on the photo eye. Gated on an accepted pose and anchor quality; invisible when the service is down.",
+			"A learned near-field rebuild joins the terrain far field, anchored by the solved pose. The camera starts exactly at the photo's eye. Shown only for an accepted pose and a good anchor, and hidden when the service is down.",
 		modules: [
 			"src/lib/nearfield/controller.ts",
 			"src/lib/nearfield/scene.ts",

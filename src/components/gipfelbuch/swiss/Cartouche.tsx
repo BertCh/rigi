@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import type { ReactNode } from "react";
 import { MarkerUnderline } from "./hand";
 import { TYPE } from "./type";
 
 export interface CartoucheProps {
 	kicker: string;
 	title: string;
-	subtitle?: string;
+	subtitle?: ReactNode;
 	/** Edition line, e.g. "Ausgabe 2026 · LV95". */
 	edition?: string;
 	className?: string;

@@ -79,7 +79,7 @@
 	font-variant-numeric: tabular-nums;
 }
 
-/* Titles are hand lettering (Caveat 700). Caveat's x-height is about 0.40 em, so ex-height
+/* Titles are hand lettering (Architects Daughter, sized to a 0.40 em x-height in fonts.css), so ex-height
  * adjustment brings it to the visual size the TYPE scale was set for. */
 .gb-swiss .display-title,
 .gb-swiss :is(h2, h3):not(.gb-print) {

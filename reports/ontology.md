@@ -16,11 +16,11 @@ _what the photographer brought: photos, their metadata, rolls_
 
 | concept | definition | UI words | code words | avoid |
 |---|---|---|---|---|
-| **Photo** `photo` | One image plus what the device recorded about it (size, time, position, heading, gravity, lens). Bundled, uploaded (local), demo or benchmark. _Note: geo/photo-meta.ts#PhotoMeta is the RAW EXIF record (optional fields, `altitude`, `focal35`); lib/photos.ts#PhotoMeta is the app record. Same name, different concepts: raw-exif vs photo._ | Photo | `PhotoMeta`, `photo`, `meta` |  |
+| **Photo** `photo` | One image plus what the phone recorded with it: time, position, heading, tilt and lens. _Note: geo/photo-meta.ts#PhotoMeta is the RAW EXIF record (optional fields, `altitude`, `focal35`); lib/photos.ts#PhotoMeta is the app record. Same name, different concepts: raw-exif vs photo._ | Photo | `PhotoMeta`, `photo`, `meta` |  |
 | **Raw EXIF** `raw-exif` | Tags as read from the file before Rigi interprets them (optional everything, magnetic or true heading, 35 mm focal). |  | `ExifTags`, `ExifPhotoMeta` |  |
-| **Prior** `camera-prior` (is camera) | The camera the device's sensors imply before any solving: compass yaw, gravity pitch/roll, EXIF focal, GPS position. A ROLE (fed into solves), not a source. | compass + gravity, phone sensors | `prior`, `priorPose`, `Priors`, `PriorPhoto`, `Unknowns` |  |
+| **Prior** `camera-prior` (is camera) | The camera the phone's sensors imply before any solving: compass heading, tilt, lens and GPS position. | compass + gravity, phone sensors | `prior`, `priorPose`, `Priors`, `PriorPhoto`, `Unknowns` |  |
 | **Unknown priors** `prior-unknowns` | Which priors are placeholders, not measurements: yaw (no compass), gravity (no pitch/roll), focal (no lens data). _Note: tools/bench uses the inverse polarity `focalKnown`._ |  | `Unknowns`, `yawUnknown`, `pitchRollUnknown`, `focalUnknown` |  |
-| **Roll** `roll` | Photos of one area shown together (mosaic, map drape, panorama). Derived by clustering photos (15 km link), never stored. | Roll, camera roll, sample trip | `Roll` |  |
+| **Roll** `roll` | Photos of one area, shown as a mosaic, on the map and as a panorama. Grouped on the fly, never stored. | Roll, camera roll, sample trip | `Roll` |  |
 | **Viewpoint** `viewpoint` | Photos taken from (almost) the same spot (250 m); their poses stitch into one panorama. _Note: lib/roll/align/viewpoint.ts uses 'viewpoint' for a compass-bias ANCHOR: that is the viewpoint-bias method, not this concept._ | Viewpoint, spot | `Viewpoint`, `VIEWPOINT_RADIUS_M` |  |
 | **Library** `library` | Everything on this device: bundled samples, the demo trip, and uploads in IndexedDB. | My library |  |  |
 
@@ -32,11 +32,11 @@ _the terrain and mapped features the photo shows_
 |---|---|---|---|---|
 | **Region** `region` | A ~20 km neighbourhood of mapped features (peaks, trails, water names, lakes) around one or more photos. |  | `RegionData`, `LocalRegion` |  |
 | **Mapped feature** `feature` | Something named on the map that can appear in a photo. |  |  |  |
-| **Peak** `peak` (is feature) | A named summit (OSM natural=peak) with elevation and, where known, prominence. _Note: `ele` is `number\|undefined` in Peak/PeakInput but `number\|null` in RegionPeak/PoolPeak; RegionPeak has no id (keyed by name)._ | Peak, summit | `Peak`, `RegionPeak`, `PoolPeak`, `PeakInput`, `PeakPoint` |  |
+| **Peak** `peak` (is feature) | A named summit from OpenStreetMap, with its height and, where known, prominence. _Note: `ele` is `number\|undefined` in Peak/PeakInput but `number\|null` in RegionPeak/PoolPeak; RegionPeak has no id (keyed by name)._ | Peak, summit | `Peak`, `RegionPeak`, `PoolPeak`, `PeakInput`, `PeakPoint` |  |
 | **Lake** `lake` (is feature) | A water body whose level is a horizontal reference (shore cues, eye floor). |  | `LakeGeo`, `SceneLake`, `LakeLevel` |  |
 | **Trail** `trail` (is feature) | A mapped path with an SAC difficulty class, drawn on the terrain. |  | `RegionTrail` |  |
-| **Terrain** `terrain` | The DEM surface: heights in metres MSL, sampled from tiles at distance-dependent zoom. |  | `Terrain`, `TerrainSampler`, `HeightFn` |  |
-| **DEM source** `dem-source` | A tiled elevation dataset (Mapterhorn 512 px, Terrarium 256 px) with zoom levels by distance. |  | `DemSource`, `TerrainLevel` |  |
+| **Terrain** `terrain` | The ground surface: heights above sea level, read from tiles that get coarser with distance. |  | `Terrain`, `TerrainSampler`, `HeightFn` |  |
+| **DEM source** `dem-source` | A tiled height dataset, Mapterhorn or Terrarium; nearer ground gets finer tiles. |  | `DemSource`, `TerrainLevel` |  |
 | **DEM tile** `dem-tile` | One z/x/y height raster (row 0 = north), possibly an ancestor stand-in. |  | `TileKey`, `DemRaster` |  |
 | **3D Tiles source** `tiles3d-source` | Photogrammetry / building tiles drawn in Step Inside (swisstopo MSL, Google ellipsoidal; Google is display-only). |  | `Tiles3DSource`, `Tiles3DSourceId` |  |
 
@@ -51,7 +51,7 @@ _where the camera was and how it pointed_
 | **Intrinsics** `intrinsics` | The lens model beyond vfov: focal scale, k1 radial distortion, principal point (normalised). Default: square pixels, centred, no distortion. _Note: Four shapes, one lens: Intrinsics is a DEVIATION from the pinhole that pose.vfov implies (fScale × focal, k1, normalised centre offset); IntrinsicsNorm is absolute (fx/W, fy/H, cx/W, cy/H; fy = 0.5/tan(vfov/2), fx = fy/aspect); geo Camera f/cx/cy and export CameraModel.K are display-frame pixels (after EXIF orientation)._ |  | `Intrinsics`, `f35`, `focal`, `fScale` |  |
 | **Eye** `eye` | The camera centre: lat/lon plus height (MSL). Usually GPS horizontally; vertically the eye rule unless solved. | camera position | `eye`, `eyeAlt`, `EnuFrame`, `Eye` | eyeOffset (pose6dof: it is absolute, not an offset) |
 | **Position** `geo-position` | A WGS84 point with an explicit height datum. |  | `LatLon`, `GeoPoint` |  |
-| **Eye rule** `eye-rule` | How eye height is set without a solve: max(GPS alt, DEM + 1.6 m); with no altitude the engine uses DEM + 1.8 m while geo/pipeline uses DEM + 1.6 m. _Note: Known drift: engine.ts:393 and roll ridgelines.worker.ts use 1.8 m when alt is null; geo/pipeline.ts:45 uses 1.6 m._ |  | `EYE_ABOVE_GROUND`, `eyeAlt` |  |
+| **Eye rule** `eye-rule` | How high the camera sits without a solve: the GPS altitude, but at least standing height above the ground. _Note: Known drift: engine.ts:393 and roll ridgelines.worker.ts use 1.8 m when alt is null; geo/pipeline.ts:45 uses 1.6 m._ |  | `EYE_ABOVE_GROUND`, `eyeAlt` |  |
 
 ### Evidence
 
@@ -59,12 +59,12 @@ _what is observed in the photo and matched to the world_
 
 | concept | definition | UI words | code words | avoid |
 |---|---|---|---|---|
-| **Horizon** `horizon` | The MODELLED skyline: per-azimuth elevation of the DEM's highest visible ridge from the eye. |  | `HorizonProfile`, `FastHorizonProfile`, `EyeHorizon`, `LayeredHorizon` | skyline (for the modelled curve) |
-| **Skyline** `skyline` | The OBSERVED sky/terrain boundary in the photo: per-column row and weight. |  | `SkylineObservation`, `SkylineRows`, `SkylineInput`, `SkylineSample` |  |
+| **Horizon** `horizon` | The skyline the terrain predicts: the highest visible ridge in every direction. |  | `HorizonProfile`, `FastHorizonProfile`, `EyeHorizon`, `LayeredHorizon` | skyline (for the modelled curve) |
+| **Skyline** `skyline` | The line between sky and terrain as seen in the photo. |  | `SkylineObservation`, `SkylineRows`, `SkylineInput`, `SkylineSample` |  |
 | **Sky mask** `sky-mask` | Per-pixel P(sky)·255, row 0 = top, from the segmentation model or a colour fallback. |  | `SkyMask`, `SkyMaskLike` |  |
 | **Foreground mask** `foreground-mask` | Per-pixel person/foreground mask (255 = person), row 0 = top: protected from terrain blending and excluded from skyline evidence. _Note: renderer.ts FgMask is a generic 8-bit mask shape reused for foreground, P(sky) and the occluder, not this concept._ |  | `ForegroundMask`, `protectPeople` |  |
 | **Correspondence** `correspondence` | An image point tied to the world: a 3D point, a direction, a level or an azimuth. The input to pin solves and MAP. |  | `Correspondence`, `PointCorr`, `DirCorr`, `LevelCorr`, `AzimuthCorr`, `Corr2D3D` |  |
-| **Pin** `pin` (is correspondence) | A user's tap tying a named peak to an image point (1 pin: yaw/pitch; 2: + roll; 3: + fov). _Note: session state only; the solved pose is saved, the pins are not._ | Pin | `Pin`, `TapPin` | pin (meaning a map position pin: call that map-pin / place) |
+| **Pin** `pin` (is correspondence) | A tap that ties a named peak to a point in the photo. One pin sets direction, two add tilt, three add the lens. _Note: session state only; the solved pose is saved, the pins are not._ | Pin | `Pin`, `TapPin` | pin (meaning a map position pin: call that map-pin / place) |
 | **Cue** `cue` (is correspondence) | An automatically found or curated correspondence of one evidence family (point, edge, level, shore), with residual and confidence. |  | `Cue`, `InteriorPin`, `MatchedCue`, `JointCue` |  |
 
 ### Estimate
@@ -73,7 +73,7 @@ _solving, judging and choosing camera estimates_
 
 | concept | definition | UI words | code words | avoid |
 |---|---|---|---|---|
-| **Pose estimate** `pose-estimate` | An orientation (and possibly eye) plus its provenance: who/what produced it, from which evidence, and how it was judged. |  | `SolvedPose`, `AppAlign`, `UnknownPoseOutcome`, `SecondOpinion`, `DemoPose` |  |
+| **Pose estimate** `pose-estimate` | Where the camera pointed (sometimes where it stood), plus who found it, from what, and how sure. |  | `SolvedPose`, `AppAlign`, `UnknownPoseOutcome`, `SecondOpinion`, `DemoPose` |  |
 | **Candidate** `candidate` (is pose-estimate) | One of several alternative pose estimates offered for choice (picker, cascade seeds, autoAlign alternatives). |  | `Candidate`, `alternatives`, `candidates`, `RefineMode` |  |
 | **Solve result** `solve-result` | A solver's full output: the estimate plus residuals, inliers, uncertainty and diagnostics. _Note: Two exports are both named SolveResult (geo/solve.ts, pose6dof/types.ts)._ |  | `SolveResult`, `AlignResult`, `RefineResult`, `MapResult`, `MatchResult`, `UnknownPoseResult` |  |
 | **Provenance** `provenance` | How a value is known, on orthogonal axes: agent, method, evidence, role, status, outcome, corroboration, confidence. |  | `PoseSource`, `AlignState`, `positionSource`, `source`, `method` |  |
@@ -93,7 +93,7 @@ _how a solved photo is drawn: modes, looks, labels, layers_
 | **Look preset** `look-preset` | A named patch over CLASSIC (classic, minimal, topo-map, night, …). |  | `PresetId`, `PRESETS` |  |
 | **Label** `peak-label` | A peak projected into the photo, ranked, occlusion-tested and laid out. _Note: Three exports named PeakLabel (settings.ts, deck/scene.ts, geo/peaks.ts)._ | labels | `PeakLabel`, `LabelCandidate`, `PlacedLabel` |  |
 | **Reveal** `reveal` | The overlay's bloom-in animation on load (presets, duration, glow). |  | `RevealConfig`, `RevealPresetId` |  |
-| **Step Inside** `step-inside` | The near field rebuilt in 3D (Gaussian splats on the DEM) with photo / orbit / fly / top-down cameras. | Step Inside, Photo, Orbit, Fly, Top-down | `NearFieldScene`, `StepMode`, `GaussianCloud` |  |
+| **Step Inside** `step-inside` | The near ground rebuilt in 3D on the terrain; view it from the photo, orbiting, flying or from above. | Step Inside, Photo, Orbit, Fly, Top-down | `NearFieldScene`, `StepMode`, `GaussianCloud` |  |
 
 ### Interchange
 
@@ -220,12 +220,12 @@ A value's provenance is recorded on independent axes. It is never folded into a 
 
 | term | meaning |
 |---|---|
-| `user` | a person, in this app (pin, drag, save, accept, map pin) |
-| `sensor` | the capturing device: GPS, compass, gravity, clock, lens/EXIF |
-| `solver` | a Rigi algorithm fitting evidence (align, cascade, matcher, propagate, …) |
-| `reference` | curated external truth: ground-truth fits, OSM, swisstopo, the DEM, tables |
-| `model` | a learned model (sky segmentation, depth, splats, generation) |
-| `rule` | a fixed default or deterministic rule (eye = DEM + 1.6 m, f35 = 26 mm, interpolation) |
+| `user` | you, in the app |
+| `sensor` | the phone's sensors |
+| `solver` | a Rigi algorithm |
+| `reference` | maps and terrain data |
+| `model` | a learned model |
+| `rule` | a fixed rule |
 
 ### Role: how it is used
 
@@ -307,10 +307,10 @@ Trusted auto (`isTrustedAuto`) means: an automatic agent, status `accepted`, and
 | `ground-truth-fit` | reference | Hand-fitted ground truth | point | orientation, focal, eye-height | data/ground-truth.json |
 | `osm-data` | reference | OpenStreetMap features | map | geometry | lib/upload/region.ts, lib/osm |
 | `swisstopo-data` | reference | swisstopo data | map, terrain | geometry | lib/tiles3d, lib/concord |
-| `dem-sample` | reference | DEM height sample | terrain | eye-height, geometry | lib/dem |
+| `dem-sample` | reference | Ground height lookup | terrain | eye-height, geometry | lib/dem |
 | `level-table` | reference | Lake level table | map | eye-height | lib/geocam/lakes/levels.ts |
-| `eye-rule` | rule | Eye = max(GPS alt, DEM + 1.6 m) (DEM + 1.8 m without altitude in the engine) | ground, alt | eye-height | lib/deck/scene.ts, lib/geo/pipeline.ts |
-| `alt-contour` | rule | Eye on the GPS-altitude iso-band | gps, alt, ground | position, eye-height | lib/concord/priors/altitude.ts |
+| `eye-rule` | rule | Eye at GPS height, at least 1.6 m above ground | ground, alt | eye-height | lib/deck/scene.ts, lib/geo/pipeline.ts |
+| `alt-contour` | rule | Eye on the GPS height contour | gps, alt, ground | position, eye-height | lib/concord/priors/altitude.ts |
 | `viewpoint-bias` | rule | Shift a prior by the median yaw offset of the viewpoint's solved anchors | compass, rotation | orientation | lib/roll/align/viewpoint.ts |
 | `track-interpolate` | rule | Interpolate position along the roll's GPS track | time, gps | position | lib/roll/import/interpolate.ts |
 | `track-nearest` | rule | Nearest GPS'd photo in time | time, gps | position | lib/roll/import/interpolate.ts |
@@ -721,15 +721,15 @@ These are places where the code disagrees with itself, found by modelling it. `d
 
 | kind | finding | where | action |
 |---|---|---|---|
-| drift | FIXED in b9d29b1. Stale verdict (app bug): an eye move or a restored save re-creates the engine and sets alignState 'manual'/'saved', but a second opinion aborted by that teardown never clears `verify` (the catch skips setVerify(null) when aborted). A hand-moved pose can then show the 'Verified'/'Refined' badge, concord counts it HIGH, and exports stay locked if verify was 'pending'. | components/PhotoWorkspace.tsx:433-437 (manual/saved without setVerify(null)); components/PhotoWorkspace.tsx:556 (aborted catch keeps verify) | Fixed: setVerify(null) in both branches (b9d29b1). Canonically a verdict on a person's pose is ignored (workspaceProvenance); staleVerifyStates() keeps the old states so the checks prove every gate would ignore them. |
-| drift | Three 'accepted pose' gates. picker isAutoHigh (= canonical isTrustedAuto) and nearfield poseAccepted (= canonical endorsed-or-trusted) agree with the ontology on every reachable state. concordConfidence counts any corroborating verdict under any align state; that differed only on the stale-verdict states, unreachable since b9d29b1, so all three gates now agree on every reachable state. | lib/picker/candidates.ts isAutoHigh; lib/nearfield/controller.ts poseAccepted; lib/concord/app/useConcordDisplay.ts concordConfidence | Gates should call the canonical predicates (workspaceIsTrustedAuto / workspaceIsSettled) so the three rules can't drift apart again; ontology.check.ts proves agreement on every reachable state. |
-| drift | Eye height without GPS altitude: the engine and roll ridgelines use DEM + 1.8 m, geo/pipeline (solver scene) uses DEM + 1.6 m. | lib/engine.ts:393; lib/roll/mosaic/ridgelines.worker.ts:89; lib/geo/pipeline.ts:45 | Record as the eye-rule concept; unify in the engine owner's pass. |
-| synonym | Position source is one fact under four vocabularies: upload 'exif'\|'pin', matcher 'exif-gps'\|'manual', import 'interpolated'\|'nearest'\|'pin', EyePrior 'gps+…'\|'pin'. Worse, roll import stores TRACK-INTERPOLATED positions as positionSource 'pin', so 'pin'/'manual' really means 'not GPS'. | lib/upload/exif.ts; lib/integration/unknown-pose.ts positionSource; lib/roll/import/provenance.ts; lib/concord/priors/altitude.ts | All crosswalk to the same ProvenanceClass rows (crosswalk/world.ts). |
-| synonym | Prior unknowns have two polarities: app yawUnknown/pitchRollUnknown/focalUnknown, bench harness focalKnown. | lib/upload/exif.ts; tools/bench/harness/cascade.ts | Concept prior-unknowns; new code uses the *Unknown polarity. |
-| homonym | Same export name, different concept: PhotoMeta (app record vs raw EXIF), SolveResult (geo vs pose6dof), Params (pose6dof vs peakfix), PeakLabel ×3, PeakInput ×3, CompositeLook (style type vs look class), Confidence (refine vs ontology). RESOLVED 2026-10-01: ExifPhotoMeta, SkylineSolveResult / GcpSolveResult, FitParams / GcpParams, PeakLabelPx / BaselinePeakLabel (settings PeakLabel keeps the name), GeoJsonPeak / RidgelinePeakInput, CompositeLookStyle, RefineConfidence. | lib/photos.ts; lib/geo/photo-meta.ts; lib/geo/solve.ts; lib/pose6dof/types.ts; lib/settings.ts; lib/geo/peaks.ts; lib/deck/scene.ts | Done: each export now has a unique name; the concept words live in lib/ontology/domain.ts. |
-| homonym | 'pin' means a peak↔pixel tap (workspace), a map position pin (upload/import), and a pixel+name control point (data/control-points.json). | lib/align.ts Pin; lib/upload/exif.ts positionSource; data/control-points.json | Concepts pin vs method map-pin vs correspondence. |
-| units | Five pixel bases (norm, working px, 1600 wide, 1600 long side, 1000 wide) and four bbox orders; lat/lon order differs (TerrainSampler.sample(lon, lat) vs Terrain.heightAt(lat, lon); inside ONE region record, center is [lat, lon] but trail coords are [lon, lat]). | lib/refine/confidence.ts rmsPx1600; lib/geocam/core/state.ts focalPx1600; lib/picker/candidates.ts tapResidualPx; lib/upload/region.ts bboxAround | PixelBasis + Px<B>, BBox + WSEN/SWNE converters, LonLatPair/LatLonPair brands. |
-| synonym | View mode words: code overlay/replace/world, UI Overlay/Blend/In map; the union was declared three times (settings, three-apply, deck-apply). | lib/settings.ts; lib/style/three-apply.ts; lib/style/deck-apply.ts | StyleMode and DeckStyleMode are aliases of ViewMode; UI words in VIEW_MODE. |
-| units | Photo ids: the FNV fallback id (local-f + 9 hex) is not disjoint from SHA-256 ids that start with f, contrary to the decode.ts comment. | lib/upload/decode.ts contentHash | Low risk (needs a 36-bit collision); give the fallback its own prefix if it matters. |
-| deferred | Vec3 copies inside files with in-flight patches (gpu/**, deck/**, deck-webgpu/**, look haze/relief) keep their local declaration for now. | lib/gpu; lib/deck; lib/deck-webgpu; lib/look | Re-export the ontology Vec3 once those patches land. |
-| deferred | Realizations in modules not yet committed: demo/index.ts DemoPose (pose-estimate) and peakfix/layered.ts LayeredHorizon (horizon). | lib/demo; lib/peakfix | Add them to catalogue/concepts.ts realizedBy once those modules are in HEAD. |
+| drift | Stale verdict (fixed b9d29b1): an eye move or restored save kept an aborted second opinion, so a hand-moved pose could show 'Verified' and count as HIGH. | components/PhotoWorkspace.tsx:433-437 (manual/saved without setVerify(null)); components/PhotoWorkspace.tsx:556 (aborted catch keeps verify) | setVerify(null) in both branches; staleVerifyStates() keeps the old states under test. |
+| drift | Three 'accepted pose' gates (picker, near-field, concord) are written separately; they agree on every reachable state. | lib/picker/candidates.ts isAutoHigh; lib/nearfield/controller.ts poseAccepted; lib/concord/app/useConcordDisplay.ts concordConfidence | Call workspaceIsTrustedAuto / workspaceIsSettled; ontology.check.ts proves agreement. |
+| drift | Eye height without GPS altitude: DEM + 1.8 m in the engine and roll, DEM + 1.6 m in the solver. | lib/engine.ts:393; lib/roll/mosaic/ridgelines.worker.ts:89; lib/geo/pipeline.ts:45 | Unify under the eye-rule concept. |
+| synonym | Position source has four vocabularies (upload, matcher, import, eye prior); roll import stores track-interpolated positions as 'pin', so 'pin' means 'not GPS'. | lib/upload/exif.ts; lib/integration/unknown-pose.ts positionSource; lib/roll/import/provenance.ts; lib/concord/priors/altitude.ts | All map to ProvenanceClass (crosswalk/world.ts). |
+| synonym | Prior unknowns: app says focalUnknown, the bench says focalKnown. | lib/upload/exif.ts; tools/bench/harness/cascade.ts | New code uses *Unknown. |
+| homonym | Seven export names meant two or three things each (PhotoMeta, SolveResult, Params, PeakLabel, PeakInput, CompositeLook, Confidence). | lib/photos.ts; lib/geo/photo-meta.ts; lib/geo/solve.ts; lib/pose6dof/types.ts; lib/settings.ts; lib/geo/peaks.ts; lib/deck/scene.ts | Renamed (resolved); concept words live in lib/ontology/domain.ts. |
+| homonym | 'pin' means a peak tap, a map position, or a control point. | lib/align.ts Pin; lib/upload/exif.ts positionSource; data/control-points.json | Separate concepts: pin, map-pin, correspondence. |
+| units | Five pixel bases, four bbox orders and mixed lat/lon order, even inside one region record. | lib/refine/confidence.ts rmsPx1600; lib/geocam/core/state.ts focalPx1600; lib/picker/candidates.ts tapResidualPx; lib/upload/region.ts bboxAround | Branded types: Px<B>, WSEN/SWNE, LonLatPair/LatLonPair. |
+| synonym | View mode: code says overlay/replace/world, UI says Overlay/Blend/In map. | lib/settings.ts; lib/style/three-apply.ts; lib/style/deck-apply.ts | One ViewMode; UI words in VIEW_MODE. |
+| units | Fallback photo ids (local-f…) can collide with SHA-256 ids starting with f. | lib/upload/decode.ts contentHash | Low risk; give the fallback its own prefix if needed. |
+| deferred | Local Vec3 copies remain in gpu, deck, deck-webgpu and look. | lib/gpu; lib/deck; lib/deck-webgpu; lib/look | Re-export the ontology Vec3. |
+| deferred | DemoPose and LayeredHorizon are not yet listed as realizations. | lib/demo; lib/peakfix | Add them to realizedBy in catalogue/concepts.ts. |

@@ -31,7 +31,6 @@ import {
 	Figure,
 	HandLabel,
 	MarginNote,
-	Measured as PhotoMeasured,
 	PhotoStory,
 	RealPhoto,
 	Sym,
@@ -136,14 +135,8 @@ function useTerrainData() {
 	}, []);
 	return d;
 }
-const Measured = ({ d, what }: { d: TerrainData | null; what: string }) => (
-	<span className="gb-secondary">
-		Measured: {what} Real tiles and the real TerrainSampler, by{" "}
-		<span className="font-mono">
-			{d?.script ?? "scripts/gipfelbuch/data-terrain.ts"}
-		</span>
-		{d ? `, ${d.generated}` : ""}.
-	</span>
+const Measured = ({ what }: { d: TerrainData | null; what: string }) => (
+	<span className="gb-secondary">Measured: {what}</span>
 );
 
 function link(id: string, label: string) {
@@ -188,11 +181,9 @@ function RealEye({ d }: { d: TerrainData | null }) {
 			bleed
 			caption={
 				<>
-					The same GPS fix lifts the eye by very different amounts on two maps.{" "}
-					<Measured
-						d={d}
-						what="the eye rule on the 12 Niederhorn photos, ground read at each fix."
-					/>
+					The same GPS fix lifts the camera by different amounts on two terrain
+					models.{" "}
+					<Measured d={d} what="the eye rule on the 12 Niederhorn photos." />
 				</>
 			}
 		>
@@ -200,7 +191,7 @@ function RealEye({ d }: { d: TerrainData | null }) {
 				viewBox={`0 0 560 ${40 + rows.length * RH + 24}`}
 				className="block h-auto w-full"
 				role="img"
-				aria-label="Metres each demo photo's eye is lifted by the eye rule, for Terrarium and Mapterhorn ground"
+				aria-label="Metres each demo photo's camera is lifted, Terrarium vs Mapterhorn"
 			>
 				{[0, 10, 20, 30].map((v) => (
 					<g key={v}>
@@ -287,8 +278,8 @@ function RealEye({ d }: { d: TerrainData | null }) {
 									color="var(--gb-secondary)"
 									halo={0}
 								>
-									+{r.liftT.toFixed(0)} m: alt {r.alt.toFixed(0)} vs ground{" "}
-									{r.groundTerrarium.toFixed(0)}
+									+{r.liftT.toFixed(0)} m (GPS {r.alt.toFixed(0)}, ground{" "}
+									{r.groundTerrarium.toFixed(0)})
 								</HandLabel>
 							)}
 							{!big && r.liftM > 0 && (
@@ -349,7 +340,7 @@ function RealEye({ d }: { d: TerrainData | null }) {
 					/>
 				</PencilLayer>
 				<HandText x={X1 + 14} y={36 + 5 * RH} size={14} rotate={-2}>
-					finer map, higher crest: Mapterhorn lifts {nM} of {rows.length}
+					finer model, higher crest: Mapterhorn lifts {nM} of {rows.length}
 				</HandText>
 				<PenArrow
 					from={[X1 + 10, 32 + 5 * RH]}
@@ -359,13 +350,11 @@ function RealEye({ d }: { d: TerrainData | null }) {
 				/>
 			</svg>
 			<p className={`mt-3 ${TYPE.caption}`}>
-				Bar = metres the eye is lifted above the raw GPS altitude. On Mapterhorn
-				ground the rule lifts {nM} of {rows.length} photos (excluding demo-09:
-				median {med(liftsM).toFixed(0)} m, up to{" "}
-				{Math.max(...liftsM).toFixed(0)} m): the photographer probably stands on
-				the crest, and the finer DEM has the crest higher than the GPS altitude.
-				On Terrarium ground, which smooths that crest down, it lifts only {nT}{" "}
-				(the build-data run used Terrarium). demo-09 carries a GPS altitude of{" "}
+				Bar = metres the camera is lifted above the GPS altitude. Mapterhorn
+				lifts {nM} of {rows.length} photos (median {med(liftsM).toFixed(0)} m,
+				up to {Math.max(...liftsM).toFixed(0)} m; photo 09 excluded): the finer
+				model puts the crest higher than the GPS altitude. Terrarium smooths the
+				crest and lifts only {nT}. Photo 09&apos;s GPS altitude is{" "}
 				{rows.find((r) => r.id === "demo-09")?.alt.toFixed(0)} m,{" "}
 				{Math.round(
 					(rows.find((r) => r.id === "demo-09")?.groundTerrarium ?? 0) -
@@ -387,11 +376,11 @@ function SnapEquation({ d }: { d: TerrainData | null }) {
 				{
 					sym: "r",
 					c: "var(--gb-ink)",
-					text: "half-width of the dashed search square in Fig. 3, in metres",
+					text: "half-width of the dashed search square, in metres",
 				},
 				{
 					sym: "d",
-					text: "distance from the camera to the OSM node, in metres",
+					text: "distance from camera to the OSM peak, in metres",
 				},
 			]}
 		>
@@ -425,13 +414,10 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 			bleed
 			caption={
 				<>
-					Fixed example, not photo-specific: the snap moves {ex.name} {ex.move}{" "}
-					m onto its summit (the red grid sample is the highest of the 9 by 9);
-					the median over {pr.n} peaks is {pr.medianMoveMapterhorn} m.{" "}
-					<Measured
-						d={d}
-						what="the engine's snap rule on Mapterhorn around the real OSM nodes within 40 km."
-					/>
+					The snap moves {ex.name} {ex.move} m onto its summit (red = highest of
+					the 9 by 9 samples). Median over {pr.n} peaks:{" "}
+					{pr.medianMoveMapterhorn} m.{" "}
+					<Measured d={d} what="peaks within 40 km, Mapterhorn." />
 				</>
 			}
 		>
@@ -547,7 +533,7 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 						anchor="end"
 						rotate={-2}
 					>
-						OSM node here, summit 9 by 9 samples away
+						OSM point here; summit is in the grid
 					</HandText>
 					<CircledKey
 						x={ex.osmPx[0] - 14}
@@ -572,23 +558,23 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 					<div className="bg-[var(--gb-paper-deep)] p-3">
 						<div className={`gb-ink ${TYPE.caption}`}>{ex.name}</div>
 						<div className="mt-1 flex justify-between">
-							<span>distance, radius</span>
+							<span>distance, search radius</span>
 							<span className="gb-ink">
 								{(ex.dist / 1000).toFixed(1)} km, {ex.radius} m
 							</span>
 						</div>
 						<div className="mt-1 flex justify-between">
-							<span>DEM at the OSM node</span>
+							<span>height at OSM point</span>
 							<span className="gb-ink">{ex.osmH.toFixed(1)} m</span>
 						</div>
 						<div className="mt-1 flex justify-between">
-							<span>DEM at the snapped point</span>
+							<span>height at summit</span>
 							<span className="text-[var(--accent)]">
 								<SpotHeight value={ex.snapH.toFixed(1)} unit="m" />
 							</span>
 						</div>
 						<div className="mt-1 flex justify-between">
-							<span>OSM ele tag</span>
+							<span>OSM height tag</span>
 							<span className="gb-ink">
 								{ex.ele == null ? "none" : `${ex.ele} m`}
 							</span>
@@ -613,16 +599,14 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 						</div>
 						<div className="bg-[var(--gb-paper-deep)] p-2">
 							<div className={`gb-ink ${TYPE.body}`}>{pr.n}</div>
-							peaks, 150 m to 40 km
+							peaks (150 m to 40 km)
 						</div>
 					</div>
 					<p className={`mt-3 font-sans ${TYPE.caption}`}>
-						Does the snap agree with OSM&apos;s own ele tag? Median |ele minus
-						DEM| over {pr.nWithEle} tagged peaks:{" "}
-						{pr.medianAbsEleMinusOsmNodeMapterhorn} m at the node,{" "}
-						{pr.medianAbsEleMinusSnapMapterhorn} m at the snapped point
-						(Mapterhorn); on Terrarium, which blunts summits, the snapped point
-						is {pr.medianAbsEleMinusSnapTerrarium} m off.
+						Check against OSM&apos;s own height tag ({pr.nWithEle} tagged peaks,
+						median error): {pr.medianAbsEleMinusOsmNodeMapterhorn} m at the OSM
+						point, {pr.medianAbsEleMinusSnapMapterhorn} m after the snap
+						(Mapterhorn), {pr.medianAbsEleMinusSnapTerrarium} m on Terrarium.
 					</p>
 				</div>
 			</div>
@@ -644,42 +628,42 @@ const LEDGER: {
 	{
 		what: "Eye height",
 		verb: "snap",
-		rule: "max(GPS alt, DEM + 1.6 m); DEM + 1.8 m without altitude",
+		rule: "higher of GPS altitude and ground + 1.6 m; ground + 1.8 m without altitude",
 		where: "src/lib/deck/scene.ts",
 		when: "always",
 	},
 	{
 		what: "OSM peaks",
 		verb: "snap",
-		rule: "highest of 9×9 samples within ±min(250, 60 + 0.004·d) m",
+		rule: "highest of 9×9 samples in a search square",
 		where: "src/lib/deck/engine.ts",
 		when: "always (150 m – 110 km)",
 	},
 	{
 		what: "Eye on a lake",
 		verb: "bound",
-		rule: "eye ≥ lake level + 0.3 m; lifts only, fail-open",
+		rule: "never below lake level + 0.3 m; only lifts",
 		where: "src/lib/geocam/lakes/floor.ts",
-		when: "?geoLakeFloor",
+		when: "optional",
 	},
 	{
 		what: "GPS altitude",
 		verb: "prior",
-		rule: "Gaussian + iso-band where DEM + 1.6 ≈ alt; never moves the fix",
+		rule: "soft hint around where ground + 1.6 m matches the altitude; never moves the fix",
 		where: "src/lib/concord/priors/altitude.ts",
-		when: "?concord=eye",
+		when: "optional",
 	},
 	{
 		what: "Near-field depth",
 		verb: "calibrate",
-		rule: "monotone log-log curve to DEM range, 15 m – 3 km, quality-gated",
+		rule: "curve fitted to terrain distance, 15 m to 3 km, used only when it fits well",
 		where: "src/lib/nearfield/anchor.ts",
 		when: "Step Inside",
 	},
 	{
 		what: "Near-field objects",
 		verb: "snap",
-		rule: "scale each object to the DEM range at its ground contacts",
+		rule: "scale each object to the terrain distance at its ground contacts",
 		where: "src/lib/nearfield/ground.ts",
 		when: "Step Inside",
 	},
@@ -700,12 +684,7 @@ function Ledger() {
 						key={r.what}
 						className="grid gap-x-4 gap-y-1 px-2 py-3 even:bg-[var(--gb-paper-deep)] @[640px]:grid-cols-[10rem_5.5rem_1fr_9rem]"
 					>
-						<div className={`gb-ink ${TYPE.caption}`}>
-							{r.what}
-							<div className="mt-1">
-								<CodeRef path={r.where} />
-							</div>
-						</div>
+						<div className={`gb-ink ${TYPE.caption}`}>{r.what}</div>
 						<div>
 							<span
 								className={`nb-hand px-1 underline decoration-wavy decoration-1 underline-offset-4 ${TYPE.body}`}
@@ -735,16 +714,11 @@ function Hero({ d }: { d: TerrainData | null }) {
 		<Figure
 			label="Fig. 1"
 			bleed
+			pinned="demo-03"
 			caption={
-				<>
-					{d
-						? `Three things in this photo are pinned to the map; a typical peak moves ${d.peakRule.medianMoveMapterhorn} m onto its summit.`
-						: "Three things in this photo are pinned to the map."}{" "}
-					Fixed: demo-03, with hand-placed marks.{" "}
-					<PhotoMeasured data={photo}>
-						Peak moves: {d?.script ?? "scripts/gipfelbuch/data-terrain.ts"}.
-					</PhotoMeasured>
-				</>
+				d
+					? `Three things in this photo are pinned to the terrain; a typical peak moves ${d.peakRule.medianMoveMapterhorn} m onto its summit.`
+					: "Three things in this photo are pinned to the terrain."
 			}
 		>
 			<RealPhoto bleed data={photo} layers={[]} crop={crop}>
@@ -771,7 +745,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 						)}
 						<Mark x={300} y={790} n={3} k={2} />
 						<HandText x={420} y={846} size={22} rotate={-2}>
-							eye never below the ground
+							camera never below ground
 						</HandText>
 						{d && (
 							<HandText x={300} y={760} size={22} anchor="end" rotate={2}>
@@ -784,15 +758,15 @@ function Hero({ d }: { d: TerrainData | null }) {
 			<MarkList
 				items={[
 					<>
-						<strong className="gb-ink">The camera</strong> is never below the
-						ground. {link("eye-rule", "Eye rule")}
+						<strong className="gb-ink">The camera</strong> stays above ground.{" "}
+						{link("eye-rule", "Eye rule")}
 					</>,
 					<>
-						<strong className="gb-ink">Peaks</strong> climb to the highest map
-						point nearby. {link("peak", "Peak")}
+						<strong className="gb-ink">Peaks</strong> climb to the highest
+						nearby terrain point. {link("peak", "Peak")}
 					</>,
 					<>
-						<strong className="gb-ink">Depth</strong> is bent onto the map's
+						<strong className="gb-ink">Depth</strong> is bent to the terrain's
 						distances. {link("dem-anchoring", "DEM anchoring")}
 					</>,
 				]}
@@ -971,25 +945,22 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 		<>
 			<Hero d={d} />
 
-			<Beat
-				kicker="The idea"
-				title="The map is the referee for everything we place."
-			>
+			<Beat kicker="The idea" title="The terrain has the final say.">
 				<p>
-					A photo brings a GPS spot, maybe an altitude, and named peaks. None of
-					them agree exactly with the terrain the solver measures.
+					A photo brings a GPS spot, maybe an altitude, and named peaks. None
+					match the terrain exactly.
 				</p>
 				<p>
 					<HandMark type="highlight">
-						We trust the map only where it is plainly better.
+						We trust the terrain only where it is plainly better.
 					</HandMark>{" "}
-					Elsewhere it gives a floor or a hint. In Fig. 1,{" "}
-					<CircledNumber value={1} seed="ts-p1" /> is the camera,{" "}
-					<CircledNumber value={2} seed="ts-p2" /> a peak and{" "}
-					<CircledNumber value={3} seed="ts-p3" /> the depth.
+					Elsewhere it gives a floor or a hint. In Fig. 1:{" "}
+					<CircledNumber value={1} seed="ts-p1" /> camera,{" "}
+					<CircledNumber value={2} seed="ts-p2" /> peak,{" "}
+					<CircledNumber value={3} seed="ts-p3" /> depth.
 					{d && (
 						<MarginNote mark="a">
-							{`I notice a typical peak moves ${d.peakRule.medianMoveMapterhorn} m, the 90th percentile ${d.peakRule.p90MoveMapterhorn} m.`}
+							{`A typical peak moves ${d.peakRule.medianMoveMapterhorn} m; the 90th percentile ${d.peakRule.p90MoveMapterhorn} m.`}
 						</MarginNote>
 					)}
 				</p>
@@ -1000,17 +971,17 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					steps={[
 						{
 							title: "Snap",
-							body: "The map is clearly right: move the thing onto it. Peaks do this.",
+							body: "The terrain is clearly right: move it there. Peaks do this.",
 							visual: <MiniSnap />,
 						},
 						{
 							title: "Bound",
-							body: "The map only rules out a region: keep the eye above the lake.",
+							body: "The terrain only rules out a region: keep the camera above the lake.",
 							visual: <MiniBound />,
 						},
 						{
 							title: "Hint",
-							body: "The sensor still knows something: GPS altitude stays a soft hint.",
+							body: "The sensor still knows something: GPS altitude stays a hint.",
 							visual: <MiniPrior />,
 						},
 					]}
@@ -1025,16 +996,15 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Peaks"
-				title="Map peaks sit beside their summits; we climb them."
+				title="OSM peaks sit beside their summits. We move them up."
 			>
 				<p>
 					Named peaks come from OpenStreetMap, often a few dozen metres off the
-					real top. We look in a square around the node, wider for far peaks,
-					and move it to the{" "}
-					<HandMark type="underline">highest map point</HandMark>. In Fig. 3,{" "}
-					<CircledNumber value={1} color="ink" seed="ts-p-n1" /> is the OSM node
-					and <CircledNumber value={2} seed="ts-p-n2" /> the summit it climbs
-					to.
+					real top. We search a square around the OSM point, wider for far
+					peaks, and move the peak to the{" "}
+					<HandMark type="underline">highest terrain point</HandMark>. In Fig.
+					3: <CircledNumber value={1} color="ink" seed="ts-p-n1" /> OSM point,{" "}
+					<CircledNumber value={2} seed="ts-p-n2" /> summit.
 					<MarginNote mark="b">
 						Why 9 by 9? Enough samples to find the crest inside the square.
 					</MarginNote>
@@ -1046,22 +1016,24 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="The answer depends on which map you ask."
+				title="The answer depends on the terrain model."
 			>
 				<p>
-					Two elevation maps put the same spot at different heights. The eye
+					Two terrain models put the same spot at different heights. The camera
 					lift changes with them.{" "}
 					<HandMark type="double">
 						Treating a hint as a snap would throw the measurement away.
 					</HandMark>
 					<MarginNote mark="c">
-						Which map is right? Neither is a true eye height, so none can score
-						the lift.
+						Which model is right? Neither gives a true camera height, so none
+						can score the lift.
 					</MarginNote>
 				</p>
 				{gaps && (
 					<p>
-						<HandMark type="strike">Ground is ground, whichever map.</HandMark>{" "}
+						<HandMark type="strike">
+							Ground is ground, whichever model.
+						</HandMark>{" "}
 						<span
 							className="nb-hand"
 							style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
@@ -1088,7 +1060,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						value: gaps
 							? `${Math.round(Math.min(...gaps))} to ${Math.round(Math.max(...gaps))} m`
 							: "…",
-						label: "two maps' ground height at the same 12 GPS fixes",
+						label: "ground height of the two models at the same 12 GPS fixes",
 					},
 					{
 						value: "0.13",
@@ -1096,13 +1068,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							"median depth error after anchoring, in log units (about 14%), 23 photos; one scale gives 0.34",
 					},
 				]}
-				source={
-					<>
-						Peaks and ground:{" "}
-						{d?.script ?? "scripts/gipfelbuch/data-terrain.ts"}, Mapterhorn and
-						Terrarium. Depth: reports/step-inside-results.md.
-					</>
-				}
+				source="Peaks and ground: Mapterhorn and Terrarium. Depth: 23 test photos."
 			/>
 
 			<Details>
@@ -1110,26 +1076,23 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<Ledger />
 				<h3>Eye height</h3>
 				<p>
-					<code>eyeAltitude</code> keeps the GPS altitude unless it is below
-					standing height over the DEM, then uses <code>DEM + 1.6 m</code>; with
-					no altitude it uses <code>DEM + 1.8 m</code>. It only ever lifts the
-					eye, so a barometer-aided altitude above the ground survives. Over
-					Lake Thun the DEM's flat water cells read{" "}
-					{d?.lake.terrariumMin ?? "…"} m (Terrarium) and{" "}
+					The camera keeps the GPS altitude unless it is below standing height
+					over the terrain, then uses ground + 1.6 m; with no altitude it uses
+					ground + 1.8 m. It only ever lifts, so a barometer-aided altitude
+					above the ground survives. Over Lake Thun the terrain&apos;s flat
+					water cells read {d?.lake.terrariumMin ?? "…"} m (Terrarium) and{" "}
 					{d?.lake.mapterhornMin ?? "…"} m (Mapterhorn), so the lake bound is a
-					fixed level + 0.3 m rather than the DEM value. One metre of eye height
-					moves a ridge 500 m away by about 0.11° (atan 1/500), about 6 px in a
-					4000 px frame at 26 mm equivalent. Near a summit the horizontal fix
-					can land up-slope and <code>DEM + 1.6</code> then puts the eye 5 to 20
-					m too high; the concord eye prior (<code>?concord=eye</code>) treats
-					the altitude as a measurement through an iso-band and never snaps.
+					fixed level + 0.3 m rather than the model value. One metre of camera
+					height moves a ridge 500 m away by about 0.11°, about 6 px in a 4000
+					px frame at 26 mm equivalent. Near a summit the horizontal fix can
+					land up-slope and ground + 1.6 m then puts the camera 5 to 20 m too
+					high; an optional prior treats the altitude as a measurement and never
+					snaps.
 				</p>
 				<p>
-					The frame's origin matters too: the renderer's ENU frame sits at sea
-					level, with the eye at <code>(0, 0, eyeAlt)</code>. A solver handed
-					the default position prior <code>[0, 0, 0]</code> projects from sea
-					level, which a regression test measured at about 3° of pitch and roll
-					(<code>src/lib/pose6dof/README.md</code>).
+					The frame&apos;s origin matters too: a solver that projects from sea
+					level instead of the camera&apos;s real height is off by about 3° of
+					pitch and roll.
 				</p>
 				<h3>Peaks</h3>
 				<p>

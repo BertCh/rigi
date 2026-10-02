@@ -218,11 +218,11 @@ export function NotebookMap({ className }: { className?: string }) {
 				<header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5 pb-4 md:pl-[92px]">
 					<div>
 						<p className="nb-label text-[11px] text-[var(--nb-brown)]">
-							Field notes · {index?.place ?? "Niederhorn above Lake Thun"}
+							Feldbuch · {index?.place ?? "Niederhorn above Lake Thun"}
 						</p>
 						<p className="mt-1.5 max-w-xl text-[13px] leading-relaxed">
-							One photo, followed from the phone to the terrain and back. Pick
-							another page: every number below is re-read from its measured run.
+							One photo, followed from phone to terrain and back. Pick another
+							photo and every number updates.
 						</p>
 					</div>
 					<PhotoStrip index={index} selected={photoId} onSelect={setPhotoId} />
@@ -237,14 +237,14 @@ export function NotebookMap({ className }: { className?: string }) {
 							<div className="space-y-7">
 								<PastedPrint
 									seed={`print-${data.id}`}
-									caption={`${data.id} · skyline band, ${data.photo.width} px working copy`}
+									caption={`${data.id} · skyline band`}
 								>
 									<SkylineSketch data={data} />
 								</PastedPrint>
 								<Legend refused={!data.solved.accepted} />
 								<div>
 									<p className="nb-hand text-[16px] leading-tight">
-										median miss per sky column, before → after the solve
+										median miss, before → after the solve
 									</p>
 									<MissSketch data={data} />
 								</div>
@@ -264,20 +264,19 @@ export function NotebookMap({ className }: { className?: string }) {
 							<div className="space-y-8">
 								<PastedPrint
 									seed={`dem-${data.id}`}
-									caption={`hillshade ±${data.demPatch.halfKm} km, north up`}
+									caption={`relief shading, ±${data.demPatch.halfKm} km, north up`}
 									className="mx-auto max-w-[400px]"
 								>
 									<DemSketch data={data} />
 								</PastedPrint>
 								<div>
 									<p className="nb-hand text-[16px] leading-tight">
-										the ground straight ahead, sketched from the DEM
+										the ground straight ahead
 									</p>
 									<SectionSketch data={data} />
 									<p className="mt-2 text-[13px] leading-relaxed text-[var(--nb-faint)]">
-										Brown ticks are ridge crests the horizon scan found on this
-										bearing; the red dashes are the sight line that grazes the
-										farthest one.
+										Brown ticks: ridge crests on this bearing. Red dashes: the
+										sight line grazing the farthest one.
 									</p>
 								</div>
 							</div>
@@ -295,7 +294,7 @@ export function NotebookMap({ className }: { className?: string }) {
 						index ? (
 							<div className="space-y-3">
 								<p className="nb-hand text-[16px] leading-tight">
-									all twelve photos: how wrong the compass was (click one)
+									compass error for all twelve photos (click one)
 								</p>
 								<TallySketch
 									photos={index.photos}
@@ -306,11 +305,11 @@ export function NotebookMap({ className }: { className?: string }) {
 									<span className="flex items-center gap-2">
 										<TallyMarks count={accepted.length} seed="tally-ok" />
 										<span>
-											<Value>{accepted.length}</Value> shown as solved
+											<Value>{accepted.length}</Value> solved
 											{refined.length ? (
 												<>
 													{" "}
-													(<Value>{refined.length}</Value> via refine)
+													(<Value>{refined.length}</Value> after refinement)
 												</>
 											) : null}
 										</span>
@@ -331,11 +330,7 @@ export function NotebookMap({ className }: { className?: string }) {
 				/>
 
 				<footer className="mt-4 text-[13px] leading-relaxed text-[var(--nb-faint)] md:pl-[92px]">
-					Measured by{" "}
-					<code className="nb-num">{index?.script ?? "build-data.ts"}</code> on{" "}
-					{index?.generated ?? "…"} with the real CPU pipeline. Lines on the
-					photos and maps are drawn exactly from that run; only the pen
-					furniture (arrows, circles, hachures) is hand-wobbled.
+					Measured data; only the pen marks are hand-drawn.
 				</footer>
 			</article>
 		</div>
@@ -349,17 +344,15 @@ function Legend({ refused }: { refused: boolean }) {
 		dash?: string;
 		width: number;
 	}[] = [
-		{ label: "traced in the photo", stroke: "var(--nb-pencil)", width: 2.4 },
+		{ label: "skyline in photo", stroke: "var(--nb-pencil)", width: 2.4 },
 		{
-			label: "terrain at the compass guess",
+			label: "horizon at phone's guess",
 			stroke: "var(--nb-blue)",
 			dash: "7 5",
 			width: 2.2,
 		},
 		{
-			label: refused
-				? "terrain at the refused solve"
-				: "terrain at the solved pose",
+			label: refused ? "horizon at refused pose" : "horizon at solved pose",
 			stroke: "var(--nb-red)",
 			width: 1.8,
 		},

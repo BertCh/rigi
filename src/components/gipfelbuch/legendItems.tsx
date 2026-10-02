@@ -26,19 +26,19 @@ export type LegendKey =
 	| "rock";
 
 const LEGEND_SYMBOLS: Record<LegendKey, LegendItem> = {
-	contour: { symbol: <ContourSymbol />, label: "Contour: terrain, the DEM" },
-	water: { symbol: <WaterSymbol />, label: "Water: data flowing through" },
-	route: { symbol: <RouteSymbol />, label: "Route: a solved pose" },
-	peak: { symbol: <PeakSymbol />, label: "Spot height: a measured peak" },
+	contour: { symbol: <ContourSymbol />, label: "Contour: terrain height" },
+	water: { symbol: <WaterSymbol />, label: "Water: lakes and rivers" },
+	route: { symbol: <RouteSymbol />, label: "Route: solved camera" },
+	peak: { symbol: <PeakSymbol />, label: "Spot height: peak" },
 	trig: {
 		symbol: <TrigPointSymbol />,
-		label: "Station: a ground-truth viewpoint",
+		label: "Station: known camera position",
 	},
 	viewpoint: {
 		symbol: <ViewpointSymbol />,
-		label: "Viewpoint: the photo camera",
+		label: "Viewpoint: photo camera",
 	},
-	rock: { symbol: <RockSymbol />, label: "Rock: the skyline" },
+	rock: { symbol: <RockSymbol />, label: "Rock: skyline" },
 };
 
 /** Symbols drawn on each concept's page. */

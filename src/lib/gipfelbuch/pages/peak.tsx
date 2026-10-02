@@ -39,7 +39,6 @@ import {
 	LAYER_STYLE,
 	LiveReveal,
 	MarginNote,
-	Measured,
 	Op,
 	PhotoPicker,
 	RealPhoto,
@@ -210,7 +209,8 @@ function RayMarch() {
 		<Figure
 			label="Fig. D1"
 			bleed
-			caption="The visibility test in viewPeaks. From the eye, every terrain sample along the ray is converted to the same apparent elevation angle as the summit (curvature and refraction lower it by d²/2R_eff). The summit is hidden as soon as one sample rises more than 0.05° above it. The marcher steps by max(10 m, 0.4 % of d), so it is fine up close and coarse far away, and it stops short of the summit so the peak's own flank cannot hide it. Terrain and summits are synthetic."
+			source="Skizze"
+			caption="The visibility test. From the eye, each terrain sample along the ray is converted to the same apparent elevation angle as the summit (curvature and refraction lower it by d²/2R_eff). The summit is hidden once one sample rises more than 0.05° above it. Steps are max(10 m, 0.4 % of d), fine up close and coarse far away, and the march stops short of the summit so its own flank cannot hide it."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
@@ -415,7 +415,7 @@ function RayMarch() {
 					</div>
 					<div className="block">
 						<span className="flex justify-between font-mono text-[11px] gb-secondary">
-							<span>eye height, m MSL</span>
+							<span>eye height, m a.s.l.</span>
 							<span className="text-[var(--gb-ink)]">{eye} m</span>
 						</span>
 						<HandRange
@@ -436,7 +436,7 @@ function RayMarch() {
 						</dd>
 					</div>
 					<div>
-						<dt className="gb-secondary">curve + refr. drop</dt>
+						<dt className="gb-secondary">earth-curve drop</dt>
 						<dd className="text-[13px] text-[var(--gb-ink)]">
 							{dropAtPeak.toFixed(0)} m
 						</dd>
@@ -622,7 +622,7 @@ function layout(maxLabels: number, spacingPct: number): Verdict[] {
 				c,
 				s,
 				state: "spacing",
-				why: `${Math.round(Math.abs(clash.x - c.x) * PW)} px from ${clash.name ?? "peak"} (< ${Math.round(minSpacing)})`,
+				why: `${Math.round(Math.abs(clash.x - c.x) * PW)} px from ${clash.name ?? "peak"} (needs ${Math.round(minSpacing)})`,
 			});
 		} else {
 			kept.push(c);
@@ -653,14 +653,15 @@ function LabelLayout() {
 		<Figure
 			label="Fig. D2"
 			bleed
-			caption="From visible summits to labels. Candidates are scored with the exact formula in peaks.ts, then taken best first. A summit is kept unless one already kept is closer than the minimum spacing across the image (default 3 % of the width), and the walk stops at maxLabels (default 20; 6 here so the cap shows). The two hollow summits failed the ray march and never enter the ranking. The unnamed spot height loses 3000 points and is placed last. Summits and scores are synthetic."
+			source="Skizze"
+			caption="From visible summits to labels. Candidates are scored, then taken best first. A summit is kept unless a kept one is closer than the minimum spacing (default 3 % of image width); the walk stops at the label cap (default 20; 6 here so the cap shows). The two hollow summits are hidden and never enter the ranking. The unnamed spot height loses 3000 points."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
 					viewBox={`0 0 ${PW} ${PH + 20}`}
 					className="block h-auto w-full"
 					role="img"
-					aria-label="A skyline with ranked summits being labelled greedily with a minimum horizontal spacing"
+					aria-label="A horizon with ranked summits being labelled greedily with a minimum horizontal spacing"
 				>
 					<Hachure
 						d={SKY_PATH}
@@ -788,7 +789,7 @@ function LabelLayout() {
 						size={FIG_LABEL}
 						halo={0}
 					>
-						{`${shown.filter((v) => v.state === "kept").length} labels · min spacing ${Math.round((sp / 100) * PW)} px of ${PW}`}
+						{`${shown.filter((v) => v.state === "kept").length} labels · min spacing ${Math.round((sp / 100) * PW)} px`}
 					</HandLabel>
 				</svg>
 			</div>
@@ -819,7 +820,7 @@ function LabelLayout() {
 			<div className="mt-4 grid gap-4 sm:grid-cols-2">
 				<div className="block">
 					<span className="flex justify-between font-mono text-[11px] gb-secondary">
-						<span>maxLabels (code default 20)</span>
+						<span>label cap (default 20)</span>
 						<span className="text-[var(--gb-ink)]">{maxL}</span>
 					</span>
 					<HandRange
@@ -827,7 +828,7 @@ function LabelLayout() {
 						max={10}
 						step={1}
 						value={maxL}
-						label="maxLabels"
+						label="Label cap"
 						onChange={(v) => {
 							setManual(true);
 							setMaxL(v);
@@ -836,7 +837,7 @@ function LabelLayout() {
 				</div>
 				<div className="block">
 					<span className="flex justify-between font-mono text-[11px] gb-secondary">
-						<span>minSpacing, % of image width (default 3)</span>
+						<span>minimum spacing, % of image width (default 3)</span>
 						<span className="text-[var(--gb-ink)]">{sp.toFixed(1)} %</span>
 					</span>
 					<HandRange
@@ -944,6 +945,7 @@ function HiddenSummit() {
 		<Figure
 			label="Fig. 3"
 			bleed
+			pinned="demo-10"
 			caption={
 				<>
 					{pr ? (
@@ -955,7 +957,6 @@ function HiddenSummit() {
 							gets no label.{" "}
 						</>
 					) : null}
-					<Measured data={d} />
 				</>
 			}
 		>
@@ -1219,7 +1220,7 @@ function YawSlide() {
 				<>
 					Each degree of compass error slides every label sideways by{" "}
 					{pxPerDeg.toFixed(1)} px, whatever the peak. Rings are where the
-					summits really are. <Measured data={d} />
+					summits really are.
 				</>
 			}
 		>
@@ -1286,7 +1287,7 @@ function YawSlide() {
 				where={[
 					{
 						sym: "f",
-						text: <>focal length in pixels: {f.toFixed(0)} px (demo-01)</>,
+						text: <>focal length in pixels: {f.toFixed(0)} px (photo 01)</>,
 					},
 					{ sym: "Δψ", c: "var(--accent)", text: "yaw (compass) error" },
 				]}
@@ -1302,20 +1303,6 @@ function YawSlide() {
 // ======================================================================================
 // Page
 // ======================================================================================
-const SHAPES: [string, string][] = [
-	["Peak", "geo/peaks.ts: OSM node with ele, prominence, wikidata"],
-	[
-		"RegionPeak",
-		"photos.ts: stored per region, ele and prominence may be null",
-	],
-	["PoolPeak", "picker/candidates.ts: summit in the engine's ENU metres"],
-	["PeakInput", "export/geojson.ts: what exports write"],
-	[
-		"PeakLabel ×3",
-		"settings, deck/scene, geo/peaks: the projected, placed result",
-	],
-];
-
 // ======================================================================================
 // Measured figures: the real pipeline on the Niederhorn demo photos (public/demo/gipfelbuch)
 // ======================================================================================
@@ -1354,11 +1341,8 @@ function RealSummits() {
 			bleed
 			caption={
 				<>
-					{pc
-						? `Of ${pc.inFrame} named peaks in this frame, ${pc.hidden} sit behind a nearer ridge and ${pc.labelled} of the ${pc.visible} visible ones get a label; `
-						: ""}
-					red rings mark the {Math.min(RINGED, hid.length)} tallest hidden ones.
-					Below: the same rays from above. <Measured data={d} />
+					Red rings mark the {Math.min(RINGED, hid.length)} tallest hidden
+					summits; below, the same rays from above.
 				</>
 			}
 		>
@@ -1404,7 +1388,7 @@ function RealSummits() {
 								width={1.3}
 							/>
 						</svg>
-						hidden summits (failed ray march)
+						hidden summits (behind a nearer ridge)
 					</button>
 				</div>
 			</div>
@@ -1525,18 +1509,18 @@ function RealOcclusion() {
 	return (
 		<Figure
 			label="Fig. 4"
+			pinned="demo-10"
 			caption={
 				<>
 					{hid.length} tall summits sit{" "}
 					{Math.min(...hid.map((p) => -gap(p))).toFixed(1)}–
-					{Math.max(...hid.map((p) => -gap(p))).toFixed(1)}° below the skyline
-					(demo-10; the {vis.length} visible ones sit on it).{" "}
+					{Math.max(...hid.map((p) => -gap(p))).toFixed(1)}° below the horizon
+					(the {vis.length} visible ones sit on it).{" "}
 					{named && (
 						<>
-							{named.name} is {(-gap(named)).toFixed(1)}° under it.{" "}
+							{named.name} is {(-gap(named)).toFixed(1)}° under it.
 						</>
 					)}
-					<Measured data={d} />
 				</>
 			}
 		>
@@ -1544,7 +1528,7 @@ function RealOcclusion() {
 				viewBox={`0 0 ${W} ${H}`}
 				className="block h-auto w-full"
 				role="img"
-				aria-label="DEM skyline elevation angle against azimuth, with visible summits on it and hidden summits below it"
+				aria-label="Terrain horizon elevation angle against azimuth, with visible summits on it and hidden summits below it"
 			>
 				{[0, 2, 4, 6]
 					.filter((e) => e >= e0 && e <= e1)
@@ -1622,7 +1606,7 @@ function RealOcclusion() {
 					</HandNote>
 				)}
 				<HandLabel x={W - 14} y={H - 6} anchor="end" size={FIG_LABEL} halo={0}>
-					{`azimuth ${a0.toFixed(0)}°–${a1.toFixed(0)}° · skyline step ${d.horizon.step}°`}
+					{`azimuth ${a0.toFixed(0)}°–${a1.toFixed(0)}°`}
 				</HandLabel>
 				{worst && (
 					<>
@@ -1640,12 +1624,12 @@ function RealOcclusion() {
 							color="pencil"
 							rotate={-2}
 						>
-							{`${worst.name}: ${Math.abs(gap(worst)).toFixed(2)}° under the skyline`}
+							{`${worst.name}: ${Math.abs(gap(worst)).toFixed(2)}° under the horizon`}
 						</HandText>
 					</>
 				)}
 				<HandText x={40} y={H - 34} size={16} color="pencil" rotate={-1.5}>
-					skyline = steepest ground in every direction
+					horizon = steepest ground in every direction
 				</HandText>
 			</svg>
 			<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] gb-secondary">
@@ -1745,8 +1729,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					onto the real ridge.
 					<MarginNote mark="a">
 						{movedMedian
-							? `Compass ${Math.abs(d1?.solved.delta.yaw ?? 0).toFixed(1)}° off: the median summit slid ${movedMedian.toFixed(0)} px. Hmm.`
-							: "A bad pose slides every summit sideways. Hmm."}
+							? `Compass ${Math.abs(d1?.solved.delta.yaw ?? 0).toFixed(1)}° off: the median summit slid ${movedMedian.toFixed(0)} px.`
+							: "A bad pose slides every summit sideways."}
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1755,12 +1739,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				label="Fig. 2"
 				bleed
 				caption={
-					<>
-						{moved.length
-							? `Same photo, same summits: ${moved.length} labelled summits move by a median ${movedMedian.toFixed(0)} px between the phone's guess and the solved pose (compass ${Math.abs(d1?.solved.delta.yaw ?? 0).toFixed(1)}° off). `
-							: "Same photo, same summits: only the camera pose changes. "}
-						<Measured data={d1} />
-					</>
+					moved.length
+						? `${moved.length} labelled summits move a median ${movedMedian.toFixed(0)} px between the phone's guess and the solved pose (compass ${Math.abs(d1?.solved.delta.yaw ?? 0).toFixed(1)}° off).`
+						: "Same photo, same summits: only the camera pose changes."
 				}
 			>
 				<Compare
@@ -1815,7 +1796,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<p>
 					{pc ? (
 						<>
-							Of {pc.inFrame} named peaks in demo-10's frame,{" "}
+							Of {pc.inFrame} named peaks in photo 10's frame,{" "}
 							<HandMark type="double">
 								{pc.hidden} sit behind a nearer ridge
 							</HandMark>
@@ -1868,8 +1849,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				label="Fig. 6"
 				caption={
 					<>
-						Four people-free photos, same rules: terrain hides most named peaks,
-						the label cap trims the rest. <Measured data={peakData} />
+						Four more photos, same rules: terrain hides most named peaks, the
+						label cap trims the rest.
 					</>
 				}
 			>
@@ -1915,26 +1896,20 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: pc ? `${pc.hidden} of ${pc.inFrame}` : "…",
-						label:
-							"named peaks in demo-10's frame hidden by terrain (full run)",
+						label: "named peaks in photo 10's frame hidden by terrain",
 					},
 					{
 						value:
 							pc && visible10 != null ? `${pc.labelled} of ${visible10}` : "…",
-						label: "visible summits that get a label (demo-10, full run)",
+						label: "visible summits that get a label (photo 10)",
 					},
 					{
 						value: "0.05°",
-						label: "how far a nearer ridge may rise above a summit",
+						label: "how far a ridge may rise above a summit before it hides it",
 					},
 					{ value: "150 km", label: "farthest summit considered" },
 				]}
-				source={
-					<>
-						Counts: scripts/gipfelbuch/data-peak.ts on demo-10 (OSM peaks with a
-						name, within 120 km). Tolerance and range: src/lib/geo/peaks.ts.
-					</>
-				}
+				source="Counts for photo 10: named OpenStreetMap peaks within 120 km."
 			/>
 
 			<Details>
@@ -1946,22 +1921,18 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						An OSM node says only that a mountain exists somewhere near a point.
 						To become a label in the photo it has to answer: how high is it, in
 						which direction and at what angle from this eye, can the eye
-						actually see it, and is it worth the pixels. All four live in{" "}
-						<code>geo/peaks.ts</code>,{" "}
-						<HandMark type="circle">about two hundred lines</HandMark>.
+						actually see it, and is it worth the pixels.
 						<MarginNote mark="b">
 							Four questions, four steps below. The third is the one that drops
 							most.
 						</MarginNote>{" "}
-						The {link("terrain-snapping", "snapping page")} covers the first
-						half of question one (moving the node onto the DEM summit); this
-						page follows a peak from there to the screen.
+						The {link("terrain-snapping", "snapping sheet")} covers the first
+						half of question one (moving the node onto the DEM summit).
 					</p>
 				</Section>
 				<Section title="The mechanism, in isolation" kicker="Schematic">
 					<p>
-						Fig. D1 below is a schematic with invented summits: it exists so you
-						can move the eye and watch a single ray march succeed or fail.
+						Invented summits: move the eye and watch one ray march pass or fail.
 					</p>
 				</Section>
 
@@ -1981,9 +1952,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 										<code>name</code> (falling back to <code>name:de</code>,{" "}
 										<code>name:en</code>), <code>ele</code>,{" "}
 										<code>prominence</code> and <code>wikidata</code>. Heights
-										are forgiving: <code>"1,234.5"</code> and{" "}
-										<code>"4000 ft"</code> both parse, the latter converted at
-										0.3048.
+										parse in several formats, including feet.
 									</>
 								),
 							},
@@ -2067,22 +2036,6 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							Unnamed costs 3000: that is a veto, not a ranking.
 						</MarginNote>
 					</p>
-				</Section>
-
-				<Section title="Seven shapes, one concept" kicker="In the ontology">
-					<p>
-						The same summit appears as different types depending on the stage it
-						is in. The catalogue in <code>reports/ontology.md</code> names the
-						canonical one and the bridges:
-					</p>
-					<dl className="mt-3 grid gap-x-6 gap-y-1.5 font-mono text-[13px] sm:grid-cols-[auto_1fr]">
-						{SHAPES.map(([k, v]) => (
-							<div key={k} className="contents">
-								<dt className="text-[var(--accent)]">{k}</dt>
-								<dd className="gb-secondary">{v}</dd>
-							</div>
-						))}
-					</dl>
 				</Section>
 
 				<Section title="Where it fits" kicker="Context">

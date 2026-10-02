@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { Database } from "lucide-react";
 import {
 	createContext,
 	type ReactNode,
@@ -10,18 +9,23 @@ import {
 	useEffect,
 	useId,
 	useMemo,
+	useRef,
 	useState,
+	useSyncExternalStore,
 } from "react";
 import { cn } from "#/lib/utils";
 import { HandDot, SketchPath } from "../notebook/Ink";
 import { sketchify } from "../notebook/sketchify";
 import { IMHOF_SHADING_STOPS, ImhofRampFilter } from "../swiss/imhof";
-import { SWISS } from "../swiss/inks";
 import { TYPE } from "../swiss/type";
-import { type TafelBake, useTafelBake } from "../tafel/useTafelBake";
+import { useTafelBake } from "../tafel/useTafelBake";
 import type { FigureImprint } from "./Figure";
+import { FigureSkeleton } from "./FigureSkeleton";
+import { GeoSpill, RULER_BAND, type SpillCursor } from "./GeoSpill";
 import { HandStrike } from "./hand";
-import { poseAt, useAlignmentStory } from "./story";
+import { dashFor, inkFor, LAYER_STYLE, type PhotoLayer } from "./inks";
+import { HandLabel } from "./labels";
+import { SpillSideContext, useAlignmentStory } from "./story";
 
 // Measured data for gipfelbuch pages: the real CPU pipeline run on the bundled Niederhorn demo photos by
 // scripts/gipfelbuch/build-data.ts → public/demo/gipfelbuch/*. Pages render these instead of synthetic stand-ins.
@@ -180,33 +184,100 @@ export interface GipfelbuchIndex {
 }
 
 const cache = new Map<string, Promise<unknown>>();
+/** Values already fetched, so a revisit renders at once instead of through a loading frame. */
+const loaded = new Map<string, unknown>();
+/** URLs whose last fetch failed: the figure shows a hand note instead of a skeleton forever. */
+const failed = new Set<string>();
+const failedListeners = new Set<() => void>();
+let failedVersion = 0;
+const markFailed = (url: string, isFailed: boolean) => {
+	if (failed.has(url) === isFailed) return;
+	if (isFailed) failed.add(url);
+	else failed.delete(url);
+	failedVersion++;
+	for (const listener of failedListeners) listener();
+};
 function load<T>(url: string): Promise<T> {
 	let p = cache.get(url);
 	if (!p) {
+		markFailed(url, false);
 		p = fetch(url).then((r) => {
 			if (!r.ok) throw new Error(`${url}: ${r.status}`);
 			return r.json();
 		});
-		p.catch(() => cache.delete(url));
+		p.then(
+			(v) => loaded.set(url, v),
+			() => {
+				cache.delete(url);
+				markFailed(url, true);
+			},
+		);
 		cache.set(url, p);
 	}
 	return p as Promise<T>;
 }
-function useJson<T>(url: string | null): T | null {
-	const [d, setD] = useState<T | null>(null);
+
+/** Marks a data object that is the previous photo's, kept on screen while the next one loads. */
+const STALE = Symbol("gipfelbuch.stale");
+/** True while `data` is the previous photo's, shown dimmed until the requested one arrives. */
+export const isStaleData = (data: object | null | undefined): boolean =>
+	!!data && (data as { [STALE]?: boolean })[STALE] === true;
+
+/**
+ * Fetches `url`. While a new url loads, the previous value stays (marked stale, see `isStaleData`) so a
+ * picker does not blank the figure and jump the page's height; null only before the first load.
+ */
+function useJson<T extends object>(url: string | null): T | null {
+	const [state, setState] = useState<{ url: string | null; data: T | null }>({
+		url: null,
+		data: null,
+	});
 	useEffect(() => {
 		if (!url) return;
 		let live = true;
-		setD(null);
 		load<T>(url).then(
-			(v) => live && setD(v),
+			(v) => live && setState({ url, data: v }),
 			(e) => console.warn("[gipfelbuch]", e),
 		);
 		return () => {
 			live = false;
 		};
 	}, [url]);
-	return d;
+	const previous = state.data;
+	const stale = useMemo(
+		() =>
+			previous
+				? (Object.defineProperty({ ...previous }, STALE, {
+						value: true,
+					}) as T)
+				: null,
+		[previous],
+	);
+	if (!url) return null;
+	const ready = loaded.get(url) as T | undefined;
+	if (ready) return ready;
+	return state.url === url ? state.data : stale;
+}
+
+const subscribeFailed = (listener: () => void) => {
+	failedListeners.add(listener);
+	return () => {
+		failedListeners.delete(listener);
+	};
+};
+/** The photo id whose data failed to load (the one named by `id`, else any), or null. */
+export function useLoadFailure(id?: string): string | null {
+	useSyncExternalStore(
+		subscribeFailed,
+		() => failedVersion,
+		() => 0,
+	);
+	const prefix = "/demo/gipfelbuch/";
+	if (id) return failed.has(`${prefix}${id}.json`) ? id : null;
+	for (const url of failed)
+		if (url.startsWith(prefix))
+			return url.slice(prefix.length).replace(/\.json$/, "");
+	return null;
 }
 
 /** Measured pipeline data for one demo photo (null while loading). */
@@ -232,24 +303,7 @@ export function rowsPath(rows: Rows, maxJump = 12, sx = 1, sy = 1) {
 	return d;
 }
 
-export type PhotoLayer =
-	| "skyline"
-	| "weight"
-	| "prior"
-	| "solved"
-	| "peaks"
-	| "priorPeaks"
-	| "sky";
-export const LAYER_STYLE: Record<PhotoLayer, { label: string; color: string }> =
-	{
-		skyline: { label: "detected skyline", color: "#f0a30a" },
-		weight: { label: "column confidence", color: "#f0a30a" },
-		prior: { label: "DEM at sensor prior", color: "#e0207f" },
-		solved: { label: "DEM at solved pose", color: "#0aa5bd" },
-		peaks: { label: "peaks (solved)", color: "var(--gb-ink, #131313)" },
-		priorPeaks: { label: "peaks (prior)", color: "#e0207f" },
-		sky: { label: "sky probability", color: "#7aa7ff" },
-	};
+export { LAYER_STYLE, type PhotoLayer };
 
 /** Hand block capitals (peak and place names) and hand figures (values), per the hand pass. */
 const CAPS_STACK = "var(--gb-font-caps), var(--gb-font-hand), cursive";
@@ -399,26 +453,16 @@ export function imprintFor(
 	return kind === "photo"
 		? {
 				aufnahme: `${data.id}${data.photo.takenAt ? `, ${data.photo.takenAt.slice(0, 10)}` : ""}`,
-				revision: data.solved.stage,
-				stich: "SVG",
 			}
 		: {
-				aufnahme: `${data.dem} DEM, ${2 * data.demPatch.halfKm} km patch`,
-				revision: "hillshade",
-				stich: "SVG",
+				aufnahme: `${data.dem} terrain, ${2 * data.demPatch.halfKm} km`,
 			};
 }
 
 function ImprintLine({ imprint }: { imprint: FigureImprint }) {
 	return (
 		<p className={`${TYPE.micro} gb-secondary mt-1.5`}>
-			{[
-				imprint.aufnahme && `Aufnahme ${imprint.aufnahme}`,
-				imprint.revision && `Revision ${imprint.revision}`,
-				imprint.stich && `Stich ${imprint.stich}`,
-			]
-				.filter(Boolean)
-				.join(" · ")}
+			{imprint.aufnahme && `Aufnahme ${imprint.aufnahme}`}
 		</p>
 	);
 }
@@ -442,6 +486,11 @@ export function RealPhoto({
 	labelInfo = false,
 	imprint: imprintProp,
 	bleed,
+	spillCursor,
+	spillT,
+	aspect,
+	id,
+	alsoNames = true,
 	className,
 	children,
 }: {
@@ -455,14 +504,30 @@ export function RealPhoto({
 	/** One micro provenance line under the photo (Aufnahme / Revision / Stich); false hides it. */
 	imprint?: boolean;
 	/**
-	 * Geo bleed: the measured terrain carries on past the photo's frame, as on the Tafel. The baked
-	 * ridge strokes, the compass ruler and the summits outside the frame are drawn on the paper around
-	 * the photo, fading out. The svg keeps the container's width and the photo sits inside it, with this
-	 * fraction of the frame width of paper on each side (true = 0.14). Use on one big photo per wide
-	 * figure, never inside a Trio or Gallery. In a Compare, give both sides the same `bleed` so the wipe
-	 * stays registered.
+	 * Geo bleed, as on the landing page: the photo keeps its full width and its measured world runs
+	 * out past the figure onto the sheet's margins (the Tafel bake's ridge strokes, a hand compass
+	 * ruler over the top and the summits beyond the frame), fading out towards the sheet's edge. A
+	 * number caps the spill per side as a fraction of the photo's width (true = 0.5, the bake's
+	 * extent). Use on one big photo per figure, never inside a Trio or Gallery. In a Compare give both
+	 * sides the same `bleed`: the bottom side draws the spill at the wipe's position, the top side none.
 	 */
 	bleed?: boolean | number;
+	/**
+	 * Where the figure points (a sweep's column, a ray's azimuth): marked on the spill's compass ruler
+	 * and, past the frame, dropped to the horizon. Needs `bleed`.
+	 */
+	spillCursor?: SpillCursor | null;
+	/**
+	 * The spill's pose, 0 = the phone's guess .. 1 = solved, for a figure that steps through poses
+	 * without an alignment story; by default it follows the story, a Compare or the layers shown.
+	 */
+	spillT?: number;
+	/** Width / height of the loading skeleton (default 4/3), so the figure does not jump when the photo arrives. */
+	aspect?: number;
+	/** The photo id being loaded, so a failed fetch names it (otherwise any failed gipfelbuch photo counts). */
+	id?: string;
+	/** Under the photo, list the summits whose names fit no row ("also: 1 Name · 2 Name"); default on. */
+	alsoNames?: boolean;
 	className?: string;
 	children?: (d: GipfelbuchPhotoData) => ReactNode;
 }) {
@@ -471,15 +536,19 @@ export function RealPhoto({
 	const story = useAlignmentStory();
 	const [off, setOff] = useState<Set<PhotoLayer>>(new Set());
 	const clipId = `gipfelbuch-clip-${useId().replace(/:/g, "")}`;
-	const bleedFraction = bleed === true ? 0.14 : bleed || 0;
-	const bake = useTafelBake(bleedFraction > 0 && data ? data.id : null);
+	const side = useContext(SpillSideContext);
+	const hostRef = useRef<HTMLDivElement>(null);
+	const bleedFraction = bleed === true ? 0.5 : bleed || 0;
+	const bake = useTafelBake(
+		bleedFraction > 0 && data && !side?.off ? data.id : null,
+	);
+	const failedId = useLoadFailure(id);
 	if (!data)
 		return (
-			<div
-				className={cn(
-					"aspect-[4/3] w-full animate-pulse bg-white/[0.06] motion-reduce:animate-none",
-					className,
-				)}
+			<FigureSkeleton
+				aspect={aspect ?? 4 / 3}
+				failedId={failedId}
+				className={className}
 			/>
 		);
 	const { width: W, height: H } = data.photo;
@@ -490,11 +559,13 @@ export function RealPhoto({
 	const showsPrior = on("prior") || on("priorPeaks");
 	const showsSolved = on("solved") || on("peaks");
 	const bleedT =
-		showsPrior && !showsSolved
+		side?.t ??
+		spillT ??
+		(showsPrior && !showsSolved
 			? 0
 			: showsSolved && !showsPrior
 				? 1
-				: (story?.t ?? 1);
+				: (story?.t ?? 1));
 	// with both lines on in a story, the story's end of the correction is the one inked
 	const lineOpacity = (l: "prior" | "solved" | "skyline") =>
 		!story || l === "skyline" || !(on("prior") && on("solved"))
@@ -509,137 +580,166 @@ export function RealPhoto({
 		.filter((p) => p.labelled && inCrop(p.prior))
 		.slice(0, maxLabels);
 	const ws = data.skyline.weight;
-	const frameW = x1 - x0;
-	const spill =
-		bleedFraction > 0
-			? {
-					mx: bleedFraction * frameW,
-					top: 34 * k,
-					bottom: 10 * k,
-				}
-			: null;
-	const view = spill
-		? [
-				x0 - spill.mx,
-				y0 - spill.top,
-				frameW + 2 * spill.mx,
-				y1 - y0 + spill.top + spill.bottom,
-			]
-		: [x0, y0, frameW, y1 - y0];
+	const view = [x0, y0, x1 - x0, y1 - y0];
+	const stale = isStaleData(data);
+	// KR8 label layout, shared with the footnote under the photo: dropped summits are numbered
+	const layoutBox = { k, left: x0, right: x1 };
+	const solvedLayout = layoutPeakLabels(
+		solvedLabels.map((p) => ({
+			name: p.name,
+			at: p.solved as [number, number],
+			sub: labelInfo
+				? `${p.dem} m · ${(p.distance / 1000).toFixed(0)} km`
+				: undefined,
+		})),
+		layoutBox,
+	);
+	const priorLayout = layoutPeakLabels(
+		priorLabels.map((p) => ({
+			name: p.name,
+			at: p.prior as [number, number],
+		})),
+		layoutBox,
+		// the solved layer owns the footnote when both show
+		on("peaks") ? 0 : 1,
+	);
+	const droppedNames = [
+		...(on("peaks") ? solvedLayout : []),
+		...(on("priorPeaks") && !on("peaks") ? priorLayout : []),
+	].filter((l) => l.note != null);
 	return (
-		<div className={className}>
-			<svg
-				viewBox={view.join(" ")}
-				className="block h-auto w-full overflow-hidden"
-				role="img"
-				aria-label={`${data.id} with measured overlays`}
+		<div
+			className={cn(
+				"transition-opacity duration-300 motion-reduce:transition-none",
+				stale && "opacity-[0.55]",
+				className,
+			)}
+			aria-busy={stale || undefined}
+		>
+			<div
+				ref={hostRef}
+				className="relative isolate"
+				style={bleedFraction > 0 ? { marginTop: RULER_BAND } : undefined}
 			>
-				{spill && (
-					<GeoBleed
+				{bleedFraction > 0 && !side?.off && (
+					<GeoSpill
+						hostRef={hostRef}
 						data={data}
 						bake={bake}
 						frame={[x0, y0, x1, y1]}
-						view={view as [number, number, number, number]}
-						k={k}
-						id={clipId}
+						maxSpill={bleedFraction}
 						t={bleedT}
+						immediate={side?.t != null}
+						echo={{
+							layers: layers.filter((l) => !off.has(l)),
+							opacity: {
+								prior: lineOpacity("prior"),
+								solved: lineOpacity("solved"),
+							},
+						}}
+						cursor={spillCursor}
 					/>
 				)}
-				<defs>
-					<clipPath id={clipId}>
-						<rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} />
-					</clipPath>
-				</defs>
-				<g clipPath={`url(#${clipId})`}>
-					<image
-						href={data.photo.src}
-						width={W}
-						height={H}
-						preserveAspectRatio="none"
-					/>
-					{on("sky") && data.skyImage && (
+				<svg
+					viewBox={view.join(" ")}
+					className="block h-auto w-full overflow-hidden"
+					role="img"
+					aria-label={`${data.id} with measured overlays`}
+				>
+					<defs>
+						<clipPath id={clipId}>
+							<rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} />
+						</clipPath>
+					</defs>
+					<g clipPath={`url(#${clipId})`}>
 						<image
-							href={data.skyImage}
+							href={data.photo.src}
 							width={W}
 							height={H}
 							preserveAspectRatio="none"
-							opacity={0.7}
-							style={{ mixBlendMode: "screen" }}
 						/>
-					)}
-					<g fill="none" strokeLinecap="round" strokeLinejoin="round">
-						{(["prior", "solved", "skyline"] as const).map(
-							(l) =>
-								on(l) && (
-									<PhotoLine
-										key={l}
-										d={rowsPath(
-											l === "skyline"
-												? data.skyline.rows
-												: l === "prior"
-													? data.priorRows
-													: data.solvedRows,
-											l === "skyline" ? 8 : 12,
-										)}
-										seed={`${data.id}-${l}`}
-										color={LAYER_STYLE[l].color}
-										width={(l === "skyline" ? 1.7 : 2.2) * k}
-										halo={(l === "skyline" ? 4 : 4.6) * k}
-										dash={l === "prior" ? `${6 * k} ${5 * k}` : undefined}
-										opacity={lineOpacity(l)}
-										crisp
-									/>
-								),
+						{on("sky") && data.skyImage && (
+							<image
+								href={data.skyImage}
+								width={W}
+								height={H}
+								preserveAspectRatio="none"
+								opacity={0.7}
+								style={{ mixBlendMode: "screen" }}
+							/>
 						)}
-						{on("weight") &&
-							data.skyline.rows.map((y, x) =>
-								y == null || x % Math.max(1, Math.round(4 * k)) ? null : (
-									<line
-										// biome-ignore lint/suspicious/noArrayIndexKey: the index is the image column
-										key={x}
-										x1={x + 0.5}
-										x2={x + 0.5}
-										y1={y}
-										y2={y - (4 + 26 * ws[x]) * k}
-										stroke={LAYER_STYLE.weight.color}
-										strokeWidth={2.4 * k}
-										opacity={0.25 + 0.75 * ws[x]}
-									/>
-								),
+						<g fill="none" strokeLinecap="round" strokeLinejoin="round">
+							{(["prior", "solved", "skyline"] as const).map(
+								(l) =>
+									on(l) && (
+										<PhotoLine
+											key={l}
+											d={rowsPath(
+												l === "skyline"
+													? data.skyline.rows
+													: l === "prior"
+														? data.priorRows
+														: data.solvedRows,
+												l === "skyline" ? 8 : 12,
+											)}
+											seed={`${data.id}-${l}`}
+											color={inkFor(l, "photo")}
+											width={(l === "skyline" ? 1.7 : 2.2) * k}
+											halo={(l === "skyline" ? 4 : 4.6) * k}
+											dash={dashFor(l, k)}
+											opacity={lineOpacity(l)}
+											crisp
+										/>
+									),
 							)}
+							{on("weight") &&
+								data.skyline.rows.map((y, x) =>
+									y == null || x % Math.max(1, Math.round(4 * k)) ? null : (
+										<line
+											// biome-ignore lint/suspicious/noArrayIndexKey: the index is the image column
+											key={x}
+											x1={x + 0.5}
+											x2={x + 0.5}
+											y1={y}
+											y2={y - (4 + 26 * ws[x]) * k}
+											stroke={LAYER_STYLE.weight.color}
+											strokeWidth={2.4 * k}
+											opacity={0.25 + 0.75 * ws[x]}
+										/>
+									),
+								)}
+						</g>
+						{on("priorPeaks") && (
+							<PeakLabels
+								placed={priorLayout}
+								color={inkFor("priorPeaks", "photo")}
+								k={k}
+								top={y0}
+							/>
+						)}
+						{on("peaks") && (
+							<PeakLabels
+								placed={solvedLayout}
+								color={inkFor("peaks", "photo")}
+								k={k}
+								top={y0}
+							/>
+						)}
+						{children?.(data)}
 					</g>
-					{on("priorPeaks") && (
-						<PeakLabels
-							items={priorLabels.map((p) => ({
-								name: p.name,
-								at: p.prior as [number, number],
-							}))}
-							color={LAYER_STYLE.priorPeaks.color}
-							k={k}
-							top={y0}
-							left={x0}
-							right={x1}
-						/>
-					)}
-					{on("peaks") && (
-						<PeakLabels
-							items={solvedLabels.map((p) => ({
-								name: p.name,
-								at: p.solved as [number, number],
-								sub: labelInfo
-									? `${p.dem} m · ${(p.distance / 1000).toFixed(0)} km`
-									: undefined,
-							}))}
-							color={LAYER_STYLE.peaks.color}
-							k={k}
-							top={y0}
-							left={x0}
-							right={x1}
-						/>
-					)}
-					{children?.(data)}
-				</g>
-			</svg>
+				</svg>
+			</div>
+			{alsoNames && droppedNames.length > 0 && (
+				<p className="nb-hand mt-1.5 text-[17px] leading-[21px] text-[var(--gb-secondary,#4a545c)]">
+					also:{" "}
+					{droppedNames.map((l, i) => (
+						<span key={l.item.name}>
+							{i > 0 && " · "}
+							<span className="nb-num">{l.note}</span> {l.item.name}
+						</span>
+					))}
+				</p>
+			)}
 			{imprint && <ImprintLine imprint={imprintFor(data, "photo")} />}
 			{toggles && toggles.length > 0 && (
 				<div className="mt-3 flex flex-wrap gap-1.5">
@@ -672,7 +772,7 @@ export function RealPhoto({
 									y={5}
 									r={3.8}
 									seed={`toggle-${l}`}
-									color={LAYER_STYLE[l].color}
+									color={inkFor(l, "photo")}
 									opacity={off.has(l) ? 0.3 : 1}
 								/>
 							</svg>
@@ -690,29 +790,36 @@ export function RealPhoto({
 	);
 }
 
-/** Peak marks with leaders; names staggered over three rows by x so neighbours don't overlap. */
-function PeakLabels({
-	items,
-	color,
-	k,
-	top,
-	left,
-	right,
-}: {
-	items: { name: string; at: [number, number]; sub?: string }[];
-	color: string;
-	k: number;
-	top: number;
-	left: number;
-	right: number;
-}) {
+export interface PeakLabelItem {
+	name: string;
+	at: [number, number];
+	sub?: string;
+}
+export interface PlacedPeakLabel {
+	item: PeakLabelItem;
+	anchor: "start" | "middle" | "end";
+	/** Row 0-2 the name sits on, or -1 when it fitted none (dot only). */
+	row: number;
+	/** Footnote number of a dropped summit (1-based, in priority order); undefined when named. */
+	note?: number;
+}
+
+/**
+ * KR8: place names in priority order (the data's ranking) on up to three rows. A label's box is its real
+ * extent for its anchor plus the leader stub; a summit whose name fits no row keeps its dot, loses the
+ * name and gets the next footnote number (from `firstNote`; 0 gives no numbers), so two close summits
+ * never overprint and the name is still on the sheet. Pure; `k` scales px to the photo's crop.
+ */
+export function layoutPeakLabels(
+	items: PeakLabelItem[],
+	box: { k: number; left: number; right: number },
+	firstNote = 1,
+): PlacedPeakLabel[] {
+	const { k, left, right } = box;
 	const fs = 14 * k;
-	const rowH = (items.some((i) => i.sub) ? 26 : 15) * k;
-	// KR8: place in priority order (the data's ranking), on up to three rows. A label's box is its
-	// real extent for its anchor plus the leader stub; a summit whose name fits no row keeps its dot
-	// and loses the name, so two close summits never overprint.
 	const rows: [number, number][][] = [[], [], []];
-	const placed = items.map((it) => {
+	let next = firstNote;
+	return items.map((it) => {
 		// hand block capitals with 0.08 em tracking run wider than the old condensed face
 		const w = it.name.length * fs * 0.7 + 8 * k;
 		const anchor: "start" | "middle" | "end" =
@@ -727,19 +834,41 @@ function PeakLabels({
 				: anchor === "end"
 					? it.at[0] - w
 					: it.at[0] - w / 2;
-		const box: [number, number] = [x0, x0 + w];
+		const span: [number, number] = [x0, x0 + w];
 		const row = rows.findIndex((r) =>
-			r.every(([a0, a1]) => box[1] < a0 || box[0] > a1),
+			r.every(([a0, a1]) => span[1] < a0 || span[0] > a1),
 		);
-		if (row >= 0) rows[row].push(box);
-		return { it, anchor, row };
+		if (row >= 0) rows[row].push(span);
+		return {
+			item: it,
+			anchor,
+			row,
+			note: row < 0 && firstNote > 0 ? next++ : undefined,
+		};
 	});
+}
+
+/** Peak marks with leaders; names staggered over three rows by x so neighbours don't overlap. */
+function PeakLabels({
+	placed,
+	color,
+	k,
+	top,
+}: {
+	placed: PlacedPeakLabel[];
+	color: string;
+	k: number;
+	top: number;
+}) {
+	const fs = 14 * k;
+	const rowH = (placed.some((p) => p.item.sub) ? 26 : 15) * k;
 	return (
 		<g>
-			{placed.map(({ it, anchor, row }) => {
+			{placed.map(({ item: it, anchor, row, note }) => {
 				if (row < 0)
 					return (
 						<g key={it.name}>
+							<title>{it.name}</title>
 							<HandDot
 								x={it.at[0]}
 								y={it.at[1]}
@@ -757,6 +886,19 @@ function PeakLabels({
 								opacity={1}
 								data
 							/>
+							{note != null && (
+								<HandLabel
+									x={it.at[0]}
+									y={it.at[1] - 7 * k}
+									anchor="middle"
+									size={11 * k}
+									color={PHOTO_INK}
+									halo={3 * k}
+									haloColor={HALO}
+								>
+									{note}
+								</HandLabel>
+							)}
 						</g>
 					);
 				const ty = Math.max(
@@ -765,6 +907,7 @@ function PeakLabels({
 				);
 				return (
 					<g key={it.name}>
+						<title>{it.sub ? `${it.name}, ${it.sub}` : it.name}</title>
 						{/* hairline leader from the summit up to the name: paper under, pen over */}
 						<PhotoLine
 							d={`M${it.at[0]} ${it.at[1] - 3 * k}L${it.at[0]} ${ty + 3 * k}`}
@@ -835,9 +978,42 @@ function PeakLabels({
 	);
 }
 
-/** Cone inks on paper: chart kin of the photo overlay magenta / cyan (RM, GL). */
-const DEM_PRIOR = "#ab343a";
-const DEM_SOLVED = "#30626b";
+/** DemPatch's square viewBox side. */
+const DEM_VIEW = 400;
+
+/** Pixel of a bearing and distance (m) from the camera on the north-up patch (the camera is at the centre). */
+export function demToPx(
+	halfKm: number,
+	azDeg: number,
+	distM: number,
+	size = DEM_VIEW,
+): [number, number] {
+	const r = (azDeg * Math.PI) / 180;
+	const half = halfKm * 1000;
+	return [
+		size / 2 + (Math.sin(r) * distM * size) / (2 * half),
+		size / 2 - (Math.cos(r) * distM * size) / (2 * half),
+	];
+}
+
+/**
+ * The view cone as a closed SVG path on the DEM patch: from the camera along yaw ± hfov/2 out to `reach`
+ * (metres, default 1.6 times the patch's half width) and round the arc. Shared by DemPatch, the story
+ * map and anything drawing a cone on `demPatch` pixels.
+ */
+export function coneWedge(
+	data: { demPatch: { halfKm: number } },
+	yaw: number,
+	hfov: number,
+	reach = data.demPatch.halfKm * 1600,
+	size = DEM_VIEW,
+): string {
+	const halfKm = data.demPatch.halfKm;
+	const a = demToPx(halfKm, yaw - hfov / 2, reach, size);
+	const b = demToPx(halfKm, yaw + hfov / 2, reach, size);
+	const radius = (reach * size) / (2 * halfKm * 1000);
+	return `M${size / 2} ${size / 2}L${a[0]} ${a[1]}A${radius} ${radius} 0 0 1 ${b[0]} ${b[1]}Z`;
+}
 
 /**
  * The hillshaded DEM patch around a demo photo's camera, north up, with the view cone at the prior
@@ -847,6 +1023,9 @@ export function DemPatch({
 	data,
 	cone = ["prior", "solved"],
 	peaks = true,
+	coneFill = 0.1,
+	aspect = 1,
+	id,
 	imprint: imprintProp,
 	className,
 	children,
@@ -854,6 +1033,12 @@ export function DemPatch({
 	data: GipfelbuchPhotoData | null;
 	cone?: ("prior" | "solved")[];
 	peaks?: boolean;
+	/** Tint inside each cone, as a fill opacity (the solved cone takes 1.4 times it); 0 for outlines only. */
+	coneFill?: number;
+	/** Width / height of the loading skeleton (default square). */
+	aspect?: number;
+	/** The photo id being loaded, so a failed fetch names it. */
+	id?: string;
 	/** One micro provenance line under the patch; false hides it. */
 	imprint?: boolean;
 	className?: string;
@@ -864,33 +1049,27 @@ export function DemPatch({
 }) {
 	const imprintDefault = useContext(ImprintContext);
 	const imprint = imprintProp ?? imprintDefault;
+	const failedId = useLoadFailure(id);
 	if (!data)
 		return (
-			<div
-				className={cn(
-					"aspect-square w-full animate-pulse bg-white/[0.06] motion-reduce:animate-none",
-					className,
-				)}
+			<FigureSkeleton
+				aspect={aspect}
+				failedId={failedId}
+				className={className}
 			/>
 		);
-	const S = 400;
+	const S = DEM_VIEW;
 	const half = data.demPatch.halfKm * 1000;
-	const toPx = (az: number, d: number): [number, number] => {
-		const r = (az * Math.PI) / 180;
-		return [
-			S / 2 + (Math.sin(r) * d * S) / (2 * half),
-			S / 2 - (Math.cos(r) * d * S) / (2 * half),
-		];
-	};
-	const wedge = (yaw: number, hfov: number, reach: number) => {
-		const a = toPx(yaw - hfov / 2, reach);
-		const b = toPx(yaw + hfov / 2, reach);
-		const rr = (reach * S) / (2 * half);
-		return `M${S / 2} ${S / 2}L${a[0]} ${a[1]}A${rr} ${rr} 0 0 1 ${b[0]} ${b[1]}Z`;
-	};
-	const reach = half * 1.6;
+	const toPx = (az: number, d: number): [number, number] =>
+		demToPx(data.demPatch.halfKm, az, d, S);
 	return (
-		<div className={cn("relative overflow-hidden", className)}>
+		<div
+			className={cn(
+				"relative overflow-hidden transition-opacity duration-300 motion-reduce:transition-none",
+				isStaleData(data) && "opacity-[0.55]",
+				className,
+			)}
+		>
 			<svg
 				viewBox={`0 0 ${S} ${S}`}
 				className="block h-auto w-full"
@@ -914,24 +1093,27 @@ export function DemPatch({
 					opacity={0.92}
 					style={{ mixBlendMode: "multiply" }}
 				/>
-				{cone.includes("prior") && (
-					<PhotoLine
-						d={wedge(data.prior.yaw, data.prior.hfov, reach)}
-						seed={`${data.id}-cone-prior`}
-						color={DEM_PRIOR}
-						width={1.5}
-						halo={4}
-						dash="5 4"
-					/>
-				)}
-				{cone.includes("solved") && (
-					<PhotoLine
-						d={wedge(data.solved.yaw, data.solved.hfov, reach)}
-						seed={`${data.id}-cone-solved`}
-						color={DEM_SOLVED}
-						width={1.9}
-						halo={4.4}
-					/>
+				{(["prior", "solved"] as const).map(
+					(l) =>
+						cone.includes(l) && (
+							<g key={l}>
+								{coneFill > 0 && (
+									<path
+										d={coneWedge(data, data[l].yaw, data[l].hfov)}
+										fill={inkFor(l, "paper")}
+										fillOpacity={l === "solved" ? coneFill * 1.4 : coneFill}
+									/>
+								)}
+								<PhotoLine
+									d={coneWedge(data, data[l].yaw, data[l].hfov)}
+									seed={`${data.id}-cone-${l}`}
+									color={inkFor(l, "paper")}
+									width={l === "solved" ? 1.9 : 1.5}
+									halo={l === "solved" ? 4.4 : 4}
+									dash={l === "prior" ? dashFor("prior", 5 / 6) : undefined}
+								/>
+							</g>
+						),
 				)}
 				{peaks &&
 					data.peaks
@@ -1028,15 +1210,25 @@ export function Measured({
 }) {
 	return (
 		<span className="inline-flex flex-wrap items-center gap-1.5">
-			<Database
-				className="size-3 text-[var(--gb-contour,var(--accent))]"
-				strokeWidth={1.6}
-			/>
-			<span>
-				Measured{data?.id ? ` on ${data.id}` : ""}
-				{data?.dem ? ` (${data.dem} DEM)` : ""} by{" "}
-				{data?.script ?? "scripts/gipfelbuch/build-data.ts"}
-				{data?.generated ? `, ${data.generated}` : ""}.
+			{/* a pen tick: the figure is drawn from a measurement */}
+			<svg
+				viewBox="0 0 14 12"
+				className="size-3.5 shrink-0 overflow-visible"
+				aria-hidden="true"
+			>
+				<SketchPath
+					d="M2 6.5L5.5 10L12 2"
+					seed="measured-tick"
+					color="forest"
+					width={1.6}
+					passes={1}
+					tolerance={0.6}
+				/>
+			</svg>
+			<span
+				title={`Measured by ${data?.script ?? "scripts/gipfelbuch/build-data.ts"}${data?.generated ? `, ${data.generated}` : ""}${data?.dem ? ` (${data.dem} terrain)` : ""}`}
+			>
+				Measured{data?.id ? ` on ${data.id.replace(/^demo-/, "photo ")}` : ""}.
 			</span>
 			{children}
 		</span>
@@ -1096,218 +1288,5 @@ export function PhotoPicker({
 				</button>
 			))}
 		</div>
-	);
-}
-
-/** RGB of a #rrggbb hex as 0..1, for an feColorMatrix (SVG attributes take no var()). */
-const rgb01 = (hex: string) =>
-	[1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255);
-
-const CARDINAL: Record<number, string> = {
-	0: "N",
-	90: "E",
-	180: "S",
-	270: "W",
-};
-
-/**
- * The paper around a photo, carrying its measured world past the frame: the Tafel bake's ridge
- * strokes re-inked in contour brown, a compass ruler over the top, and the summits outside the
- * frame. Everything fades towards the outer edges. Drawn in working-frame px, under the photo.
- */
-function GeoBleed({
-	data,
-	bake,
-	frame,
-	view,
-	k,
-	id,
-	t = 1,
-}: {
-	data: GipfelbuchPhotoData;
-	bake: TafelBake | null;
-	frame: [number, number, number, number];
-	view: [number, number, number, number];
-	k: number;
-	id: string;
-	/** Alignment story position: 0 draws the world where the phone's guess puts it, 1 at the solved pose. */
-	t?: number;
-}) {
-	if (!bake) return null;
-	const [x0, y0, x1, y1] = frame;
-	const [vx, vy, vw, vh] = view;
-	// canvas px per working px, and the canvas box in working px
-	const scale = (bake.width * bake.photo.w) / data.photo.width;
-	const cw = bake.width / scale;
-	const ch = bake.height / scale;
-	const cx = -(bake.photo.x * bake.width) / scale;
-	const cy = -(bake.photo.y * bake.height) / scale;
-	const [r, g, b] = rgb01(SWISS.contour);
-	const fadeL = (x0 - vx) / vw;
-	const fadeR = (x1 - vx) / vw;
-	const rulerY = y0 - 14 * k;
-	const norm = (a: number) => ((a % 360) + 360) % 360;
-	// the bake is drawn at its own camera; at another pose the world slides by f·tan(Δyaw) across and
-	// f·tan(pitch) down (roll and the focal change are small here and left out)
-	const pose = poseAt(data, t);
-	const RAD = Math.PI / 180;
-	const dYaw = ((((bake.camera.yaw - pose.yaw + 180) % 360) + 360) % 360) - 180;
-	const dx = pose.f * Math.tan(dYaw * RAD);
-	const dy =
-		pose.f * Math.tan(pose.pitch * RAD) -
-		bake.camera.f * Math.tan(bake.camera.pitch * RAD);
-	const ticks = bake.ticks
-		.map((t) => ({ ...t, wx: cx + t.x * cw + dx, a: norm(t.az) }))
-		.filter((t) => t.wx >= vx && t.wx <= vx + vw);
-	const outside = bake.peaks
-		.map((p) => ({ ...p, wx: cx + p.x * cw + dx, wy: cy + p.y * ch + dy }))
-		.filter(
-			(p) =>
-				(p.wx < x0 - 6 * k || p.wx > x1 + 6 * k) &&
-				p.wx > vx + 8 * k &&
-				p.wx < vx + vw - 8 * k &&
-				p.wy > y0 + 4 * k &&
-				p.wy < y1,
-		)
-		.sort((p, q) => q.ele - p.ele)
-		.slice(0, 4);
-	return (
-		<g>
-			<defs>
-				<filter id={`${id}-ink`} colorInterpolationFilters="sRGB">
-					<feColorMatrix
-						type="matrix"
-						values={`0 0 0 0 ${r} 0 0 0 0 ${g} 0 0 0 0 ${b} 0 0 0 1 0`}
-					/>
-				</filter>
-				<linearGradient id={`${id}-fade`} x1="0" x2="1" y1="0" y2="0">
-					<stop offset="0" stopColor="#fff" stopOpacity="0" />
-					<stop offset={fadeL * 0.55} stopColor="#fff" stopOpacity="0.35" />
-					<stop offset={fadeL} stopColor="#fff" stopOpacity="1" />
-					<stop offset={fadeR} stopColor="#fff" stopOpacity="1" />
-					<stop
-						offset={1 - (1 - fadeR) * 0.55}
-						stopColor="#fff"
-						stopOpacity="0.35"
-					/>
-					<stop offset="1" stopColor="#fff" stopOpacity="0" />
-				</linearGradient>
-				<mask id={`${id}-mask`} maskUnits="userSpaceOnUse">
-					<rect
-						x={vx}
-						y={vy}
-						width={vw}
-						height={vh}
-						fill={`url(#${id}-fade)`}
-					/>
-				</mask>
-			</defs>
-			<g mask={`url(#${id}-mask)`}>
-				<image
-					href={bake.src}
-					x={cx + dx}
-					y={cy + dy}
-					width={cw}
-					height={ch}
-					preserveAspectRatio="none"
-					filter={`url(#${id}-ink)`}
-					opacity={0.9}
-				/>
-				{/* compass ruler drawn by hand: every 5°, lettered every 15° and at the cardinals */}
-				<SketchPath
-					d={`M${vx.toFixed(1)} ${rulerY.toFixed(1)}L${(vx + vw).toFixed(1)} ${rulerY.toFixed(1)}`}
-					seed={`${data.id}-ruler`}
-					color={SWISS.ink}
-					width={0.9 * k}
-					opacity={0.6}
-					passes={2}
-					tolerance={0.9 * k}
-				/>
-				<SketchPath
-					d={ticks
-						.map((t) => {
-							const major = t.a % 15 === 0 || !!CARDINAL[t.a];
-							return `M${t.wx.toFixed(1)} ${rulerY.toFixed(1)}L${t.wx.toFixed(1)} ${(rulerY + (major ? 7 : 4) * k).toFixed(1)}`;
-						})
-						.join("")}
-					seed={`${data.id}-ruler-ticks`}
-					color={SWISS.ink}
-					width={0.9 * k}
-					opacity={0.7}
-					passes={1}
-					tolerance={0.4 * k}
-				/>
-				{ticks.map((t) => {
-					const cardinal = CARDINAL[t.a];
-					const major = t.a % 15 === 0 || !!cardinal;
-					return (
-						major && (
-							<text
-								key={t.az}
-								x={t.wx}
-								y={rulerY - 4 * k}
-								textAnchor="middle"
-								fontSize={(cardinal ? 12 : 10.5) * k}
-								className={cardinal ? "nb-label" : "nb-num"}
-								style={{
-									fill: cardinal ? SWISS.red : SWISS.secondary,
-									fontFamily: cardinal ? CAPS_STACK : FIGURE_STACK,
-								}}
-							>
-								{cardinal ?? `${t.a}°`}
-							</text>
-						)
-					);
-				})}
-			</g>
-			{/* summits beyond the frame, named in the margin like a Panoramatafel */}
-			{outside.map((p) => (
-				<g key={p.name}>
-					{/* a summit triangle by hand: a pen outline over a light fill */}
-					<path
-						d={`M${p.wx} ${p.wy - 1 * k}l${-3.2 * k} ${5.5 * k}h${6.4 * k}z`}
-						fill={SWISS.navy}
-						fillOpacity={0.35}
-					/>
-					<SketchPath
-						d={`M${p.wx} ${p.wy - 1 * k}l${-3.2 * k} ${5.5 * k}h${6.4 * k}z`}
-						seed={`bleed-peak-${p.name}`}
-						color={SWISS.navy}
-						width={1.1 * k}
-						passes={2}
-						tolerance={0.5 * k}
-					/>
-					<text
-						x={p.wx}
-						y={p.wy - 5 * k}
-						textAnchor="middle"
-						fontSize={11.5 * k}
-						className="nb-label"
-						stroke={SWISS.paper}
-						strokeWidth={2.8 * k}
-						paintOrder="stroke"
-						strokeLinejoin="round"
-						style={{ fill: SWISS.navy, fontFamily: CAPS_STACK }}
-					>
-						{p.name}
-						<tspan
-							x={p.wx}
-							dy={-12 * k}
-							fontSize={10 * k}
-							className="nb-num"
-							style={{
-								fill: SWISS.secondary,
-								fontFamily: FIGURE_STACK,
-								fontStyle: "italic",
-								textTransform: "none",
-								letterSpacing: 0,
-							}}
-						>
-							{p.ele} m · {p.km.toFixed(0)} km
-						</tspan>
-					</text>
-				</g>
-			))}
-		</g>
 	);
 }

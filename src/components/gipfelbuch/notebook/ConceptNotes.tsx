@@ -82,7 +82,7 @@ export function FieldNotes({
 			<div className="inline-block max-w-full">
 				<p className="nb-label text-[11px] leading-[12px] text-[var(--nb-brown)]">
 					Feldbuch · p.{entryNumber}
-					{step ? ` · step ${STEP_NUMBER.get(step.id)}` : ""} · {entry.question}
+					{step ? ` · step ${STEP_NUMBER.get(step.id)}` : ""}
 				</p>
 				<div className="mt-1 w-2/5">
 					<PenRule
@@ -127,7 +127,7 @@ export function FieldNotes({
 				))}
 			</ul>
 			<p className="nb-hand mt-3 text-[18px] leading-[24px] text-[var(--nb-pencil)]">
-				measured on {photoId}; pick another photo and every page follows
+				measured on {photoId}; pick another photo to update
 			</p>
 		</aside>
 	);
@@ -335,9 +335,8 @@ export function NotebookTrail({ id }: { id: string }) {
 				/>
 			</svg>
 			<figcaption className="mt-1 text-[13px] leading-relaxed text-[color-mix(in_srgb,var(--nb-ink)_65%,transparent)]">
-				The page of the notebook this concept sits on. Numbers run through the
-				whole book; blue notes come in from other pages, brown notes go out to
-				them.{" "}
+				Where this sits in the notebook. Blue notes come in from other pages,
+				brown ones go out.{" "}
 				<Link
 					to="/gipfelbuch"
 					hash={`group-${byId.get(entry.hub)?.group ?? ""}`}

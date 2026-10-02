@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import {
+	type CSSProperties,
 	type KeyboardEvent,
 	type PointerEvent,
 	useEffect,
@@ -12,7 +13,13 @@ import { cn } from "#/lib/utils";
 import { SketchPath } from "../notebook/Ink";
 import { SWISS } from "../swiss/inks";
 import { useInView, useReducedMotion } from "./hooks";
-import { CrispLine, DemPatch, type GipfelbuchPhotoData } from "./real";
+import { inkFor, LAYER_INKS } from "./inks";
+import {
+	CrispLine,
+	coneWedge,
+	DemPatch,
+	type GipfelbuchPhotoData,
+} from "./real";
 import { poseAt, useAlignmentStory, useTween } from "./story";
 
 // The side map of an alignment story: the DEM patch around the camera with the view cone at the
@@ -21,9 +28,9 @@ import { poseAt, useAlignmentStory, useTween } from "./story";
 // cone sweeps over them. Inside an AlignmentStoryProvider the map follows the wipe or stage, and
 // dragging round the camera (or the arrow keys) drives the story from the map.
 
-/** Cone inks on paper, the chart kin of the photo overlay magenta / cyan (as in DemPatch). */
-const PRIOR_INK = "#ab343a";
-const SOLVED_INK = "#30626b";
+/** Cone inks on paper, from the one layer table (the same as DemPatch's cones). Hex, so they can be mixed. */
+const PRIOR_INK = LAYER_INKS.prior.paperHex;
+const SOLVED_INK = LAYER_INKS.solved.paperHex;
 /** Hand block capitals for summit names (hand pass). */
 const CAPS = "var(--gb-font-caps), var(--gb-font-hand), cursive";
 /** DemPatch's square viewBox side. */
@@ -149,13 +156,8 @@ export function StoryMap({
 			>
 				<DemPatch data={d} cone={[]} peaks={false} imprint={false}>
 					{(_, toPx) => {
-						const [cx, cy] = toPx(0, 0);
-						const wedge = (yaw: number, hfov: number, dist: number) => {
-							const a = toPx(yaw - hfov / 2, dist);
-							const b = toPx(yaw + hfov / 2, dist);
-							const rr = (dist * S) / (2 * half);
-							return `M${cx} ${cy}L${a[0]} ${a[1]}A${rr} ${rr} 0 0 1 ${b[0]} ${b[1]}Z`;
-						};
+						const wedge = (yaw: number, hfov: number, dist: number) =>
+							coneWedge(d, yaw, hfov, dist, S);
 						const ink = mixHex(PRIOR_INK, SOLVED_INK, t);
 						// the correction arc, from the guess's heading to the live heading
 						const arcR = S * 0.17;
@@ -272,9 +274,15 @@ export function StoryMap({
 					className={cn(
 						"nb-hand pointer-events-none absolute top-1.5 left-2.5 text-[20px] leading-[22px] font-bold transition-colors motion-reduce:transition-none [text-shadow:0_0_2px_var(--gb-paper,#ece6da),0_0_4px_var(--gb-paper,#ece6da),0_0_6px_var(--gb-paper,#ece6da)]",
 						settled && t >= 0.98
-							? "text-[var(--gb-forest,#30626b)]"
-							: "text-[var(--gb-red,#ab343a)]",
+							? "text-[var(--sm-solved)]"
+							: "text-[var(--sm-prior)]",
 					)}
+					style={
+						{
+							"--sm-solved": inkFor("solved", "paper"),
+							"--sm-prior": inkFor("prior", "paper"),
+						} as CSSProperties
+					}
 				>
 					{stateWord}
 				</span>
@@ -289,8 +297,7 @@ export function StoryMap({
 					<span className={t >= 0.5 ? "text-[var(--gb-ink)]" : undefined}>
 						{d.solved.yaw.toFixed(1)}°
 					</span>{" "}
-					· compass {sgn(dyaw)}° · {d.peaks.filter((p) => p.labelled).length}{" "}
-					named summits
+					· {d.peaks.filter((p) => p.labelled).length} peaks named
 					{story ? " · drag the cone" : ""}
 				</p>
 			)}

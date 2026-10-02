@@ -237,7 +237,7 @@ export function Tafel({
 			<div
 				ref={viewRef}
 				role="img"
-				aria-label={d ? describe(d) : "Skyline figure, loading"}
+				aria-label={d ? describe(d) : "Loading figure"}
 				className="relative"
 				style={{ height: stageH }}
 			>
@@ -269,11 +269,11 @@ export function Tafel({
 			>
 				<span className={`${TYPE.caption} nb-hand`}>
 					{caption ??
-						"The photo band with its measured skyline; the terrain carries on past the frame."}
+						"Photo with its measured skyline. The terrain carries on past the frame."}
 				</span>
 				<span className={`${TYPE.micro} gb-secondary shrink-0 sm:text-right`}>
 					{d
-						? `Aufnahme ${d.id}${d.photo.takenAt ? `, ${d.photo.takenAt.slice(0, 10)}` : ""} · Revision build-data.ts ${d.generated.slice(0, 10)}`
+						? `Aufnahme ${d.id}${d.photo.takenAt ? `, ${d.photo.takenAt.slice(0, 10)}` : ""}`
 						: "\u00a0"}
 				</span>
 			</figcaption>

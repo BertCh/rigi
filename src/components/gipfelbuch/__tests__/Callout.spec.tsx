@@ -11,26 +11,25 @@ afterEach(cleanup);
 describe("Callout", () => {
 	it("defaults to the note voice", () => {
 		render(<Callout>hello</Callout>);
-		expect(screen.getByText("I notice")).toBeTruthy();
+		expect(screen.getByText("Note")).toBeTruthy();
 		expect(screen.getByText("hello")).toBeTruthy();
 	});
 	it.each([
-		["lesson", "So:"],
-		["warning", "Careful, trap!"],
+		["lesson", "In short"],
+		["warning", "Careful"],
 		["result", "Result"],
-		["negative", "Tried this"],
+		["negative", "Dead end"],
 	] as const)("%s has its default title", (tone, label) => {
 		render(<Callout tone={tone}>x</Callout>);
 		expect(screen.getByText(label)).toBeTruthy();
 	});
-	it("uses an explicit title and marks negative results", () => {
+	it("uses an explicit title", () => {
 		render(
 			<Callout tone="negative" title="Joint solve">
 				body
 			</Callout>,
 		);
 		expect(screen.getByText("Joint solve")).toBeTruthy();
-		expect(screen.getByText(/didn't work/)).toBeTruthy();
 	});
 	it("renders as an aside", () => {
 		render(<Callout>x</Callout>);

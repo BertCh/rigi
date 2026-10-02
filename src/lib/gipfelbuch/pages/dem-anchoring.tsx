@@ -29,10 +29,10 @@ import {
 	Eq,
 	Figure,
 	HandLabel,
+	HandRange,
 	LiveStepInside,
 	MarginNote,
 	Op,
-	Measured as PhotoMeasured,
 	Plot,
 	RealPhoto,
 	Steps,
@@ -471,30 +471,31 @@ function CurveFigure() {
 	return (
 		<Figure
 			label="Fig. 3"
-			caption="Synthetic scene, real algorithm. Each dot is one ground pixel: model depth across, map distance up. One scale misses the bend; the curve follows it."
+			source="Skizze"
+			caption="Invented scene, real fit. Each dot is a ground pixel: model depth across, terrain distance up. One scale misses the bend; the curve follows it."
 		>
 			<div ref={ref}>
 				<div className="mb-3 flex flex-wrap items-center gap-2">
 					<Chip mode={mode} setMode={setMode} m="auto" label="play" />
 					<Chip mode={mode} setMode={setMode} m="scale" label="one scale" />
-					<Chip mode={mode} setMode={setMode} m="curve" label="range curve" />
+					<Chip mode={mode} setMode={setMode} m="curve" label="depth curve" />
 					<span className={`ml-auto font-mono ${TYPE.micro} gb-secondary`}>
 						{mode === "auto"
 							? p < 0.02
-								? "1 · one global scale"
+								? "1 · one scale"
 								: p < 0.98
-									? "2 · knots pull the line onto the DEM"
-									: "3 · monotone log-log curve"
+									? "2 · knots pull the line onto the terrain"
+									: "3 · a smooth rising curve"
 							: mode === "scale"
-								? "dem = s · model"
-								: "dem = f(model)"}
+								? "terrain = s · model"
+								: "terrain = f(model)"}
 					</span>
 				</div>
 				<svg
 					viewBox={`0 0 ${FW} ${FH}`}
 					className="block h-auto w-full"
 					role="img"
-					aria-label="Log-log scatter of DEM range against model ray length with a fitted curve"
+					aria-label="Log-log scatter of terrain distance against model depth with a fitted curve"
 				>
 					<defs>
 						<clipPath id={clipId}>
@@ -555,7 +556,7 @@ function CurveFigure() {
 						size={LABEL}
 						color={SWISS.ink}
 					>
-						model ray length (m)
+						model depth (m)
 					</HandLabel>
 					<HandLabel
 						x={9}
@@ -565,7 +566,7 @@ function CurveFigure() {
 						color={SWISS.ink}
 						rotate={-90}
 					>
-						DEM range (m)
+						terrain distance (m)
 					</HandLabel>
 
 					<g clipPath={`url(#${clipId})`}>
@@ -670,7 +671,7 @@ function CurveFigure() {
 						</g>
 					))}
 					<HandText x={PADL + 14} y={PADT + 24} size={13} color="red">
-						{`one scale ${scaleStats.err.toFixed(2)}, the curve ${fitStats.err.toFixed(2)}`}
+						{`median error: one scale ${scaleStats.err.toFixed(2)}, curve ${fitStats.err.toFixed(2)}`}
 					</HandText>
 					<PenArrow
 						from={[PADL + 150, PADT + 30]}
@@ -715,7 +716,7 @@ function CurveFigure() {
 							{(st.inl * 100).toFixed(0)}%
 						</div>
 						<div className={`font-mono ${TYPE.micro} gb-secondary`}>
-							inside the ±25 % band
+							within 25 % of the terrain
 						</div>
 					</div>
 					<div>
@@ -723,21 +724,19 @@ function CurveFigure() {
 							{st.err.toFixed(2)}
 						</div>
 						<div className={`font-mono ${TYPE.micro} gb-secondary`}>
-							median |log residual|
+							median error (log)
 						</div>
 					</div>
 					<div>
 						<div className="font-light [font-variant-numeric:tabular-nums_lining-nums] text-2xl text-[var(--accent)]">
 							{cur.x.length}
 						</div>
-						<div className={`font-mono ${TYPE.micro} gb-secondary`}>
-							knots (≤ 6)
-						</div>
+						<div className={`font-mono ${TYPE.micro} gb-secondary`}>knots</div>
 					</div>
 				</div>
 				<p className={`mt-3 text-center font-mono ${TYPE.micro} gb-secondary`}>
 					this scatter: one scale {scaleStats.err.toFixed(2)} → curve{" "}
-					{fitStats.err.toFixed(2)} · real photos (23 dev): 0.34 → 0.13
+					{fitStats.err.toFixed(2)} · 23 real photos: 0.34 → 0.13
 				</p>
 			</div>
 		</Figure>
@@ -832,11 +831,11 @@ const CELL_HATCH: Record<Cell, string> = (() => {
 	return out;
 })();
 const CELL_LABEL: Record<Cell, string> = {
-	sky: "sky mask",
-	person: "people mask",
-	near: "DEM < 15 m",
-	far: "DEM > 3 km",
-	kept: "candidate pair",
+	sky: "sky",
+	person: "people",
+	near: "under 15 m",
+	far: "over 3 km",
+	kept: "used",
 };
 
 function CandidateFigure() {
@@ -863,7 +862,8 @@ function CandidateFigure() {
 	return (
 		<Figure
 			label="D1"
-			caption="Schematic. Left: which pixels become (model, DEM) pairs. Sky, people, grazing near ground and the far haze never reach the fit. Right: the model predicts z-depth, the DEM gives ray length, so each pixel's depth is first stretched by rayFactor."
+			source="Skizze"
+			caption="Left: which pixels become depth pairs. Sky, people, near ground at a grazing angle and far haze never reach the fit. Right: the model gives depth along the optical axis, the terrain gives distance along the ray, so each pixel's depth is first stretched to match."
 		>
 			<div ref={ref} className="grid gap-6 sm:grid-cols-2">
 				<div>
@@ -1051,7 +1051,7 @@ function CandidateFigure() {
 							size={10}
 							color={SWISS.contour}
 						>
-							z (model)
+							depth (model)
 						</HandLabel>
 						<HandLabel
 							x={(cx + px) / 2 + (th > 0 ? 10 : -10)}
@@ -1060,7 +1060,7 @@ function CandidateFigure() {
 							size={10}
 							color={SWISS.red}
 						>
-							|ray| (DEM)
+							ray (terrain)
 						</HandLabel>
 						<HandText x={cx + 74} y={cy - 18} size={13} color="red">
 							{`${fac.toFixed(2)}× longer than z`}
@@ -1092,7 +1092,7 @@ function GaugeFigure() {
 	const qx = (e: number) => 46 + (e / 0.5) * (QW - 46 - 16);
 	const qy = (v: number) => 226 - v * 200;
 	const cur = q(err);
-	const state = cur < 0.15 ? "hidden" : cur < 0.35 ? "low trust" : "trusted";
+	const state = cur < 0.15 ? "hidden" : cur < 0.35 ? "low trust" : "shown";
 	const stateColor =
 		cur < 0.15 ? ROSE : cur < 0.35 ? AMBER : "var(--nb-forest)";
 	const pts = Array.from({ length: 101 }, (_, i) => {
@@ -1102,7 +1102,8 @@ function GaugeFigure() {
 	return (
 		<Figure
 			label="D2"
-			caption="Quality = inlier fraction × exp(−(err/0.2)²). Drag the two inputs: the dot is the photo, the colour is what Step Inside does with it."
+			source="Skizze"
+			caption="Quality = share of pixels that fit × exp(−(error/0.2)²). Drag the two inputs: the dot is the photo, the colour is what Step Inside does with it."
 		>
 			<svg
 				viewBox={`0 0 ${QW} ${QH}`}
@@ -1187,7 +1188,7 @@ function GaugeFigure() {
 					hidden
 				</HandLabel>
 				<HandText x={60} y={qy(0.07) - 14} size={13} color="red">
-					below 0.15 I hide the whole scene
+					below 0.15: scene hidden
 				</HandText>
 				<HandText
 					x={QW - 22}
@@ -1226,7 +1227,7 @@ function GaugeFigure() {
 					size={LABEL}
 					color={SWISS.ink}
 				>
-					median |log residual| over all candidates
+					median error (log) over all pixels
 				</HandLabel>
 				{[
 					[0.13, "curve 0.13"],
@@ -1279,32 +1280,30 @@ function GaugeFigure() {
 				/>
 			</svg>
 			<div className="mt-3 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-				<label className={`block font-mono ${TYPE.micro} gb-secondary`}>
-					residual err {err.toFixed(2)}
-					<input
-						type="range"
+				<div className={`block font-mono ${TYPE.micro} gb-secondary`}>
+					error
+					<HandRange
+						value={err}
 						min={0}
 						max={0.5}
 						step={0.005}
-						value={err}
-						onChange={(e) => setErr(Number(e.target.value))}
-						className="mt-1 block w-full"
-						style={{ accentColor: "var(--accent)" }}
+						label="Error"
+						onChange={setErr}
+						readout={err.toFixed(2)}
 					/>
-				</label>
-				<label className={`block font-mono ${TYPE.micro} gb-secondary`}>
-					inlier fraction {inl.toFixed(2)}
-					<input
-						type="range"
+				</div>
+				<div className={`block font-mono ${TYPE.micro} gb-secondary`}>
+					share that fits
+					<HandRange
+						value={inl}
 						min={0.1}
 						max={1}
 						step={0.01}
-						value={inl}
-						onChange={(e) => setInl(Number(e.target.value))}
-						className="mt-1 block w-full"
-						style={{ accentColor: "var(--accent)" }}
+						label="Share that fits"
+						onChange={setInl}
+						readout={inl.toFixed(2)}
 					/>
-				</label>
+				</div>
 				<div className="text-right">
 					<div
 						className="font-light [font-variant-numeric:tabular-nums_lining-nums] text-3xl"
@@ -1442,15 +1441,11 @@ function HeroStages({ d }: { d: TerrainData | null }) {
 		<Figure
 			label="Fig. 1"
 			bleed
+			pinned="demo-01"
 			caption={
-				<>
-					{s
-						? `Fixed: demo-01. ${s.pct}% of ${s.total} ground cells lie 15 m to 3 km away, the range the fit uses.`
-						: "The map gives a distance for every ground pixel."}{" "}
-					<PhotoMeasured data={photo}>
-						Ranges: {d?.script ?? "scripts/gipfelbuch/data-terrain.ts"}.
-					</PhotoMeasured>
-				</>
+				s
+					? `${s.pct}% of ${s.total} ground cells lie 15 m to 3 km away, the range the fit uses.`
+					: "The terrain gives a distance for every ground pixel."
 			}
 		>
 			<Stages
@@ -1650,13 +1645,13 @@ function AnchorEquation() {
 			where={[
 				{
 					sym: "m",
-					text: "model ray length of a ground pixel (x axis in Fig. 2)",
+					text: "model depth of a ground pixel (x axis in Fig. 2)",
 				},
-				{ sym: "D", text: "map distance to that pixel (y axis in Fig. 2)" },
+				{ sym: "D", text: "terrain distance to that pixel (y axis in Fig. 2)" },
 				{
 					sym: "f",
 					c: "var(--accent)",
-					text: "the fitted curve, one line per photo in Fig. 2; one scale would force f(m) = s·m",
+					text: "the fitted curve (one line per photo in Fig. 2); one scale would force f(m) = s·m",
 				},
 				{ sym: "w", text: "weight: each octave of distance counts equally" },
 			]}
@@ -1693,11 +1688,8 @@ function RealCurves({ d }: { d: TerrainData | null }) {
 			caption={
 				<>
 					Real photos agree the model compresses distance, by a different amount
-					each time.{" "}
-					<PhotoMeasured data={d}>
-						{sp.nFitted} wild spike photos (not the demo set); dashed line = DEM
-						equals model.
-					</PhotoMeasured>
+					each time. {sp.nFitted} other photos; dashed line: model equals
+					terrain.
 				</>
 			}
 		>
@@ -1707,8 +1699,8 @@ function RealCurves({ d }: { d: TerrainData | null }) {
 					y={[XL0, Math.log(4000)]}
 					width={460}
 					height={320}
-					xLabel="model ray length (m)"
-					yLabel="DEM range (m)"
+					xLabel="model depth (m)"
+					yLabel="terrain distance (m)"
 					fmtX={(v) => `${Math.round(Math.exp(v))}`}
 					fmtY={(v) => `${Math.round(Math.exp(v))}`}
 				>
@@ -1771,7 +1763,7 @@ function RealCurves({ d }: { d: TerrainData | null }) {
 				</Plot>
 				<div className={`font-mono ${TYPE.micro} gb-secondary`}>
 					<p className="mb-2">
-						Median DEM / model ratio of the {sp.nFitted} curves (the red line):
+						Median terrain / model ratio of the {sp.nFitted} curves (red line):
 					</p>
 					<div className="grid grid-cols-3 gap-2 text-center">
 						{rows.map((q) => (
@@ -1812,11 +1804,8 @@ function RealQuality({ d }: { d: TerrainData | null }) {
 			caption={
 				<>
 					{sp.fits.length - hidden} of {sp.nFitted} fitted photos clear the 0.15
-					hide line.{" "}
-					<PhotoMeasured data={d}>
-						{sp.nFitted} spike photos; {sp.nPhotos - sp.nFitted} more had too
-						few ground pixels to fit.
-					</PhotoMeasured>
+					hide line. {sp.nPhotos - sp.nFitted} more had too little ground to
+					fit.
 				</>
 			}
 		>
@@ -1954,7 +1943,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="The map is a ruler the depth model never had."
+				title="The terrain is a ruler the depth model never had."
 			>
 				<p>
 					A depth model gets shape right and metres wrong. Near the camera it is
@@ -1963,13 +1952,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					<HandMark type="highlight">
-						Once the camera is solved, the map knows the true distance to the
-						ground.
+						Once the camera is solved, the terrain model knows the true distance
+						to the ground.
 					</HandMark>{" "}
 					We bend the model's depth onto that ruler.
 					<MarginNote mark="a">
-						I notice the DEM/model ratio is about 1 at 15 to 30 m and about 2.9
-						at 100 to 300 m.
+						The terrain/model ratio is about 1 at 15 to 30 m and about 2.9 at
+						100 to 300 m.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1986,7 +1975,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					steps={[
 						{
 							title: "Pair up",
-							body: "Each ground pixel gives a pair: model depth and map distance.",
+							body: "Each ground pixel gives a pair: model depth and terrain distance.",
 							visual: <MiniWindow d={d} />,
 						},
 						{
@@ -2010,18 +1999,17 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<p>
 					Switch between one scale and the fitted curve to see the difference.
 					Play it: <CircledNumber value={1} /> one global scale,{" "}
-					<CircledNumber value={2} /> knots pull the line onto the map,{" "}
-					<CircledNumber value={3} /> a monotone curve.
+					<CircledNumber value={2} /> knots pull the line onto the terrain,{" "}
+					<CircledNumber value={3} /> a smooth rising curve.
 				</p>
 				<p>
 					First guess: <HandMark type="strike">one scale per photo.</HandMark>{" "}
 					<span className="nb-hand" style={{ color: "var(--nb-red)" }}>
-						a curve: median log error 0.34 falls to 0.13
+						a curve: median error (log) 0.34 falls to 0.13
 					</span>
 					.
 					<MarginNote mark="b">
-						Why does the foreground break first? The model squeezes near range
-						least.
+						The model squeezes near range least, so the foreground breaks first.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -2033,14 +2021,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="A poor match hides the scene instead of guessing."
 			>
 				<p>
-					When model and map disagree, the near-field scene is hidden or
-					labelled low trust. The score checks the depth fit.{" "}
+					When model and terrain disagree, the near-field scene is hidden or
+					marked low trust. The score checks the depth fit.{" "}
 					<HandMark type="wavy" color="red">
 						It cannot tell a right camera from a wrong one.
 					</HandMark>
 					<MarginNote mark="c">
-						AUC 0.73 as a pose check. Too weak to lean on, so it only gates the
-						scene.
+						As a test of the camera pose it is weak (AUC 0.73; 0.5 is chance, 1
+						is perfect), so it only decides whether the scene is shown.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -2052,8 +2040,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="Where the fit holds, the photo can be stepped into."
 			>
 				<p>
-					A good fit puts the lifted near-field on the map's own metres, so the
-					camera can start at the photo's eye and move.{" "}
+					A good fit puts the lifted near-field on the terrain's own metres, so
+					the camera can start at the photo's position and move.{" "}
 					<HandMark type="underline">
 						A poor fit keeps the scene hidden instead.
 					</HandMark>
@@ -2066,7 +2054,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: sp ? `${sp.medianResidCurve}` : "…",
-						label: `median depth error on terrain with the curve, in log units (about 14%); one scale gives ${sp?.medianResidScale ?? 0.34} (${sp?.nResid ?? 23} photos)`,
+						label: `median depth error with the curve (log units, about 14%); one scale gives ${sp?.medianResidScale ?? 0.34} (${sp?.nResid ?? 23} photos)`,
 					},
 					{
 						value: sp && shown != null ? `${shown} / ${sp.nFitted}` : "…",
@@ -2078,105 +2066,95 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					},
 					{
 						value: "0.73",
-						label: "AUC as a pose check: too weak to use as one",
+						label: "AUC as a pose check (0.5 is chance)",
 					},
 				]}
-				source={
-					<>
-						Spike photos (wild, not the demo set):
-						tools/nearfield/spike/place.json via{" "}
-						{d?.script ?? "scripts/gipfelbuch/data-terrain.ts"}. AUC:
-						reports/step-inside-results.md.
-					</>
-				}
+				source="Measured on 27 photos outside the demo set."
 			/>
 
 			<Details>
 				<h3>Why the model needs a curve</h3>
 				<p>
 					The model compresses range, and by a different amount per photo. On
-					the P0 spike the DEM/model ratio was about 1 at 15 to 30 m, about 2.9
-					at 100 to 300 m and about 6.6 at 300 to 1000 m
-					(reports/step-inside-results.md). Pick one scale to fix the mountains
-					and a person next to the camera drifts behind the ground at their
-					feet. Once the camera is solved (
-					{link("viewport-inference", "viewport inference")}), the DEM gives the
-					ray length to the ground at every terrain pixel.
+					the test photos the terrain/model ratio was about 1 at 15 to 30 m,
+					about 2.9 at 100 to 300 m and about 6.6 at 300 to 1000 m. Pick one
+					scale to fix the mountains and a person next to the camera drifts
+					behind the ground at their feet. Once the camera is solved (
+					{link("viewport-inference", "viewport inference")}), the terrain model
+					gives the distance to the ground at every terrain pixel.
 				</p>
 				<h3>The fit, step by step</h3>
 				<Steps
 					steps={[
 						{
-							title: "Collect (model, DEM) pairs",
-							body: "On a stride giving at most about 40k candidates, each pixel needs a finite model depth, no sky and no person (masks), and a DEM range between 15 and 3000 m. Below 15 m the DEM range is dominated by eye height and resolution at grazing angles; beyond 3 km the model carries no depth signal. Fewer than 200 candidates means no fit and quality 0.",
+							title: "Collect depth pairs",
+							body: "Up to about 40,000 pixels are sampled. Each needs a valid model depth, no sky, no person, and a terrain distance between 15 m and 3 km. Under 15 m the terrain distance is dominated by eye height and grazing angles; beyond 3 km the model carries no depth signal. Fewer than 200 pixels means no fit and quality 0.",
 						},
 						{
 							title: "Put both on the same axis",
-							body: "MoGe-class models predict z-depth; the DEM sampler returns ray length. The model value is multiplied by rayFactor(K, u, v) using the photo's own pose intrinsics, so both sides measure along the pixel's ray.",
+							body: "The depth model gives depth along the optical axis; the terrain gives distance along the pixel's ray. The model value is scaled by the photo's own camera geometry, so both sides measure along the same ray.",
 						},
 						{
-							title: "Weigh every octave of range equally",
-							body: "A landscape is mostly far pixels. Each octave of DEM range gets the same total weight, so the few near-terrain pixels pull as hard as the thousands of distant ones.",
+							title: "Weigh every doubling of distance equally",
+							body: "A landscape is mostly far pixels. Each doubling of distance gets the same total weight, so the few near pixels pull as hard as the thousands of distant ones.",
 						},
 						{
 							title: "Drop knots at weighted quantiles",
-							body: "Up to six knots from the 2nd to the 98th percentile of log model ray, at least 0.2 log units apart. The curve is linear in log-log between them.",
+							body: "Up to six knots, from the 2nd to the 98th percentile of model depth, at least 0.2 log units apart. Between knots the curve is a straight line on a log-log plot.",
 						},
 						{
 							title: "Find the globally best knot heights",
-							body: "Dynamic programming over a 0.02 grid of log metres minimises the truncated L1 loss Σ w · min(|log D − log f(m)|, ln 1.25), with every segment slope between 0.75 and 6. Monotone and never flat: an object standing in front of far terrain is a one-sided outlier. A slope-1 prior breaks ties, and a final shift by the weighted inlier median gives sub-grid precision.",
+							body: "The best knot heights are found exactly (dynamic programming) by minimising Σ w · min(|log D − log f(m)|, ln 1.25), with every segment slope between 0.75 and 6. The curve always rises: an object in front of far terrain only ever reads too near. A slope-1 preference breaks ties, and a final shift by the median error of the good points refines the result.",
 						},
 						{
 							title: "Apply it to the scene",
-							body: "curveRange interpolates log metres between knots, keeps a constant ratio beyond the far knot, and eases back to a ratio of 1 at 15 m below the near knot, so a person 2 m from the lens is never pushed to 20 m.",
+							body: "Between knots the curve is interpolated in log metres; beyond the far knot the ratio stays constant; below the near knot it eases back to a ratio of 1 at 15 m, so a person 2 m from the lens is never pushed to 20 m.",
 						},
 					]}
 				/>
 				<CandidateFigure />
-				<h3>From residual to trust</h3>
+				<h3>From error to trust</h3>
 				<p>
-					Quality is the inlier fraction times a Gaussian falloff of the median
-					absolute log residual over all candidates, not just the inliers: with
-					a ±25 % band the inlier median is small whatever the fit (the code
-					comment says about 0.07; not re-measured here). Step Inside reads it
-					to decide whether to show the near-field scene. The thresholds (hide
-					below 0.15, label below 0.35) were calibrated on the P0 spike.
-					Deciding whether the pose is right is the job of the{" "}
-					{link("accept-rule", "accept rule")}.
+					Quality is the share of pixels that fit, times a falloff in the median
+					error over all pixels, not just the good ones: with a ±25 % band the
+					median of the good ones is small whatever the fit. Step Inside uses it
+					to decide whether to show the near-field scene. Hide below 0.15, label
+					below 0.35, set on the test photos. Deciding whether the pose is right
+					is the job of the {link("accept-rule", "accept rule")}.
 				</p>
 				<GaugeFigure />
 				<h3>In the code</h3>
 				<div className="not-prose grid gap-3 sm:grid-cols-2">
 					{[
 						[
-							"fitAnchor(depth, demRangeAt, K, opts)",
+							"Fit and score",
 							"src/lib/nearfield/anchor.ts",
-							"Collects candidates, fits, scores. Returns an AnchorFit with the curve and quality.",
+							"Collects the pixel pairs, fits the curve and scores it.",
 						],
 						[
-							"fitCurve(mr, dr, opts)",
+							"The curve",
 							"src/lib/nearfield/anchor.ts",
-							"Weighted-quantile knots and the dynamic programme under CURVE_DEFAULTS.",
+							"Knots at weighted quantiles, then the best heights.",
 						],
 						[
-							"curveRange(curve, m)",
+							"Applying it",
 							"src/lib/nearfield/anchor.ts",
-							"Evaluates the curve, with slope-1 extension and the near-field blend (CURVE_METRIC_NEAR = 15).",
+							"Evaluates the curve, with a straight extension and a blend back to the near field.",
 						],
 						[
-							"anchorQuality(fit)",
+							"The score",
 							"src/lib/nearfield/anchor.ts",
-							"inlierFrac · exp(−(err/0.2)²). ANCHOR_LOW_TRUST 0.35, ANCHOR_MIN_QUALITY 0.15 in types.ts.",
+							"Share that fits times a falloff in the error; hide below 0.15, label below 0.35.",
 						],
 						[
-							"rayFactor / modelDepth / sampleDemGrid",
+							"Geometry",
 							"src/lib/nearfield/geom.ts",
-							"z-depth to ray length, depth-grid access, DEM range lookups on the grid.",
+							"Depth along the axis to distance along the ray, and terrain lookups on the grid.",
 						],
 						[
-							"Renderer.sampleAt(u, v).range",
+							"Terrain side",
 							"src/lib/nearfield/near-dem.ts",
-							"The DEM side of every pair: terrain ray length in metres, one source for both renderers.",
+							"The terrain side of every pair: distance in metres, one source for both renderers.",
 						],
 					].map(([name, path, text]) => (
 						<div key={name} className="bg-[var(--gb-paper-deep)] p-4">
@@ -2193,13 +2171,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					))}
 				</div>
 				<p>
-					Its DEM side is the {link("terrain-sampler", "terrain sampler")}.
-					Background reports:
+					The terrain side comes from the{" "}
+					{link("terrain-sampler", "terrain sampler")}.
 				</p>
-				<div className="flex flex-wrap gap-2">
-					<CodeRef path="reports/step-inside-design.md" />
-					<CodeRef path="reports/step-inside-results.md" />
-				</div>
 			</Details>
 		</>
 	);

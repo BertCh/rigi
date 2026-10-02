@@ -18,12 +18,8 @@ export interface LegendProps {
 	className?: string;
 }
 
-/** Zeichenerklärung: a lettered heading and hand rows, no panel. Lists only what the page shows (F1). */
-export function Legend({
-	items,
-	title = "Zeichenerklärung · Legend",
-	className,
-}: LegendProps) {
+/** Legende: a lettered heading and hand rows, no panel. Lists only what the page shows (F1). */
+export function Legend({ items, title = "Legende", className }: LegendProps) {
 	if (items.length === 0) return null;
 	return (
 		<section className={`px-6 py-6 ${className ?? ""}`}>

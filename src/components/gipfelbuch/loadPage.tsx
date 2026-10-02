@@ -38,13 +38,17 @@ export class PageBoundary extends Component<
 	static getDerivedStateFromProps(p: { resetKey: string }, s: { key: string }) {
 		return p.resetKey !== s.key ? { err: null, key: p.resetKey } : null;
 	}
+	componentDidCatch(err: Error) {
+		// the reader sees a plain line; the message stays in the console
+		console.error("Gipfelbuch figure failed to render:", err);
+	}
 	render() {
 		if (this.state.err) {
 			return (
 				<>
 					{this.props.fallback}
 					<p className="nb-hand mt-4 text-[18px] leading-[22px] text-[var(--rigi-trap)]">
-						This page's custom visual failed to render: {this.state.err.message}
+						This figure could not be drawn.
 					</p>
 				</>
 			);

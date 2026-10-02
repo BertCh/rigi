@@ -9,10 +9,10 @@ Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelb
 
 - **Hand is the form; print is the exception.** The whole sheet is written by hand:
   - body: Playpen Sans (`--gb-font-body`);
-  - titles and `h2`/`h3`: Caveat 700 lettering (`--gb-font-letter`);
+  - titles and `h2`/`h3`: Architects Daughter lettering (`--gb-font-letter`);
   - kickers, labels and peak names: Patrick Hand SC block capitals (`--gb-font-caps`, `.gb-caps`, `.nb-label`);
   - numbers: hand figures, Shantell Sans with tabular figures (`--gb-font-figure`, `.gb-num`, `.nb-num`);
-  - notes: Caveat (`HandText`, `MarginNote`).
+  - notes: Architects Daughter (`HandText`, `MarginNote`).
 
   Print survives only for code (mono), equations (`--gb-font-math`) and an opt-in `.gb-print`. Never name a face inline.
 - **Figure labels** are `HandLabel` / `HandNote` (`viz/labels.tsx`; formerly PrintLabel/PrintNote). Use `caps` for names and `italic` for heights and derived values (LK rule).
@@ -28,6 +28,20 @@ Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelb
 
   Hand marks for prose (underline, double, wavy, circle, box, strike, highlight), washes and a pencil construction layer live in `notebook/marks.tsx`.
 - **Still out** (user, 2026-10-01): paper grain, tape, tilted photos, the red margin rule and sheet-edge ticks. The soft grid stays.
+
+## Landing spill, 2026-10-02: this overrides the "Geo bleed" bullet below
+
+- **`RealPhoto bleed` now spills like the landing page's surround** (`viz/GeoSpill.tsx`, after `site/Surround.tsx`). The photo keeps the figure's full width, and its measured world runs out past the figure and the sheet to the window's edge, as on the landing. That world is the Tafel bake's ridge strokes in terrain ink (the Tafel's `.tafel-spill` stroke mask), a hand compass ruler in a 30 px band above the photo, and up to five summits beyond the frame with hand leaders, caps names and italic "height · km". The outer 60% of each side fades out.
+- **Extent.** `true` lets each side spill up to 0.5 of the photo's width (the bake's own extent), and a number caps it. The spill reaches the window's edge, or stops `EDGE` px inside the nearest `[data-gb-bleed-bounds]` ancestor: `Stages` sets `"right"` beside an `aside` map. Phones get the ruler only.
+- **Compare.** The bottom side draws the spill at the wipe's position (`SpillSideContext`, t = 1 − x), so the margins slide between the guess and the fix. The clipped top side draws none. Keep `bleed` on both sides so the ruler band stays registered.
+- ~~One spilled photo per sheet~~ (superseded below). Never in Trio, Gallery or thumbnails.
+
+## Concept spill, 2026-10-02 (user: every photo figure and animated sequence gets a side spill that maps to what it shows)
+
+- **Every single-photo figure spills**, PhotoStory included (its default `bleed` is on again). Trio, Gallery and thumbnail tiles still never spill.
+- **The spill echoes the photo's layers** past the frame, through the bake's wide DEM horizon (`TafelBake.horizon`, yaw ± 85°, written by `data-tafel.ts`; `--horizon-only` re-traces just that row). It is traced as `horizon.profile` is, so it meets `priorRows` / `solvedRows` at the frame's edge (median under 0.5 px, pinned by `__tests__/geo-spill.spec.ts`). `sky` gives navy hachure above the horizon; `skyline` gives the DEM horizon dashed in contour ink (past the frame the line is the map's, not the eye's); `prior` and `solved` give the horizon at those poses in their paper inks, faded by the story as in the photo; `peaks` / `priorPeaks` ink the summit marks. The pencil note says what is carried.
+- **Cursor.** `RealPhoto spillCursor={{ x, az, label, layer }}` marks a column or a bearing on the compass ruler; past the frame it drops to the horizon with a ring. Use it for a sweep, a profiled bearing, a tap.
+- **Pose.** `spillT` sets the spill's pose (0 guess .. 1 solved) for a figure that steps through poses without an alignment story. The spill slides (about 600 ms) from the pose it last showed for that photo, so a `Stages` step that remounts the photo moves the margins instead of jumping; a Compare wipe follows at once.
 
 ## Restore pass, 2026-10-01 (sessions 2d and 25)
 
@@ -106,7 +120,7 @@ water blue) plus route red, and map furniture around the content. Every ink is a
   Wegweiser yellow, `--gb-paper` / `--gb-paper-deep` grounds. Canvas and anywhere a CSS var can't reach:
   `SWISS.*`. `var(--accent)` is still the concept's group colour (`groupColor`, paper-tuned hex).
 - **Type.** Seven sizes only, from the `TYPE` map in `swiss/type.ts` (micro, kicker, caption, body, lead,
-  h3, h2, h1, stat). Titles use `.display-title` / `TYPE.h1` (hand lettering, Caveat 700, since the hand pass); body GB Hand Body
+  h3, h2, h1, stat). Titles use `.display-title` / `TYPE.h1` (hand lettering, Architects Daughter, since the hand pass); body GB Hand Body
   (Fira Sans); `.gb-caps` condensed caps for kickers; `.gb-coord` / `.gb-num` GB Mono with tabular figures.
   Never name a font inline: use the `--gb-font-*` tokens. Italic marks a category (water, derived values),
   never ornament.
@@ -123,12 +137,12 @@ water blue) plus route red, and map furniture around the content. Every ink is a
 
 The full rationale and sources are in `reports/gipfelbuch-field-notebook-design.md` §2. In short:
 - Type sizes come only from `swiss/type.ts` (`TYPE.micro|kicker|caption|body|lead|h3|h2|h1|stat`).
-- Hand pass: the H1 and section heads are Caveat 700 lettering; there is no serif except in equations.
+- Hand pass: the H1 and section heads are Architects Daughter lettering; there is no serif except in equations.
 - Secondary text uses `var(--gb-secondary,#4a545c)` and never BL.
 - Italic (`.gb-derived`) marks an estimated or derived value.
 - Tables use `.gb-table`: one header rule, right-aligned tabular numbers.
 - Line style encodes certainty: solid = measured, dashed = approximate or model, dotted = open.
-- Hand notes are Caveat at 18 px or more, up to about 20 words each, as many as the page needs. Figure labels use `variant="label"` (Shantell Sans). Digits inside `HandText` render in print automatically.
+- Hand notes are Architects Daughter at 18 px or more, up to about 20 words each, as many as the page needs. Figure labels use `variant="label"` (Shantell Sans). Digits inside `HandText` render in print automatically.
 - Kitsch test: every material element (stamp, waymark) must carry a fact. No shadows.
 - Soft sheet (user, 2026-10-01): no paper texture and no notebook props. The ground is flat warm white (`--gb-paper`, W 96% + YY 4%) with a faint grid (`--nb-grid` 6 %, index ruling 8 %). There is no grain, tape, tilted prints, red margin rule or sheet-edge ticks. Prints sit square on a thin white mat. Hand notes, circled numbers and sketched figures stay.
 - `gipfelbuch.check.ts` lints the pages for the text contrast floor (`text-white/65` or higher), half-pixel sizes, rounded pills and `display-title`. To exempt a line, put `// gb-lint-allow` on it.

@@ -9,19 +9,19 @@ import { HandFrame, HandSideRule, HandStrike, HandUnderline } from "./hand";
 /**
  * The notebook's voices (hand pass; Laws' "I notice / I wonder / it reminds me of"). Each tone keeps its
  * old key so pages need no change:
- * - note: "I notice", in ink, a single underline under the title;
+ * - note: "Note", in ink, a single underline under the title;
  * - lesson: the conclusion, in brown, the ONE boxed thing (a hand box with overshooting corners);
  * - warning: a trap, in red, a wavy pen mark down the side;
  * - result: in forest green, a double underline on the title;
- * - negative: a dead end, in pencil, the idea struck through (still readable) with a red "didn't work".
+ * - negative: a dead end, in pencil, the idea struck through (still readable) .
  */
 const TONES = {
-	note: { label: "I notice", c: "var(--gb-ink)", ink: "ink" },
-	lesson: { label: "So:", c: "var(--gb-contour, #95500c)", ink: "brown" },
-	warning: { label: "Careful, trap!", c: "var(--gb-red, #bf2233)", ink: "red" },
+	note: { label: "Note", c: "var(--gb-ink)", ink: "ink" },
+	lesson: { label: "In short", c: "var(--gb-contour, #95500c)", ink: "brown" },
+	warning: { label: "Careful", c: "var(--gb-red, #bf2233)", ink: "red" },
 	result: { label: "Result", c: "var(--gb-forest, #575e4e)", ink: "forest" },
 	negative: {
-		label: "Tried this",
+		label: "Dead end",
 		c: "var(--gb-pencil, #49423d)",
 		ink: "pencil",
 	},
@@ -96,11 +96,6 @@ export function Callout({
 						/>
 					)}
 				</span>
-				{tone === "negative" && (
-					<span className="nb-hand ml-2 text-[18px] font-normal text-[var(--gb-red)]">
-						✗ didn't work
-					</span>
-				)}
 			</p>
 			<div
 				className={cn(

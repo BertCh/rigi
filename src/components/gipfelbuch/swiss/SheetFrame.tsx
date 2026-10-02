@@ -62,13 +62,12 @@ export function SheetFrame({
 	corners = null,
 	imprint,
 	stand,
-	edition,
 	crossRefs,
 	className,
 }: SheetFrameProps) {
 	let imprintLine = imprint;
 	if (imprintLine && stand && !imprintLine.includes("Stand")) {
-		imprintLine += `${edition ? ` · Ausgabe ${edition}` : ""} · Stand ${stand}`;
+		imprintLine += ` · Stand ${stand}`;
 	}
 	return (
 		<div
@@ -77,7 +76,10 @@ export function SheetFrame({
 			style={{ viewTransitionName: "gb-sheet" }}
 		>
 			{/* the soft grid is the sheet's ground (user, softer sheet: "keep the grid paper") */}
-			<div className="nb-book relative mx-auto max-w-6xl sm:px-0">
+			<div
+				// the geo spill around a hero photo runs past the sheet to the window edge, as on the landing
+				className="nb-book relative mx-auto max-w-6xl sm:px-0"
+			>
 				<div className="relative sm:p-[22px]">
 					{corners ? (
 						<>

@@ -102,9 +102,9 @@ const CLS_COLOR: Record<Cls, string> = {
 	Sky: "var(--nb-navy)",
 };
 const CLS_NOTE: Record<Cls, string> = {
-	Object: "splat",
-	Terrain: "drape",
-	Far: "DEM only",
+	Object: "lifted to 3D",
+	Terrain: "photo drape",
+	Far: "terrain only",
 	Sky: "photo sky",
 };
 
@@ -116,11 +116,11 @@ type Row = {
 	person?: boolean;
 };
 const ROWS: Row[] = [
-	{ label: "climber", sub: "people mask", range: 14, dem: 31, person: true },
+	{ label: "climber", sub: "person mask", range: 14, dem: 31, person: true },
 	{ label: "hut roof", sub: "against the sky", range: 38, dem: null },
 	{ label: "boulder", sub: "well in front", range: 22, dem: 58 },
 	{ label: "fence post", sub: "just above ground", range: 45, dem: 52 },
-	{ label: "meadow", sub: "agrees with DEM", range: 71, dem: 74 },
+	{ label: "meadow", sub: "matches terrain", range: 71, dem: 74 },
 	{ label: "grass at feet", sub: "gap under 3 m", range: 18, dem: 20 },
 	{ label: "spruce", sub: "in front of slope", range: 118, dem: 290 },
 	{ label: "far barn", sub: "beyond the radius", range: 210, dem: 380 },
@@ -171,7 +171,7 @@ function SplitRuler() {
 		<Figure
 			label="D1"
 			bleed
-			caption="Schematic (illustrative rows, not measurements). The depth split, one pixel per row. Brown is how far the DEM says the terrain is along that pixel's ray; the accent dot is where the anchored model depth puts the surface. The shaded band is the Object zone (model depth under dem x (1 - margin), at least 3 m in front). Inside it the pixel is lifted into a splat; on the DEM it stays in the drape; past the near radius it is left to the terrain. Drag the two parameters, or watch the last row sweep through all three outcomes."
+			caption="Schematic with made-up rows, one pixel per row. Brown tick: how far the terrain model says the ground is along that pixel's ray. Dot: where the depth model puts the surface. Shaded band: the object zone, at least 3 m and a set share of the terrain distance in front of the ground. Objects are lifted into 3D; ground stays in the photo; beyond the near radius only terrain is drawn. Drag the sliders, or watch the last row."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
@@ -219,7 +219,7 @@ function SplitRuler() {
 						anchor="middle"
 						color="var(--gb-contour)"
 					>
-						nearRadius {radius} m
+						near radius {radius} m
 					</HandLabel>
 					{/* axis */}
 					{ticks.map((v) => (
@@ -244,7 +244,7 @@ function SplitRuler() {
 						</g>
 					))}
 					<HandLabel x={AX0} y={H - 4}>
-						range along the pixel ray (log scale)
+						distance along the ray (log scale)
 					</HandLabel>
 					<PenArrow
 						from={[rx(probe.range), H - 56]}
@@ -330,7 +330,7 @@ function SplitRuler() {
 										size={12}
 										color={DEM_C}
 									>
-										no DEM hit
+										no terrain behind
 									</HandLabel>
 								)}
 								{/* model dot */}
@@ -362,7 +362,7 @@ function SplitRuler() {
 
 			<div className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_auto]">
 				<Slider
-					label="objectMargin"
+					label="margin"
 					value={margin}
 					min={0.1}
 					max={0.9}
@@ -371,7 +371,7 @@ function SplitRuler() {
 					onChange={setMargin}
 				/>
 				<Slider
-					label="nearRadius"
+					label="near radius"
 					value={radius}
 					min={40}
 					max={300}
@@ -478,7 +478,7 @@ function ConfidenceDisc() {
 		<Figure
 			label="D2"
 			bleed
-			caption="Schematic (illustrative objects). Plan view, looking down. The camera starts on the photo eye (the dot at the bottom) and may orbit, pan and dolly, but every position is clamped to a disc of radius r = min(60, 0.5 x median object range) + 10 m. Close subjects give a small disc because parallax would expose what one view never saw; a far panorama is capped at 70 m. Drag the median range."
+			caption="Schematic, seen from above. The camera starts at the photo's position (bottom dot) and can roam only inside a disc of radius r = min(60, half the median object distance) + 10 m. Close subjects get a small disc, because moving would reveal what the photo never saw. Far views cap at 70 m. Drag the median distance."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
 				<svg
@@ -569,7 +569,7 @@ function ConfidenceDisc() {
 						width={1.6}
 					/>
 					<HandLabel x={ex} y={46} anchor="middle" color={DEM_C}>
-						far field: DEM terrain, never moves
+						far field: terrain model, fixed
 					</HandLabel>
 					{/* roaming camera */}
 					<PenLine
@@ -611,7 +611,7 @@ function ConfidenceDisc() {
 						width={1.6}
 					/>
 					<HandLabel x={ex + 9} y={ey + 16}>
-						photo eye
+						photo position
 					</HandLabel>
 					<PenArrow
 						from={[ex - m2(r) * 0.95 - 4, ey - m2(r) * 0.2 - 40]}
@@ -665,7 +665,7 @@ function ConfidenceDisc() {
 			</div>
 			<div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
 				<Slider
-					label="median range of the kept objects"
+					label="median object distance"
 					value={med}
 					min={5}
 					max={200}
@@ -703,19 +703,19 @@ function Provenance() {
 		{
 			rgb: PROVENANCE_COLORS.reconstructed,
 			n: "reconstructed",
-			d: "model / multi-view geometry",
+			d: "rebuilt by a model",
 		},
-		{ rgb: PROVENANCE_COLORS.dem, n: "dem", d: "terrain model" },
+		{ rgb: PROVENANCE_COLORS.dem, n: "terrain", d: "from the terrain model" },
 		{
 			rgb: PROVENANCE_COLORS.generated,
 			n: "generated",
-			d: "invented, never measurable",
+			d: "invented, never a measurement",
 		},
 	];
 	return (
 		<Figure
 			label="D3"
-			caption="The Truth toggle mixes 65 % of a provenance tint into every surface. The generated class is the only one filtered out of exports and readouts (provenance.ts filterForExport)."
+			caption="The Truth toggle tints every surface by where it came from. Generated surfaces are never exported or measured."
 		>
 			<div className="grid gap-3 sm:grid-cols-4">
 				{items.map((i) => (
@@ -918,13 +918,11 @@ function RealRange() {
 				<span className="gb-ink">
 					{((near.length / ground.length) * 100).toFixed(0)} %
 				</span>{" "}
-				of the {ground.length * step} image rows that see ground in the central
-				column hit it inside the 150 m near radius (nearest hit{" "}
-				{minR.toFixed(0)} m
-				{near.length ? `, farthest near hit ${maxNear.toFixed(0)} m` : ""}); the
-				rest is <em>Far</em> and left to the DEM. The eye is{" "}
-				{(d.gps.eye - d.gps.ground).toFixed(0)} m above the DEM ground here (see
-				the next figure).
+				of the {ground.length * step} ground rows in the centre column land
+				inside 150 m (nearest {minR.toFixed(0)} m
+				{near.length ? `, farthest ${maxNear.toFixed(0)} m` : ""}). The rest is
+				<em> far</em> and left to the terrain model. Camera height here:{" "}
+				{(d.gps.eye - d.gps.ground).toFixed(0)} m above ground.
 			</p>
 		);
 	}
@@ -934,15 +932,9 @@ function RealRange() {
 			bleed
 			caption={
 				<>
-					Every image row on the centre line is a ray from the eye; its length
-					to the first hill is read off the terrain. Green is inside 150 m,
-					brown is far, blue is sky.{" "}
-					<Measured data={d}>
-						<span>
-							Ranges ray-cast from its{" "}
-							<span className="gb-ink">terrainProfile</span>.
-						</span>
-					</Measured>
+					Each image row on the centre line is a ray from the camera; its length
+					is read off the terrain model. Green: inside 150 m. Brown: far. Blue:
+					sky. <Measured data={d} />
 				</>
 			}
 		>
@@ -999,9 +991,8 @@ function RealEye() {
 			bleed
 			caption={
 				<>
-					Bars: GPS altitude above the terrain under each photo. White tick: the
-					eye height we use, never below ground plus 1.6 m. Measured by{" "}
-					{d.script}, {d.generated}.
+					Bars: GPS height above the ground under each photo. White tick: the
+					camera height we use, at least ground + 1.6 m.
 				</>
 			}
 		>
@@ -1082,8 +1073,8 @@ function RealEye() {
 							/>
 							{!ok && (
 								<HandLabel x={L + 8} y={y + 14} size={13} color={SWISS.red}>
-									EXIF {r.gpsAlt.toFixed(0)} m vs ground {r.ground.toFixed(0)}{" "}
-									m: eye clamped to ground + 1.6
+									GPS {r.gpsAlt.toFixed(0)} m, ground {r.ground.toFixed(0)} m:
+									set to ground + 1.6 m
 								</HandLabel>
 							)}
 						</g>
@@ -1091,17 +1082,15 @@ function RealEye() {
 				})}
 			</svg>
 			<p className={`mt-3 font-mono gb-secondary ${TYPE.micro}`}>
-				{sane.length} of {rows.length} photos report an altitude{" "}
+				{sane.length} of {rows.length} photos report a GPS height{" "}
 				<span className="gb-ink">
 					{lo.toFixed(0)}–{hi.toFixed(0)} m
 				</span>{" "}
-				above the DEM ground;{" "}
-				{bad.length === 1 ? "one photo" : `${bad.length} photos`} (
-				{bad.map((b) => b.id).join(", ")}) reports an altitude{" "}
-				{Math.abs(bad[0]?.above ?? 0).toFixed(0)} m <em>below</em> the ground
-				and falls back to the 1.6 m floor. The step-inside report found the same
-				scale of error at the Niederhorn spot: GPS eye errors of 7–37 m
-				(reports/step-inside-results.md, finding 7).
+				above ground; {bad.length === 1 ? "one photo" : `${bad.length} photos`}{" "}
+				({bad.map((b) => b.id).join(", ")}) reports{" "}
+				{Math.abs(bad[0]?.above ?? 0).toFixed(0)} m <em>below</em> ground and
+				gets the 1.6 m floor. Elsewhere on the Niederhorn, GPS height errors of
+				7–37 m were found.
 			</p>
 		</Figure>
 	);
@@ -1120,7 +1109,7 @@ function RealCompression() {
 	return (
 		<Figure
 			label="D4"
-			caption="Why the anchor exists. The monocular model (MoGe-2) compresses range: the DEM distance divided by the model distance, on terrain pixels, is about 1 at 20 m but 2.9 at 100–300 m and 6.6 at 300–1000 m. One global scale would leave a median terrain error of 0.34 (log); a per-photo monotone log-log curve brings it to 0.13. Figures quoted from reports/step-inside-results.md findings 1 and 2 (2026-09-29), not measured by the gipfelbuch script."
+			caption="Why depth needs anchoring. A single-photo depth model squeezes distance: true distance divided by model distance is about 1 at 20 m, 2.9 at 100–300 m, 6.6 at 300–1000 m. One global scale leaves a typical error of 0.34 (log units); a per-photo curve cuts it to 0.13."
 		>
 			<svg
 				viewBox={`0 0 ${W} 130`}
@@ -1289,7 +1278,7 @@ function HeroStages() {
 				stages={[
 					{
 						label: "Photo",
-						caption: "A solved photo knows exactly where its camera stood.",
+						caption: "A solved photo knows where the camera stood.",
 						render: () => <RealPhoto data={d} layers={[]} bleed />,
 					},
 					{
@@ -1446,7 +1435,7 @@ function AnchorCurve({ d }: { d: SplitData }) {
 			/>
 			<g transform={`rotate(-38 ${X(Math.log(700))} ${Y(Math.log(520))})`}>
 				<HandLabel x={X(Math.log(700))} y={Y(Math.log(520))}>
-					model as is
+					raw depth model
 				</HandLabel>
 			</g>
 			<PenLine
@@ -1544,11 +1533,11 @@ function RealSplit() {
 			bleed
 			caption={
 				<>
-					What the split decided on one baked photo.{" "}
+					What the split decided on one photo.{" "}
 					<Key color="var(--accent)">Lifted into 3D</Key>: {pct(c.object)} % of
-					the pixels that are not sky, mostly the hiker and the lift cabin.{" "}
-					<Key color={DEM_C}>Left to the terrain</Key>: {pct(c.far)} %. The
-					hiker is lifted by the people mask, not by depth.{" "}
+					non-sky pixels, mostly the hiker and the lift cabin.{" "}
+					<Key color={DEM_C}>Left to terrain</Key>: {pct(c.far)} %. The hiker is
+					picked out by the person mask, not by depth.{" "}
 					<Measured
 						data={d as unknown as { script: string; generated: string }}
 					/>
@@ -1558,7 +1547,7 @@ function RealSplit() {
 			<div className="grid items-center gap-5 lg:grid-cols-[1.5fr_1fr]">
 				<Compare
 					beforeLabel="photo"
-					afterLabel="what the split decided"
+					afterLabel="after the split"
 					start={0.5}
 					before={photo(false)}
 					after={photo(true)}
@@ -1566,11 +1555,10 @@ function RealSplit() {
 				<div>
 					<AnchorCurve d={d} />
 					<p className={`mt-2 font-mono gb-secondary ${TYPE.micro}`}>
-						The fitted curve: the model says{" "}
-						{Math.exp(d.anchor.curve.x[3]).toFixed(0)} m where the terrain says{" "}
-						{Math.exp(d.anchor.curve.y[3]).toFixed(0)} m. Fit quality{" "}
-						{d.anchor.quality.toFixed(2)}, from{" "}
-						{d.anchor.n.toLocaleString("en")} terrain pixels.
+						Fitted curve: model {Math.exp(d.anchor.curve.x[3]).toFixed(0)} m =
+						terrain {Math.exp(d.anchor.curve.y[3]).toFixed(0)} m. Fit quality{" "}
+						{d.anchor.quality.toFixed(2)}, {d.anchor.n.toLocaleString("en")}{" "}
+						ground pixels.
 					</p>
 				</div>
 			</div>
@@ -1676,7 +1664,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					.
 					<MarginNote mark="a">
 						The 150 m radius is the whole bargain: inside it we rebuild, outside
-						it we trust the map.
+						it we trust the terrain model.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1695,8 +1683,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					m, <CircledNumber value={2} color="brown" /> brown is far, blue is
 					sky.
 					<MarginNote mark="b">
-						Rows near the bottom are close ground; the stripe turns brown
-						quickly as the eye climbs.
+						Low rows are close ground; the stripe turns brown quickly higher up.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1704,12 +1691,12 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			<RealRange />
 
 			<Eq
-				label="The split rule, per pixel"
+				label="Split rule, per pixel"
 				where={[
 					{
 						sym: "ρ",
 						c: "var(--accent)",
-						text: "range from the depth model, after anchoring to the terrain, in metres",
+						text: "distance from the depth model, anchored to the terrain (m)",
 					},
 					{
 						sym: (
@@ -1718,7 +1705,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							</>
 						),
 						c: DEM_C,
-						text: "range to the terrain along the same ray, from the terrain model",
+						text: "distance to the terrain along the same ray (m)",
 					},
 				]}
 			>
@@ -1757,8 +1744,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							visual: <MiniSplit />,
 						},
 						{
-							title: "Stand at the eye",
-							body: "The camera begins on the photo's own viewpoint, and stays close.",
+							title: "Stand where the photo was taken",
+							body: "The camera starts where the photo was taken and stays close.",
 							visual: <MiniEye />,
 						},
 					]}
@@ -1771,7 +1758,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					<HandMark type="wavy">Beyond 100 m the depth model drifts</HandMark>,
-					and objects blur into the slope. The start point is also uncertain,
+					and objects blur into the slope. The camera height is also uncertain,
 					because phone GPS height is rough.
 					<MarginNote mark="c">Why trust a hut at 200 m? We do not.</MarginNote>
 				</p>
@@ -1785,55 +1772,48 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						value: "150 m",
 						label: "near radius, beyond which only terrain is drawn",
 					},
-					{ value: "60 fps", label: "with 200 000 splats on screen" },
+					{ value: "60 fps", label: "with 200 000 points on screen" },
 					{
 						value: "15 %",
-						label: "of non-person drape smear removed on deck.gl (WebGL2)",
+						label: "of ground smear removed; the goal was 80 %",
 					},
-					{ value: "80 %", label: "was the target, so the gate is not met" },
 				]}
-				source={
-					<>reports/step-inside-results.md (verdict, rendering, finding 5).</>
-				}
 			/>
 
 			<Details>
-				<h3>The split rule, tunable (illustrative rows)</h3>
+				<h3>The split rule, adjustable</h3>
 				<SplitRuler />
 
 				<h3>How it works</h3>
 				<div className="space-y-3">
 					<p>
 						The split in D1 is{" "}
-						<HandMark type="circle">the heart of it</HandMark>: the per-pixel
-						decision in <code>split.ts</code>. The rest of the pipeline exists
-						to make that comparison meaningful and to turn its answer into
-						something you can walk around.
+						<HandMark type="circle">the heart of it</HandMark>. The rest of the
+						pipeline makes that comparison meaningful and turns the result into
+						a place you can walk around.
 					</p>
 				</div>
 				<Steps
 					steps={[
 						{
-							title: "Gate on an accepted pose",
+							title: "Only accepted poses",
 							body: (
 								<>
-									<code>poseAccepted</code> admits only photos whose pose a
-									solver confirmed or the user set (accepted, pinned, saved,
-									manual, or auto with a verified, refined or matched verdict).
-									See {A("accept-rule", "the accept rule")}. If the optional
-									service is down, the feature simply is not offered.
+									Only photos whose camera position was confirmed by the solver
+									or set by you are used. See{" "}
+									{A("accept-rule", "the accept rule")}. If the depth service is
+									down, the feature is not offered.
 								</>
 							),
 						},
 						{
-							title: "Ask the service for depth and splats",
+							title: "Get depth and 3D points",
 							body: (
 								<>
-									<code>/depth</code> (monocular depth) and{" "}
-									<code>/gaussians</code> (a splat cloud) run once per photo and
-									are cached, so changing the pose does not repeat the slow
-									part. The renderer meanwhile reads back its own DEM range for
-									every depth cell.
+									A depth model and a 3D-point model run once per photo and are
+									cached, so changing the pose does not repeat the slow part.
+									Meanwhile the renderer reads the terrain distance for every
+									depth cell.
 								</>
 							),
 						},
@@ -1841,11 +1821,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Anchor model depth to the DEM",
 							body: (
 								<>
-									Monocular depth is compressed in range, so a calibration curve
-									is fitted on terrain pixels to turn it into metres. That is
-									its own algorithm: see {A("dem-anchoring", "DEM anchoring")}.
-									The fit also yields a quality score: below 0.15 the scene is
-									hidden, below 0.35 it carries a low-trust badge.
+									Single-photo depth is squeezed at long range, so a curve is
+									fitted on terrain pixels to turn it into metres (see{" "}
+									{A("dem-anchoring", "DEM anchoring")}). Fit quality below 0.15
+									hides the scene; below 0.35 it gets a low-trust badge.
 								</>
 							),
 						},
@@ -1853,13 +1832,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Split every pixel",
 							body: (
 								<>
-									Compare anchored range with DEM range (D1). People are always
-									Objects. Beyond 150 m everything is Far. A model pixel with no
-									terrain behind it, such as a roof against the sky, is an
-									Object. Otherwise a pixel is an Object only if it is more than
-									half the DEM range in front <em>and</em> at least 3 m in
-									front; the margin is wide on purpose because depth error grows
-									with range.
+									Compare model distance with terrain distance (D1). People are
+									always objects. Beyond 150 m everything is far. A pixel with
+									no terrain behind it, like a roof against the sky, is an
+									object. Otherwise it is an object only if it is in front of
+									the terrain by more than half the distance <em>and</em> at
+									least 3 m. The margin is wide because depth error grows with
+									distance.
 								</>
 							),
 						},
@@ -1867,11 +1846,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Ground and place the objects",
 							body: (
 								<>
-									Each connected Object component is scaled about the camera by
-									the median of DEM range over model range at the cells where it
-									touches calibrated terrain, so trees, poles and huts stand on
-									the ground instead of floating. Components with too few
-									contacts keep the calibration curve (<code>ground.ts</code>).
+									Each object is scaled about the camera so that where it
+									touches the ground it matches the terrain distance. Trees,
+									poles and huts then stand on the ground instead of floating.
+									Objects with too few ground contacts keep the fitted curve.
 								</>
 							),
 						},
@@ -1879,10 +1857,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Build the scene, mask the drape",
 							body: (
 								<>
-									Surviving splats are converted to the photo's ENU frame, and a
-									confidence radius is derived from their ranges (D2). Object
-									pixels are then taken out of the flat photo drape, so the
-									splats do not double up on their own copy.
+									Kept points are placed in world coordinates and a roaming
+									radius is derived from their distances (D2). Object pixels are
+									cut out of the flat photo, so they are not drawn twice.
 								</>
 							),
 						},
@@ -1890,11 +1867,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Step in",
 							body: (
 								<>
-									The camera begins exactly on the solved pose and eases home
-									when you leave. Photo mode is clamped to the confidence radius
-									around the eye; orbit, fly and map modes roam freely but stay
-									above the terrain. The Truth toggle recolours everything by
-									provenance (D3).
+									The camera starts at the solved position and eases back when
+									you leave. Photo mode stays inside the confidence radius;
+									orbit, fly and map modes roam freely but stay above the
+									terrain. The Truth toggle recolours everything by provenance
+									(D3).
 								</>
 							),
 						},
@@ -1905,12 +1882,12 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 				<Flow
 					nodes={[
-						{ label: "accepted pose", sub: "poseAccepted" },
-						{ label: "depth + splats", sub: "service, cached" },
-						{ label: "anchor", sub: "quality gate" },
-						{ label: "split", sub: "Terrain / Object / Far" },
-						{ label: "scene", sub: "ENU splats + radius" },
-						{ label: "step in", sub: "camera on the eye" },
+						{ label: "accepted pose", sub: "solver or user" },
+						{ label: "depth + points", sub: "cached" },
+						{ label: "anchor", sub: "quality check" },
+						{ label: "split", sub: "terrain / object / far" },
+						{ label: "scene", sub: "points + radius" },
+						{ label: "step in", sub: "camera at the photo" },
 					]}
 				/>
 
@@ -1919,15 +1896,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<div className="grid gap-6 sm:grid-cols-3">
 					<Stat
 						value="150 m"
-						label="near radius: beyond it the DEM alone draws the world"
+						label="near radius: beyond it only terrain is drawn"
 					/>
 					<Stat
 						value="200k"
-						label="splats render at 60 fps; 1M runs at about 35-45 fps (reports/step-inside-results.md)"
-					/>
-					<Stat
-						value="2"
-						label="renderers shared one near-camera DEM and agreed within 3 % (three.js has since been removed)"
+						label="points render at 60 fps; a million run at about 35-45 fps"
 					/>
 				</div>
 
@@ -1935,24 +1908,21 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 				<Callout
 					tone="negative"
-					title="The headline gate is not met"
+					title="What it does not do yet"
 					className="!mt-0"
 				>
-					Measured against hand labels, the split removed about{" "}
-					<HandMark type="double">15 %</HandMark> of the non-person drape smear
-					on accepted photos with deck.gl (4 % with the since-removed three.js
-					engine), against an <HandMark type="strike">80 %</HandMark>{" "}
-					<span className="nb-hand text-[var(--gb-red)]">gate not met</span>{" "}
-					target: depth cannot separate huts and trees at 100–300 m from the
-					terrain behind them. The feature works end to end and is honest about
-					provenance, but this part of the claim is still open
-					(reports/step-inside-results.md, verdict and finding 5).
+					Against hand labels, the split removed about{" "}
+					<HandMark type="double">15 %</HandMark> of the ground smear on
+					accepted photos. The goal was <HandMark type="strike">80 %</HandMark>{" "}
+					<span className="nb-hand text-[var(--gb-red)]">not met</span>. Depth
+					cannot separate huts and trees at 100–300 m from the slope behind
+					them. The rest of the feature works; this part is still open.
 				</Callout>
 
-				<Callout tone="note" title="Why the depth model alone is never trusted">
-					The scene is only as good as the pose and the anchor beneath it. A
-					scene is not drawn when the pose was not accepted, and the anchor
-					residual decides whether it is shown, badged or hidden.{" "}
+				<Callout tone="note" title="Why depth alone is not trusted">
+					The scene is only as good as the camera position and the anchor
+					beneath it. Without an accepted position nothing is drawn; fit quality
+					decides whether it is shown, badged or hidden.{" "}
 					<HandMark type="box">
 						Nothing generated is ever exported as a measurement.
 					</HandMark>
@@ -1997,14 +1967,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<h3>Where it fits</h3>
 				<div className="space-y-3">
 					<p>
-						Step Inside is a consumer of the solve: the pose from{" "}
+						Step Inside builds on the solve: the camera position from{" "}
 						{A("pose-estimate", "the pose estimate")}, found by{" "}
 						{A("viewport-inference", "viewport inference")} and corrected by{" "}
-						{A("terrain-snapping", "terrain snapping")}, is what lets a
-						monocular depth map be read against the DEM at all.{" "}
-						{A("dem-anchoring", "DEM anchoring")} supplies the metre ruler it
-						relies on, and {A("camera-roll", "the camera roll")} reuses the same
-						3D viewer for a whole day of photos.
+						{A("terrain-snapping", "terrain snapping")}, lets depth be compared
+						with the terrain at all. {A("dem-anchoring", "DEM anchoring")} gives
+						it metres, and {A("camera-roll", "the camera roll")} reuses the same
+						viewer for a day of photos.
 					</p>
 				</div>
 			</Details>

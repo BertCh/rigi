@@ -57,7 +57,7 @@ export const CONCEPTS = {
 		label: "Photo",
 		domain: "capture",
 		definition:
-			"One image plus what the device recorded about it (size, time, position, heading, gravity, lens). Bundled, uploaded (local), demo or benchmark.",
+			"One image plus what the phone recorded with it: time, position, heading, tilt and lens.",
 		ui: ["Photo"],
 		code: ["PhotoMeta", "photo", "meta"],
 		has: {
@@ -91,7 +91,7 @@ export const CONCEPTS = {
 		domain: "capture",
 		is: "camera",
 		definition:
-			"The camera the device's sensors imply before any solving: compass yaw, gravity pitch/roll, EXIF focal, GPS position. A ROLE (fed into solves), not a source.",
+			"The camera the phone's sensors imply before any solving: compass heading, tilt, lens and GPS position.",
 		ui: ["compass + gravity", "phone sensors"],
 		code: ["prior", "priorPose", "Priors", "PriorPhoto", "Unknowns"],
 		has: { orientation: one("orientation"), unknowns: one("prior-unknowns") },
@@ -116,7 +116,7 @@ export const CONCEPTS = {
 		label: "Roll",
 		domain: "capture",
 		definition:
-			"Photos of one area shown together (mosaic, map drape, panorama). Derived by clustering photos (15 km link), never stored.",
+			"Photos of one area, shown as a mosaic, on the map and as a panorama. Grouped on the fly, never stored.",
 		ui: ["Roll", "camera roll", "sample trip"],
 		code: ["Roll"],
 		has: {
@@ -175,7 +175,7 @@ export const CONCEPTS = {
 		domain: "world",
 		is: "feature",
 		definition:
-			"A named summit (OSM natural=peak) with elevation and, where known, prominence.",
+			"A named summit from OpenStreetMap, with its height and, where known, prominence.",
 		ui: ["Peak", "summit"],
 		code: ["Peak", "RegionPeak", "PoolPeak", "PeakInput", "PeakPoint"],
 		realizedBy: [
@@ -216,7 +216,7 @@ export const CONCEPTS = {
 		label: "Terrain",
 		domain: "world",
 		definition:
-			"The DEM surface: heights in metres MSL, sampled from tiles at distance-dependent zoom.",
+			"The ground surface: heights above sea level, read from tiles that get coarser with distance.",
 		code: ["Terrain", "TerrainSampler", "HeightFn"],
 		has: { source: one("dem-source"), tiles: many("dem-tile") },
 		realizedBy: ["lib/geo/terrain.ts#TerrainSampler"],
@@ -226,7 +226,7 @@ export const CONCEPTS = {
 		label: "DEM source",
 		domain: "world",
 		definition:
-			"A tiled elevation dataset (Mapterhorn 512 px, Terrarium 256 px) with zoom levels by distance.",
+			"A tiled height dataset, Mapterhorn or Terrarium; nearer ground gets finer tiles.",
 		code: ["DemSource", "TerrainLevel"],
 		realizedBy: ["lib/dem/sources.ts#DemSource"],
 	},
@@ -321,7 +321,7 @@ export const CONCEPTS = {
 		label: "Eye rule",
 		domain: "camera",
 		definition:
-			"How eye height is set without a solve: max(GPS alt, DEM + 1.6 m); with no altitude the engine uses DEM + 1.8 m while geo/pipeline uses DEM + 1.6 m.",
+			"How high the camera sits without a solve: the GPS altitude, but at least standing height above the ground.",
 		code: ["EYE_ABOVE_GROUND", "eyeAlt"],
 		realizedBy: ["lib/concord/priors/altitude.ts#EyePrior"],
 		note: "Known drift: engine.ts:393 and roll ridgelines.worker.ts use 1.8 m when alt is null; geo/pipeline.ts:45 uses 1.6 m.",
@@ -332,7 +332,7 @@ export const CONCEPTS = {
 		label: "Horizon",
 		domain: "evidence",
 		definition:
-			"The MODELLED skyline: per-azimuth elevation of the DEM's highest visible ridge from the eye.",
+			"The skyline the terrain predicts: the highest visible ridge in every direction.",
 		code: [
 			"HorizonProfile",
 			"FastHorizonProfile",
@@ -351,8 +351,7 @@ export const CONCEPTS = {
 	skyline: {
 		label: "Skyline",
 		domain: "evidence",
-		definition:
-			"The OBSERVED sky/terrain boundary in the photo: per-column row and weight.",
+		definition: "The line between sky and terrain as seen in the photo.",
 		code: [
 			"SkylineObservation",
 			"SkylineRows",
@@ -411,7 +410,7 @@ export const CONCEPTS = {
 		domain: "evidence",
 		is: "correspondence",
 		definition:
-			"A user's tap tying a named peak to an image point (1 pin: yaw/pitch; 2: + roll; 3: + fov).",
+			"A tap that ties a named peak to a point in the photo. One pin sets direction, two add tilt, three add the lens.",
 		ui: ["Pin"],
 		code: ["Pin", "TapPin"],
 		avoid: ["pin (meaning a map position pin: call that map-pin / place)"],
@@ -436,7 +435,7 @@ export const CONCEPTS = {
 		label: "Pose estimate",
 		domain: "estimate",
 		definition:
-			"An orientation (and possibly eye) plus its provenance: who/what produced it, from which evidence, and how it was judged.",
+			"Where the camera pointed (sometimes where it stood), plus who found it, from what, and how sure.",
 		code: [
 			"SolvedPose",
 			"AppAlign",
@@ -606,7 +605,7 @@ export const CONCEPTS = {
 		label: "Step Inside",
 		domain: "presentation",
 		definition:
-			"The near field rebuilt in 3D (Gaussian splats on the DEM) with photo / orbit / fly / top-down cameras.",
+			"The near ground rebuilt in 3D on the terrain; view it from the photo, orbiting, flying or from above.",
 		ui: ["Step Inside", "Photo", "Orbit", "Fly", "Top-down"],
 		code: ["NearFieldScene", "StepMode", "GaussianCloud"],
 		realizedBy: [

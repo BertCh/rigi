@@ -29,9 +29,9 @@ import {
 	Figure,
 	Flow,
 	HandLabel,
+	HandRange,
 	LiveDrape,
 	MarginNote,
-	Measured,
 	Plot,
 	Steps,
 	Sym,
@@ -178,8 +178,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 						? "Terrarium rounds the summit low."
 						: `Terrarium rounds the summit ${gap.toFixed(0)} m low.`}{" "}
 					{box?.osmSummit.ele != null &&
-						`The map's own tag says ${fmt(box.osmSummit.ele)} m. `}
-					<Measured data={d} />
+						`OpenStreetMap lists it at ${fmt(box.osmSummit.ele)} m.`}
 				</>
 			}
 		>
@@ -280,7 +279,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 							width={1}
 						/>
 						<HandText x={6} y={11} size={8} rotate={-1.5} halo={false}>
-							I notice: a {gap?.toFixed(0)} m pit where the summit should be
+							a {gap?.toFixed(0)} m pit where the summit should be
 						</HandText>
 						<HandText x={6} y={24} size={7} color="forest" halo={false}>
 							same box, same pixel, different map
@@ -308,11 +307,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 					<p className="mx-auto mt-1 max-w-[640px] text-[13px] gb-secondary">
 						<Key color={TERRA}>Terrarium</Key> and{" "}
 						<Key color={MAP}>Mapterhorn</Key>, west to east through the highest
-						pixel of the 1.2 km box. Peaks:{" "}
-						<span className="gb-num">{fmt(box.terrarium.max)} m</span> in
-						Terrarium,{" "}
-						<span className="gb-num">{fmt(box.mapterhorn.max)} m</span> in
-						Mapterhorn.
+						pixel of the 1.2 km box.
 					</p>
 				</>
 			)}
@@ -325,7 +320,7 @@ function Disagree({ d }: { d: TerrainData | null }) {
 	const tr = d?.transect;
 	if (!tr)
 		return (
-			<Figure caption="Loading measured transect.">
+			<Figure caption="Loading…">
 				<div className="aspect-[2/1] animate-pulse bg-[var(--gb-paper-deep)]" />
 			</Figure>
 		);
@@ -343,7 +338,7 @@ function Disagree({ d }: { d: TerrainData | null }) {
 			caption={
 				<>
 					Along 12 km the maps part by up to {Math.abs(diff[worst]).toFixed(0)}{" "}
-					m, at {(tr.d[worst] / 1000).toFixed(1)} km. <Measured data={d} />
+					m, at {(tr.d[worst] / 1000).toFixed(1)} km.
 				</>
 			}
 		>
@@ -399,7 +394,7 @@ function Disagree({ d }: { d: TerrainData | null }) {
 				width={560}
 				height={130}
 				xLabel="distance from camera (km)"
-				yLabel="Terr. − Map. (m)"
+				yLabel="Terrarium − Mapterhorn (m)"
 				fmtX={(v) => v.toFixed(0)}
 				fmtY={(v) => v.toFixed(0)}
 				yTicks={4}
@@ -483,12 +478,7 @@ function GroundGap({ d }: { d: TerrainData | null }) {
 	return (
 		<Figure
 			label="Fig. 4"
-			caption={
-				<>
-					At all 12 camera spots Terrarium puts the ground lower.{" "}
-					<Measured data={d} />
-				</>
-			}
+			caption={<>At all 12 cameras, Terrarium puts the ground lower.</>}
 		>
 			<svg
 				viewBox="0 0 720 188"
@@ -694,10 +684,10 @@ function FallbackMini() {
 				fine tile missing
 			</HandLabel>
 			<HandText x={60} y={66} anchor="middle" size={15} color="red" rotate={-3}>
-				NaN
+				no data
 			</HandText>
 			<HandText x={117} y={46} anchor="middle" size={12} rotate={-2}>
-				sampleAt tries the next level up
+				tries the next coarser tile
 			</HandText>
 			<PenArrow
 				seed="dem-fallback-arrow"
@@ -808,7 +798,7 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 	return (
 		<Figure
 			label="Fig. 3"
-			caption="Slide the probe: the lit band is the zoom each map would use at that distance. Small numbers are metres per tile pixel."
+			caption="Slide the probe: the lit band is the zoom each map uses at that distance. Small numbers: metres per pixel."
 		>
 			<svg
 				viewBox="0 0 600 150"
@@ -816,8 +806,8 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 				role="img"
 				aria-label="Distance bands of the Terrarium and Mapterhorn tile ladders"
 			>
-				{row("terrarium (3 bands)", TERRAIN_LEVELS, 256, 22, TERRA)}
-				{row("mapterhorn (6 bands)", MAPTERHORN.levels, 512, 88, MAP)}
+				{row("Terrarium, 3 bands", TERRAIN_LEVELS, 256, 22, TERRA)}
+				{row("Mapterhorn, 6 bands", MAPTERHORN.levels, 512, 88, MAP)}
 				{[1000, 4000, 15000, 40000, 150000].map((m) => (
 					<g key={m}>
 						<PenLine
@@ -866,32 +856,28 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 					head={4}
 				/>
 			</svg>
-			<label className="mt-2 flex items-center gap-3 font-mono text-[11px] gb-secondary">
+			<div className="mt-2 flex items-center gap-3 font-mono text-[11px] gb-secondary">
 				distance
-				<input
-					type="range"
-					min={200}
-					max={Math.log10(max) * 100}
-					value={Math.log10(d) * 100}
-					onChange={(e) =>
-						setD(Math.round(10 ** (Number(e.target.value) / 100)))
-					}
-					className="flex-1 accent-[var(--accent)]"
-					aria-label="Sample distance from camera"
-				/>
-				<span className="w-16 text-right gb-ink">
-					{d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${d} m`}
-				</span>
-			</label>
+				<div className="flex-1">
+					<HandRange
+						min={200}
+						max={Math.log10(max) * 100}
+						step={1}
+						value={Math.log10(d) * 100}
+						onChange={(v) => setD(Math.round(10 ** (v / 100)))}
+						label="Sample distance from camera"
+						readout={d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${d} m`}
+					/>
+				</div>
+			</div>
 
 			{data && (
 				<p className="mt-1 font-mono text-[11px] gb-secondary">
-					Measured at the Niederhorn camera: the selected band is{" "}
+					At the Niederhorn camera this band is{" "}
 					{data.levels.mapterhorn[pick(MAPTERHORN.levels)].tiles} Mapterhorn
 					tiles of {data.levels.mapterhorn[pick(MAPTERHORN.levels)].tileKm} km,
 					or {data.levels.terrarium[pick(TERRAIN_LEVELS)].tiles} Terrarium tiles
-					of {data.levels.terrarium[pick(TERRAIN_LEVELS)].tileKm} km
-					(tilesAround count, {data.script}).
+					of {data.levels.terrarium[pick(TERRAIN_LEVELS)].tileKm} km.
 				</p>
 			)}
 		</Figure>
@@ -935,11 +921,7 @@ function Encoding({ d }: { d: TerrainData | null }) {
 	return (
 		<Figure
 			label="D1"
-			caption={
-				<>
-					The tile pixel under the camera in each source. <Measured data={d} />
-				</>
-			}
+			caption={<>The tile pixel under the camera in each source.</>}
 		>
 			<div className="grid gap-3 sm:grid-cols-2">
 				{(d?.rgb ?? []).map((p) => {
@@ -1002,10 +984,9 @@ export default function Page(_: { node: GipfelbuchNode }) {
 				</p>
 				{d && (
 					<p>
-						At their finest, tile pixels are {d.box.mapterhorn.nativeMPerPx} m
-						wide in Mapterhorn and {d.box.terrarium.nativeMPerPx} m in
-						Terrarium. Pixel size is only the grid: Terrarium is built from
-						coarser surveys, so its{" "}
+						At their finest, a pixel is {d.box.mapterhorn.nativeMPerPx} m in
+						Mapterhorn and {d.box.terrarium.nativeMPerPx} m in Terrarium. But
+						Terrarium is built from coarser surveys, so its{" "}
 						<HandMark type="wavy">grid is finer than its detail</HandMark>
 						<MarginNote mark="a">
 							{d
@@ -1058,20 +1039,20 @@ export default function Page(_: { node: GipfelbuchNode }) {
 				}
 			>
 				<p>
-					Heights feed the skyline we match. In the benchmark, drawing on the
-					wrong map moved the skyline by{" "}
+					Heights feed the horizon we match to the photo. On 100 test photos,
+					drawing on the wrong map moved the horizon by{" "}
 					<HandMark type="double">1 to 27% of image height</HandMark>.
 					<MarginNote mark="b">
-						My first verification drew on Terrarium. It was wrong.
+						My first check used Terrarium. It was wrong.
 					</MarginNote>
 				</p>
 				<p>
-					Fine tiles also exist only where surveys do. Elsewhere we fall back to
-					coarser ones. Cascade result: <HandMark type="strike">14</HandMark>{" "}
+					Fine tiles exist only where surveys do; elsewhere we fall back to
+					coarser ones. Result: <HandMark type="strike">14</HandMark>{" "}
 					<span className="nb-hand" style={{ color: "var(--gb-red)" }}>
 						25
 					</span>{" "}
-					correct poses once the map was Mapterhorn.
+					correct poses of 100 once the map was Mapterhorn.
 				</p>
 			</Beat>
 
@@ -1080,10 +1061,10 @@ export default function Page(_: { node: GipfelbuchNode }) {
 			{/* The shell Tafel spills this sheet's one photo: the plate keeps its frame, no surround or line art. */}
 			<LiveDrape
 				number="Fig. 5"
-				title="The ground the DEM gives each photo"
+				title="The ground under each photo"
 				notes={[
 					{
-						text: "each photo hangs on the DEM's slopes, not the phone's altitude",
+						text: "each photo sits on the map's slope, not the phone's altitude",
 						at: [0.35, 0.45],
 						side: "left",
 					},
@@ -1119,13 +1100,7 @@ export default function Page(_: { node: GipfelbuchNode }) {
 						label: "ground gap across the 12 demo cameras",
 					},
 				]}
-				source={
-					<>
-						Benchmark: reports/bench-wild.md (cascade re-run, all 100 photos).
-						Others: measured by scripts/gipfelbuch/data-terrain.ts at the
-						Niederhorn camera.
-					</>
-				}
+				source="First figure: 100-photo benchmark. Others: measured at the Niederhorn camera."
 			/>
 
 			<Details>
@@ -1136,10 +1111,9 @@ export default function Page(_: { node: GipfelbuchNode }) {
 					deepest <code>maxZoom</code> and a list of distance{" "}
 					<code>levels</code>. <code>MAPTERHORN</code> ({MAPTERHORN.tileSize} px
 					WebP, to z{MAPTERHORN.maxZoom}, swissALTI3D in Switzerland) is the
-					user-approved default that every DEM consumer uses.{" "}
-					<code>TERRAIN_LEVELS</code> belongs to <code>TERRARIUM_AWS</code> (
-					{TERRARIUM_AWS.tileSize} px PNG, z{TERRARIUM_AWS.maxZoom}), kept as
-					the comparison. Both are{" "}
+					default. <code>TERRAIN_LEVELS</code> belongs to{" "}
+					<code>TERRARIUM_AWS</code> ({TERRARIUM_AWS.tileSize} px PNG, z
+					{TERRARIUM_AWS.maxZoom}), kept as the comparison. Both are{" "}
 					<A id="terrarium-encoding">Terrarium-encoded</A>, so the decoder is
 					shared and a tile is a <A id="dem-tile">DEM tile</A> either way.
 				</p>
@@ -1195,10 +1169,6 @@ export default function Page(_: { node: GipfelbuchNode }) {
 								</span>
 							))}
 						</div>
-						<p>
-							Measured by <code>{d.script}</code>, {d.generated} (HTTP status of
-							one tile per zoom).
-						</p>
 					</>
 				)}
 				<h3>Bare earth or treetops?</h3>
@@ -1207,29 +1177,27 @@ export default function Page(_: { node: GipfelbuchNode }) {
 					deviation 0.3 to 0.5 m from lidar, 1 to 3 m above 2000 m where it
 					comes from stereo images). Mapterhorn&rsquo;s global layer is
 					Copernicus GLO-30, a 30 m surface model that includes canopy and
-					roofs, with an absolute vertical error under 4 m (90%). So the same
+					roofs, with an absolute vertical error under 4 m (90%). So
 					&ldquo;ground&rdquo; means bare earth in Switzerland and treetops
-					elsewhere. We did not re-measure these figures; they come from the
-					swisstopo and Copernicus product descriptions.
+					elsewhere. Figures are from the swisstopo and Copernicus product
+					descriptions, not re-measured.
 				</p>
 				<h3>Why it matters in Rigi</h3>
 				<p>
 					Georeferencing depends on skyline notches and ridgelines matching the
 					photo to a few hundredths of a degree. A DEM that rounds off summits
 					moves exactly those features. Swapping Terrarium for Mapterhorn took
-					the cascade from 14 to 25 correct poses on the 100-photo{" "}
-					<A id="wild-benchmark">wild benchmark</A>, with no algorithm change
-					(reports/bench-wild.md). It is also the licensing surface: see the{" "}
-					<A id="licence-register">licence register</A>.
+					the solver from 14 to 25 correct poses on the 100-photo{" "}
+					<A id="wild-benchmark">benchmark</A>, with no algorithm change. See
+					also the <A id="licence-register">licence register</A>.
 				</p>
 				<h3>Gotchas and lessons</h3>
 				<ul>
 					<li>
-						<strong>Verify on the DEM the method used.</strong> The first
-						benchmark verification drew overlays on Terrarium while methods
-						solved on Mapterhorn; ground differed by up to 114 m and the drawn
-						skyline moved 1 to 27% of image height. The reported precision
-						(0.72) and a &quot;GPS parallax&quot; story were wrong.
+						<strong>Check against the map the method used.</strong> The first
+						benchmark check drew overlays on Terrarium while the methods solved
+						on Mapterhorn; ground differed by up to 114 m and the drawn skyline
+						moved 1 to 27% of image height.
 					</li>
 					<li>
 						The 12-photo ground truth was fitted against Terrarium notches, so
@@ -1239,14 +1207,10 @@ export default function Page(_: { node: GipfelbuchNode }) {
 						Self-hosted tiles must be the same 512 px Terrarium WebP, and
 						missing tiles must return 404 or 204 so the ancestor fallback works.
 					</li>
-					<li>
-						Terrarium is for <code>/baseline</code> and research scripts only;
-						it is not on product paths.
-					</li>
 				</ul>
-				<Callout tone="negative" title="Terrarium cascade">
-					14 correct vs 25 on Mapterhorn: the smoother DEM is not a cheaper
-					equivalent; it silently changes accuracy.
+				<Callout tone="negative" title="Terrarium costs accuracy">
+					14 correct poses against 25 on Mapterhorn: the smoother map is not a
+					cheaper equivalent.
 				</Callout>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">

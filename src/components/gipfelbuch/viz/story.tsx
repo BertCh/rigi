@@ -43,6 +43,14 @@ export function AlignmentStoryProvider({
 	);
 }
 
+/**
+ * How a photo's geo spill is drawn inside a Compare: the bottom side carries it at the wipe's
+ * position (`t`), and the clipped top side leaves it out (`off`), so the margins show one world that
+ * slides as the wipe moves.
+ */
+export type SpillSide = { t?: number; off?: boolean };
+export const SpillSideContext = createContext<SpillSide | null>(null);
+
 /** The enclosing alignment story, or null outside one. */
 export const useAlignmentStory = () => useContext(StoryContext);
 

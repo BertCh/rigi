@@ -13,7 +13,6 @@ import {
 	CONCEPT_IDS,
 	conceptView,
 	findingsByKind,
-	findingsFor,
 	hasNode,
 	isConceptId,
 	isMethodId,
@@ -129,18 +128,14 @@ describe("ontology adapter", () => {
 			searchWords({ ...NODES[0], ontologyId: undefined, methodIds: undefined }),
 		).toEqual([]);
 	});
-	it("findingsFor only returns findings that name one of the node's modules", () => {
+	it("concept chips that link to a sheet carry that sheet's title", () => {
 		for (const n of NODES) {
-			const f = findingsFor(n);
-			for (const x of f)
-				expect(
-					x.where.some((w) => {
-						const p = w.trim().split(/[\s:]/)[0];
-						const full = /^(src|tools|data)\//.test(p) ? p : `src/${p}`;
-						return n.modules.includes(full);
-					}),
-				).toBe(true);
+			if (!n.ontologyId) continue;
+			const v = conceptView(n.ontologyId);
+			for (const r of [v.parent, ...v.children, ...v.parts, ...v.partOf]) {
+				const node = r?.nodeId && NODES.find((x) => x.id === r.nodeId);
+				if (node) expect(r.label).toBe(node.title);
+			}
 		}
-		expect(findingsFor({ ...NODES[0], modules: [] })).toEqual([]);
 	});
 });

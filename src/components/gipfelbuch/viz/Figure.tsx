@@ -8,7 +8,7 @@ import { TYPE } from "../swiss/type";
 import { HandSideRule, HandUnderline, seedUnit } from "./hand";
 import { useInView } from "./hooks";
 
-/** Provenance roles: Aufnahme (source), Revision (measuring stage), Stich (renderer). */
+/** Provenance: Aufnahme (the source, with id and date). Only the source is printed. */
 export interface FigureImprint {
 	aufnahme?: string;
 	revision?: string;
@@ -16,13 +16,7 @@ export interface FigureImprint {
 }
 
 const formatImprint = (imprint: FigureImprint) =>
-	[
-		imprint.aufnahme && `Aufnahme ${imprint.aufnahme}`,
-		imprint.revision && `Revision ${imprint.revision}`,
-		imprint.stich && `Stich ${imprint.stich}`,
-	]
-		.filter(Boolean)
-		.join(" · ");
+	imprint.aufnahme ? `Aufnahme ${imprint.aufnahme}` : "";
 
 /**
  * A drawing on the sheet, separated by space: no fill, no padding, no outline. Hand pass: "Fig. n" (the
@@ -44,6 +38,7 @@ export function Figure({
 	number,
 	imprint,
 	printCaption = false,
+	pinned,
 }: {
 	children: ReactNode;
 	caption?: ReactNode;
@@ -68,6 +63,8 @@ export function Figure({
 	imprint?: FigureImprint;
 	/** Set a long, dense caption in the body hand (Playpen) instead of the Caveat note hand. */
 	printCaption?: boolean;
+	/** The demo photo the figure is fixed on ("demo-10"): a small hand chip "demo-10 · pinned" before the caption. */
+	pinned?: string;
 }) {
 	const [ref, on] = useInView();
 	const lettering = number ?? label;
@@ -117,9 +114,21 @@ export function Figure({
 			>
 				{children}
 			</div>
-			{(caption || source || imprint) && (
+			{(caption || source || imprint || pinned) && (
 				<figcaption className="mt-3 px-0.5">
 					<div className="flex items-baseline gap-3">
+						{pinned && (
+							<span className="nb-hand relative shrink-0 px-1.5 text-[17px] leading-[22px] text-[var(--gb-secondary,#4a545c)]">
+								{pinned}
+								<HandUnderline
+									seed={`${seed}-pinned`}
+									color="pencil"
+									width={1.2}
+									coverage={1}
+									offset={-2}
+								/>
+							</span>
+						)}
 						{caption && (
 							<span
 								className={cn(
@@ -151,7 +160,7 @@ export function Figure({
 				<div className="relative mt-4 py-1 pl-5 text-[14px] leading-[20px] text-[var(--gb-ink)]">
 					<HandSideRule seed={`${seed}-reading`} color="pencil" width={1.4} />
 					<p className="nb-hand mb-0.5 text-[20px] leading-[24px] text-[var(--gb-contour,var(--gb-ink))]">
-						how to read it →
+						How to read it
 					</p>
 					{reading}
 				</div>
