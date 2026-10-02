@@ -11,8 +11,9 @@
 // cost), the idle release and device loss (last: they destroy the sidecar). Every GPU result is compared exactly with a CPU
 // computation.
 import { Buffer, type Device, luma, Texture } from "@luma.gl/core";
-import { webgpuAdapter } from "@luma.gl/webgpu";
+import { type WebGPUDevice, webgpuAdapter } from "@luma.gl/webgpu";
 import { setFlagOverride } from "#/lib/flags";
+import { adapterLimits } from "../adapter-peek";
 import {
 	adoptedRenderDevice,
 	adoptRenderDevice,
@@ -292,26 +293,18 @@ export async function coreSelftest(): Promise<{
 		const features = Object.fromEntries(
 			COMPUTE_FEATURES.map((f) => [f, hasFeature(device, f)]),
 		);
-		const gpu = (
-			navigator as unknown as {
-				gpu: {
-					requestAdapter: (
-						o?: unknown,
-					) => Promise<{ limits: Record<string, number> } | null>;
-				};
-			}
-		).gpu;
-		const adapter = await gpu.requestAdapter({
-			powerPreference: "high-performance",
-		});
+		const adapter = (device as WebGPUDevice).adapter;
+		const adapterLimitValues = adapter
+			? adapterLimits(adapter, RAISED_LIMITS)
+			: {};
 		const limits = device.limits as unknown as Record<string, number>;
 		const raised = Object.fromEntries(
-			RAISED_LIMITS.map((k) => [k, [limits[k], adapter?.limits[k]]]),
+			RAISED_LIMITS.map((k) => [k, [limits[k], adapterLimitValues[k]]]),
 		);
 		check(
 			"device-features-limits",
 			!!adapter &&
-				RAISED_LIMITS.every((k) => limits[k] === adapter.limits[k]) &&
+				RAISED_LIMITS.every((k) => limits[k] === adapterLimitValues[k]) &&
 				hasFeature(null, "subgroups") === false,
 			{ features, raised },
 		);

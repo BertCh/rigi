@@ -9,6 +9,7 @@
  */
 import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
+import { navigatorGpu, peekWebGPUAdapter } from "#/lib/gpu/adapter-peek";
 import { type ModelRun, modelSize, normalise, resamplePlanes } from "./core";
 
 /**
@@ -94,11 +95,9 @@ async function hardwareWebGPU(): Promise<boolean> {
 		isFallbackAdapter?: boolean;
 		info?: { architecture?: string };
 	};
-	type Gpu = { requestAdapter(): Promise<unknown> };
-	const gpu = (globalThis.navigator as { gpu?: Gpu } | undefined)?.gpu;
-	if (!gpu) return false;
+	if (!navigatorGpu()) return false;
 	try {
-		const a = (await gpu.requestAdapter()) as Adapter | null;
+		const a = (await peekWebGPUAdapter()) as Adapter | null;
 		return (
 			!!a && !a.isFallbackAdapter && a.info?.architecture !== "swiftshader"
 		);

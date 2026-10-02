@@ -1,7 +1,7 @@
 {
 	"src/lib/deck-webgpu/device.ts": {
-		"rawWebGpu": 3,
-		"why": "createRenderDevice: adapter probe for features and limits before luma create"
+		"rawWebGpu": 1,
+		"why": "webgpuAvailable reason text names navigator.gpu (a string, no raw call); the adapter peek lives in gpu/adapter-peek.ts"
 	},
 	"src/lib/deck-webgpu/lab.ts": {
 		"privateMember": 1,
@@ -21,6 +21,10 @@
 		"rawGl": 85,
 		"why": "WebGL2 fallback (no MSAA here): glFence/readbackQuiet probes, RED/FLOAT readability probe, the RGBA/FLOAT readPixels fallback (luma readBuffer reads only the texture's own format), copyRangeTo Y-flip blit (luma has no flipped blit); PBO pool retired in 888be38"
 	},
+	"src/lib/gpu/adapter-peek.ts": {
+		"rawWebGpu": 1,
+		"why": "the one raw navigator.gpu.requestAdapter: adapter limits/features before device creation; @luma.gl/webgpu exports WebGPUAdapter as a type only and requestGPUAdapter is protected"
+	},
 	"src/lib/gpu/core/luma.ts": {
 		"handle": 1,
 		"why": "WebGPUAdapter.attach(handle: GPUDevice) wrapper for ORT / ownsHandle; the one sanctioned attach point (nativeWebGPUDevice / nativeWebGPUBuffer next to it hand ORT native objects)"
@@ -29,28 +33,16 @@
 		"handle": 1,
 		"why": "openErrorScopes: native push/popErrorScope for opt-in checks; luma WebGPUDevice.pushErrorScope/popErrorScope are no-ops unless the device was created with debug: true"
 	},
-	"src/lib/gpu/core/selftest.ts": {
-		"rawWebGpu": 1,
-		"why": "selftest drives the raw device on purpose"
-	},
-	"src/lib/gpu/device.ts": {
-		"rawWebGpu": 1,
-		"why": "sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)"
-	},
 	"src/lib/nearfield/deck-splat-layer.ts": {
 		"rawGl": 40,
 		"why": "WebGL2 splat layer on deck's gl context"
 	},
 	"src/lib/renderer-select.ts": {
-		"rawWebGpu": 3,
-		"why": "engine probe: navigator.gpu + a probe device, the one place that decides WebGPU vs WebGL2"
+		"rawWebGpu": 2,
+		"why": "engine probe: a probe requestDevice on the peeked adapter (+ the \"no navigator.gpu\" reason string); the one place that decides WebGPU vs WebGL2 and must not load the luma WebGPU chunk"
 	},
 	"src/lib/roll/mosaic/panoGL.ts": {
 		"rawGl": 96,
 		"why": "stand-alone raw WebGL2 panorama renderer (audit-render R2)"
-	},
-	"src/lib/sky/model.ts": {
-		"rawWebGpu": 2,
-		"why": "ORT (onnxruntime-web) needs the raw GPUDevice attached; stays"
 	}
 }

@@ -30,6 +30,7 @@
 
 import type { Device, DeviceLimits } from "@luma.gl/core";
 import { getFlag } from "#/lib/flags";
+import { adapterLimits, peekWebGPUAdapter } from "./adapter-peek";
 import { idleFor, touch } from "./core/lifecycle";
 import { webgpuAdapter } from "./core/luma";
 
@@ -196,23 +197,19 @@ async function create(): Promise<Device | null> {
  * `optionalFeatures` (luma drops those the adapter lacks) and, with `maxLimits`, RAISED_LIMITS as
  * `requiredLimits` at the adapter's maximum. luma's featureLevel "max" would also request every
  * feature, so the limits are passed explicitly. The adapter's maxima come from a peek adapter
- * (same options as luma's own request), the only raw WebGPU left here. A luma-created Device owns
+ * (gpu/adapter-peek.ts, same options as luma's own request). A luma-created Device owns
  * its GPUDevice: destroying it (idle release, reset) destroys the GPUDevice. (sky/model.ts still
  * uses attach for ORT's device, which ORT creates and owns.)
  */
 async function createSidecar(maxLimits: boolean): Promise<Device> {
 	const requiredLimits: Partial<Record<keyof DeviceLimits, number>> = {};
 	if (maxLimits) {
-		const gpu = (navigator as unknown as { gpu: GPU }).gpu;
-		const adapter = await gpu.requestAdapter({
+		const adapter = await peekWebGPUAdapter({
 			powerPreference: "high-performance",
 			featureLevel: "core",
 		} as GPURequestAdapterOptions);
 		if (!adapter) throw new Error("Failed to request WebGPU adapter");
-		for (const k of RAISED_LIMITS) {
-			const v = (adapter.limits as unknown as Record<string, unknown>)[k];
-			if (typeof v === "number") requiredLimits[k] = v;
-		}
+		Object.assign(requiredLimits, adapterLimits(adapter, RAISED_LIMITS));
 	}
 	return await webgpuAdapter.create({
 		id: "rigi-compute",

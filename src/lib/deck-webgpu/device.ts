@@ -10,6 +10,11 @@ import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { getFlag } from "#/lib/flags";
 import {
+	adapterLimits,
+	navigatorGpu,
+	peekWebGPUAdapter,
+} from "#/lib/gpu/adapter-peek";
+import {
 	adoptRenderDevice,
 	RAISED_LIMITS,
 	resetComputeDevice,
@@ -62,16 +67,15 @@ export const IMPLICIT_MAX_FEATURES = [
 export async function renderRequiredLimits(): Promise<Record<string, number>> {
 	const out: Record<string, number> = {};
 	try {
-		const a = await (navigator as { gpu?: GPU }).gpu?.requestAdapter({
+		const a = await peekWebGPUAdapter({
 			powerPreference: "high-performance",
 			featureLevel: "core",
 		} as GPURequestAdapterOptions);
 		if (!a) return out;
-		const lim = a.limits as unknown as Record<string, unknown>;
-		for (const k of ["maxTextureArrayLayers", ...RAISED_LIMITS]) {
-			const v = lim[k];
-			if (typeof v === "number") out[k] = v;
-		}
+		Object.assign(
+			out,
+			adapterLimits(a, ["maxTextureArrayLayers", ...RAISED_LIMITS]),
+		);
 	} catch {}
 	return out;
 }
@@ -82,15 +86,16 @@ export type Availability =
 
 /** Can this browser give us a WebGPU adapter? Never throws. */
 export async function webgpuAvailable(): Promise<Availability> {
-	const gpu = (navigator as { gpu?: GPU }).gpu;
-	if (!gpu)
+	if (!navigatorGpu())
 		return {
 			ok: false,
 			reason:
 				"This browser has no WebGPU (navigator.gpu). Use Chrome/Edge 113+, or Safari/Firefox with WebGPU enabled.",
 		};
 	try {
-		const a = await gpu.requestAdapter({ powerPreference: "high-performance" });
+		const a = await peekWebGPUAdapter({
+			powerPreference: "high-performance",
+		});
 		if (!a)
 			return {
 				ok: false,

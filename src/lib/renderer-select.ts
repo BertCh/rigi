@@ -17,6 +17,7 @@
 // [data-renderer-reason], so harnesses assert which engine actually ran.
 
 import { getFlag } from "#/lib/flags";
+import { navigatorGpu, peekWebGPUAdapter } from "#/lib/gpu/adapter-peek";
 
 export type ResolvedRenderer = "webgpu" | "deck";
 export type RendererChoice = { renderer: ResolvedRenderer; reason: string };
@@ -42,10 +43,10 @@ let probe: Promise<
  */
 export function probeWebGpu() {
 	probe ??= (async () => {
-		const gpu = (globalThis.navigator as { gpu?: GPU } | undefined)?.gpu;
-		if (!gpu) return { ok: false as const, reason: "no navigator.gpu" };
+		if (!navigatorGpu())
+			return { ok: false as const, reason: "no navigator.gpu" };
 		try {
-			const a = await gpu.requestAdapter({
+			const a = await peekWebGPUAdapter({
 				powerPreference: "high-performance",
 			});
 			if (!a) return { ok: false as const, reason: "no WebGPU adapter" };
