@@ -4,7 +4,12 @@
 
 import { describe, expect, it } from "vitest";
 import { withFlags } from "#/test/helpers";
-import { headingDeclination, isMagneticRef, priorHeading } from "../heading";
+import {
+	headingControlWindow,
+	headingDeclination,
+	isMagneticRef,
+	priorHeading,
+} from "../heading";
 import { declination } from "../wmm";
 
 const base = {
@@ -98,5 +103,49 @@ describe("priorHeading", () => {
 		expect(priorHeading(photo)).toBe(100);
 		withFlags({ geoDecl: "on" });
 		expect(priorHeading(photo)).toBeCloseTo(100 + d, 10);
+	});
+});
+
+describe("headingControlWindow", () => {
+	it("spans prior ± halfWidth and unwraps the yaw next to the prior", () => {
+		expect(headingControlWindow(358, 2)).toEqual({
+			min: 318,
+			max: 398,
+			value: 362,
+		});
+		expect(headingControlWindow(3, 355)).toEqual({
+			min: -37,
+			max: 43,
+			value: -5,
+		});
+		expect(headingControlWindow(120, 125.5, 10)).toEqual({
+			min: 110,
+			max: 130,
+			value: 125.5,
+		});
+	});
+	it("keeps the value inside the range whenever the yaw is within halfWidth of the prior", () => {
+		for (const prior of [0, 1, 179, 180, 359.5])
+			for (const off of [-40, -12.5, 0, 7, 40]) {
+				const w = headingControlWindow(
+					prior,
+					(((prior + off) % 360) + 360) % 360,
+				);
+				expect(w.value).toBeGreaterThanOrEqual(w.min - 1e-9);
+				expect(w.value).toBeLessThanOrEqual(w.max + 1e-9);
+				expect(w.value - prior).toBeCloseTo(off, 9);
+			}
+	});
+	it("uses the full circle when the heading is unknown", () => {
+		expect(headingControlWindow(null, -10)).toEqual({
+			min: 0,
+			max: 360,
+			value: 350,
+		});
+		expect(headingControlWindow(null, 725)).toEqual({
+			min: 0,
+			max: 360,
+			value: 5,
+		});
 	});
 });

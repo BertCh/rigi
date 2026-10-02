@@ -12,6 +12,7 @@
 //
 // Flag ?geoDecl (default off): off ⇒ photo.heading unchanged (bit-identical to the pre-GEO app).
 import { getFlag } from "../../flags";
+import { wrap180, wrap360 } from "../../geodesy";
 import type { PhotoMeta } from "../../photos";
 import { declination } from "./wmm";
 
@@ -49,4 +50,23 @@ export function headingDeclination(
 	const date = Number.isFinite(t) ? new Date(t) : new Date();
 	const d = declination(photo.lat, photo.lon, photo.alt ?? 0, date);
 	return Number.isFinite(d) ? d : null;
+}
+
+/**
+ * Range and value for a manual heading control (deg). With a prior heading the control spans
+ * prior ± halfWidth and the yaw is unwrapped next to the prior, so a solved yaw of 2° under a
+ * 358° compass shows as 362° instead of being clamped to the range's low end. Without one
+ * (`prior` null: heading unknown) it spans the full circle and shows yaw in [0, 360).
+ */
+export function headingControlWindow(
+	prior: number | null,
+	yaw: number,
+	halfWidth = 40,
+): { min: number; max: number; value: number } {
+	if (prior == null) return { min: 0, max: 360, value: wrap360(yaw) };
+	return {
+		min: prior - halfWidth,
+		max: prior + halfWidth,
+		value: prior + wrap180(yaw - prior),
+	};
 }

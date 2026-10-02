@@ -31,6 +31,10 @@ import { ExportMenu } from "#/lib/export/ExportMenu";
 import { downloadBlob, exportFromEngine } from "#/lib/export/engine-export";
 import { getFlag } from "#/lib/flags";
 import {
+	headingControlWindow,
+	priorHeading,
+} from "#/lib/geocam/priors/heading";
+import {
 	type EyeSearchResult,
 	persistPosition,
 	photoAtEye,
@@ -2086,11 +2090,10 @@ export function PhotoWorkspace({
 								<div className="space-y-2 pt-1">
 									<Slider
 										label="Heading"
-										value={
-											unknowns.yaw ? ((pose.yaw % 360) + 360) % 360 : pose.yaw
-										}
-										min={unknowns.yaw ? 0 : (photo.heading ?? 0) - 40}
-										max={unknowns.yaw ? 360 : (photo.heading ?? 0) + 40}
+										{...headingControlWindow(
+											unknowns.yaw ? null : (priorHeading(photo) ?? 0),
+											pose.yaw,
+										)}
 										step={0.05}
 										format={(v) => `${(((v % 360) + 360) % 360).toFixed(2)}°`}
 										onChange={(yaw) => setPose({ ...pose, yaw })}
