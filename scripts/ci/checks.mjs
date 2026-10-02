@@ -1101,4 +1101,11 @@ export const CHECKS = [
 		cmd: tsx("scripts/gpu/terrarium-stats-dawn.ts"),
 		timeoutS: 120,
 	},
+	{
+		id: "sky-refine-conv-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/sky-refine-conv-dawn.ts"),
+		timeoutS: 120,
+	},
 ];

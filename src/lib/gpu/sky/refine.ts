@@ -6,47 +6,41 @@
 // sky worker's guided-filter refine. The low-res P(sky) may be a Float32Array or, when ONNX Runtime
 // runs on this same device (sky/model.ts shareOrtDevice), the model's output GPUBuffer itself, so
 // the model output never leaves the GPU and only the final byte mask is read back.
-// Parity with the CPU refine: scripts/gpu/sky-bench.mjs (float mask ~1e-6, bytes almost all equal;
-// see refine.wgsl.ts for what is exact and what is f32-vs-f64). The kernels run as one core
-// ComputeGraph (./refine-graph.ts: aliased transients, inputs pooled under the lease "sky-refine",
-// one submit, one readback); the pooled dispatchAll path it replaced was removed on 2026-10-01.
+// Parity with the CPU refine: scripts/gpu/sky-refine-conv-dawn.ts (tolerances: float mask 1e-4,
+// bytes within 1; see refine.wgsl.ts for what is exact and what is f32-vs-f64). The box means are
+// luma GPUConvolutions between the low-res kernels; everything runs as one core ComputeGraph
+// (./refine-graph.ts: aliased transients, inputs pooled under the lease "sky-refine", one submit,
+// one readback); the pooled dispatchAll path it replaced was removed on 2026-10-01.
 import type { Buffer, Device } from "@luma.gl/core";
 import {
 	type BindKind,
 	defineKernel,
 	warmKernelsAsync,
 } from "#/lib/gpu/core/kernel";
-import { LO_H, LO_H2, LO_V, LO_V2, PACK, UP_H, UP_V } from "./refine.wgsl";
+import { LO_FINISH, LO_PREP, LO_SOLVE, PACK, UP_H, UP_V } from "./refine.wgsl";
 
 const GROUP = "sky";
 const def = (id: string, src: string, layout: [string, BindKind][]) =>
 	defineKernel(id, src, layout, { group: GROUP, label: `sky-${id}` });
 const RO = "read-only-storage" as const;
 
-export const K_LO_H = def("lo-h", LO_H, [
+export const K_LO_PREP = def("lo-prep", LO_PREP, [
 	["prm", "uniform"],
 	["gl", RO],
 	["gp", RO],
-	["t", "storage"],
+	["s1", "storage"],
 ]);
-export const K_LO_V = def("lo-v", LO_V, [
+export const K_LO_SOLVE = def("lo-solve", LO_SOLVE, [
 	["prm", "uniform"],
-	["t", RO],
+	["s3", RO],
 	["gp", RO],
-	["ab", "storage"],
+	["a1", "storage"],
 	["band", "storage"],
 ]);
-export const K_LO_H2 = def("lo-h2", LO_H2, [
+export const K_LO_FINISH = def("lo-finish", LO_FINISH, [
 	["prm", "uniform"],
-	["ab", RO],
-	["band", RO],
-	["abH", "storage"],
-	["bandH", "storage"],
-]);
-export const K_LO_V2 = def("lo-v2", LO_V2, [
-	["prm", "uniform"],
-	["abH", RO],
-	["bandH", RO],
+	["a3", RO],
+	["b2", RO],
 	["gp", RO],
 	["abS", "storage"],
 	["pb", "storage"],

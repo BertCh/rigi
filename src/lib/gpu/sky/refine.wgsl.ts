@@ -4,11 +4,13 @@
 
 // WGSL for the GPU sky refine (twin of sky/core.ts refineToWorking with refine = true): the fast
 // colour guided filter at model resolution, the band blend, the bilinear upsample to working
-// resolution, and toBytes. Every pass mirrors one CPU loop and rounds to f32 where the CPU stores a
-// Float32Array; the CPU sums in f64 (running box sums, 3×3 inverse), we sum directly in f32, so the
-// float mask agrees to ~1e-6 rather than bit-exactly.
+// resolution, and toBytes. The box means are not here: they are luma GPUConvolutions (all-ones
+// kernel, zero boundary, direct strategy) between LO_PREP, LO_SOLVE and LO_FINISH, divided by the
+// analytic in-range window count, which is the CPU's clamped-window mean in exact arithmetic. f32
+// summation order differs from the CPU's f64 running sums, so the float mask agrees to ~1e-5 rather
+// than bit-exactly (scripts/gpu/sky-refine-conv-dawn.ts prints the numbers).
 // Exact by construction: the full-res guide (RGBA byte → the CPU's fround(d / 255) through a LUT),
-// the band test (thresholds rewritten as f32 compares, see LO_V) and toBytes (per-byte f32
+// the band test (thresholds rewritten as f32 compares, see LO_SOLVE) and toBytes (per-byte f32
 // thresholds, so no f32-vs-f64 rounding of v·255).
 // @workgroup_size(256): one texel (or one packed word) per invocation, 1-D; 256 fills an Apple GPU
 // SIMD group ×8 and keeps the dispatch under 65535 groups up to 16 Mpx.
@@ -24,101 +26,104 @@ fn span(c: u32, r: u32, n: u32) -> vec2<u32> {
 `;
 
 /**
- * Row pass at model resolution. Box means (radius r) of I, p, I·p, the six I_a·I_b, and the row max /
- * min of p (radius br) for the band. Output per texel, 4 × vec4:
- * [mI.rgb, mp], [mIp.rgb, pmax], [m(rr, gg, bb), pmin], [m(rg, rb, gb), 0].
+ * Stack layout shared by the three low-res kernels and the GPUConvolutions between them: c planes,
+ * each lh rows of lw, followed by r zero rows, one field of width lw and height c·(lh + r). The gap
+ * keeps a vertical window of radius r from reaching the next plane, so one convolution over the
+ * stack equals one convolution per plane with a zero boundary.
  */
-export const LO_H = /* wgsl */ `${PARAMS}${RANGE}
+
+/**
+ * Stack S1 (13 planes): I.r, I.g, I.b, p, I.r·p, I.g·p, I.b·p, rr, gg, bb, rg, rb, gb (the inputs
+ * of the box means of the guided filter). One invocation per stack element, so the gap rows are
+ * written too (zeros): a full write, as the graph's clear audit requires.
+ * @workgroup_size(256), 1-D.
+ */
+export const LO_PREP = /* wgsl */ `${PARAMS}
 @group(0) @binding(0) var<uniform> prm: P;
 @group(0) @binding(1) var<storage, read> gl: array<f32>;
 @group(0) @binding(2) var<storage, read> gp: array<f32>;
-@group(0) @binding(3) var<storage, read_write> t: array<vec4<f32>>;
+@group(0) @binding(3) var<storage, read_write> s1: array<f32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let n = prm.lw * prm.lh;
+  let pitch = prm.lh + prm.r;
   let i = id.x;
-  if (i >= n) { return; }
-  let y = i / prm.lw;
-  let x = i - y * prm.lw;
-  let s = span(x, prm.r, prm.lw);
-  var mI = vec3<f32>(0.0);
-  var mp = 0.0;
-  var mIp = vec3<f32>(0.0);
-  var d = vec3<f32>(0.0);
-  var o = vec3<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) {
-    let j = y * prm.lw + k;
-    let c = vec3<f32>(gl[j], gl[n + j], gl[2u * n + j]);
+  if (i >= 13u * pitch * prm.lw) { return; }
+  let row = i / prm.lw;
+  let x = i - row * prm.lw;
+  let c = row / pitch;
+  let y = row - c * pitch;
+  var v = 0.0;
+  if (y < prm.lh) {
+    let j = y * prm.lw + x;
+    let col = vec3<f32>(gl[j], gl[n + j], gl[2u * n + j]);
     let p = gp[j];
-    mI += c;
-    mp += p;
-    mIp += c * p;
-    d += c * c;
-    o += vec3<f32>(c.x * c.y, c.x * c.z, c.y * c.z);
+    switch (c) {
+      case 0u: { v = col.x; }
+      case 1u: { v = col.y; }
+      case 2u: { v = col.z; }
+      case 3u: { v = p; }
+      case 4u: { v = col.x * p; }
+      case 5u: { v = col.y * p; }
+      case 6u: { v = col.z * p; }
+      case 7u: { v = col.x * col.x; }
+      case 8u: { v = col.y * col.y; }
+      case 9u: { v = col.z * col.z; }
+      case 10u: { v = col.x * col.y; }
+      case 11u: { v = col.x * col.z; }
+      default: { v = col.y * col.z; }
+    }
   }
-  let cnt = f32(s.y - s.x);
-  let e = span(x, prm.br, prm.lw);
-  var mx = gp[i];
-  var mn = gp[i];
-  for (var k = e.x; k < e.y; k++) {
-    let v = gp[y * prm.lw + k];
-    mx = max(mx, v);
-    mn = min(mn, v);
-  }
-  t[4u * i] = vec4<f32>(mI / cnt, mp / cnt);
-  t[4u * i + 1u] = vec4<f32>(mIp / cnt, mx);
-  t[4u * i + 2u] = vec4<f32>(d / cnt, mn);
-  t[4u * i + 3u] = vec4<f32>(o / cnt, 0.0);
+  s1[i] = v;
 }
 `;
 
 /**
- * Column pass: box means of the row means, then the colour guided-filter solve
- * a = (Σ + εI)⁻¹ cov(I, p), b = mean(p) − a·mean(I) (cofactor inverse, as the CPU), and the band
- * indicator max(straddle, unsure). The CPU compares f32 p with the f64 constants 0.05 / 0.95:
+ * The colour guided-filter solve on the box SUMS of S1 (S3, after the horizontal and vertical
+ * GPUConvolutions): means = sums / the in-range window count (the CPU's clamped-window mean, an
+ * all-ones zero-boundary convolution over the analytic count), then
+ * a = (Σ + εI)⁻¹ cov(I, p), b = mean(p) − a·mean(I) (cofactor inverse, as the CPU), written to the
+ * 4-plane stack A1 (gap rows zero) for the next smoothing. Also the band indicator
+ * max(straddle, unsure) into the lw × lh plane: the 2-D window max / min of p over the clamped
+ * (2·br+1)² window. The CPU compares f32 p with the f64 constants 0.05 / 0.95:
  * p > 0.05 ⇔ p ≥ f32(0.05) (f32(0.05) > 0.05) and p < 0.95 ⇔ p ≤ f32(0.95) (f32(0.95) < 0.95).
+ * One invocation per (x, y) of the lh + r rows of a plane (rows ≥ lh write the zero gap).
+ * @workgroup_size(256), 1-D.
  */
-export const LO_V = /* wgsl */ `${PARAMS}${RANGE}
+export const LO_SOLVE = /* wgsl */ `${PARAMS}${RANGE}
 @group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> t: array<vec4<f32>>;
+@group(0) @binding(1) var<storage, read> s3: array<f32>;
 @group(0) @binding(2) var<storage, read> gp: array<f32>;
-@group(0) @binding(3) var<storage, read_write> ab: array<vec4<f32>>;
+@group(0) @binding(3) var<storage, read_write> a1: array<f32>;
 @group(0) @binding(4) var<storage, read_write> band: array<f32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let n = prm.lw * prm.lh;
+  let pitch = prm.lh + prm.r;
+  let plane = pitch * prm.lw;
   let i = id.x;
-  if (i >= n) { return; }
+  if (i >= plane) { return; }
   let y = i / prm.lw;
   let x = i - y * prm.lw;
-  let s = span(y, prm.r, prm.lh);
-  var m0 = vec4<f32>(0.0);
-  var m1 = vec3<f32>(0.0);
-  var m2 = vec3<f32>(0.0);
-  var m3 = vec3<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) {
-    let j = 4u * (k * prm.lw + x);
-    m0 += t[j];
-    m1 += t[j + 1u].xyz;
-    m2 += t[j + 2u].xyz;
-    m3 += t[j + 3u].xyz;
+  if (y >= prm.lh) {
+    for (var c = 0u; c < 4u; c++) { a1[c * plane + i] = 0.0; }
+    return;
   }
-  let cnt = f32(s.y - s.x);
-  m0 /= cnt;
-  m1 /= cnt;
-  m2 /= cnt;
-  m3 /= cnt;
-  let mI = m0.xyz;
-  let mp = m0.w;
-  let x0 = m1.x - mI.x * mp;
-  let x1 = m1.y - mI.y * mp;
-  let x2 = m1.z - mI.z * mp;
-  let s00 = (m2.x - mI.x * mI.x) + prm.eps;
-  let s11 = (m2.y - mI.y * mI.y) + prm.eps;
-  let s22 = (m2.z - mI.z * mI.z) + prm.eps;
-  let s01 = m3.x - mI.x * mI.y;
-  let s02 = m3.y - mI.x * mI.z;
-  let s12 = m3.z - mI.y * mI.z;
+  let sx = span(x, prm.r, prm.lw);
+  let sy = span(y, prm.r, prm.lh);
+  let inv = 1.0 / f32((sx.y - sx.x) * (sy.y - sy.x));
+  var m: array<f32, 13>;
+  for (var c = 0u; c < 13u; c++) { m[c] = s3[c * plane + i] * inv; }
+  let mI = vec3<f32>(m[0], m[1], m[2]);
+  let mp = m[3];
+  let x0 = m[4] - mI.x * mp;
+  let x1 = m[5] - mI.y * mp;
+  let x2 = m[6] - mI.z * mp;
+  let s00 = (m[7] - mI.x * mI.x) + prm.eps;
+  let s11 = (m[8] - mI.y * mI.y) + prm.eps;
+  let s22 = (m[9] - mI.z * mI.z) + prm.eps;
+  let s01 = m[10] - mI.x * mI.y;
+  let s02 = m[11] - mI.x * mI.z;
+  let s12 = m[12] - mI.y * mI.z;
   let c00 = s11 * s22 - s12 * s12;
   let c01 = s02 * s12 - s01 * s22;
   let c02 = s01 * s12 - s02 * s11;
@@ -128,54 +133,39 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let det = s00 * c00 + s01 * c01 + s02 * c02;
   let id_ = 1.0 / det;
   let a0 = (c00 * x0 + c01 * x1 + c02 * x2) * id_;
-  let a1 = (c01 * x0 + c11 * x1 + c12 * x2) * id_;
+  let a1v = (c01 * x0 + c11 * x1 + c12 * x2) * id_;
   let a2 = (c02 * x0 + c12 * x1 + c22 * x2) * id_;
-  ab[i] = vec4<f32>(a0, a1, a2, mp - a0 * mI.x - a1 * mI.y - a2 * mI.z);
-  let e = span(y, prm.br, prm.lh);
-  var mx = t[4u * i + 1u].w;
-  var mn = t[4u * i + 2u].w;
-  for (var k = e.x; k < e.y; k++) {
-    let j = 4u * (k * prm.lw + x);
-    mx = max(mx, t[j + 1u].w);
-    mn = min(mn, t[j + 2u].w);
+  a1[i] = a0;
+  a1[plane + i] = a1v;
+  a1[2u * plane + i] = a2;
+  a1[3u * plane + i] = mp - a0 * mI.x - a1v * mI.y - a2 * mI.z;
+  let ex = span(x, prm.br, prm.lw);
+  let ey = span(y, prm.br, prm.lh);
+  var mx = gp[y * prm.lw + x];
+  var mn = mx;
+  for (var yy = ey.x; yy < ey.y; yy++) {
+    for (var xx = ex.x; xx < ex.y; xx++) {
+      let v = gp[yy * prm.lw + xx];
+      mx = max(mx, v);
+      mn = min(mn, v);
+    }
   }
-  let p = gp[i];
+  let p = gp[y * prm.lw + x];
   let straddle = mx > 0.5 && mn < 0.5;
   let unsure = p >= 0.05 && p <= 0.95;
-  band[i] = select(0.0, 1.0, straddle || unsure);
+  band[y * prm.lw + x] = select(0.0, 1.0, straddle || unsure);
 }
 `;
 
-/** Row box means of (a, b) (radius r) and of the band (radius 1). */
-export const LO_H2 = /* wgsl */ `${PARAMS}${RANGE}
+/**
+ * Smoothed (a, b) and the band blend weight for the upsample: the box SUMS of the (a, b) stack (A3,
+ * radius r) and of the band plane (B2, 3×3) divided by their in-range counts, and p passed through.
+ * @workgroup_size(256), 1-D.
+ */
+export const LO_FINISH = /* wgsl */ `${PARAMS}${RANGE}
 @group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> ab: array<vec4<f32>>;
-@group(0) @binding(2) var<storage, read> band: array<f32>;
-@group(0) @binding(3) var<storage, read_write> abH: array<vec4<f32>>;
-@group(0) @binding(4) var<storage, read_write> bandH: array<f32>;
-@compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let n = prm.lw * prm.lh;
-  let i = id.x;
-  if (i >= n) { return; }
-  let y = i / prm.lw;
-  let x = i - y * prm.lw;
-  let s = span(x, prm.r, prm.lw);
-  var acc = vec4<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) { acc += ab[y * prm.lw + k]; }
-  abH[i] = acc / f32(s.y - s.x);
-  let e = span(x, 1u, prm.lw);
-  var b = 0.0;
-  for (var k = e.x; k < e.y; k++) { b += band[y * prm.lw + k]; }
-  bandH[i] = b / f32(e.y - e.x);
-}
-`;
-
-/** Column box means: smoothed (a, b) and, for the upsample, (p, band). */
-export const LO_V2 = /* wgsl */ `${PARAMS}${RANGE}
-@group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> abH: array<vec4<f32>>;
-@group(0) @binding(2) var<storage, read> bandH: array<f32>;
+@group(0) @binding(1) var<storage, read> a3: array<f32>;
+@group(0) @binding(2) var<storage, read> b2: array<f32>;
 @group(0) @binding(3) var<storage, read> gp: array<f32>;
 @group(0) @binding(4) var<storage, read_write> abS: array<vec4<f32>>;
 @group(0) @binding(5) var<storage, read_write> pb: array<vec2<f32>>;
@@ -186,14 +176,14 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   if (i >= n) { return; }
   let y = i / prm.lw;
   let x = i - y * prm.lw;
-  let s = span(y, prm.r, prm.lh);
-  var acc = vec4<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) { acc += abH[k * prm.lw + x]; }
-  abS[i] = acc / f32(s.y - s.x);
-  let e = span(y, 1u, prm.lh);
-  var b = 0.0;
-  for (var k = e.x; k < e.y; k++) { b += bandH[k * prm.lw + x]; }
-  pb[i] = vec2<f32>(gp[i], b / f32(e.y - e.x));
+  let plane = (prm.lh + prm.r) * prm.lw;
+  let sx = span(x, prm.r, prm.lw);
+  let sy = span(y, prm.r, prm.lh);
+  let inv = 1.0 / f32((sx.y - sx.x) * (sy.y - sy.x));
+  abS[i] = vec4<f32>(a3[i], a3[plane + i], a3[2u * plane + i], a3[3u * plane + i]) * inv;
+  let ex = span(x, 1u, prm.lw);
+  let ey = span(y, 1u, prm.lh);
+  pb[i] = vec2<f32>(gp[i], b2[i] / f32((ex.y - ex.x) * (ey.y - ey.x)));
 }
 `;
 

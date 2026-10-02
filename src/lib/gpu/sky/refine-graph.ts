@@ -3,44 +3,52 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // The GPU sky refine (refine.ts refineSkyGpu) on gpu-core's GPUCommandGraph, via core/graph.ts
-// ComputeGraph: the only GPU refine since 2026-10-01 (the pooled dispatchAll path it replaced gave
-// bit-identical bytes and floats).
+// ComputeGraph: the only GPU refine since 2026-10-01. Since the luma-convolution adoption the box
+// means are luma GPUConvolutions (direct strategy, all-ones kernel, zero boundary), so the output
+// is within f32 tolerance of the CPU twin, not bit-identical to the former hand-written passes.
 //
-// The seven kernels of refine.ts in one linear chain (the graph's topological order is the insertion
-// order, and the seven dispatches coalesce into one compute pass):
-// - the ten intermediates (t, ab, band, abH, bandH, abS, pb, u4, u2, q) and the byte mask are graph
-//   TRANSIENTS, sized exactly (a pool would round each to a power of two) and aliased by lifetime: the
-//   low-res t / ab / band / … die before the full-res u4 / u2 / q / bytes are born;
-// - the inputs (params, guideLo, P(sky), rgba, axis taps, LUT) are graph IMPORTS, still pooled under
-//   the "sky-refine" lease (graph imports are caller-owned) and bound per run through
+// The chain, one compute pass (the graph's topological order is the insertion order):
+// - lo-prep writes 13 planes (I.rgb, p, I·p, the six I_a·I_b) into ONE stacked field s1 of width lw
+//   and height 13·(lh + r): each plane is followed by r zero rows, so a vertical window never reaches
+//   the next plane (see refine.wgsl.ts);
+// - GPUConvolution horizontal (2r+1 × 1) s1 → s2, vertical (1 × 2r+1) s2 → s3: the box sums;
+// - lo-solve divides by the analytic in-range count, solves the guided filter into the 4-plane stack
+//   a1 and writes the band plane (2-D window max / min of p);
+// - GPUConvolution H then V over a1 → a2 → a3 (radius r), and a 3×3 over the band plane;
+// - lo-finish divides by the counts into abS / pb; up-h, up-v, pack as before;
+// - the transients (s1..s3, a1..a3, band, bandS, abS, pb, u4, u2, q) and the byte mask are graph
+//   TRANSIENTS, sized exactly (a pool would round each to a power of two) and aliased by lifetime;
+// - the inputs (params, guideLo, P(sky), rgba, axis taps, LUT, the all-ones kernel) are graph IMPORTS,
+//   pooled under the "sky-refine" lease (graph imports are caller-owned) and bound per run through
 //   run({ buffers }). ORT's output GPUBuffer is wrapped per run (not owned), so the model output
 //   never leaves the GPU;
 // - the byte mask (and the float mask when asked) are read by a core readNode on the graph's encoder
 //   (results in run().reads.read); the float range is sized 0 when not asked, which skips its copy;
-// - compiled graphs are cached by shape (lw, lh, W, H) with core cachedGraph (group "sky-refine",
-//   2 per device; radius / eps / band are uniforms, so they do not key the cache).
+// - compiled graphs are cached by shape (lw, lh, W, H) and the guided-filter radius r (it shapes the
+//   stacks and kernels) with core cachedGraph (group "sky-refine", 2 per device); the band radius and
+//   eps are uniforms and do not key the cache.
 //
 // Clear audit (aliasing hands a transient another transient's stale bytes, and transients are never
-// zeroed per encoding): every kernel here writes every element of its outputs' logical ranges and
-// none uses atomics (see refine.wgsl.ts: each output is written once per invocation index < count,
-// and the dispatch covers the whole count), so every storage output is "full" (KernelNode.writes
-// default) and no clearNode is needed; core's compile-time clear lint enforces the rule.
+// zeroed per encoding): lo-prep and lo-solve write every element of their outputs (the gap rows
+// get zeros), each GPUConvolution writes all width·height elements of its output, lo-finish and the
+// rest write each element once, and none uses atomics, so every storage output is "full"
+// (KernelNode.writes default) and no clearNode is needed; core's compile-time clear lint enforces it.
 import { Buffer, type Device } from "@luma.gl/core";
 import {
 	type ComputeGraph,
 	cachedGraph,
 	releaseCachedGraphs,
 } from "#/lib/gpu/core/graph";
+import { GPUConvolution } from "#/lib/gpu/core/luma";
 import { pooledStorage, pooledUniform, withLease } from "#/lib/gpu/core/pool";
 import {
 	axisTable,
 	inputBytes,
 	isFloats,
 	isHost,
-	K_LO_H,
-	K_LO_H2,
-	K_LO_V,
-	K_LO_V2,
+	K_LO_FINISH,
+	K_LO_PREP,
+	K_LO_SOLVE,
 	K_PACK,
 	K_UP_H,
 	K_UP_V,
@@ -66,16 +74,32 @@ type Params = { floats: boolean };
 
 type GraphStats = NonNullable<ComputeGraph<Params>["stats"]>;
 
+/** Planes of the S1 / S2 / S3 stacks (see LO_PREP) and of the (a, b) stack. */
+const STACK_PLANES = 13;
+const AB_PLANES = 4;
+/** Elements of the all-ones kernel buffer: the longest of the 1-D (2r+1) and the 3×3 band kernels. */
+const onesLength = (r: number) => Math.max(2 * r + 1, 9);
+
 /** Byte sizes of every intermediate (exact, before any pow2 rounding). */
-export function skyScratchBytes(lw: number, lh: number, W: number, H: number) {
+export function skyScratchBytes(
+	lw: number,
+	lh: number,
+	W: number,
+	H: number,
+	r = 3,
+) {
 	const n = lw * lh;
 	const N = W * H;
+	const plane = (lh + r) * lw * 4;
 	return {
-		t: n * 64,
-		ab: n * 16,
+		s1: STACK_PLANES * plane,
+		s2: STACK_PLANES * plane,
+		s3: STACK_PLANES * plane,
+		a1: AB_PLANES * plane,
+		a2: AB_PLANES * plane,
+		a3: AB_PLANES * plane,
 		band: n * 4,
-		abH: n * 16,
-		bandH: n * 4,
+		bandS: n * 4,
 		abS: n * 16,
 		pb: n * 8,
 		u4: W * lh * 16,
@@ -96,11 +120,20 @@ function checkDispatch(
 	lh: number,
 	W: number,
 	H: number,
+	r: number,
 ) {
 	const maxWg = device.limits.maxComputeWorkgroupsPerDimension;
-	if (Math.ceil(Math.max(W * H, W * lh, lw * lh) / WG) > maxWg)
+	// lo-prep writes the 13-plane stack (the largest 1-D dispatch of ours; the convolutions lay out
+	// their own dispatch)
+	const widest = Math.max(W * H, W * lh, STACK_PLANES * (lh + r) * lw);
+	if (Math.ceil(widest / WG) > maxWg)
 		throw new Error(
 			`refineSkyGraph: ${W}x${H} needs more than ${maxWg} workgroups per dispatch`,
+		);
+	const maxBinding = device.limits.maxStorageBufferBindingSize;
+	if (STACK_PLANES * (lh + r) * lw * 4 > maxBinding)
+		throw new Error(
+			`refineSkyGraph: ${lw}x${lh} stack exceeds maxStorageBufferBindingSize ${maxBinding}`,
 		);
 }
 
@@ -111,6 +144,7 @@ export function buildSkyGraph(
 	lh: number,
 	W: number,
 	H: number,
+	r: number,
 ): void {
 	const n = lw * lh;
 	const N = W * H;
@@ -131,44 +165,80 @@ export function buildSkyGraph(
 		Buffer.STORAGE,
 	);
 	const lut = g.importBuffer("lut", 512 * 4, undefined, Buffer.STORAGE);
-	const sz = skyScratchBytes(lw, lh, W, H);
+	const ones = g.importBuffer(
+		"ones",
+		onesLength(r) * 4,
+		undefined,
+		Buffer.STORAGE,
+	);
+	const sz = skyScratchBytes(lw, lh, W, H, r);
 	const tr = (id: keyof typeof sz) => g.transientBuffer(id, sz[id]);
-	const t = tr("t");
-	const ab = tr("ab");
+	const s1 = tr("s1");
+	const s2 = tr("s2");
+	const s3 = tr("s3");
+	const a1 = tr("a1");
+	const a2 = tr("a2");
+	const a3 = tr("a3");
 	const band = tr("band");
-	const abH = tr("abH");
-	const bandH = tr("bandH");
+	const bandS = tr("bandS");
 	const abS = tr("abS");
 	const pb = tr("pb");
 	const u4 = tr("u4");
 	const u2 = tr("u2");
 	const q = tr("q");
 	const bytes = tr("bytes");
-	const lo: [number] = [Math.ceil(n / WG)];
+	const pitch = lh + r;
+	const sCount = STACK_PLANES * pitch * lw;
+	const aCount = AB_PLANES * pitch * lw;
+	// all-ones box kernels over the stacks: the (2r+1) window along one axis, zero boundary, direct
+	// (a 5-7 tap loop per element; the FFT crossover is far away)
+	const box = (
+		id: string,
+		input: typeof s1,
+		output: typeof s1,
+		count: number,
+		kw: number,
+		kh: number,
+		height: number,
+	) =>
+		g.add(
+			new GPUConvolution({
+				id,
+				width: lw,
+				height,
+				kernelWidth: kw,
+				kernelHeight: kh,
+				strategy: "direct",
+				boundary: "zero",
+				input: g.view(input, "float32", count),
+				kernel: g.view(ones, "float32", kw * kh),
+				output: g.view(output, "float32", count),
+			}),
+		);
+	const k = 2 * r + 1;
 	g.addKernel({
-		id: "lo-h",
-		spec: K_LO_H,
-		bindings: { prm, gl, gp, t },
-		workgroups: lo,
+		id: "lo-prep",
+		spec: K_LO_PREP,
+		bindings: { prm, gl, gp, s1 },
+		workgroups: [Math.ceil(sCount / WG)],
+	});
+	box("sky-box-h", s1, s2, sCount, k, 1, STACK_PLANES * pitch);
+	box("sky-box-v", s2, s3, sCount, 1, k, STACK_PLANES * pitch);
+	g.addKernel({
+		id: "lo-solve",
+		spec: K_LO_SOLVE,
+		bindings: { prm, s3, gp, a1, band },
+		workgroups: [Math.ceil((pitch * lw) / WG)],
+	});
+	box("sky-ab-h", a1, a2, aCount, k, 1, AB_PLANES * pitch);
+	box("sky-ab-v", a2, a3, aCount, 1, k, AB_PLANES * pitch);
+	box("sky-band", band, bandS, n, 3, 3, lh);
+	g.addKernel({
+		id: "lo-finish",
+		spec: K_LO_FINISH,
+		bindings: { prm, a3, b2: bandS, gp, abS, pb },
+		workgroups: [Math.ceil(n / WG)],
 	})
-		.addKernel({
-			id: "lo-v",
-			spec: K_LO_V,
-			bindings: { prm, t, gp, ab, band },
-			workgroups: lo,
-		})
-		.addKernel({
-			id: "lo-h2",
-			spec: K_LO_H2,
-			bindings: { prm, ab, band, abH, bandH },
-			workgroups: lo,
-		})
-		.addKernel({
-			id: "lo-v2",
-			spec: K_LO_V2,
-			bindings: { prm, abH, bandH, gp, abS, pb },
-			workgroups: lo,
-		})
 		.addKernel({
 			id: "up-h",
 			spec: K_UP_H,
@@ -214,16 +284,17 @@ export async function refineSkyGraph(
 	const N = W * H;
 	if (inputBytes(input.rgba) !== 4 * N || inputBytes(input.guideLo) !== 12 * n)
 		throw new Error("refineSkyGraph: input sizes do not match");
-	checkDispatch(device, lw, lh, W, H);
+	const r = input.radius ?? 3;
+	checkDispatch(device, lw, lh, W, H, r);
 	return withLease(SKY_GRAPH_GROUP, async () => {
-		const key = `${lw}x${lh}>${W}x${H}`;
+		const key = `${lw}x${lh}>${W}x${H}/r${r}`;
 		// cachedGraph inside the group's lease, run() queued synchronously after it (no await between),
 		// so an eviction's destroy lands after this run
 		const { graph, hit } = cachedGraph<Params, void>(
 			device,
 			SKY_GRAPH_GROUP,
 			key,
-			(g) => buildSkyGraph(g, lw, lh, W, H),
+			(g) => buildSkyGraph(g, lw, lh, W, H, r),
 			MAX_GRAPHS,
 		);
 		graph.compile();
@@ -237,7 +308,7 @@ export async function refineSkyGraph(
 			lh,
 			W,
 			H,
-			r: input.radius ?? 3,
+			r,
 			br: input.band ?? 3,
 			eps: input.eps ?? 2e-3,
 		});
@@ -279,11 +350,16 @@ export async function refineSkyGraph(
 				axisTable(lw, lh, W, H),
 			);
 			const lut = pooledStorage(device, "sky-refine/lut", lutTable());
+			const ones = pooledStorage(
+				device,
+				"sky-refine/ones",
+				new Float32Array(onesLength(r)).fill(1),
+			);
 			const floats = !!input.floats;
 			// run() cancels every staged slot it does not hand back, whatever throws
 			const { reads } = await graph.run(
 				{ floats },
-				{ buffers: { prm, gl, gp, rgba, axis, lut } },
+				{ buffers: { prm, gl, gp, rgba, axis, lut, ones } },
 			);
 			const [b, f] = reads.read ?? [];
 			if (!b) throw new Error("refineSkyGraph: read node did not run");

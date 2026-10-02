@@ -133,6 +133,7 @@ export {
 	GPUCommandGraphEncoding,
 	GPUCommandGraphInspector,
 	GPUConditionalOperation,
+	GPUConvolution,
 	GPUFFT1D,
 	GPUHistogram,
 	GPUProgram,
