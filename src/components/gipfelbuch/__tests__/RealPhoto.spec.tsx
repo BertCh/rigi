@@ -152,6 +152,23 @@ describe("RealPhoto overlay stack", () => {
 	});
 });
 
+describe("RealPhoto poster", () => {
+	it("lists the thumbnail before the photo and shows the photo at once where motion is not allowed", () => {
+		const { container } = render(
+			<RealPhoto data={data} layers={["skyline"]} />,
+		);
+		const hrefs = [...container.querySelectorAll("image")].map((i) =>
+			i.getAttribute("href"),
+		);
+		const poster = hrefs.indexOf(data.photo.thumb);
+		const main = hrefs.indexOf(data.photo.src);
+		expect(poster).toBeGreaterThanOrEqual(0);
+		expect(poster).toBeLessThan(main);
+		const image = container.querySelectorAll("image")[main] as SVGImageElement;
+		expect(image.style.opacity).not.toBe("0");
+	});
+});
+
 describe("labelledPeaksIn", () => {
 	it("keeps labelled summits inside the crop, in rank order, capped", () => {
 		const { width: W, height: H } = data.photo;

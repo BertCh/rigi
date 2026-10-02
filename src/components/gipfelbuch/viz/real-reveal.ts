@@ -122,7 +122,7 @@ export const shouldDrawOn = (
  * The hero bloom's phase for the figure at `ref`. Settled wherever motion is not allowed (server,
  * first paint, reduced motion, webdriver, print). On a client it hides the layers once (before paint)
  * and plays when ARM of the frame is in view; it re-arms below RESET (replay on return), on `key`
- * (a new photo) and after a `hoverReplay` pointer rest on a settled frame. `allowed` is
+ * (a new photo), after a `hoverReplay` mouse rest on a settled frame and on a tap. `allowed` is
  * useMotionAllowed's answer, for strokes that draw on outside a bloom.
  */
 export function useHeroBloom(
@@ -196,25 +196,49 @@ export function useHeroBloom(
 		const id = setTimeout(() => setPhase("settled"), bloomEnd(labels));
 		return () => clearTimeout(id);
 	}, [phase, labels]);
-	// a pointer resting on a settled frame replays it: fade out, then bloom
+	// a mouse resting on a settled frame replays it, as does a tap on a phone: fade out, then bloom
 	useEffect(() => {
 		const el = ref.current;
 		if (!on || !replay || !el || phase !== "settled") return;
 		let rest: ReturnType<typeof setTimeout> | undefined;
-		const enter = () => {
+		let touch = false;
+		const again = () => {
+			replaying.current = true;
+			setPhase("pending");
+		};
+		const enter = (e: PointerEvent) => {
 			clearTimeout(rest);
-			rest = setTimeout(() => {
-				replaying.current = true;
-				setPhase("pending");
-			}, MOTION.hoverReplay);
+			// a finger crossing the frame while scrolling is not a rest
+			if (e.pointerType === "touch") return;
+			rest = setTimeout(again, MOTION.hoverReplay);
 		};
 		const leave = () => clearTimeout(rest);
+		const down = (e: PointerEvent) => {
+			touch = e.pointerType === "touch";
+		};
+		const cancel = () => {
+			touch = false;
+		};
+		// a click follows a tap, never a scroll; a tap on a control inside the figure is the control's
+		const tap = (e: Event) => {
+			const control = (e.target as Element | null)?.closest?.(
+				"button, a, input, select, [role=button], [role=slider]",
+			);
+			if (touch && !control) again();
+			touch = false;
+		};
 		el.addEventListener("pointerenter", enter);
 		el.addEventListener("pointerleave", leave);
+		el.addEventListener("pointerdown", down);
+		el.addEventListener("pointercancel", cancel);
+		el.addEventListener("click", tap);
 		return () => {
 			clearTimeout(rest);
 			el.removeEventListener("pointerenter", enter);
 			el.removeEventListener("pointerleave", leave);
+			el.removeEventListener("pointerdown", down);
+			el.removeEventListener("pointercancel", cancel);
+			el.removeEventListener("click", tap);
 		};
 	}, [ref, on, replay, phase]);
 	return { phase: on ? phase : "settled", allowed };

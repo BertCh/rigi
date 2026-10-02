@@ -2112,6 +2112,17 @@ function YawSearch() {
 					...(hyp === "best" ? (["solved"] as const) : []),
 				]}
 				crop={crop}
+				// the drawn rival line is the horizon at the runner-up yaw: mark that bearing in the margins
+				spillCursor={
+					// the drawn rival (runnerRows) is the local search's runner-up, whatever the curve shown
+					hyp === "runner" && d && ps?.local?.runner
+						? {
+								az: d.prior.yaw + ps.local.runner.dy,
+								label: "runner-up",
+								layer: "prior",
+							}
+						: undefined
+				}
 			>
 				{(dd) =>
 					hyp === "runner" && ps?.runnerRows ? (

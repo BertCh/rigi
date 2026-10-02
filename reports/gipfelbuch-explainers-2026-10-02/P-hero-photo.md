@@ -56,7 +56,7 @@ Each role is one `<g>` in a single svg, in grammar order (v0.2):
 | 1 | raster | `<image>` (poster: the 160 px thumb under it while the 800 px decodes) | none, never filtered | Crossfade over `crossfade` once decoded |
 | 1b | raster | `sky` mask (screen, 0.7) | sky photo ink | Fade (it is a generated image, display-only) |
 | 2 | derived | `prior`, `solved` (DEM horizon at a pose) | magenta dashed / cyan | Fade over `fade`. A superseded one goes **ghost** (0.35) |
-| 3 | measured | `skyline`, `weight` | amber | Pen draw-on over `trace` (1300) with `EASE.draw`. A leave is a fade |
+| 3 | measured | `skyline`, `weight` | amber | Pen draw-on over `trace` (1300) with `EASE.linear`: the eye's scan is even. A leave is a fade |
 | 5 | notes | `priorPeaks`, `peaks` (dot, leader, name) | ink on a paper halo | Fade, labels `staggerLabel` apart in rank order |
 | – | caller | `children(d)` (marks, arrows, notes) | caller's | Caller's (Mark, HandNote and so on, with their own draw-on) |
 
@@ -157,6 +157,12 @@ A hero with a spill and no `spillCursor` would show the bearing under the pointe
   - `labelledPeaksIn` (an ask from pod M).
 
   Specs: real-reveal, useHeroBloom, RealPhoto and GeoSpill.
+- Round 2 (see the commit `gipfelbuch/hero-photo: spill registration spec, poster ...`):
+  - spill registration spec: all 12 demo photos meet the frame within 0.5 px, with median 0.01–0.17 px at the edge columns;
+  - a poster under the photo (thumb), and a picker's new photo fades in over it;
+  - viewport-inference Fig. 1 bleed bounds;
+  - baseline-pipeline YawSearch runner-up spill cursor;
+  - tap-to-replay on touch.
 
 ## 10. Notes to other pods
 - **G:** `--fig-halo` is used only on line halos. Text halos stay paper because the ink is dark. Six Figures widen with `bleed` and have nothing in the margin (§7).

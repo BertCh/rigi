@@ -639,6 +639,21 @@ export function RealPhoto({
 		labels: maxLabels,
 		replay: !toggles?.length,
 	});
+	// the photo that has finished decoding; the main image fades in over its poster once it has
+	const photoSrc = data?.photo.src ?? null;
+	const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+	// the first photo this figure shows is never held back (server HTML, a remount, a cached image whose
+	// load fired before hydration): only a later photo (a picker) fades in over its poster
+	const firstSrc = useRef<string | null>(null);
+	if (photoSrc && firstSrc.current == null) firstSrc.current = photoSrc;
+	useEffect(() => {
+		// never hold a photo back for long if its load event is missed
+		if (!allowed || !photoSrc) return;
+		const id = window.setTimeout(() => setLoadedSrc(photoSrc), 2500);
+		return () => window.clearTimeout(id);
+	}, [allowed, photoSrc]);
+	const photoFade =
+		allowed && photoSrc !== firstSrc.current && loadedSrc !== photoSrc;
 	// a layer group, once mounted, stays (hidden when off), so a change of `layers` fades or draws
 	// instead of popping, and the photo itself never remounts
 	const mounted = useRef(new Set<PhotoLayer>()).current;
@@ -765,11 +780,30 @@ export function RealPhoto({
 						</clipPath>
 					</defs>
 					<g clipPath={`url(#${clipId})`}>
+						{data.photo.thumb && (
+							// the small photo stands in for paper while the full one decodes
+							<image
+								href={data.photo.thumb}
+								width={W}
+								height={H}
+								preserveAspectRatio="none"
+								data-poster=""
+							/>
+						)}
 						<image
 							href={data.photo.src}
 							width={W}
 							height={H}
 							preserveAspectRatio="none"
+							onLoad={() => setLoadedSrc(data.photo.src)}
+							style={
+								allowed
+									? {
+											opacity: photoFade ? 0 : 1,
+											transition: `opacity ${MOTION.crossfade}ms`,
+										}
+									: undefined
+							}
 						/>
 						{shows("sky") && data.skyImage && (
 							<OverlayLayer

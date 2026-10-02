@@ -83,7 +83,9 @@ describe("useHeroBloom", () => {
 		});
 		// a pointer rest replays it: the lit frame fades out for replayFade, then blooms
 		act(() => {
-			probe.dispatchEvent(new Event("pointerenter"));
+			probe.dispatchEvent(
+				Object.assign(new Event("pointerenter"), { pointerType: "mouse" }),
+			);
 		});
 		await waitFor(() => expect(phaseOf(probe)).toBe("pending"));
 		const faded = performance.now();
@@ -93,6 +95,24 @@ describe("useHeroBloom", () => {
 		);
 		await waitFor(() => expect(phaseOf(probe)).toBe("settled"), {
 			timeout: 3000,
+		});
+		// a finger crossing the frame does not replay it; a tap does
+		act(() => {
+			probe.dispatchEvent(
+				Object.assign(new Event("pointerenter"), { pointerType: "touch" }),
+			);
+		});
+		await new Promise((r) => setTimeout(r, MOTION.hoverReplay + 100));
+		expect(phaseOf(probe)).toBe("settled");
+		act(() => {
+			probe.dispatchEvent(
+				Object.assign(new Event("pointerdown"), { pointerType: "touch" }),
+			);
+			probe.dispatchEvent(new Event("click"));
+		});
+		await waitFor(() => expect(phaseOf(probe)).toBe("pending"));
+		await waitFor(() => expect(phaseOf(probe)).toBe("settled"), {
+			timeout: 4000,
 		});
 		// leaving the view re-arms it, to replay on return
 		show(0.1);

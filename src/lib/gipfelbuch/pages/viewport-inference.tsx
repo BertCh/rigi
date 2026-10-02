@@ -2078,27 +2078,30 @@ function HeroCompare() {
 		>
 			<AlignmentStoryProvider>
 				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
-					<Compare
-						before={
-							<RealPhoto
-								data={d}
-								layers={["skyline", "prior"]}
-								crop={crop}
-								bleed
-							/>
-						}
-						after={
-							<RealPhoto
-								data={d}
-								layers={["skyline", "solved"]}
-								crop={crop}
-								bleed
-							/>
-						}
-						beforeLabel="phone's guess"
-						afterLabel="solved"
-						start={0.5}
-					/>
+					{/* the spill keeps off the story map on the right */}
+					<div className="min-w-0" data-gb-bleed-bounds="right">
+						<Compare
+							before={
+								<RealPhoto
+									data={d}
+									layers={["skyline", "prior"]}
+									crop={crop}
+									bleed
+								/>
+							}
+							after={
+								<RealPhoto
+									data={d}
+									layers={["skyline", "solved"]}
+									crop={crop}
+									bleed
+								/>
+							}
+							beforeLabel="phone's guess"
+							afterLabel="solved"
+							start={0.5}
+						/>
+					</div>
 					<StoryMap data={d} crop={crop} />
 				</div>
 			</AlignmentStoryProvider>
