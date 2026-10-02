@@ -8,6 +8,7 @@
 //    up on, so the 360° set still completes (pending 0, stats.failed 1); before, pending stayed 1 and
 //    loadFullTerrain waited out its 300 s; a transient failure loads on retry; a failed tile in the
 //    first selection no longer blocks the first set
+//    (run for both terrainScheduler strategies; load order parity is in __tests__/terrain-stream.spec.ts)
 //  - tile cache: a stalled network fetch fails as a TimeoutError after fetchTimeoutMs (counted), a
 //    caller's abort is still an AbortError, and the DEM loader falls back to the ancestor tile
 import { configureTileCache, TileCache } from "../cache";
@@ -18,8 +19,9 @@ import type { TerrainStats } from "./terrain-data";
 import { TerrainStreamer, TILE_LOAD_ATTEMPTS } from "./terrain-stream";
 
 let failures = 0;
+let label = "";
 const ok = (c: boolean, m: string) => {
-	console.log(`${c ? "PASS" : "FAIL"}  ${m}`);
+	console.log(`${c ? "PASS" : "FAIL"}  ${label}${m}`);
 	if (!c) failures++;
 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -32,6 +34,7 @@ console.warn = () => {};
  */
 async function stream(
 	fails: (id: string, attempt: number, phase: 1 | 2) => boolean,
+	scheduler: "rigi" | "loaders",
 ) {
 	const frame = new EnuFrame(46.68, 7.85, 0);
 	const attempts = new Map<string, number>();
@@ -39,6 +42,7 @@ async function stream(
 	const sets: TerrainStats[] = [];
 	const s = new TerrainStreamer(frame, {
 		radiusM: 30_000,
+		scheduler,
 		onUpdate: (set) => set.stats && sets.push(set.stats),
 		loadTile: async (key) => {
 			const id = `${key.z}/${key.x}/${key.y}`;
@@ -75,50 +79,54 @@ async function stream(
 	return { sets, first, attempts };
 }
 
-// the first z ≥ 12 tile loaded in the 360° phase fails every time
-{
-	let bad: string | null = null;
-	const r = await stream((id, _n, phase) => {
-		if (phase !== 2 || Number(id.split("/")[0]) < 12) return false;
-		bad ??= id;
-		return id === bad;
-	});
-	const last = r.sets.at(-1);
-	ok(r.first > 0, "30° selection completes");
-	ok(
-		last?.generation === 2 && last.pending === 0 && last.failed === 1,
-		`360°: a tile that always fails is given up on, the set completes (pending ${last?.pending}, failed ${last?.failed})`,
-	);
-	ok(
-		bad !== null && r.attempts.get(`2:${bad}`) === TILE_LOAD_ATTEMPTS,
-		`the failing tile was tried ${TILE_LOAD_ATTEMPTS}× (${bad && r.attempts.get(`2:${bad}`)})`,
-	);
-}
-// transient: fails twice, then loads
-{
-	let flaky: string | null = null;
-	const r = await stream((id, n, phase) => {
-		if (phase !== 2 || Number(id.split("/")[0]) < 12) return false;
-		flaky ??= id;
-		return id === flaky && n <= 2;
-	});
-	const last = r.sets.at(-1);
-	ok(
-		last?.generation === 2 && last.pending === 0 && !last.failed,
-		"360°: a tile that fails twice loads on its retry (nothing given up)",
-	);
-}
-// a failed tile in the very first selection (all-or-nothing first set)
-{
-	let bad: string | null = null;
-	const r = await stream((id, _n, phase) => {
-		if (phase !== 1 || Number(id.split("/")[0]) < 12) return false;
-		bad ??= id;
-		return id === bad;
-	});
-	ok(r.first > 0, "first selection with an always-failing tile still emits");
+for (const scheduler of ["rigi", "loaders"] as const) {
+	label = `[${scheduler}] `;
+	// the first z ≥ 12 tile loaded in the 360° phase fails every time
+	{
+		let bad: string | null = null;
+		const r = await stream((id, _n, phase) => {
+			if (phase !== 2 || Number(id.split("/")[0]) < 12) return false;
+			bad ??= id;
+			return id === bad;
+		}, scheduler);
+		const last = r.sets.at(-1);
+		ok(r.first > 0, "30° selection completes");
+		ok(
+			last?.generation === 2 && last.pending === 0 && last.failed === 1,
+			`360°: a tile that always fails is given up on, the set completes (pending ${last?.pending}, failed ${last?.failed})`,
+		);
+		ok(
+			bad !== null && r.attempts.get(`2:${bad}`) === TILE_LOAD_ATTEMPTS,
+			`the failing tile was tried ${TILE_LOAD_ATTEMPTS}× (${bad && r.attempts.get(`2:${bad}`)})`,
+		);
+	}
+	// transient: fails twice, then loads
+	{
+		let flaky: string | null = null;
+		const r = await stream((id, n, phase) => {
+			if (phase !== 2 || Number(id.split("/")[0]) < 12) return false;
+			flaky ??= id;
+			return id === flaky && n <= 2;
+		}, scheduler);
+		const last = r.sets.at(-1);
+		ok(
+			last?.generation === 2 && last.pending === 0 && !last.failed,
+			"360°: a tile that fails twice loads on its retry (nothing given up)",
+		);
+	}
+	// a failed tile in the very first selection (all-or-nothing first set)
+	{
+		let bad: string | null = null;
+		const r = await stream((id, _n, phase) => {
+			if (phase !== 1 || Number(id.split("/")[0]) < 12) return false;
+			bad ??= id;
+			return id === bad;
+		}, scheduler);
+		ok(r.first > 0, "first selection with an always-failing tile still emits");
+	}
 }
 
+label = "";
 // ---- tile cache stall timeout ----
 /** A server where `/stall` never answers (until aborted, like fetch), anything else is 200. */
 const stallServer = (stall: (url: string) => boolean) =>

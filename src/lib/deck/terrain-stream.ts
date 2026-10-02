@@ -8,6 +8,7 @@
 // stood in for by already-loaded geometry (its old-resolution mesh, a loaded parent, or a full
 // set of loaded children), so the surface never has holes while refining or coarsening.
 
+import { RequestScheduler } from "@loaders.gl/core";
 import { tilePriority } from "../cache";
 import {
 	type DemLoadOptions,
@@ -18,6 +19,7 @@ import {
 	type TileKey,
 	tileId,
 } from "../dem";
+import { getFlag } from "../flags";
 import type { EnuFrame } from "../geodesy";
 import {
 	buildLiteMesh,
@@ -43,6 +45,8 @@ export type StreamOptions = {
 	lodOutside?: number;
 	/** Max concurrent tile loads. */
 	concurrency?: number;
+	/** Load ordering (default: the `terrainScheduler` flag, read once); see TileScheduler. */
+	scheduler?: "loaders" | "rigi";
 	/** Meshes kept beyond the rendered set (LRU-ish cache for panning back). */
 	spareMeshes?: number;
 	/**
@@ -97,6 +101,121 @@ export function fitStreamTile(dem: DemRaster, seg: number): DemRaster {
 
 type Want = TileChoice & { id: string; seg: number };
 
+/** What a TileScheduler needs from the streamer. */
+type SchedulerHost = {
+	concurrency: number;
+	loadingCount(): number;
+	/** `w` as currently wanted if it is still worth loading (wanted at that seg, not loaded, loading, given up or disposed), else null. */
+	current(w: Want): Want | null;
+	/** Lower loads first (metres; out-of-view pushed back). */
+	priority(w: Want): number;
+	/** Starts the load; `release` frees the scheduler's slot (idempotent) when it ends or goes stale. */
+	start(w: Want, release: () => void): void;
+};
+
+/** Orders and rate-limits tile loads: the streamer's own queue, or loaders.gl's RequestScheduler. */
+interface TileScheduler {
+	/** A new selection; `ordered` is the load order, its first `ahead` tiles are the preview-first ones. */
+	reset(ordered: Want[], ahead: number): void;
+	/** A failed load comes back, ahead of everything queued. */
+	retry(w: Want): void;
+	/** Starts what free slots allow (a no-op for the loaders strategy, which starts itself). */
+	pump(): void;
+	/** Tiles waiting for a slot. */
+	queued(): number;
+	clear(): void;
+}
+
+/** The streamer's own sorted queue, drained by pump() up to the concurrency cap. */
+class QueueScheduler implements TileScheduler {
+	private queue: Want[] = [];
+	constructor(private host: SchedulerHost) {}
+	reset(ordered: Want[]) {
+		this.queue = ordered;
+	}
+	retry(w: Want) {
+		this.queue.unshift(w);
+		this.pump();
+	}
+	pump() {
+		while (
+			this.host.loadingCount() < this.host.concurrency &&
+			this.queue.length
+		) {
+			const cur = this.host.current(this.queue.shift() as Want);
+			if (cur) this.host.start(cur, () => {});
+		}
+	}
+	queued() {
+		return this.queue.length;
+	}
+	clear() {
+		this.queue = [];
+	}
+}
+
+/** Added to the priority of tiles outside the coarse-first group: they all load after it. */
+const AFTER_PREVIEW = 1e9;
+
+/**
+ * One RequestScheduler request per (tile, seg); its getPriority is re-read from the current
+ * selection whenever a slot opens (loaders.gl sorts ascending and cancels below 0), so a wedge
+ * change re-orders and drops stale tiles without rebuilding anything, and a tile still wanted keeps
+ * its place. Retries sit ahead of everything (later retries first, like unshift).
+ */
+class LoadersScheduler implements TileScheduler {
+	private scheduler: RequestScheduler;
+	private scheduled = new Map<string, Want>();
+	private ahead = new Set<string>();
+	private retrying = new Map<string, number>();
+	private retrySeq = 0;
+	constructor(private host: SchedulerHost) {
+		this.scheduler = new RequestScheduler({ maxRequests: host.concurrency });
+	}
+	reset(ordered: Want[], ahead: number) {
+		this.retrying.clear();
+		this.ahead = new Set(ordered.slice(0, ahead).map(wantKey));
+		for (const w of ordered) this.schedule(w);
+	}
+	retry(w: Want) {
+		this.retrying.set(wantKey(w), ++this.retrySeq);
+		this.schedule(w);
+	}
+	pump() {}
+	queued() {
+		let n = 0;
+		for (const w of this.scheduled.values()) if (this.host.current(w)) n++;
+		return n;
+	}
+	clear() {}
+	private priority(key: string) {
+		const cur = this.host.current(this.scheduled.get(key) as Want);
+		if (!cur) return -1;
+		const retry = this.retrying.get(key);
+		if (retry) return 1 / (1 + retry); // ahead of every selection priority (>= 2)
+		return (
+			2 + this.host.priority(cur) + (this.ahead.has(key) ? 0 : AFTER_PREVIEW)
+		);
+	}
+	private schedule(w: Want) {
+		const key = wantKey(w);
+		if (this.scheduled.has(key)) return;
+		this.scheduled.set(key, w);
+		this.scheduler
+			.scheduleRequest(key, () => this.priority(key))
+			.then((slot) => {
+				this.scheduled.delete(key);
+				this.retrying.delete(key);
+				if (!slot) return; // cancelled: stale
+				const cur = this.host.current(w);
+				if (cur) this.host.start(cur, slot.done);
+				else slot.done();
+			});
+	}
+}
+
+const wantKey = (w: Want) => `${w.id}:${w.seg}`;
+
 /**
  * Loads of one tile (at one resolution) that may come back empty (null: a fetch that failed through
  * the whole ancestor fallback, a decode error, a mesh build that threw) before the streamer gives up
@@ -123,19 +242,19 @@ export class TerrainStreamer {
 	private o: Required<
 		Omit<
 			StreamOptions,
-			"onProgress" | "onPreview" | "previewMaxZoom" | "loadTile"
+			"onProgress" | "onPreview" | "previewMaxZoom" | "loadTile" | "scheduler"
 		>
 	> &
 		Pick<
 			StreamOptions,
-			"onProgress" | "onPreview" | "previewMaxZoom" | "loadTile"
+			"onProgress" | "onPreview" | "previewMaxZoom" | "loadTile" | "scheduler"
 		>;
 	/** One mesh per tile id (replaced when the wanted resolution changes). */
 	private meshes = new Map<string, TileMesh>();
 	private lastUsed = new Map<string, number>();
 	private want: Want[] = [];
 	private wantById = new Map<string, Want>();
-	private queue: Want[] = [];
+	private scheduler: TileScheduler;
 	/** Coarse-first selection still to be handed to onPreview (null = none pending). */
 	private preview: Want[] | null = null;
 	private previewById = new Map<string, Want>();
@@ -146,7 +265,10 @@ export class TerrainStreamer {
 	/** Tiles given up on for this selection (`id:seg`): not pending, stood in for. */
 	private gaveUp = new Set<string>();
 	/** In-flight loads, abortable when they go stale. */
-	private loading = new Map<string, { seg: number; ac: AbortController }>();
+	private loading = new Map<
+		string,
+		{ seg: number; ac: AbortController; release: () => void }
+	>();
 	private wedge?: ViewWedge;
 	private generation = 0;
 	private genStart = 0;
@@ -173,6 +295,17 @@ export class TerrainStreamer {
 			spareGpuLayers: 48,
 			...options,
 		};
+		const host: SchedulerHost = {
+			concurrency: this.o.concurrency,
+			loadingCount: () => this.loading.size,
+			current: (w) => this.currentWant(w),
+			priority: (w) => this.priority(w),
+			start: (w, release) => this.startLoad(w, release),
+		};
+		this.scheduler =
+			(options.scheduler ?? getFlag("terrainScheduler")) === "loaders"
+				? new LoadersScheduler(host)
+				: new QueueScheduler(host);
 	}
 
 	/**
@@ -206,6 +339,7 @@ export class TerrainStreamer {
 			const w = this.wantById.get(id) ?? this.previewById.get(id);
 			if (!w || w.seg !== l.seg) {
 				l.ac.abort();
+				l.release();
 				this.loading.delete(id); // free the slot; re-queued below if wanted at a new seg
 			}
 		}
@@ -213,10 +347,11 @@ export class TerrainStreamer {
 		// queued for the previous wedge and not in this list is dropped (stale).
 		const missing = (w: Want) =>
 			this.meshes.get(w.id)?.seg !== w.seg && !this.loading.has(w.id);
-		this.queue = this.want
+		let queue = this.want
 			.filter(missing)
 			.sort((a, b) => this.priority(a) - this.priority(b));
-		this.genTotal = this.queue.length + this.loading.size;
+		this.genTotal = queue.length + this.loading.size;
+		let ahead = 0;
 		// Coarse-first (first selection only): the capped selection's tiles go ahead of the rest.
 		// Most of them (the far field) are in the full selection too, at the same resolution.
 		this.preview = null;
@@ -241,10 +376,12 @@ export class TerrainStreamer {
 					return missing(w) && (!f || f.seg === w.seg);
 				})
 				.sort((a, b) => this.priority(a) - this.priority(b));
-			const ahead = new Set(first.map((w) => w.id));
-			this.queue = [...first, ...this.queue.filter((w) => !ahead.has(w.id))];
+			const aheadIds = new Set(first.map((w) => w.id));
+			queue = [...first, ...queue.filter((w) => !aheadIds.has(w.id))];
+			ahead = first.length;
 		}
-		this.pump();
+		this.scheduler.reset(queue, ahead);
+		this.scheduler.pump();
 		this.scheduleEmit(0);
 		this.maybePreview();
 		return true;
@@ -257,7 +394,7 @@ export class TerrainStreamer {
 
 	dispose() {
 		this.disposed = true;
-		this.queue = [];
+		this.scheduler.clear();
 		for (const l of this.loading.values()) l.ac.abort();
 		if (this.emitTimer) clearTimeout(this.emitTimer);
 		for (const m of this.meshes.values()) m.gpuLayer?.release();
@@ -269,33 +406,35 @@ export class TerrainStreamer {
 		return (w.focus ? 1 : 4) * (w.distance + w.size * 0.25);
 	}
 
-	private pump() {
-		while (
-			!this.disposed &&
-			this.loading.size < this.o.concurrency &&
-			this.queue.length
-		) {
-			const w = this.queue.shift() as Want;
-			const cur = this.wantById.get(w.id) ?? this.previewById.get(w.id);
-			if (!cur || cur.seg !== w.seg) continue; // went stale
-			if (this.meshes.get(w.id)?.seg === w.seg || this.loading.has(w.id))
-				continue;
-			const ac = new AbortController();
-			this.loading.set(w.id, { seg: w.seg, ac });
-			const gen = this.generation;
-			this.load(w, ac.signal)
-				.catch(() => false) // a mesh build that threw: a failed load
-				.then((ok) => {
-					if (!ok && !ac.signal.aborted && gen === this.generation)
-						this.failed(w);
-				})
-				.finally(() => {
-					if (this.loading.get(w.id)?.ac === ac) this.loading.delete(w.id);
-					this.pump();
-					this.maybePreview();
-					this.scheduleEmit(this.queue.length || this.loading.size ? 150 : 0);
-				});
-		}
+	/** `w` as currently wanted, or null once it is stale, loaded, loading, given up on or disposed. */
+	private currentWant(w: Want): Want | null {
+		if (this.disposed) return null;
+		const cur = this.wantById.get(w.id) ?? this.previewById.get(w.id);
+		if (!cur || cur.seg !== w.seg) return null;
+		if (this.meshes.get(w.id)?.seg === w.seg || this.loading.has(w.id))
+			return null;
+		return this.gaveUp.has(`${w.id}:${w.seg}`) ? null : cur;
+	}
+
+	private startLoad(w: Want, release: () => void) {
+		const ac = new AbortController();
+		this.loading.set(w.id, { seg: w.seg, ac, release });
+		const gen = this.generation;
+		this.load(w, ac.signal)
+			.catch(() => false) // a mesh build that threw: a failed load
+			.then((ok) => {
+				if (!ok && !ac.signal.aborted && gen === this.generation)
+					this.failed(w);
+			})
+			.finally(() => {
+				if (this.loading.get(w.id)?.ac === ac) this.loading.delete(w.id);
+				release();
+				this.scheduler.pump();
+				this.maybePreview();
+				this.scheduleEmit(
+					this.scheduler.queued() || this.loading.size ? 150 : 0,
+				);
+			});
 	}
 
 	/** A load of `w` came back empty: retried after a backoff, or given up on (TILE_LOAD_ATTEMPTS). */
@@ -313,12 +452,8 @@ export class TerrainStreamer {
 		const gen = this.generation;
 		setTimeout(() => {
 			if (this.disposed || gen !== this.generation) return;
-			const cur = this.wantById.get(w.id) ?? this.previewById.get(w.id);
-			if (!cur || cur.seg !== w.seg) return;
-			if (this.meshes.get(w.id)?.seg === w.seg || this.loading.has(w.id))
-				return;
-			this.queue.unshift(cur);
-			this.pump();
+			const retry = this.currentWant(w);
+			if (retry) this.scheduler.retry(retry);
 		}, n * TILE_RETRY_MS);
 	}
 

@@ -100,6 +100,13 @@ export const FLAG_SCHEMA = {
 	 */
 	deckDebug: onOff("off"),
 	/**
+	 * Who orders the terrain streamer's tile loads (deck/terrain-stream.ts): loaders = loaders.gl's
+	 * RequestScheduler (each wanted tile is one scheduled request whose priority is re-read from
+	 * the current selection whenever a slot opens), rigi = the streamer's own sorted queue + pump.
+	 * Same load order; loaders adds one macrotask hop per slot refill.
+	 */
+	terrainScheduler: oneOf(["loaders", "rigi"], "loaders"),
+	/**
 	 * WebGPU batched terrain: replay the GPU-culled terrain draws (geometry + colour passes) from
 	 * recorded render bundles instead of re-encoding them every frame (CPU encode cost only; pixels
 	 * identical, scripts/gpu/render-bundle-dawn.ts). Re-records on any bound-resource, pipeline or

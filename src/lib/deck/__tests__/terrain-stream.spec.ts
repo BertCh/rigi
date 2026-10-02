@@ -70,7 +70,10 @@ describe("downsample2 / fitStreamTile", () => {
 	});
 });
 
-describe("TerrainStreamer", () => {
+describe.each([
+	"rigi",
+	"loaders",
+] as const)("TerrainStreamer (%s scheduler)", (scheduler) => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -90,6 +93,7 @@ describe("TerrainStreamer", () => {
 		const progress: [number, number][] = [];
 		const s = new TerrainStreamer(frame, {
 			...base,
+			scheduler,
 			loadTile: (k, seg) => loadTile(k, seg),
 			onUpdate: (set) => sets.push(set),
 			onPreview: (set) => previews.push(set),
@@ -307,5 +311,111 @@ describe("TerrainStreamer", () => {
 				expect(anc).toBe(false);
 			}
 		s.dispose();
+	});
+});
+
+/**
+ * The load-start order of the two schedulers must agree. Loads are held and completed one at a time
+ * (oldest first) so only the scheduler decides what starts next.
+ */
+describe("terrain scheduler load order: loaders == rigi", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	type Script = {
+		concurrency: number;
+		preview?: boolean;
+		/** Completions before the second wedge (null = none). */
+		wedgeAfter?: number;
+		/** Tile that fails its first `failures` loads (the n-th load started, 0-based). */
+		failNth?: { nth: number; failures: number };
+	};
+
+	async function record(
+		scheduler: "rigi" | "loaders",
+		sc: Script,
+	): Promise<string[]> {
+		const order: string[] = [];
+		const held: { id: string; done: (ok: boolean) => void }[] = [];
+		const attempts = new Map<string, number>();
+		let failId: string | null = null;
+		const s = new TerrainStreamer(frame, {
+			radiusM: 20_000,
+			minZoom: 9,
+			maxZoom: 12,
+			concurrency: sc.concurrency,
+			scheduler,
+			...(sc.preview ? { previewMaxZoom: 11, onPreview: () => {} } : {}),
+			onUpdate: () => {},
+			loadTile: (key, seg) =>
+				new Promise((res) => {
+					const id = `${tileId(key)}:${seg}`;
+					order.push(id);
+					if (sc.failNth && order.length - 1 === sc.failNth.nth) failId = id;
+					const n = (attempts.get(id) ?? 0) + 1;
+					attempts.set(id, n);
+					held.push({
+						id,
+						done: (ok) =>
+							res(
+								ok && !(id === failId && n <= (sc.failNth?.failures ?? 0))
+									? flatTile(key)
+									: null,
+							),
+					});
+				}),
+		});
+		s.setWedge({ headingDeg: 0, halfAngleDeg: 40 });
+		let completed = 0;
+		let wedged = false;
+		for (let guard = 0; guard < 2000; guard++) {
+			await vi.advanceTimersByTimeAsync(TILE_RETRY_MS * 3);
+			if (!wedged && sc.wedgeAfter != null && completed >= sc.wedgeAfter) {
+				wedged = true;
+				s.setWedge({ headingDeg: 120, halfAngleDeg: 40 });
+				continue;
+			}
+			const next = held.shift();
+			if (!next) break;
+			next.done(true);
+			completed++;
+		}
+		s.dispose();
+		return order;
+	}
+
+	const scripts: [string, Script][] = [];
+	for (const concurrency of [1, 3]) {
+		scripts.push([
+			`first selection with preview, c=${concurrency}`,
+			{ concurrency, preview: true },
+		]);
+		scripts.push([
+			`wedge change mid-load, c=${concurrency}`,
+			{ concurrency, wedgeAfter: 4 },
+		]);
+		scripts.push([
+			`wedge change mid-load with preview, c=${concurrency}`,
+			{ concurrency, preview: true, wedgeAfter: 4 },
+		]);
+		scripts.push([
+			`failing tile retries, c=${concurrency}`,
+			{ concurrency, failNth: { nth: 2, failures: 2 } },
+		]);
+		scripts.push([
+			`always-failing tile, c=${concurrency}`,
+			{ concurrency, failNth: { nth: 1, failures: 99 } },
+		]);
+	}
+	it.each(scripts)("%s", async (_name, sc) => {
+		const a = await record("rigi", sc);
+		const b = await record("loaders", sc);
+		expect(a.length).toBeGreaterThan(5);
+		expect(b).toEqual(a);
 	});
 });
