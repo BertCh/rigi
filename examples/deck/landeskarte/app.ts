@@ -216,7 +216,6 @@ export function createLandeskarteScene(
     tiles: unknown;
     sample: (lat: number, lon: number) => number | null;
   };
-  let debugLayers = null as (() => Layer[]) | null;
   let tileRequestTimer: ReturnType<typeof setTimeout> | undefined;
   let prefetchedOtherMode = false;
   let shadowShades = 0;
@@ -693,7 +692,7 @@ export function createLandeskarteScene(
     diagnostics.mode = mode;
     diagnostics.minutes = minutes;
     diagnostics.pose = clonePose(pose);
-    deck.setProps({viewState: getViewState(), layers: debugLayers ? debugLayers() : buildLayers()});
+    deck.setProps({viewState: getViewState(), layers: buildLayers()});
     if (furniture && !flying) {
       furniture.update({
         pose,
@@ -1309,36 +1308,6 @@ export function createLandeskarteScene(
 
   return {
     deck,
-    debugState() {
-      return {
-        ringBins: ring?.bins,
-        trailSample: trailSampler.sample,
-        trails,
-        peaks: peaks.map((peak, index) => ({
-          name: peak.name,
-          ele: peak.ele,
-          vis: ring?.peakVisible[index],
-          margin: ring?.peakMarginDeg[index],
-          xy: projectToScreen(
-            pose,
-            (() => {
-              const e = frame.toEnu(peak.lat, peak.lon, peak.ele);
-              return [e[0], e[1], e[2] - curvatureDrop(Math.hypot(e[0], e[1]), refractionK)] as [
-                number,
-                number,
-                number
-              ];
-            })(),
-            width,
-            height
-          )
-        })),
-        placed: placedLabels.length
-      };
-    },
-    setDebugLayers(fn: (() => Layer[]) | null) {
-      debugLayers = fn;
-    },
     ready,
     diagnostics,
     waitForFrame,

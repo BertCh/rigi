@@ -34,13 +34,13 @@ The sky (`layers/sky-layer.ts`) is a full-screen layer drawn first that rebuilds
 
 One curvature convention everywhere: `up = elevation - (1 - k) (e^2 + n^2) / 2R`, `R = 6371008.8`, `k = 0.13`. The same `1 - k` goes to the terrain, the Nebelmeer, the trails, the labels and the ring. With the flat/curved switch off, `k = 1`.
 
-Labels, trails and stations are ordinary deck.gl `TextLayer`, `PathLayer`, `LineLayer` and `ScatterplotLayer` layers. Names and markers live in a second pixel-space `OrthographicView` selected by a `layerFilter` on the `screen-` id prefix, positioned by a CPU mirror of the viewport (`projectToScreen`, agreeing with deck's `viewport.project` to 2e-13 px). Trails are draped on the loaded DEM in world metres. Everything on the page around the canvas (neatline, LV95 graticule ticks, scale bar from the camera's metres per pixel, a legend that lists only what is drawn, north arrow, imprint, the ruler) is DOM and SVG.
+Only the tiles of the current view's quadtree selection are drawn, so zoom levels never overlap. Labels, trails and stations are ordinary deck.gl `TextLayer`, `PathLayer`, `LineLayer` and `ScatterplotLayer` layers. Names and markers live in a second pixel-space `OrthographicView` selected by a `layerFilter` on the `screen-` id prefix, positioned by a CPU mirror of the viewport (`projectToScreen`, agreeing with deck's `viewport.project` to 2e-13 px). Trails are draped on the loaded DEM in world metres. deck.gl's `pixels` width units are one world unit per pixel in a perspective view, so trail widths are metres scaled by the distance from the eye (a width of n px at distance d is n times 2 tan(vfov / 2) / height times d). Everything on the page around the canvas (neatline, LV95 graticule ticks, scale bar from the camera's metres per pixel, a legend that lists only what is drawn, north arrow, imprint, the ruler) is DOM and SVG.
 
 ### The light pipeline
 
 Two graphs share one z11 Terrarium mosaic (7 by 7 tiles, 94 km wide) centred on the summit.
 
-- **Ring** (WebGPU): `decode-terrarium`, then `march-horizon` (2048 azimuth bins, 5 m to 45 km from the summit eye, `(h - h_eye) / d - d (1 - k) / 2R`), then `peak-visibility` (one thread per peak). Its output feeds the label visibility (names are only placed where the summit clears the skyline) and the optional skyline overlay.
+- **Ring** (WebGPU): `decode-terrarium`, then `march-horizon` (2048 azimuth bins, 5 m to 45 km from the summit eye, `(h - h_eye) / d - d (1 - k) / 2R`), then `peak-visibility` (one thread per peak). The eye is the DEM plus 1.6 m (the photo's lens sits 45 m below the DEM at the Niederhorn top, so a ring from the lens itself would be blocked by the ground at its feet). Its output feeds the label visibility (names are only placed where the summit clears the skyline) and the optional skyline overlay.
 - **Shadow** (WebGPU): `decode-terrarium` over a 1024 by 1024 window (26.8 km), then `horizon-map`: 16 azimuths by 256 geometric samples from 26 m to 12 km, u16 angles over [-0.25, pi/2] rad, 33.5 MiB, one azimuth per dispatch with an awaited submit in between so no single submit runs long. On every sun change `shade-at-time` looks up and interpolates the horizon between azimuths, applies a smoothstep penumbra of 0.27 degrees and writes a byte buffer that is copied to an `r8unorm` texture (the buffer row pitch is 256 bytes). `ambient-field` (sky-view factor) runs once. `sun-hours` accumulates the 288 five-minute table steps in f32 and is read back once for the cursor read-out.
 - **CPU twin** (WebGL2, no compute): the same 16 by 256 horizon map at 256 by 256 texels (stride 4) in a worker, with `Math.fround` in the kernel's operation order, then the same shade on every `setSun`, written with `texture.writeData`. The twin is also the checkable specification of the kernels: `checks/parity.check.ts` compares it to a direct double-precision march.
 - **One consumer.** The terrain fragment shader only ever samples a `ShadowField` (shadow plus ambient), whichever side filled it, so it never branches on the backend. If compute fails the field is null and the terrain draws without cast shadow.
@@ -59,7 +59,24 @@ What was run, and what was not. Nothing here is a claim about other machines or 
 
 - Static: `npx tsc --noEmit -p examples/deck/landeskarte`, `npx biome check --write` on every source file, `node scripts/ci/spdx.mjs`.
 - CPU checks, `node examples/deck/landeskarte/scripts/run-checks.mjs`: 12 of 12 pass. Selected numbers: the sun against an independent Meeus formulation, max azimuth difference 0.029 deg and elevation 0.009 deg over 768 instants, and the repository's reference values to 0.005 deg; sunset 19:59 CEST. The CPU ring twin against a double-precision march, max 7.7e-6 deg over 2048 bins. The horizon-map twin against a double-precision march, max 2.9e-5 rad (one quantisation step is 2.8e-5 rad). `sampleHeight` against an analytic terrain, 0.06 m. The CPU viewport mirror against deck's `project`, 2.4e-13 px. The label placer: no overlaps and no leader crossings over a 24-yaw sweep (374 names, 3073 pairs).
-- Browser, `node scripts/gpu/with-render-lock.mjs -- node examples/deck/landeskarte/scripts/visual-smoke.mjs` (the smoke test): @@SMOKE@@
+- Browser, `node scripts/gpu/with-render-lock.mjs -- node examples/deck/landeskarte/scripts/visual-smoke.mjs` (the smoke test): ran during integration on one Apple-silicon Mac (headless Chromium, Metal). It was **not** re-run to completion after the last edits (a render freeze began): in two later runs the frozen-capture check (two screenshots of an idle `?t=` scene must be byte-identical) failed on WebGPU with about 687 differing pixels, at most 18 of 255, in the mid-distance terrain band, and the cause is not found. The numbers below come from the last run in which every check passed, on both backends, with 164 of 164 DEM tiles loaded and 0 failed. Treat them as measured once, not as a standing guarantee, and the frozen-capture determinism as unverified.
+
+  | | WebGPU | WebGL2 |
+  |---|---|---|
+  | compute path | graph | CPU twin |
+  | plan sheet | contour ink 20 308 px, no route red until a station is selected | contour ink 19 861 px, same |
+  | selection | 436 route-red px | 299 route-red px |
+  | lift | ends 0.000 m from the summit frame, roll -2.413 deg | same |
+  | Stockhorn label | 0.00 px from the CPU projection | 0.00 px |
+  | shadowed fraction of the terrain band | 0.040 at 11:00 UTC, 0.756 at 17:45 UTC | 0.036, 0.753 |
+  | colour of the lit pixels (R/B) | 0.961 at 11:00 UTC, 1.073 at 16:30 UTC | 0.954, 1.073 |
+  | frozen `?t=` capture | byte-identical twice | byte-identical twice |
+
+  Across backends the 15:28 CEST panorama differs by a mean 3.25 of 255 per channel, and all 12 common labels sit at the same pixel. The default backend falls back to WebGL2 when `navigator.gpu` is absent.
+
+  GPU horizon map against the CPU twin (window 256 by 256 texels, 16 azimuths, 1 048 576 angles): the largest difference is 6.4e-3 deg (one quantisation step is 1.6e-3 deg), 1 angle is over the 0.005 deg tolerance, 1 043 336 are bit-identical, and 0 shadow bits flip. The one outlier is most likely a sample on a texel edge that rounds to the neighbouring texel in f32 on one side only; this has not been confirmed, and the smoke test allows 1 in 10^5. The GPU skyline ring against its CPU twin differs by at most 1.6e-5 deg over 2048 bins. The GPU run takes 0.28 s and the twin 6.7 s in a worker.
+  Three of the smoke heuristics were wrong for this look and were changed: the sky is a real blue and the terrain a pale map tone, so the sky need not be brighter (it must be a smooth, distinct tone); the sun's colour is read from the brightest quarter of the terrain rows at 16:30 UTC, because at 17:45 UTC the sun is 2 degrees up behind the hills and the panorama is almost all shade; and the Stockhorn is the nearest of the three OSM summits with that name.
+  Not measured: per-node GPU milliseconds (headless Chromium offered no `timestamp-query`, so the proof drawer shows none), other GPUs and browsers, frame rates, and phone behaviour.
 
 ### Photo skylines
 
@@ -88,6 +105,8 @@ The check asserts that among photos with confidence at least 0.7 the worst ML me
 - Copying a storage buffer into an `r8unorm` texture needs a 256-byte row pitch, and a render target needs `Texture.COPY_SRC` to be read back. `texture.readDataAsync` is deprecated and throws; `texture.readBuffer(...)` then `buffer.readAsync()` works.
 - deck.gl's built-in view-state transitions could not be observed on a custom `View` with array props in our probe, so the lift is an app-driven rAF flight that sets the view state each frame.
 - `ScatterplotLayer` is a flat disc and invisible edge-on in a perspective view at zero pitch; the example draws its markers in the pixel-space view instead.
+- deck's `parameters` on a layer are applied over its models' own, so the sky dome needs `parameters: {depthCompare: 'always', depthWriteEnabled: false}` as a layer prop or it writes depth and hides the terrain.
+- In a perspective viewport `widthUnits: 'pixels'` is not pixels (scale 1, see above); use metres and scale them.
 - A custom `View` whose `ControllerType` throws needs `controller: false` on the `Deck`; input goes through `views/orbit-controls.ts` so the wheel is never captured.
 - luma's `heightFog` module is exported and has no slab geometry; it is not used (see the Nebelmeer above).
 

@@ -4,6 +4,13 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Examples: Landeskarte Abendlicht (2026-10-01)
+
+- New flagship example `examples/deck/landeskarte`: the Niederhorn above Lake Thun as a Swiss Landeskarte sheet (Imhof multidirectional relief, own hypsometric palette, three-ink contours, rock and scree, LV95 ticks, scale bar from camera resolution, legend of drawn symbols only) that lifts into the summit panorama and ends exactly on the solved frame of photo demo-01.
+- A time ruler (05:00 to 20:00 CEST, the 20-minute summit stay magnified) moves the real sun of 7 Sep 2026 (NOAA/Meeus with an independent check); cast shadows and sky-view come from a 16-azimuth GPU horizon map built with luma.gl's `GPUCommandGraph` on WebGPU and from a CPU twin in a worker on WebGL2. A GPU skyline ring decides which peaks are labelled.
+- Stations show each photo's solved pose as geometry (wedges, Feldbuch rays, Wegweiser plate). An optional layer draws the photo skylines found by U2-Net-P (baked offline, geometry only) against the DEM horizon.
+- 12 tsx CPU checks (`node examples/deck/landeskarte/scripts/run-checks.mjs`). Built by a multi-agent swarm from `reports/summit-example-spec.md` (WIP, browser smoke pending a consolidated pass).
+
 ### Gipfelbuch: Swiss notebook and explainer fidelity restored (2026-10-01)
 
 - **Concept sheets.** The notebook is back in the shell:

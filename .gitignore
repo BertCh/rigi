@@ -32,6 +32,8 @@ __pycache__/
 # personal photos & input data
 img/
 data/
+# baked, licence-stamped example data (open map data and geometry only, never photos)
+!examples/*/*/data/
 public/photos/
 public/baseline/
 tools/bench/data/photos/
