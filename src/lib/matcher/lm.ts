@@ -14,6 +14,8 @@ export type LeastSquaresOptions = {
 	/** characteristic scale per parameter (scipy x_scale); default 1 */
 	xScale?: ArrayLike<number>;
 	maxNfev?: number;
+	/** fixed forward-difference steps per parameter (pose6's STEPS); default scaled machine-epsilon steps */
+	jacSteps?: ArrayLike<number>;
 	ftol?: number;
 	xtol?: number;
 	gtol?: number;
@@ -71,7 +73,8 @@ export function leastSquares(
 	while (nfev < maxNfev) {
 		// Jacobian (forward differences, step scaled to the parameter's magnitude / x_scale)
 		for (let j = 0; j < n; j++) {
-			const h = SQRT_EPS * Math.max(Math.abs(x[j]), scale[j]);
+			const h =
+				opts.jacSteps?.[j] ?? SQRT_EPS * Math.max(Math.abs(x[j]), scale[j]);
 			const xh = Float64Array.from(x);
 			xh[j] += h;
 			const rh = fun(xh);

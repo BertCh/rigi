@@ -500,6 +500,23 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"pose6dof *RansacAsync: K hypotheses × N correspondences per dispatch, arg-max on the GPU; batches under 2^19 work items and missing devices score on the CPU twin (scoreBatchCpu)",
 	},
 	{
+		id: "basin-grid",
+		island: "I5",
+		paths: ["src/lib/matcher/basin-gpu.ts"],
+		groups: ["basin-grid"],
+		realms: ["page"],
+		cadence: "per photo",
+		resources: [
+			"skyline score map S, node horizon dirs, candidate rotations, uniforms (pooled imports)",
+			"scores nodes × cands (transient)",
+			"best nodes × 3 (transient)",
+		],
+		readbacks: ["winners: nodes × 3 × (score f32, index u32)"],
+		status: "default",
+		notes:
+			"basin-gap grid coarse rotation search (rotSearchGpu): SCORE (one workgroup per candidate × node, workgroup atomicMin column table) → TOP3 (1° NMS, per node); throws on a GPU failure and the caller takes rotSearchCpu",
+	},
+	{
 		id: "skyglobal",
 		island: "I5",
 		paths: ["src/lib/gpu/skyglobal/graph.ts", "src/lib/gpu/skyglobal/index.ts"],

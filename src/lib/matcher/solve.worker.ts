@@ -26,16 +26,24 @@ ctx.onmessage = async (ev: MessageEvent<SolveJob>) => {
 	let reply: SolveReply;
 	try {
 		const result =
-			job.kind === "assemble"
-				? await assemble(
-						job.corr,
-						job.views,
-						job.eye,
-						job.prior,
-						job.sk,
-						job.opts,
-					)
-				: await legacySolve(job.corr, job.views, job.eye, job.prior, job.opts);
+			job.kind === "basin"
+				? await (await import("./basin-run")).runBasinGap(job.basin)
+				: job.kind === "assemble"
+					? await assemble(
+							job.corr,
+							job.views,
+							job.eye,
+							job.prior,
+							job.sk,
+							job.opts,
+						)
+					: await legacySolve(
+							job.corr,
+							job.views,
+							job.eye,
+							job.prior,
+							job.opts,
+						);
 		reply = { id: job.id, ok: true, result };
 	} catch (e) {
 		reply = {

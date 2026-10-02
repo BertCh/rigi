@@ -13,7 +13,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I2 | Photo prep | per photo | page, worker:sky | photoprep | `photoprep` |
 | I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, mosaic-mips, horizon-cert, precision-probe | `horizon-march`, `mosaic-mips`, `horizon-cert`, `precision-probe` |
 | I4 | Align | per align | page | align-pose, align-cert, silhouette-gpu | `align-pose`, `align-cert`, `silhouette-mask` |
-| I5 | Unknown-pose solve | per photo | worker:unknown-pose, worker:pipeline | solve-coarse, ransac, skyglobal, skyline | `solve-coarse`, `ransac`, `skyglobal`, `skyline` |
+| I5 | Unknown-pose solve | per photo | worker:unknown-pose, worker:pipeline | solve-coarse, ransac, basin-grid, skyglobal, skyline | `solve-coarse`, `ransac`, `basin-grid`, `skyglobal`, `skyline` |
 | I6 | Sky model | per photo | worker:sky | sky-model, sky-prep, sky-refine | `sky-prep`, `sky-refine` |
 | I7 | Frame | per frame | page | deck-webgpu-frame, terrain-gpu-cull | – |
 | I8 | Queries | per settle | page | geo-query-gpu | `geo-query` |
@@ -41,6 +41,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | silhouette-gpu | I4 | default | page | per align | `silhouette-mask` | geometry targets rgba32float, one per pose (render device; imports bound per run); per-pose uniforms, mask output (imports, owned by SilhouetteMaskGpu) | read: pass mask, 18 KB per 384 × 288 pose (one read node per re-rank) |
 | solve-coarse | I5 | default | worker:unknown-pose, worker:pipeline (remote) | per photo | `solve-coarse` | resident horizon profile hz (per device); u, grid imports | rows: 16 B per yaw row; blocks (flagged rows only): nYaw·nBlk·16 B |
 | ransac | I5 | default | page | per align | `ransac` | prm uniform, correspondences N × 32 B, hypotheses K × 64 B (pooled imports); score K × 8 B, best 16 B (transients) | best: 16 B per batch (winner index, count, cost) |
+| basin-grid | I5 | default | page | per photo | `basin-grid` | skyline score map S, node horizon dirs, candidate rotations, uniforms (pooled imports); scores nodes × cands (transient); best nodes × 3 (transient) | winners: nodes × 3 × (score f32, index u32) |
 | skyglobal | I5 | opt-in | page, bench | per photo | `skyglobal` | score maps, profile (pooled imports); cells, red (transients); rescore "gpu": candidate scores, per-yaw best key / arg (transients) | candidate list: count + head slots, rare second exact read; rescore "gpu": count + per-yaw best key and arg, 4 + 8·nYaw B |
 | skyline | I5 | opt-in | worker:unknown-pose, worker:eye (remote) | per photo | `skyline` | photo planes (rgba, pooled import); features, prior, sky-model cost images (transients) | cost images for the CPU Viterbi + sky-model refit |
 | sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
@@ -77,6 +78,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **silhouette-gpu**: one kernel node per pose, one submit per re-rank; keyed by pose count and target shape
 - **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) on the GPU path
 - **ransac**: pose6dof *RansacAsync: K hypotheses × N correspondences per dispatch, arg-max on the GPU; batches under 2^19 work items and missing devices score on the CPU twin (scoreBatchCpu)
+- **basin-grid**: basin-gap grid coarse rotation search (rotSearchGpu): SCORE (one workgroup per candidate × node, workgroup atomicMin column table) → TOP3 (1° NMS, per node); throws on a GPU failure and the caller takes rotSearchCpu
 - **skyglobal**: T6 skyline global search; the in-browser matcher's policy t6 (?matcherPolicy=t6, src/lib/matcher/t6.ts) runs it with the candidate re-score on the graph (RESCORE → PICK)
 - **skyline**: detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default off: 1 of 77 unknown-pose accept decisions flipped in the node A/B)
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU

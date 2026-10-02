@@ -116,6 +116,7 @@ export function createFakeWorld(
 		aspect: VIEW_W / VIEW_H,
 		prior: { ...truePose },
 		eye: EYE,
+		frame: { lat: 46.7, lon: 7.8 } as MatchEngine["frame"],
 		async renderPoseView(pose) {
 			calls.renderPoseView++;
 			const xyz = new Float32Array(VIEW_W * VIEW_H * 3);

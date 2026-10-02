@@ -45,6 +45,7 @@ import {
 	type AdhocSetup,
 	adhocDrape,
 	adhocSetup,
+	runBasinGapFor,
 	SWEEP_KP,
 	stage2,
 } from "./pipeline";
@@ -499,10 +500,24 @@ async function runOnce(
 		if (fp) {
 			c.fused.skyScore = sg.scorePose(fp, true);
 			const sup = res.confidenceChecks?.matchSupport ?? 0;
-			if ((res.confidenceLevel === "high" || sup >= GAP_SUPPORT) && s.untrusted)
-				c.fused.basinGap = {
-					error: "position-grid basin gap not available in the browser",
-				};
+			if (
+				(res.confidenceLevel === "high" || sup >= GAP_SUPPORT) &&
+				s.untrusted
+			) {
+				// t6.Run.basin_gap: the pose6 grid on this candidate's stage-2 cue + matches
+				const bg = await runBasinGapFor(ctx, s, fp, st);
+				c.fused.basinGap =
+					bg.gap != null
+						? {
+								gap: bg.gap,
+								grid: bg.grid && {
+									step: bg.grid.step,
+									best: bg.grid.best,
+									second: bg.grid.second,
+								},
+							}
+						: { error: bg.error };
+			}
 		}
 		c.ms = Math.round(performance.now() - t1);
 	}

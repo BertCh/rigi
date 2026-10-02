@@ -1216,6 +1216,13 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "basin-grid-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/basin-grid-dawn.ts"),
+		timeoutS: 180,
+	},
+	{
 		id: "skyline-conv-dawn",
 		tier: "fast",
 		group: "gpu",

@@ -9,6 +9,8 @@ import type { Pose } from "#/lib/camera";
 import { type RealmGpuOptions, realmGpuOptions } from "#/lib/gpu/core/realm";
 import { gpuEnabled } from "#/lib/gpu/device";
 import { assemble, Deadline, type StageResult } from "./assemble";
+import type { BasinGap } from "./basin";
+import type { BasinJob } from "./basin-run";
 import { type Correspondences, type LegacySolve, legacySolve } from "./core";
 import type { SkylineCue } from "./fusion";
 
@@ -37,9 +39,10 @@ export type SolveJob = {
 			prior: Pose;
 			opts: { freeFocal?: boolean };
 	  }
+	| { kind: "basin"; basin: BasinJob }
 );
 export type SolveReply =
-	| { id: number; ok: true; result: StageResult | LegacySolve }
+	| { id: number; ok: true; result: StageResult | LegacySolve | BasinGap }
 	| { id: number; ok: false; error: string; name?: string };
 
 let worker: Worker | null = null;
@@ -48,7 +51,7 @@ let seq = 0;
 const pending = new Map<
 	number,
 	{
-		resolve: (r: StageResult | LegacySolve) => void;
+		resolve: (r: StageResult | LegacySolve | BasinGap) => void;
 		reject: (e: Error) => void;
 	}
 >();
@@ -96,7 +99,7 @@ type JobBody = SolveJob extends infer J
 		: never
 	: never;
 
-function post<T extends StageResult | LegacySolve>(
+function post<T extends StageResult | LegacySolve | BasinGap>(
 	body: JobBody,
 ): Promise<T> | null {
 	const w = getWorker();
@@ -104,7 +107,7 @@ function post<T extends StageResult | LegacySolve>(
 	const id = ++seq;
 	return new Promise<T>((resolve, reject) => {
 		pending.set(id, {
-			resolve: resolve as (r: StageResult | LegacySolve) => void,
+			resolve: resolve as (r: StageResult | LegacySolve | BasinGap) => void,
 			reject,
 		});
 		w.postMessage({
@@ -159,5 +162,13 @@ export function legacySolveOffThread(
 			prior,
 			opts,
 		}) ?? legacySolve(corr, v, e, prior, opts)
+	);
+}
+
+/** The position-grid basin gap in the solve worker (in-thread without one). */
+export async function basinGapOffThread(job: BasinJob): Promise<BasinGap> {
+	return (
+		post<BasinGap>({ kind: "basin", basin: job }) ??
+		(await import("./basin-run")).runBasinGap(job)
 	);
 }

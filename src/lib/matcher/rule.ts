@@ -18,7 +18,7 @@ export type T6Fused = {
 	} | null;
 	inliers?: number | null;
 	cues?: { match?: { pose?: Pose } | null } | null;
-	basinGap?: { gap?: number | null; error?: string } | null;
+	basinGap?: { gap?: number | null; error?: string; grid?: unknown } | null;
 	[k: string]: unknown;
 };
 

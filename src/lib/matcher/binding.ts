@@ -13,6 +13,7 @@ export type MatcherEngine = Pick<
 	| "aspect"
 	| "prior"
 	| "eye"
+	| "frame"
 	| "photoElement"
 	| "renderPoseView"
 	| "loadSatellite"

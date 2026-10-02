@@ -13,7 +13,9 @@
 // "basinGap unavailable (...)", exactly as the service did when the check could not run.
 
 import type { Pose } from "#/lib/camera";
-import type { StageResult } from "./assemble";
+import { Deadline, type StageResult } from "./assemble";
+import { BASIN_GAP_MIN, type BasinGap } from "./basin";
+import type { BasinJob } from "./basin-run";
 import {
 	alignRuns,
 	correspond,
@@ -26,10 +28,14 @@ import {
 	tick,
 	type ViewPose,
 } from "./context";
-import type { LegacySolve } from "./core";
-import { LOW_CONF } from "./fusion";
+import type { Correspondences, LegacySolve } from "./core";
+import { LOW_CONF, type SkylineCue } from "./fusion";
 import { dang, hfovFromVfov, vfovFromHfov } from "./geometry";
-import { assembleOffThread, legacySolveOffThread } from "./solve-offthread";
+import {
+	assembleOffThread,
+	basinGapOffThread,
+	legacySolveOffThread,
+} from "./solve-offthread";
 
 export const DEFAULT_OFFSETS = [-20, -10, 0, 10, 20];
 export const ADHOC_DEFAULT_HFOV = 50.0;
@@ -398,10 +404,17 @@ export async function stage2(
 }
 
 /**
- * Position-grid basin gap (app.basin_gap_check): not computed in the browser yet. Same outcome as the
- * service when the check cannot run: a HIGH result is downgraded to LOW.
+ * app.basin_gap_check: the position-grid basin gap (./basin.ts, pose6.basin_gap fast mode) from the
+ * stage-2 skyline cue and matches, no new renders. Only on a HIGH result; a gap under 0.20, or a check that
+ * cannot run, downgrades it to LOW.
  */
-export function basinGapUnavailable(res: StageResult) {
+export async function basinGapCheck(
+	ctx: MatchContext,
+	s: AdhocSetup,
+	res: StageResult,
+	st: { sk: SkylineCue | null; corr: Correspondences; eye: number[] },
+) {
+	const t0 = performance.now();
 	res.confidenceChecks ??= {
 		cueAgreeDeg: null,
 		skylineMedPx: null,
@@ -409,15 +422,75 @@ export function basinGapUnavailable(res: StageResult) {
 	};
 	const checks = res.confidenceChecks;
 	checks.positionTrusted = false;
+	tick(ctx, "basinGap");
 	if (res.confidenceLevel !== "high" || !res.pose) {
 		checks.basinGap = null;
 		return;
 	}
-	checks.basinGap = null;
-	res.confidenceLevel = "low";
-	res.confidence = LOW_CONF;
-	res.lowReason =
-		"basinGap unavailable (position-grid check not available in the browser)";
+	const r = await runBasinGapFor(ctx, s, res.pose, st);
+	checks.basinGap = r.gap == null ? null : Math.round(r.gap * 1e4) / 1e4;
+	if (r.grid)
+		(checks as Record<string, unknown>).basinGrid = {
+			step: r.grid.step,
+			best: r.grid.best,
+			second: r.grid.second,
+		};
+	res.timingMs = {
+		...res.timingMs,
+		basinGap: Math.round(performance.now() - t0),
+	};
+	if (r.gap == null || r.gap < BASIN_GAP_MIN) {
+		res.confidenceLevel = "low";
+		res.confidence = LOW_CONF;
+		res.lowReason =
+			r.gap != null ? "basinGap" : `basinGap unavailable (${r.error})`;
+	}
+}
+
+/** One basin-gap run for a fused pose; never throws except on abort / deadline. */
+export async function runBasinGapFor(
+	ctx: MatchContext,
+	s: AdhocSetup,
+	pose: Pose,
+	st: { sk: SkylineCue | null; corr: Correspondences; eye: number[] },
+): Promise<{ gap: number | null; grid: BasinGap["grid"]; error?: string }> {
+	try {
+		if (!st.sk) throw new Error("no skyline cue");
+		if (performance.now() > ctx.deadline - 5000)
+			throw new Error("no time left before the request deadline");
+		const job: BasinJob = {
+			lat: ctx.engine.frame.lat,
+			lon: ctx.engine.frame.lon,
+			sk: st.sk,
+			corr: st.corr.x2d.length
+				? { x2d: st.corr.x2d, X: st.corr.X, W: st.corr.W, H: st.corr.H }
+				: null,
+			eye: Array.from(st.eye),
+			pose,
+			W: st.corr.W,
+			H: st.corr.H,
+			focalKnown: s.focalKnown,
+		};
+		const r = await (ctx.basinGap ?? basinGapOffThread)(job);
+		tick(ctx);
+		return {
+			gap: r.gap,
+			grid: r.grid,
+			error: r.gap == null ? "no grid node solved" : undefined,
+		};
+	} catch (e) {
+		if (
+			e instanceof Deadline ||
+			(e as Error)?.name === "AbortError" ||
+			ctx.signal?.aborted
+		)
+			throw e;
+		return {
+			gap: null,
+			grid: null,
+			error: String((e as Error)?.message ?? e).slice(0, 200),
+		};
+	}
 }
 
 /** app.match_adhoc, policy v034. */
@@ -493,8 +566,9 @@ export async function matchAdhoc(
 		timing.stage1 = Math.round(stages.reduce((a, x) => a + x.ms, 0));
 	}
 	const ts = performance.now();
-	const { res } = await stage2(ctx, s, prior2, r.offsets);
-	if (s.fused && s.untrusted) basinGapUnavailable(res);
+	const st2 = await stage2(ctx, s, prior2, r.offsets);
+	const res = st2.res;
+	if (s.fused && s.untrusted) await basinGapCheck(ctx, s, res, st2);
 	res.timingMs = {
 		...timing,
 		stage2: Math.round(performance.now() - ts),

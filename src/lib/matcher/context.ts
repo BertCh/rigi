@@ -11,6 +11,8 @@
 import type { Pose } from "#/lib/camera";
 import type { MatchEvidence, Renderer } from "#/lib/renderer";
 import { Deadline } from "./assemble";
+import type { BasinGap } from "./basin";
+import type { BasinJob } from "./basin-run";
 import {
 	type Correspondences,
 	checkView,
@@ -27,6 +29,7 @@ export type MatchEngine = Pick<
 	| "aspect"
 	| "prior"
 	| "eye"
+	| "frame"
 	| "renderPoseView"
 	| "loadSatellite"
 	| "loadFullTerrain"
@@ -94,6 +97,8 @@ export type MatchContext = {
 	/** satellite drape radius already loaded on this engine for this request (0 = everything) */
 	drape?: number | null;
 	timing: Record<string, number>;
+	/** the position-grid basin gap (default: ./basin-run.ts in the solve worker); injectable in tests */
+	basinGap?: (job: BasinJob) => Promise<BasinGap>;
 };
 
 /** Stage boundary: record it, stop on abort or past the deadline. */

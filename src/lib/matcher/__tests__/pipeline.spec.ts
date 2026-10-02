@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Pose } from "#/lib/camera";
 import { angleDiffDeg, withFlags } from "#/test/helpers";
+import type { BasinJob } from "../basin-run";
 import type { MatchContext } from "../context";
 import { matchAdhoc, matchKnownPrior } from "../pipeline";
 import {
@@ -78,15 +79,58 @@ describe("matcher pipelines on a synthetic world", () => {
 		expect(res.confidenceLevel).toBe("high");
 	});
 
-	it("matchAdhoc with a manual position downgrades HIGH to LOW (no basin-gap check)", async () => {
+	it("a manual position runs the basin gap: a clear gap keeps HIGH, a small one or a failed check is LOW", async () => {
 		const world = createFakeWorld();
-		const res = await matchAdhoc(makeContext(world), {
+		const req = {
 			prior: { vfov: world.truePose.vfov },
 			positionSource: "manual",
+		};
+		const grid = (gap: number) => ({
+			gap,
+			grid: {
+				step: 250,
+				n: 81,
+				evaluated: 10,
+				best: { E: 0, N: 0, cost: 100 },
+				second: { E: 500, N: 0, cost: 100 * (1 + gap) },
+			},
+			sigma: { sky: 1, match: 1 },
+			ms: 1,
+			scorer: "test",
 		});
-		expect(poseError(res.pose, world.truePose).yaw).toBeLessThan(0.2);
-		expect(res.confidenceLevel).toBe("low");
-		expect(res.lowReason?.startsWith("basinGap unavailable")).toBe(true);
+		const jobs: BasinJob[] = [];
+		const ok = await matchAdhoc(
+			makeContext(world, {
+				basinGap: async (job) => {
+					jobs.push(job);
+					return grid(0.5);
+				},
+			}),
+			req,
+		);
+		expect(poseError(ok.pose, world.truePose).yaw).toBeLessThan(0.2);
+		expect(ok.confidenceLevel).toBe("high");
+		expect(ok.confidenceChecks?.basinGap).toBe(0.5);
+		expect(ok.confidenceChecks?.positionTrusted).toBe(false);
+		expect(jobs[0].lat).toBe(46.7);
+		expect(jobs[0].sk).not.toBeNull();
+		expect(jobs[0].corr?.x2d.length).toBeGreaterThan(0);
+		const small = await matchAdhoc(
+			makeContext(world, { basinGap: async () => grid(0.1) }),
+			req,
+		);
+		expect(small.confidenceLevel).toBe("low");
+		expect(small.lowReason).toBe("basinGap");
+		const failed = await matchAdhoc(
+			makeContext(world, {
+				basinGap: async () => {
+					throw new Error("no DEM");
+				},
+			}),
+			req,
+		);
+		expect(failed.confidenceLevel).toBe("low");
+		expect(failed.lowReason).toBe("basinGap unavailable (no DEM)");
 	});
 
 	it("a past deadline rejects with Deadline, an aborted signal with AbortError", async () => {
