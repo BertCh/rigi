@@ -844,6 +844,7 @@ export const CHECKS = [
 		tier: "fast",
 		group: "roll",
 		cmd: tsx("src/lib/roll/propagate/propagate.check.ts"),
+		needs: ["public/photos/photos.json", "data/ground-truth.json"],
 		timeoutS: 120,
 	},
 
