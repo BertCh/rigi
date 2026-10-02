@@ -23,6 +23,7 @@ import {
 	toBytes,
 	workingSize,
 } from "./core";
+import { createPendingRequests } from "./pending";
 import type {
 	SkySegmentRequest,
 	SkyWorkerRequest,
@@ -93,37 +94,83 @@ let worker: Worker | null | undefined;
 let workerErrors = 0;
 const MAX_WORKER_ERRORS = 3;
 let nextId = 1;
-const pending = new Map<
-	number,
-	{ resolve: (r: SkyWorkerResponse) => void; reject: (e: unknown) => void }
->();
+/**
+ * No reply for this long while requests are pending means the worker is stuck (a hung ORT run, a GPU
+ * process crash without an error event): it is dropped like a crashed one, and every pending request
+ * falls back. Measured from the last reply, not per request, because the worker runs requests one at a
+ * time. Before the first reply the cold start (worker module, the 28 MB ORT wasm, the 4.5 MB model;
+ * ~10 s in the dev server under load, ~33 MB to download on a slow link) gets a generous allowance;
+ * afterwards one WASM inference is ~1.5 s and a reload after a device loss a few seconds more.
+ */
+const STALL_COLD_MS = 180_000;
+const STALL_WARM_MS = 60_000;
+const pending = createPendingRequests<SkyWorkerResponse>(
+	(heard) => (heard ? STALL_WARM_MS : STALL_COLD_MS),
+	() => worker && dropWorker(worker, "no reply from the sky worker"),
+);
+
+/**
+ * Terminate `wk` after an error or a stall; pending requests reject (→ inline fallback). A late event
+ * from a worker that was already replaced is ignored, so it can never take down its successor.
+ */
+function dropWorker(wk: Worker, reason: string) {
+	if (wk !== worker) return;
+	console.warn("[sky] worker error:", reason);
+	pending.rejectAll(new Error(reason));
+	worker?.terminate();
+	workerErrors++;
+	worker = workerErrors < MAX_WORKER_ERRORS ? undefined : null;
+	preloadPromise = undefined;
+	// a new worker verifies the GPU prep from scratch (prepDisabled stays: a mismatch is the device's)
+	prepVerified = 0;
+	prepMisses = 0;
+}
 
 function getWorker(): Worker | null {
 	if (worker !== undefined) return worker;
 	try {
-		worker = new Worker(new URL("./sky.worker.ts", import.meta.url), {
+		const wk = new Worker(new URL("./sky.worker.ts", import.meta.url), {
 			type: "module",
 		});
-		worker.onmessage = (ev: MessageEvent<SkyWorkerResponse>) => {
-			const p = pending.get(ev.data.id);
-			if (!p) return;
-			pending.delete(ev.data.id);
-			p.resolve(ev.data);
+		worker = wk;
+		wk.onmessage = (ev: MessageEvent<SkyWorkerResponse>) => {
+			if (wk === worker) pending.resolve(ev.data.id, ev.data);
 		};
-		worker.onerror = (ev) => {
-			console.warn("[sky] worker error:", ev.message);
-			for (const p of pending.values()) p.reject(new Error(ev.message));
-			pending.clear();
-			worker?.terminate();
-			workerErrors++;
-			worker = workerErrors < MAX_WORKER_ERRORS ? undefined : null;
-			preloadPromise = undefined;
-		};
+		wk.onerror = (ev) => dropWorker(wk, ev.message);
+		wk.onmessageerror = () => dropWorker(wk, "unreadable reply");
 	} catch (e) {
 		console.warn("[sky] cannot start worker, running fallback inline:", e);
 		worker = null;
 	}
 	return worker;
+}
+
+/**
+ * Post a request to `wk`. A post that throws (e.g. a detached buffer), or a `wk` that was dropped while
+ * the caller awaited (its bitmap, or the first reply before a needPixels resend), rejects at once
+ * instead of waiting for a reply that cannot come.
+ */
+function post(
+	wk: Worker,
+	req: SkyWorkerRequest,
+	transfer: Transferable[] = [],
+): Promise<SkyWorkerResponse> {
+	return new Promise<SkyWorkerResponse>((resolve, reject) => {
+		if (wk !== worker) {
+			if ("bitmap" in req) req.bitmap?.close();
+			reject(new Error("sky worker was replaced"));
+			return;
+		}
+		pending.add(req.id, resolve, reject);
+		try {
+			wk.postMessage(req, transfer);
+		} catch (e) {
+			pending.remove(req.id);
+			// not transferred: the bitmap is still ours to close
+			if ("bitmap" in req) req.bitmap?.close();
+			reject(e);
+		}
+	});
 }
 
 let preloadPromise: Promise<{ backend: "webgpu" | "wasm" | null }> | undefined;
@@ -158,10 +205,7 @@ export function preloadSkyModel(
 		backend: opts.backend,
 		gpu: gpuEnabled(),
 	};
-	preloadPromise = new Promise<SkyWorkerResponse>((resolve, reject) => {
-		pending.set(id, { resolve, reject });
-		wk.postMessage(req);
-	}).then(
+	preloadPromise = post(wk, req).then(
 		(res) =>
 			res.ok && res.type === "preload"
 				? { backend: res.backend }
@@ -328,10 +372,7 @@ async function segmentSkyUncached(
 				req.bitmap = await raster.bitmap();
 				transfer.push(req.bitmap);
 			}
-			return new Promise<SkyWorkerResponse>((resolve, reject) => {
-				pending.set(id, { resolve, reject });
-				wk.postMessage(req, transfer);
-			});
+			return post(wk, req, transfer);
 		};
 		try {
 			// while the device is unverified the CPU pixels ride along, so the worker can compare

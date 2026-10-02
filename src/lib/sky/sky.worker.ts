@@ -80,6 +80,9 @@ const LOAD_BACKOFF_MS = 2000;
 
 const warmed = new WeakSet<Device>();
 let lastDevice: Device | undefined;
+// devices the GPU refine ran on since the last device loss (ours, or ORT's own): the idle release frees
+// their cached refine graphs
+const refineDevices = new Set<Device>();
 
 // The prep and refine graphs are cached per shape; free them after this long without a request (the
 // device itself stays: ORT shares it). A later request rebuilds the same graphs.
@@ -90,10 +93,16 @@ const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
 	queue.run(async () => {
 		if (queue.size > 1) return;
 		const device = lastDevice;
-		if (!device) return;
+		// the refine may have run on ORT's own device (model.ortDevice) as well as on ours
+		const refineOn = new Set(refineDevices);
+		if (device) refineOn.add(device);
+		if (!refineOn.size) return;
 		// refine-graph is loaded on demand by refine.ts (import cycle); the cache is empty if it never was
 		const { releaseSkyGraphs } = await import("#/lib/gpu/sky/refine-graph");
-		await Promise.all([releasePrepGraphs(device), releaseSkyGraphs(device)]);
+		await Promise.all([
+			device && releasePrepGraphs(device),
+			...[...refineOn].map((d) => releaseSkyGraphs(d)),
+		]);
 	}),
 );
 
@@ -110,6 +119,7 @@ function noteFailure(e: unknown) {
 	models.clear();
 	failures.clear();
 	lastDevice = undefined;
+	refineDevices.clear();
 	for (const p of dropped)
 		void p.then((m) => m?.session.release?.()).catch(() => {});
 }
@@ -305,6 +315,7 @@ async function segmentWith(
 					inf?.gpuBuffer && (shared || refineDev !== device)
 						? inf.gpuBuffer
 						: undefined;
+				refineDevices.add(refineDev);
 				const out = await refineSkyGpu(refineDev, {
 					W,
 					H,
@@ -338,7 +349,10 @@ async function segmentWith(
 			);
 		}
 	} finally {
-		inf?.release();
+		// after a device loss the session (and its output) may already be gone: never mask the result
+		try {
+			inf?.release();
+		} catch {}
 	}
 	const t3 = performance.now();
 	const msg: SkyWorkerResponse = {
