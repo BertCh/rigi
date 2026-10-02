@@ -94,15 +94,15 @@ describe.each(SCENARIOS.map((s) => s.name))("fusion parity: %s", (name) => {
 			(_, c) => ((c + 0.5) / p.w) * W,
 		);
 		const curve = skyCurve(x, sk, W, H, cu);
-		ref.skyCurve.forEach((v: number | null, i: number) =>
-			near(Number.isFinite(curve[i]) ? curve[i] : null, v, 1e-5, `curve[${i}]`),
-		);
+		ref.skyCurve.forEach((v: number | null, i: number) => {
+			near(Number.isFinite(curve[i]) ? curve[i] : null, v, 1e-5, `curve[${i}]`);
+		});
 		const a = skyAssociate(x, sk, W, H, 24);
 		expect(a.ncol).toBe(ref.skyAssociate.ncol);
 		expect(a.cu.length).toBe(ref.skyAssociate.cu.length);
-		ref.skyAssociate.tgt.forEach((v: number, i: number) =>
-			near(a.tgt[i], v, 1e-5, `tgt[${i}]`),
-		);
+		ref.skyAssociate.tgt.forEach((v: number, i: number) => {
+			near(a.tgt[i], v, 1e-5, `tgt[${i}]`);
+		});
 	});
 
 	it.runIf(hasCorr)("match residuals and robust sigma", () => {

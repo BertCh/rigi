@@ -69,6 +69,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | horizon-cert | fast | certified-f32 horizon stages on the f32 emulation: 0 false certifications, finished output bit-identical to the f64 path, probe verifier; DEM cases when `out/gpu/horizon-cert/real-cases.json` exists (`scripts/gpu/horizon-cert-cases.ts`) | `src/lib/gpu/horizon/certified.check.ts` |
 | examples | fast | `examples/` type check (`scripts/examples.mjs check`) | `node scripts/examples.mjs check` |
 | ontology | fast | ontology layer: provenance axes, crosswalks | `src/lib/ontology/ontology.check.ts` (needs `public/photos/`) |
+| matcher-rule-replay | fast | T6 frozen rule (TS) replayed over recorded runs: source, level, pose equal Python | `src/lib/matcher/rule-replay.check.ts` (needs `tools/bench/final/out/B`) |
 | gipfelbuch | fast | `/gipfelbuch` graph data | `src/lib/gipfelbuch/gipfelbuch.check.ts` |
 | gipfelbuch-contrast | fast | Gipfelbuch ink contrast gate: text inks at least 4.5:1 on paper and paper-deep; relief (BL) and MG never used as text colour; palette.ts agrees with the Brezine codes | `src/components/gipfelbuch/swiss/contrast.check.ts` |
 | terroir-labels / -viz / -roll / -pack | fast | terroir cartography: labels, viz, roll, packs | `src/lib/terroir/*/*.check.ts`, `scripts/terroir/pack.check.ts` |

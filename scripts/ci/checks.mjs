@@ -138,6 +138,15 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "matcher-rule-replay",
+		tier: "fast",
+		group: "static",
+		cmd: tsx("src/lib/matcher/rule-replay.check.ts"),
+		note: "T6 frozen rule in TypeScript replayed over the recorded runs in tools/bench/final/out/B (dev split; REPLAY_ALLOW_TEST=1 adds test, equality only): selected source, level and fused pose equal the Python service's; SKIPs without the recordings",
+		needs: ["tools/bench/final/out/B"],
+		timeoutS: 60,
+	},
+	{
 		id: "gipfelbuch",
 		tier: "fast",
 		group: "static",

@@ -495,7 +495,7 @@ export function selectionCost(
 			tot += (q + (ncol - cu.length) * T2) / ncol;
 		} else tot += T2;
 	}
-	if (c && c.x2d.length && sigma.match) {
+	if (c?.x2d.length && sigma.match) {
 		const r = matchResid(x, c, eye);
 		const n = r.length / 2;
 		let q = 0;
@@ -538,7 +538,7 @@ export function diagnostics(
 		for (const v of r) if (Math.abs(v) < 4.0) cover++;
 		out.sky_cover = ncol ? cover / ncol : 0;
 	}
-	if (c && c.x2d.length) {
+	if (c?.x2d.length) {
 		const r = matchResid(x, c, eye);
 		const n = r.length / 2;
 		const inl: number[] = [];
@@ -594,7 +594,7 @@ export async function fuse(
 	const t0 = performance.now();
 	const lam = opts.lam ?? 1.0;
 	const f0 = focalPx(prior.vfov, H);
-	const c = corr && corr.x2d.length ? corr : null;
+	const c = corr?.x2d.length ? corr : null;
 	const skyPose = sk?.app?.pose ?? null;
 	const sigma: Sigma = {};
 	let skyResidAtOwn: number | null | undefined = null;
