@@ -227,10 +227,14 @@ export type QuietReadTiming = {
 /**
  * Asynchronous texture readback on the WebGL fallback: `issueRead` queues the read into a fresh
  * pack buffer (texture.readBuffer: PIXEL_PACK_BUFFER + readPixels; the buffer is new per read, so
- * its storage is never a reused, already-fenced one), then a fence behind it is waited on, the GPU
- * queue is waited short (glFence + readbackQuiet) and only then is the buffer copied out with
- * Buffer.readAsync (a plain getBufferSubData on WebGL: a memcpy once the data landed, never a stall).
- * Resolves the bytes (a fresh Uint8Array, offset 0) or null = cancelled / context lost.
+ * its storage is never a reused, already-fenced one; MAP_READ, so luma rigi.5 hints it
+ * STREAM_READ), then a fence behind it is waited on, the GPU queue is waited short (glFence +
+ * readbackQuiet) and only then is the buffer copied out with Buffer.readAsync (a plain
+ * getBufferSubData on WebGL: a memcpy once the data landed, never a stall).
+ * Resolves the bytes or null = cancelled / context lost. The bytes are a fresh Uint8Array (offset
+ * 0), or, with `target` (at least `bytes` long), a view of `target`'s memory that the copy wrote
+ * straight into (luma rigi.5 `readAsync({target})`: no extra array, no second copy). `target` is
+ * only written once the read is not cancelled.
  */
 export async function readTextureQuiet(
 	device: Device,
@@ -238,6 +242,7 @@ export async function readTextureQuiet(
 	id: string,
 	issueRead: (buffer: Buffer) => void,
 	cancelled: () => boolean = () => false,
+	target?: ArrayBufferView<ArrayBuffer>,
 ): Promise<{ data: Uint8Array; timing: QuietReadTiming } | null> {
 	const gl = glOf(device);
 	const buffer = readbackBuffer(device, bytes, id);
@@ -250,7 +255,11 @@ export async function readTextureQuiet(
 			: { ok: false, probes: 0 };
 		const t1 = performance.now();
 		if (!quiet.ok || cancelled()) return null;
-		const data = await buffer.readAsync(0, bytes);
+		const data = await buffer.readAsync(
+			0,
+			bytes,
+			target ? { target } : undefined,
+		);
 		const t2 = performance.now();
 		return {
 			data,
@@ -418,7 +427,7 @@ export class GeometryTarget {
 	 * (at most a bounded copy after QUIET_MAX_MS of continuous GPU load). false = superseded
 	 * (resize / destroy) or context lost.
 	 */
-	async read(out: Float32Array): Promise<boolean> {
+	async read(out: Float32Array<ArrayBuffer>): Promise<boolean> {
 		if (this.destroyed) return false;
 		const { width, height } = this.fbo;
 		const n = width * height;
@@ -428,6 +437,7 @@ export class GeometryTarget {
 		const texture = this.texture;
 		// one fresh buffer per read, so overlapping reads never share storage (a newer read must not
 		// overwrite a buffer whose fence an older one is still waiting on)
+		// RED/FLOAT: the copy lands straight in `out` (no 4 MB staging array + set per read)
 		const res = await readTextureQuiet(
 			this.device,
 			bytes,
@@ -437,11 +447,13 @@ export class GeometryTarget {
 					? texture.readBuffer({}, buffer)
 					: this.readPixelsRgbaInto(buffer),
 			() => this.destroyed,
+			comps === 1 ? out : undefined,
 		);
 		if (!res || this.destroyed) return false;
-		const f = new Float32Array(res.data.buffer, 0, n * comps);
-		if (comps === 1) out.set(f);
-		else for (let i = 0; i < n; i++) out[i] = f[i * 4];
+		if (comps !== 1) {
+			const f = new Float32Array(res.data.buffer, 0, n * comps);
+			for (let i = 0; i < n; i++) out[i] = f[i * 4];
+		}
 		this.lastRead = { ...res.timing, bytes };
 		return true;
 	}
@@ -578,7 +590,7 @@ export class GpuGeometrySource implements GeometrySource {
 	}
 	private target: GeometryTarget;
 	private renderer: TerrainPassRenderer;
-	private raw: Float32Array;
+	private raw: Float32Array<ArrayBuffer>;
 	private wantXyz: boolean;
 	/** The pose `range` was unpacked for (what xyz is rebuilt from), and the memoised full array. */
 	private xyzRay: XyzRay | null = null;

@@ -26,7 +26,12 @@ import {
 	type UpdateParameters,
 	type Viewport,
 } from "@deck.gl/core";
-import type { Buffer, Device, Framebuffer, Texture } from "@luma.gl/core";
+import {
+	type Buffer,
+	type Device,
+	type Framebuffer,
+	Texture,
+} from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { Pose } from "../camera";
@@ -640,9 +645,8 @@ export class PhotoCompositor implements Effect {
 	/** Max MSAA samples for the colour pass (three: layerRT samples 4); 0 = off. See msaaSamplesFor. */
 	msaaSamples = MSAA_SAMPLES;
 	private msaa?: {
-		fbo: WebGLFramebuffer;
-		color: WebGLRenderbuffer;
-		depth: WebGLRenderbuffer;
+		/** rgba16float + depth24plus attachments with `samples` samples (luma: multisample renderbuffers on WebGL) */
+		fbo: Framebuffer;
 		width: number;
 		height: number;
 		samples: number;
@@ -652,8 +656,8 @@ export class PhotoCompositor implements Effect {
 
 	/**
 	 * The colour pass into `target`, multisampled when possible: rendered into an MSAA
-	 * RGBA16F + depth renderbuffer pair, then resolved (blit) into target's texture, like three's
-	 * layerRT (samples: 4). Falls back to drawing into `target` directly (also when samples < 2).
+	 * RGBA16F + depth pair, then resolved into target's texture, like three's layerRT (samples: 4).
+	 * Falls back to drawing into `target` directly (also when samples < 2).
 	 */
 	private renderColor(
 		layers: Layer[],
@@ -673,44 +677,25 @@ export class PhotoCompositor implements Effect {
 			if (splats) this.snapshotForSplats(target);
 			return;
 		}
-		const gl = glOf(this.device as Device);
-		// a stand-in luma Framebuffer: the render pass only binds `handle` and reads the size
-		const proxy = {
-			id: "composite-color-msaa",
-			handle: ms.fbo,
-			width: ms.width,
-			height: ms.height,
-			colorAttachments: target.colorAttachments,
-			depthStencilAttachment: null,
-		} as unknown as Framebuffer;
-		renderer.render("color", layers, proxy, pose, eye);
-		const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
-		const prevDraw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
-		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ms.fbo);
-		gl.bindFramebuffer(
-			gl.DRAW_FRAMEBUFFER,
-			(target as unknown as { handle: WebGLFramebuffer }).handle,
-		);
-		gl.blitFramebuffer(
-			0,
-			0,
-			ms.width,
-			ms.height,
-			0,
-			0,
-			ms.width,
-			ms.height,
-			// the splats depth-test against the terrain: resolve its depth too (Step Inside only)
-			splats ? gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT : gl.COLOR_BUFFER_BIT,
-			gl.NEAREST,
-		);
-		// the multisampled contents are dead once resolved: let a tiler skip storing them
-		gl.invalidateFramebuffer(gl.READ_FRAMEBUFFER, [
-			gl.COLOR_ATTACHMENT0,
-			gl.DEPTH_ATTACHMENT,
-		]);
-		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
-		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prevDraw);
+		renderer.render("color", layers, ms.fbo, pose, eye);
+		// The resolve: an empty pass on the MSAA target whose end() blits (NEAREST, full size) its colour
+		// into target's texture (luma rigi.5 WebGL resolveTargets), and with `discard` invalidates the
+		// multisampled contents, dead once resolved, so a tiler can skip storing them.
+		(this.device as Device)
+			.beginRenderPass({
+				id: "composite-color-resolve",
+				framebuffer: ms.fbo,
+				clearColor: false,
+				clearDepth: false,
+				clearStencil: false,
+				discard: true,
+				resolveTargets: [target.colorAttachments[0]],
+				// the splats depth-test against the terrain: resolve its depth too (Step Inside only)
+				depthStencilResolveTarget: splats
+					? target.depthStencilAttachment
+					: null,
+			})
+			.end();
 		if (splats) this.snapshotForSplats(target);
 	}
 
@@ -725,72 +710,56 @@ export class PhotoCompositor implements Effect {
 		const m = this.msaa;
 		if (m && m.width === width && m.height === height && m.want === want)
 			return m;
-		const gl = glOf(this.device);
+		const device = this.device;
 		this.destroyMsaa();
+		const gl = glOf(device);
 		const samples = Math.min(want, gl.getParameter(gl.MAX_SAMPLES) as number);
 		if (samples < 2) {
 			this.msaa = null;
 			return null;
 		}
-		const prevFb = gl.getParameter(gl.FRAMEBUFFER_BINDING);
-		const prevRb = gl.getParameter(gl.RENDERBUFFER_BINDING);
-		const fbo = gl.createFramebuffer() as WebGLFramebuffer;
-		const color = gl.createRenderbuffer() as WebGLRenderbuffer;
-		const depth = gl.createRenderbuffer() as WebGLRenderbuffer;
-		gl.bindRenderbuffer(gl.RENDERBUFFER, color);
-		gl.renderbufferStorageMultisample(
-			gl.RENDERBUFFER,
-			samples,
-			gl.RGBA16F,
+		const color = device.createTexture({
+			id: "composite-color-msaa",
+			format: "rgba16float",
 			width,
 			height,
-		);
-		gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
-		gl.renderbufferStorageMultisample(
-			gl.RENDERBUFFER,
 			samples,
-			gl.DEPTH_COMPONENT24,
+			usage: Texture.RENDER_ATTACHMENT,
+		});
+		const depth = device.createTexture({
+			id: "composite-depth-msaa",
+			format: "depth24plus",
 			width,
 			height,
-		);
-		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-		gl.framebufferRenderbuffer(
-			gl.FRAMEBUFFER,
-			gl.COLOR_ATTACHMENT0,
-			gl.RENDERBUFFER,
-			color,
-		);
-		gl.framebufferRenderbuffer(
-			gl.FRAMEBUFFER,
-			gl.DEPTH_ATTACHMENT,
-			gl.RENDERBUFFER,
-			depth,
-		);
-		const ok =
-			gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
-		gl.bindFramebuffer(gl.FRAMEBUFFER, prevFb);
-		gl.bindRenderbuffer(gl.RENDERBUFFER, prevRb);
-		if (!ok) {
-			gl.deleteFramebuffer(fbo);
-			gl.deleteRenderbuffer(color);
-			gl.deleteRenderbuffer(depth);
+			samples,
+			usage: Texture.RENDER_ATTACHMENT,
+		});
+		try {
+			// a framebuffer with multisampled attachments checks its completeness and throws if incomplete
+			const fbo = device.createFramebuffer({
+				id: "composite-color-msaa",
+				width,
+				height,
+				colorAttachments: [color],
+				depthStencilAttachment: depth,
+			});
+			this.msaa = { fbo, width, height, samples, want };
+			return this.msaa;
+		} catch {
+			color.destroy();
+			depth.destroy();
 			console.warn(
 				"[composite] MSAA colour target unsupported; drawing without AA",
 			);
 			this.msaa = null;
 			return null;
 		}
-		this.msaa = { fbo, color, depth, width, height, samples, want };
-		return this.msaa;
 	}
 
 	private destroyMsaa() {
 		const m = this.msaa;
-		if (!m || !this.device) return;
-		const gl = glOf(this.device);
-		gl.deleteFramebuffer(m.fbo);
-		gl.deleteRenderbuffer(m.color);
-		gl.deleteRenderbuffer(m.depth);
+		if (!m) return;
+		destroyTarget(m.fbo);
 		this.msaa = undefined;
 	}
 

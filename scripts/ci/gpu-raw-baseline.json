@@ -8,26 +8,18 @@
 		"why": "dev tool debug hook (audit-gpu A11)"
 	},
 	"src/lib/deck/composite.ts": {
-		"handle": 2,
-		"rawGl": 75,
-		"why": "WebGL2 fallback: MSAA renderbuffer/blit + PBO readback; luma has no multisample resolve (audit-render R1)"
+		"handle": 1,
+		"rawGl": 14,
+		"why": "WebGL2 fallback: MAX_SAMPLES probe, benchmark gl.finish, renderColorPixels RGBA/FLOAT readPixels, fence waits; MSAA is luma (rigi.5 multisampled textures + resolveTargets)"
 	},
 	"src/lib/deck/device-lost.ts": {
 		"rawGl": 4,
 		"why": "WebGL2 fallback: context-loss handling"
 	},
-	"src/lib/deck/engine.ts": {
-		"handle": 1,
-		"why": "WebGL2 engine host"
-	},
 	"src/lib/deck/geometry-pass.ts": {
 		"handle": 3,
 		"rawGl": 85,
-		"why": "WebGL2 fallback: MSAA renderbuffer + blit, glFence/readbackQuiet probes, the RGBA/FLOAT readPixels fallback (luma readBuffer reads only the texture's own format); PBO pool retired in 888be38"
-	},
-	"src/lib/gpu/device.ts": {
-		"rawWebGpu": 1,
-		"why": "sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)"
+		"why": "WebGL2 fallback (no MSAA here): glFence/readbackQuiet probes, RED/FLOAT readability probe, the RGBA/FLOAT readPixels fallback (luma readBuffer reads only the texture's own format), copyRangeTo Y-flip blit (luma has no flipped blit); PBO pool retired in 888be38"
 	},
 	"src/lib/gpu/core/luma.ts": {
 		"handle": 1,
@@ -40,6 +32,10 @@
 	"src/lib/gpu/core/selftest.ts": {
 		"rawWebGpu": 1,
 		"why": "selftest drives the raw device on purpose"
+	},
+	"src/lib/gpu/device.ts": {
+		"rawWebGpu": 1,
+		"why": "sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)"
 	},
 	"src/lib/gpu/look/stats-fold-bench.ts": {
 		"handle": 3,

@@ -92,7 +92,7 @@ const WHY = [
 	["src/lib/flags/index.ts", "flag text mentions navigator.gpu"],
 	[
 		"src/lib/deck/composite.ts",
-		"WebGL2 fallback: MSAA renderbuffer/blit + PBO readback; luma has no multisample resolve (audit-render R1)",
+		"WebGL2 fallback: MAX_SAMPLES probe, benchmark gl.finish, renderColorPixels RGBA/FLOAT readPixels, fence waits; MSAA is luma (rigi.5 multisampled textures + resolveTargets)",
 	],
 	[
 		"src/lib/deck/geometry-pass.ts",

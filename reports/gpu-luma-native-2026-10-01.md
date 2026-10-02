@@ -65,9 +65,9 @@ All landed on fast gates only (cook mode), each commit `(WIP, browser-unverified
 
 ### Still raw on purpose, or next
 
-- `mapAndReadAsync` copies into a new array; luma WebGL `getWebGLUsage` ignores read hints (pack buffers get `STATIC_DRAW`, the old code used `STREAM_READ` because of a Chrome slow path). Candidate for rigi.5: map `Buffer.MAP_READ` to `STREAM_READ`.
+- Done in luma rigi.5 (2026-10-02): `Buffer.MAP_READ` maps to `STREAM_READ` on WebGL; `Buffer.readAsync(…, {target})` reads into a caller array (adopted by the WebGL geometry readback); WebGL multisampled textures + `resolveTargets` / `depthStencilResolveTarget` (adopted by `deck/composite.ts`, raw gl 75 → 14). `deck/geometry-pass.ts` never had MSAA: its raw gl is fences, format probes, the RGBA/FLOAT fallback and the Y-flip blit.
 - Hand-packed uniforms that remain live in the files that own the kernel inputs: solve `packCoarse`, horizon march / skyglobal `ub`, photoprep `photoPrepDims`, colour-stats `statsParamWords`, `haze.ts` / `haze-band.ts`, `relief.ts`.
-- `panoGL.ts` (own WebGL context) and the MSAA renderbuffer blit stay raw; the deck `engine.ts` owner can pass luma textures to `SilhouetteMaskGL` instead of handles.
+- `panoGL.ts` (own WebGL context) stays raw; the deck `engine.ts` owner can pass luma textures to `SilhouetteMaskGL` instead of handles.
 - deck `_onFrameTimings` adoption waits for a deck hook that covers non-layer passes; #10751 (TerrainExtension WebGPU height fit) and luma #3340 (progressive splats) stay spikes.
 - loaders.gl `GeoTIFFRasterLoader` (#4088) when `5.0.0-alpha.8` ships; `@math.gl/proj4` for LV95/geoid.
 
