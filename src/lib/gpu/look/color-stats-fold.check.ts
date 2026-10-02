@@ -5,12 +5,12 @@
 // npx tsx src/lib/gpu/look/color-stats-fold.check.ts [scenes]   (exits 1 on failure; CI fast tier: 12)
 // Node check of the band-stats fold on the GPU (./color-stats-fold.ts, fold "gpu"), no GPU: a CPU
 // emulation of the f32 kernels against the float64 fold it replaced.
-//  1. the CSR selection matrix (foldSelectionCsr) sums value j of every workgroup exactly once;
+//  1. the CSR selection matrix (foldGroupKeys) puts value j of every workgroup in group j;
 //  2. synthetic scenes (photo bytes, premultiplied layer, range with sky, people mask) through the
 //     CPU reference look/color-stats.ts reduceBands(bandInputs(...)) (f64), and through an emulation
 //     of the GPU: BAND_STATS' per-invocation f32 sums and workgroup tree (or BAND_STATS_SG's subgroup
-//     sums) → partials, then (a) the f64 fold + finalizeBands (fold "f64") and (b) the f32 SpMV
-//     row sum (luma's subgroup-row / workgroup-row: one nonzero per lane, then a tree) + BAND_FINALIZE
+//     sums) → partials, then (a) the f64 fold + finalizeBands (fold "f64") and (b) the f32
+//     GPUGroupAggregation sum (value j of every workgroup; the GPU add order varies, tolerance below) + BAND_FINALIZE
 //     in f32 (twin below) + statsFromWords (fold "gpu"). Asserts: same count / valid; every
 //     ColorStats field of (b) within 2e-5 of the reference (a measures ~1e-6) and the harmonize
 //     transfer (deck-webgpu/layers/composite.ts harmonize: Oklab Reinhard per range band, then sRGB
@@ -27,14 +27,14 @@ import {
 import { finalizeBands } from "./color-stats";
 import { STATS_VALUES } from "./color-stats.wgsl";
 import {
-	foldSelectionCsr,
+	foldGroupKeys,
 	statsFromWords,
 	subgroupLayoutFailed,
 } from "./color-stats-fold";
 import {
 	emulateFinalize,
+	emulateGroupFold,
 	emulatePartials,
-	emulateSpmv,
 	foldF64,
 	GROUPS,
 	gpuFold,
@@ -52,22 +52,20 @@ const fail = (msg: string) => {
 	console.log(`FAIL ${msg}`);
 };
 
-// ---------- 1. the selection matrix ----------
+// ---------- 1. the fold's group keys ----------
 for (const groups of [1, 7, GROUPS]) {
-	const { rows, cols, vals } = foldSelectionCsr(groups);
-	const seen = new Uint8Array(groups * STATS_VALUES);
-	for (let j = 0; j < STATS_VALUES; j++) {
-		if (rows[j + 1] - rows[j] !== groups) fail(`csr row ${j} length`);
-		for (let i = rows[j]; i < rows[j + 1]; i++) {
-			if (cols[i] % STATS_VALUES !== j) fail(`csr row ${j} col ${cols[i]}`);
-			if (vals[i] !== 1) fail(`csr value ${i}`);
-			seen[cols[i]]++;
-		}
-	}
-	if (!seen.every((c) => c === 1))
-		fail(`csr groups=${groups}: not a partition`);
+	const keys = foldGroupKeys(groups);
+	if (keys.length !== groups * STATS_VALUES)
+		fail(`keys groups=${groups}: length`);
+	const perGroup = new Uint32Array(STATS_VALUES);
+	keys.forEach((k, i) => {
+		if (k !== i % STATS_VALUES) fail(`keys[${i}] = ${k}`);
+		perGroup[k]++;
+	});
+	if (!perGroup.every((c) => c === groups))
+		fail(`keys groups=${groups}: not ${groups} per group`);
 }
-console.log("csr selection matrix: ok");
+console.log("fold group keys: ok");
 
 // ---------- the harmonize transfer (composite.ts harmonize, f64 here) → sRGB bytes ----------
 function oklabToLinear(
@@ -133,21 +131,21 @@ let differBase = 0;
 let total = 0;
 let teethWrong = 0;
 let teethDrop = 0;
-const csr = foldSelectionCsr(GROUPS);
-const wrong = foldSelectionCsr(GROUPS);
-for (let i = 0; i < wrong.cols.length; i++)
+const keys = foldGroupKeys(GROUPS);
+const wrong = foldGroupKeys(GROUPS);
+for (let i = 0; i < wrong.length; i++)
 	// every band's Σ photo L reads Σ photo a
-	if ((wrong.cols[i] % STATS_VALUES) % 13 === 1) wrong.cols[i] += 1;
-const drop = foldSelectionCsr(GROUPS);
-// every value of workgroup 5
-for (let i = 0; i < drop.cols.length; i++)
-	if (Math.floor(drop.cols[i] / STATS_VALUES) === 5) drop.vals[i] = 0;
+	if (wrong[i] % 13 === 1) wrong[i] += 1;
+const drop = foldGroupKeys(GROUPS);
+// every value of workgroup 5 is out of range (skipped by the aggregation)
+for (let i = 0; i < drop.length; i++)
+	if (Math.floor(i / STATS_VALUES) === 5) drop[i] = 0xffffffff;
 for (let seed = 1; seed <= SCENES; seed++) {
 	const { px, ref } = makeScene(seed);
 	for (const sg of [false, 32] as const) {
 		const p = emulatePartials(px, sg);
 		const a = foldF64(p, 60);
-		const b = gpuFold(p, 60, csr);
+		const b = gpuFold(p, 60, keys);
 		const tag = `scene ${seed}${sg ? " sg" : ""}`;
 		if (!sameCounts(ref, a) || !sameCounts(ref, b)) {
 			fail(
@@ -250,7 +248,7 @@ console.log(
 	const p = new Float32Array(GROUPS * STATS_VALUES).fill(3);
 	for (let k = 0; k < STATS_VALUES; k++) p[5 * STATS_VALUES + k] = -1e20;
 	for (let g = 0; g < GROUPS; g++) p[g * STATS_VALUES] = 1000;
-	const words = emulateFinalize(emulateSpmv(p, csr), 60);
+	const words = emulateFinalize(emulateGroupFold(p, keys), 60);
 	if (!subgroupLayoutFailed(words))
 		fail("subgroup layout marker not seen after the fold");
 	if (statsFromWords(words).valid) fail("marker: stats valid");

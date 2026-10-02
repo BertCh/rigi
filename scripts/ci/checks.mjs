@@ -438,7 +438,7 @@ export const CHECKS = [
 		tier: "fast",
 		group: "look",
 		cmd: tsx("src/lib/gpu/look/color-stats-fold.check.ts", "12"),
-		note: "band-stats fold on the GPU (?statsFold=gpu, WAG-4): CPU emulation of BAND_STATS(_SG) partials + f32 SpMV fold + BAND_FINALIZE vs reduceBands f64 on 12 synthetic scenes (|Δ| ≤ 2e-5, harmonize bytes ≤ 1 LSB on < 0.5 %); CSR partition; finalize edge cases; subgroup-marker; teeth (no GPU)",
+		note: "band-stats fold on the GPU (?statsFold=gpu, WAG-4): CPU emulation of BAND_STATS(_SG) partials + f32 GPUGroupAggregation fold + BAND_FINALIZE vs reduceBands f64 on 12 synthetic scenes (|Δ| ≤ 2e-5, harmonize bytes ≤ 1 LSB on < 0.5 %); fold group keys; finalize edge cases; subgroup-marker; teeth (no GPU)",
 		timeoutS: 120,
 	},
 	{
@@ -1170,5 +1170,13 @@ export const CHECKS = [
 		group: "gpu",
 		cmd: tsx("scripts/gpu/guided-filter-conv-dawn.ts"),
 		timeoutS: 120,
+	},
+	{
+		id: "color-stats-dawn",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("scripts/gpu/color-stats-dawn.ts", "3"),
+		note: "band stats on Dawn at 512x384 / 1600x1200 / 3000x2000: BAND_STATS + GPUGroupAggregation fold vs the CPU twin (counts within 1e-4, |d| <= 1e-4), median wall times; SKIP without DAWN_DIR",
+		timeoutS: 300,
 	},
 ];

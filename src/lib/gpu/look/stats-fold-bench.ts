@@ -28,7 +28,6 @@ import {
 import { submittedWorkDone } from "../core/queue";
 import { getComputeDevice, hasFeature } from "../device";
 import { type BandStatsInput, bandStatsGpu } from "./color-stats";
-import { lastStatsGraphRun } from "./color-stats-graph";
 import { lookIdle } from "./opt-in";
 import { bandStatsTex, type StatsTexInput } from "./textures";
 
@@ -301,7 +300,6 @@ export async function runStatsFoldBench(
 				const name = `${fold}${sg ? "-sg" : ""}`;
 				const f = () => bandStatsGpu(device, input, { fold, subgroups: sg });
 				variants[name] = await f();
-				if (fold === "gpu" && !sg) out.lowering = lastStatsGraphRun.lowering;
 				ms[name] = await time(reps, f);
 			}
 		out.grid = [input.w, input.h];

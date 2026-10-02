@@ -666,7 +666,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"WAG-4: a luma GPUProgram lowered onto one ComputeGraph (core/program.ts): BAND_STATS(_SG) → GPUProgramSpMV fold → BAND_FINALIZE (f32); subgroups by default where available",
+			"WAG-4: one ComputeGraph: BAND_STATS(_SG) → luma GPUGroupAggregation fold → BAND_FINALIZE (f32); subgroups by default where available",
 	},
 	{
 		id: "look-haze",

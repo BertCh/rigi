@@ -5,8 +5,8 @@
 // GPU twin of look/color-stats.ts `reduceBands(...bandInputs(...))`: Oklab, masks and the per-band
 // Σ / Σ² reduction on the GPU (color-stats.wgsl.ts), as core ComputeGraphs (color-stats-graph.ts).
 // Default (fold "gpu", since 2026-10-01): the per-workgroup partials are folded and finalized on the
-// GPU too (color-stats-fold.ts: luma GPUProgramSpMV + BAND_FINALIZE, f32) and only the ColorStats
-// (256 B) comes back. fold "f64": the 52 floats per workgroup come back and are folded here in
+// GPU too (color-stats-fold.ts: luma GPUGroupAggregation sum + BAND_FINALIZE, f32; atomic float adds, so
+// tolerance-checked against the CPU twin, not bit-identical) and only the ColorStats (256 B) comes back. fold "f64": the 52 floats per workgroup come back and are folded here in
 // float64, then finalizeBands.
 // Subgroups (default on where the device has them, `subgroups: false` opts out): the per-workgroup reduction by
 // subgroupAdd (BAND_STATS_SG), equal to the shared-memory tree up to float-sum reassociation, with a

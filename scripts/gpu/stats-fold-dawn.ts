@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The band-stats fold (src/lib/gpu/look/color-stats-fold.ts: luma GPUProgramSpMV + BAND_FINALIZE) on
-// real luma WebGPU devices in node (Dawn): the per-workgroup partials of the 12 synthetic scenes of
-// color-stats-fold.fixtures.ts (CPU emulation of BAND_STATS / BAND_STATS_SG) are copied into the
-// program's `partial` vector by a trivial producer kernel, folded and finalized on the GPU, and the
-// ColorStats read back is compared with reduceBands (f64) and the emulated f32 fold (|d| <= 2e-5).
-// Two devices: "default" (every COMPUTE_FEATURE the adapter has, so subgroups when it has them) and
-// "core" (no features, no subgroups). The SpMV strategy luma picked is read from the compilation's
-// lowering report: webgpu-spmv:subgroup-row on the first (if the adapter has subgroups and the
-// subgroup_id WGSL feature; otherwise reported), webgpu-spmv:workgroup-row on the second. Also feeds
-// partials with BAND_STATS_SG's -1e20 layout-failure marker and asserts subgroupLayoutFailed.
+// The band-stats fold (src/lib/gpu/look/color-stats-fold.ts: luma GPUGroupAggregation "sum" over the
+// partials + BAND_FINALIZE) on real luma WebGPU devices in node (Dawn): the per-workgroup partials of
+// the 12 synthetic scenes of color-stats-fold.fixtures.ts (CPU emulation of BAND_STATS /
+// BAND_STATS_SG) are copied into the graph's `partial` buffer by a trivial producer kernel, folded and
+// finalized on the GPU, and the ColorStats read back is compared with reduceBands (f64) and the
+// emulated f32 fold (|d| <= 2e-5; the GPU's float adds are atomics, so order and last bits vary per
+// run). Two devices: "default" (every COMPUTE_FEATURE the adapter has, so subgroups when it has
+// them) and "core" (no features). Also feeds partials with BAND_STATS_SG's -1e20 layout-failure
+// marker and asserts subgroupLayoutFailed.
 //
 //   (mkdir /tmp/dawn && cd /tmp/dawn && npm i webgpu@0.3.0)   # not an app dependency
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/gpu/stats-fold-dawn.ts [scenes]
@@ -26,15 +25,15 @@ import { statsParamWords } from "../../src/lib/gpu/look/color-stats";
 import { STATS_VALUES } from "../../src/lib/gpu/look/color-stats.wgsl";
 import {
 	buildFoldGraph,
-	foldSelectionCsr,
+	foldGroupKeys,
 	STATS_BYTES,
 	statsFromWords,
 	subgroupLayoutFailed,
 } from "../../src/lib/gpu/look/color-stats-fold";
 import {
 	emulateFinalize,
+	emulateGroupFold,
 	emulatePartials,
-	emulateSpmv,
 	GROUPS,
 	gpuFold,
 	makeScene,
@@ -93,13 +92,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 );
 
 const PARTIAL_BYTES = GROUPS * STATS_VALUES * 4;
-const csr = foldSelectionCsr(GROUPS);
+const keys = foldGroupKeys(GROUPS);
 
-async function checkDevice(
-	label: string,
-	features: string[],
-	expectStrategy: (subgroupRowPossible: boolean) => string,
-) {
+async function checkDevice(label: string, features: string[]) {
 	// an adapter yields one device (a second requestDevice resolves already lost): one adapter each
 	const own = (await gpu.requestAdapter()) ?? adapter;
 	const handle = await own.requestDevice({ requiredFeatures: features });
@@ -109,13 +104,10 @@ async function checkDevice(
 		true,
 	)) as Device;
 	const hasSubgroups = device.features.has("subgroups");
-	const hasSubgroupId = !!(
-		device as unknown as { wgslLanguageFeatures?: Set<string> }
-	).wgslLanguageFeatures?.has("subgroup_id");
 	console.log(
-		`\n[${label}] features: ${[...device.features].join(",") || "(none)"}; subgroups ${hasSubgroups}, wgsl subgroup_id ${hasSubgroupId}`,
+		`\n[${label}] features: ${[...device.features].join(",") || "(none)"}; subgroups ${hasSubgroups}`,
 	);
-	const { graph, compilation, stats } = buildFoldGraph<undefined>(
+	const { graph, stats } = buildFoldGraph<undefined>(
 		device,
 		`stats-fold-dawn-${label}`,
 		GROUPS,
@@ -136,15 +128,6 @@ async function checkDevice(
 	);
 	graph.readNode("stats", [stats]);
 	await graph.compileAsync();
-	const decisions = compilation.lowering.decisions;
-	for (const d of decisions)
-		console.log(`  ${d.operationId.padEnd(10)} ${d.lowering}  (${d.reason})`);
-	const spmv = decisions.find((d) => d.lowering.startsWith("webgpu-spmv:"));
-	const want = expectStrategy(hasSubgroups && hasSubgroupId);
-	console.log(`  SpMV decision: ${spmv?.lowering} (expected ${want})`);
-	if (spmv?.lowering !== want)
-		fail(`[${label}] SpMV decision ${spmv?.lowering}`);
-
 	const partialBuffer = device.createBuffer({
 		id: "src",
 		usage: Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST,
@@ -173,7 +156,7 @@ async function checkDevice(
 			const p = emulatePartials(px, sg);
 			const words = await fold(p);
 			const got = statsFromWords(words);
-			const emulated = gpuFold(p, 60, csr);
+			const emulated = gpuFold(p, 60, keys);
 			const tag = `[${label}] scene ${seed}${sg ? " sg" : ""}`;
 			compared++;
 			if (subgroupLayoutFailed(words)) fail(`${tag}: flagged layout failure`);
@@ -198,7 +181,7 @@ async function checkDevice(
 	for (let k = 0; k < STATS_VALUES; k++) marked[5 * STATS_VALUES + k] = -1e20;
 	for (let g = 0; g < GROUPS; g++) marked[g * STATS_VALUES] = 1000;
 	const markedWords = await fold(marked);
-	const cpuMarked = emulateFinalize(emulateSpmv(marked, csr), 60);
+	const cpuMarked = emulateFinalize(emulateGroupFold(marked, keys), 60);
 	if (!subgroupLayoutFailed(markedWords)) fail(`[${label}] marker not seen`);
 	if (!subgroupLayoutFailed(cpuMarked)) fail(`[${label}] marker: CPU twin`);
 	if (statsFromWords(markedWords).valid) fail(`[${label}] marker: stats valid`);
@@ -208,19 +191,12 @@ async function checkDevice(
 	partialBuffer.destroy();
 	prm.destroy();
 	graph.destroy();
-	return { subgroupRow: spmv?.lowering === "webgpu-spmv:subgroup-row" };
 }
 
 const featuresOf = (all: boolean) =>
 	all ? COMPUTE_FEATURES.filter((f) => adapter.features.has(f)) : [];
-const first = await checkDevice("default", featuresOf(true), (possible) =>
-	possible ? "webgpu-spmv:subgroup-row" : "webgpu-spmv:workgroup-row",
-);
-if (!first.subgroupRow)
-	console.log(
-		"NOTE [default]: subgroup-row NOT exercised: luma needs the subgroup_id WGSL language feature (Dawn webgpu@0.3.0 lists none), so workgroup-row ran on both devices; the subgroup-row path stays browser-only",
-	);
-await checkDevice("core", featuresOf(false), () => "webgpu-spmv:workgroup-row");
+await checkDevice("default", featuresOf(true));
+await checkDevice("core", featuresOf(false));
 console.log(
 	failed ? `\nFAIL stats-fold-dawn: ${failed}` : "\nPASS stats-fold-dawn",
 );

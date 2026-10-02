@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Shared fixtures of the band-stats fold (./color-stats-fold.ts): the 12-scene synthetic generator and
-// the CPU emulation of the GPU kernels (BAND_STATS / BAND_STATS_SG partials, luma's SpMV row sum,
+// the CPU emulation of the GPU kernels (BAND_STATS / BAND_STATS_SG partials, luma's GPUGroupAggregation fold,
 // BAND_FINALIZE in f32). Used by color-stats-fold.check.ts (no GPU) and
 // scripts/gpu/stats-fold-dawn.ts (the partials feed the real GPU fold on Dawn).
 import {
@@ -14,11 +14,7 @@ import {
 } from "../../look/color-stats";
 import { finalizeBands } from "./color-stats";
 import { STATS_VALUES } from "./color-stats.wgsl";
-import {
-	foldSelectionCsr,
-	STATS_WORDS,
-	statsFromWords,
-} from "./color-stats-fold";
+import { foldGroupKeys, STATS_WORDS, statsFromWords } from "./color-stats-fold";
 import { STATS_LAYOUT } from "./color-stats-fold.wgsl";
 
 export const GROUPS = 32;
@@ -89,20 +85,18 @@ export function treeSum(v: Float32Array): number {
 	return t[0];
 }
 
-/** luma's SpMV row sum: one nonzero per lane (≤ 64 per row here), then a tree, f32. */
-export function emulateSpmv(
+/**
+ * luma's GPUGroupAggregation "sum" over the partials: value i adds into group keys[i] (out-of-range
+ * keys skipped), f32. The GPU's add order is the atomics' (varies run to run); this one is ascending.
+ */
+export function emulateGroupFold(
 	partial: Float32Array,
-	csr: ReturnType<typeof foldSelectionCsr>,
+	keys: Uint32Array,
 ): Float32Array {
 	const folded = new Float32Array(STATS_VALUES);
-	for (let j = 0; j < STATS_VALUES; j++) {
-		const lanes = new Float32Array(64);
-		for (let i = csr.rows[j]; i < csr.rows[j + 1]; i++)
-			lanes[(i - csr.rows[j]) % 64] = f(
-				lanes[(i - csr.rows[j]) % 64] + f(csr.vals[i] * partial[csr.cols[i]]),
-			);
-		folded[j] = treeSum(lanes);
-	}
+	for (let i = 0; i < keys.length; i++)
+		if (keys[i] < STATS_VALUES)
+			folded[keys[i]] = f(folded[keys[i]] + partial[i]);
 	return folded;
 }
 
@@ -175,8 +169,8 @@ export function foldF64(p: Float32Array, minCount: number): ColorStats {
 export const gpuFold = (
 	p: Float32Array,
 	minCount: number,
-	csr = foldSelectionCsr(GROUPS),
-) => statsFromWords(emulateFinalize(emulateSpmv(p, csr), minCount));
+	keys = foldGroupKeys(GROUPS),
+) => statsFromWords(emulateFinalize(emulateGroupFold(p, keys), minCount));
 
 export const KEYS = ["photoMean", "photoStd", "layerMean", "layerStd"] as const;
 export function maxDelta(a: ColorStats, b: ColorStats) {

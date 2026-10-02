@@ -25,16 +25,16 @@ export const STATS_LAYOUT = {
 	layerStd: 44,
 } as const;
 
-export const BAND_FINALIZE = /* wgsl */ `
+const finalizeSource = (folded: string) => /* wgsl */ `
 // BAND_STATS' parameters plus minCount (one uniform shared by both nodes)
 struct P { w: u32, h: u32, threads: u32, hasFg: u32, minRange: f32, minCount: u32 };
 @group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> folded: array<f32>;
+${folded}
 @group(0) @binding(2) var<storage, read_write> outv: array<f32>;
 
 const N_BANDS = 4u;
 
-fn trusted(b: u32) -> bool { return folded[b * 13u] >= f32(prm.minCount); }
+fn trusted(b: u32) -> bool { return fv(b * 13u) >= f32(prm.minCount); }
 
 @compute @workgroup_size(4)
 fn main(@builtin(local_invocation_index) k: u32) {
@@ -43,10 +43,10 @@ fn main(@builtin(local_invocation_index) k: u32) {
   for (var b = 0u; b < N_BANDS; b++) {
     anyOk = anyOk || trusted(b);
     // BAND_STATS_SG's failure marker (-1e20 per value) makes the folded count negative
-    broken = broken || folded[b * 13u] < 0.0;
+    broken = broken || fv(b * 13u) < 0.0;
   }
   let valid = anyOk && !broken;
-  outv[k] = select(folded[k * 13u], 0.0, broken);
+  outv[k] = select(fv(k * 13u), 0.0, broken);
   if (k == 0u) {
     outv[4] = select(select(0.0, 1.0, valid), -1.0, broken);
     for (var i = 5u; i < 8u; i++) { outv[i] = 0.0; }
@@ -61,13 +61,13 @@ fn main(@builtin(local_invocation_index) k: u32) {
     }
   }
   let o = src * 13u;
-  let n = folded[o];
+  let n = fv(o);
   for (var c = 0u; c < 3u; c++) {
-    let pm = folded[o + 1u + c] / n;
-    let lm = folded[o + 7u + c] / n;
+    let pm = fv(o + 1u + c) / n;
+    let lm = fv(o + 7u + c) / n;
     let lo = select(0.004, 0.01, c == 0u);
-    let ps = max(lo, sqrt(max(0.0, folded[o + 4u + c] / n - pm * pm)));
-    let ls = max(lo, sqrt(max(0.0, folded[o + 10u + c] / n - lm * lm)));
+    let ps = max(lo, sqrt(max(0.0, fv(o + 4u + c) / n - pm * pm)));
+    let ls = max(lo, sqrt(max(0.0, fv(o + 10u + c) / n - lm * lm)));
     let j = k * 3u + c;
     outv[8u + j] = select(0.0, pm, valid);
     outv[20u + j] = select(1.0, ps, valid);
@@ -76,3 +76,9 @@ fn main(@builtin(local_invocation_index) k: u32) {
   }
 }
 `;
+
+/** BAND_FINALIZE over the SpMV-folded sums: value j of band b at folded[b · 13 + j]. */
+export const BAND_FINALIZE = finalizeSource(/* wgsl */ `
+@group(0) @binding(1) var<storage, read> folded: array<f32>;
+fn fv(i: u32) -> f32 { return folded[i]; }
+`);

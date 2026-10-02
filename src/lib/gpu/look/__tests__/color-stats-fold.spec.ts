@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { STATS_VALUES } from "../color-stats.wgsl";
 import {
-	foldSelectionCsr,
+	foldGroupKeys,
 	STATS_BYTES,
 	STATS_WORDS,
 	statsFromWords,
@@ -13,37 +13,29 @@ import {
 } from "../color-stats-fold";
 import { STATS_LAYOUT } from "../color-stats-fold.wgsl";
 
-describe("foldSelectionCsr", () => {
-	it("is a 52-row CSR with one entry per (row, group)", () => {
-		const groups = 5;
-		const m = foldSelectionCsr(groups);
-		expect(m.rows.length).toBe(STATS_VALUES + 1);
-		expect(m.cols.length).toBe(STATS_VALUES * groups);
-		expect(m.vals.every((v) => v === 1)).toBe(true);
-		expect(m.rows[STATS_VALUES]).toBe(m.cols.length);
+describe("foldGroupKeys", () => {
+	it("keys partial i by its value index i % 52", () => {
+		const keys = foldGroupKeys(5);
+		expect(keys.length).toBe(5 * STATS_VALUES);
+		expect(keys[0]).toBe(0);
+		expect(keys[STATS_VALUES + 17]).toBe(17);
+		expect(keys[5 * STATS_VALUES - 1]).toBe(STATS_VALUES - 1);
 	});
-	it("row j sums value j of every workgroup in workgroup order", () => {
-		const groups = 3;
-		const m = foldSelectionCsr(groups);
-		for (const j of [0, 1, 17, STATS_VALUES - 1]) {
-			const cols = Array.from(m.cols.slice(m.rows[j], m.rows[j + 1]));
-			expect(cols).toEqual([0, 1, 2].map((g) => g * STATS_VALUES + j));
-		}
-	});
-	it("multiplying by the matrix folds partials like a plain column sum", () => {
+	it("puts value j of every workgroup in group j, groups times each", () => {
 		const groups = 4;
-		const m = foldSelectionCsr(groups);
+		const keys = foldGroupKeys(groups);
 		const partial = Float32Array.from(
 			{ length: groups * STATS_VALUES },
 			(_, i) => i * 0.5,
 		);
+		const folded = new Float32Array(STATS_VALUES);
+		keys.forEach((k, i) => {
+			folded[k] += partial[i];
+		});
 		for (let j = 0; j < STATS_VALUES; j++) {
-			let s = 0;
-			for (let k = m.rows[j]; k < m.rows[j + 1]; k++)
-				s += m.vals[k] * partial[m.cols[k]];
 			let want = 0;
 			for (let g = 0; g < groups; g++) want += partial[g * STATS_VALUES + j];
-			expect(s).toBe(want);
+			expect(folded[j]).toBe(want);
 		}
 	});
 });
