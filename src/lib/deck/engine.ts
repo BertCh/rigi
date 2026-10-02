@@ -150,6 +150,11 @@ import {
 	logRange,
 } from "./geometry-source";
 import { GlowMarkerLayer } from "./glow-layer";
+import {
+	evictImagery,
+	IMAGERY_CACHE_CAP_BYTES,
+	touchImagery,
+} from "./imagery-cache";
 import { PhotoView, photoViewProjection } from "./photo-view";
 import {
 	eyeAltitude,
@@ -427,6 +432,8 @@ export class DeckEngine implements Renderer {
 	private imagery = {
 		key: "",
 		map: new Map<string, ImageBitmap>(),
+		/** Tile ids evict() must keep: the render set (and the set being synced). */
+		keep: new Set<string>(),
 		abort: null as AbortController | null,
 		/** Bumps on every change to `map`; `snap` is the copy handed to the layers at `snapVersion`. */
 		version: 0,
@@ -1814,6 +1821,15 @@ export class DeckEngine implements Renderer {
 		);
 	}
 
+	/** CR-14: bound the bitmap cache (LRU, render-set tiles kept); `bump` re-snapshots for the layers. */
+	private evictImagery(bump: boolean) {
+		const c = this.imagery;
+		const gone = evictImagery(c.map, c.keep, IMAGERY_CACHE_CAP_BYTES, (b) =>
+			b.close(),
+		);
+		if (gone.length && bump) c.version++;
+	}
+
 	/** Imagery for `set`, fetched incrementally per tile (deck.tsx's cache), keyed by source. */
 	private syncImagery(
 		set: TerrainSet,
@@ -1829,6 +1845,12 @@ export class DeckEngine implements Renderer {
 			c.map = new Map();
 			c.version++;
 		}
+		c.keep = new Set([
+			...set.tiles.map((t) => t.id),
+			...(this.renderSet?.tiles ?? []).map((t) => t.id),
+		]);
+		touchImagery(c.map, c.keep);
+		this.evictImagery(true);
 		const missing = set.tiles.filter((t) => !c.map.has(t.id));
 		if (order && missing.length > 1) missing.sort(order());
 		if (missing.length && !c.abort) {
@@ -1841,6 +1863,7 @@ export class DeckEngine implements Renderer {
 				(id, bmp) => {
 					if (ac.signal.aborted) return bmp.close();
 					c.map.set(id, bmp);
+					this.evictImagery(true);
 					c.version++;
 					if (n++ % 6 === 0) this.updateLayers();
 				},

@@ -2,6 +2,29 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
+import * as THREE from "three";
+import {
+	type AlignResult,
+	type EdgeMap,
+	type Pin,
+	solvePins,
+} from "#/lib/align";
+import * as cam from "#/lib/camera";
+import { hfovFromAspect, type Pose } from "#/lib/camera";
+import { CpuGeometrySource, TerrainProfiles } from "#/lib/deck/cpu-geometry";
+import {
+	type OccPlan,
+	planOcclusion,
+	resolveOcclusion,
+	skylineFromRows,
+	texelOf,
+} from "#/lib/deck/geo-query";
+import type {
+	GeometrySource,
+	GeometrySourceFactory,
+} from "#/lib/deck/geometry-source";
+import { logRange } from "#/lib/deck/geometry-source";
 // WebGpuEngine: the Renderer surface (src/lib/renderer.ts) on WebGPU, the port of the WebGL
 // DeckEngine (deck/engine.ts). Same inputs, same queries, same look; the frame is drawn by the
 // host-agnostic WGSL cores of this directory (README.md "Layer contract") on a host:
@@ -49,29 +72,11 @@
 //
 // luma 10: nothing here touches luma beyond Device / Texture / Buffer / Framebuffer; deck only
 // through hosts/deck.ts (dynamically imported).
-import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
-import * as THREE from "three";
 import {
-	type AlignResult,
-	type EdgeMap,
-	type Pin,
-	solvePins,
-} from "#/lib/align";
-import * as cam from "#/lib/camera";
-import { hfovFromAspect, type Pose } from "#/lib/camera";
-import { CpuGeometrySource, TerrainProfiles } from "#/lib/deck/cpu-geometry";
-import {
-	type OccPlan,
-	planOcclusion,
-	resolveOcclusion,
-	skylineFromRows,
-	texelOf,
-} from "#/lib/deck/geo-query";
-import type {
-	GeometrySource,
-	GeometrySourceFactory,
-} from "#/lib/deck/geometry-source";
-import { logRange } from "#/lib/deck/geometry-source";
+	evictImagery,
+	IMAGERY_CACHE_CAP_BYTES,
+	touchImagery,
+} from "#/lib/deck/imagery-cache";
 import {
 	eyeAltitude,
 	localElevRange,
@@ -649,6 +654,8 @@ export class WebGpuEngine implements Renderer {
 	private imagery = {
 		key: "",
 		map: new Map<string, ImageBitmap>(),
+		/** Tile ids evict() must keep: the render set (and the set being synced). */
+		keep: new Set<string>(),
 		abort: null as AbortController | null,
 	};
 	private harm?: {
@@ -2507,6 +2514,12 @@ export class WebGpuEngine implements Renderer {
 		return this.harm.value;
 	}
 
+	/** CR-14: bound the bitmap cache (LRU, render-set tiles kept); pushImagery re-syncs the array. */
+	private evictImagery() {
+		const c = this.imagery;
+		evictImagery(c.map, c.keep, IMAGERY_CACHE_CAP_BYTES, (b) => b.close());
+	}
+
 	/** Imagery for `set`, fetched incrementally per tile, keyed by source (deck/engine.ts). */
 	private syncImagery(
 		set: TerrainSet,
@@ -2521,6 +2534,12 @@ export class WebGpuEngine implements Renderer {
 			c.key = src;
 			c.map = new Map();
 		}
+		c.keep = new Set([
+			...set.tiles.map((t) => t.id),
+			...(this.renderSet?.tiles ?? []).map((t) => t.id),
+		]);
+		touchImagery(c.map, c.keep);
+		this.evictImagery();
 		const missing = set.tiles.filter((t) => !c.map.has(t.id));
 		if (order && missing.length > 1) missing.sort(order());
 		if (missing.length && !c.abort) {
@@ -2533,6 +2552,7 @@ export class WebGpuEngine implements Renderer {
 				(id, bmp) => {
 					if (ac.signal.aborted) return bmp.close();
 					c.map.set(id, bmp);
+					this.evictImagery();
 					if (n++ % 6 === 0) this.pushImagery();
 				},
 				ac.signal,
