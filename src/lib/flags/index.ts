@@ -93,6 +93,13 @@ export const FLAG_SCHEMA = {
 	 */
 	statsSubgroups: onOff("on"),
 	/**
+	 * WebGPU engine: per-render-pass GPU timings (deck-webgpu/frame-timings.ts, deck.gl PR #10778's idea
+	 * for Rigi's own geometry / colour / screen passes). on = timestamp writes on those passes and a
+	 * FrameTimings sample per frame (engine.onFrameTimings, /dev/graph); needs the device feature
+	 * 'timestamp-query'. Off (default) = no query sets, render pass descriptors unchanged.
+	 */
+	gpuFrameTimings: onOff("off"),
+	/**
 	 * WebGPU batched terrain: GPU frustum cull + indirect draws (WAG W1.5; byte-identical frames to the
 	 * CPU cull, scripts/deck-webgpu/terrain-indirect-check.mjs); off = the CPU cull. Default on since
 	 * 2026-10-01 (GPU-graph first; no CPU saving at ~350–390 tiles, but no loss). WebGL and ?gpu=off

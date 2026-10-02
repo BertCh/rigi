@@ -205,6 +205,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "frame-timings",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/deck-webgpu/frame-timings-core.check.ts"),
+		note: "per-pass GPU frame timings (flag gpuFrameTimings): query-set ring (4, drop when all in flight, reuse, discard on failure), 32-pass cap, per-pass sums, rolling mean (browser: not run)",
+		timeoutS: 60,
+	},
+	{
 		id: "labels",
 		tier: "fast",
 		group: "look",

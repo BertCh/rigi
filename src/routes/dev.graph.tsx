@@ -40,6 +40,59 @@ const ms = (d: DurationSummary) =>
 		? `${d.p50Ms?.toFixed(3) ?? "–"} / ${d.p95Ms?.toFixed(3) ?? "–"} (${d.samples})`
 		: "–";
 
+type FrameTimingsView = {
+	latest: { frame: number; totalGpuMs: number } | null;
+	mean: {
+		passes: { name: string; gpuMs: number }[];
+		totalGpuMs: number;
+		frames: number;
+	};
+	disabledReason: string | null;
+};
+
+/** Rolling per-pass GPU times of the WebGPU engine (?gpuFrameTimings=on, same tab as the photo). */
+function FrameTimingsPanel() {
+	const [view, setView] = useState<FrameTimingsView | null>(null);
+	useEffect(() => {
+		let stop = false;
+		const tick = async () => {
+			const { currentFrameTimings } = await import(
+				"#/lib/deck-webgpu/frame-timings"
+			);
+			if (!stop) setView(currentFrameTimings());
+		};
+		void tick();
+		const t = setInterval(tick, 1000);
+		return () => {
+			stop = true;
+			clearInterval(t);
+		};
+	}, []);
+	return (
+		<section className="mt-6 font-mono text-xs" data-testid="frame-timings">
+			<h2 className="text-sm text-[var(--rigi-glow)]">Render pass GPU times</h2>
+			{!view ? (
+				<p className="mt-1 text-white/55">
+					Off: open the photo with ?gpuFrameTimings=on on a WebGPU device with
+					timestamp-query.
+				</p>
+			) : (
+				<p className="mt-1 text-white/55">
+					{view.disabledReason ?? `mean of ${view.mean.frames} frames`}
+					{view.mean.passes.map((p) => (
+						<span key={p.name} className="ml-4">
+							{p.name} {p.gpuMs.toFixed(3)} ms
+						</span>
+					))}
+					<span className="ml-4">
+						total {view.mean.totalGpuMs.toFixed(3)} ms
+					</span>
+				</p>
+			)}
+		</section>
+	);
+}
+
 function GraphPage() {
 	const [live, setLive] = useState<Live | null>(null);
 	const [error, setError] = useState("");
@@ -108,6 +161,7 @@ function GraphPage() {
 					{live ? `${live.rows.length} graphs` : "Loading…"}
 				</span>
 			</div>
+			<FrameTimingsPanel />
 			{error && (
 				<p className="mt-4 font-mono text-xs text-[var(--rigi-trap)]">
 					{error}

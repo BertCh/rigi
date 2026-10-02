@@ -8,6 +8,11 @@
 // compared against.
 import type { Device } from "@luma.gl/core";
 import { createRenderDevice } from "../device";
+import {
+	attachFrameTimings,
+	getFrameTimings,
+	passTimestamps,
+} from "../frame-timings";
 import type { FrameState, GpuLayerCore } from "../pass";
 import { ColorTargets, GeometryTargets, geometrySize } from "../targets";
 import {
@@ -94,6 +99,7 @@ export class DirectHost implements Host {
 		readonly device: Device,
 		pose: CameraPose,
 	) {
+		attachFrameTimings(device);
 		this.photo = pose;
 		this.view = pose;
 		const g = geometrySize(4 / 3);
@@ -146,6 +152,7 @@ export class DirectHost implements Host {
 			time: t,
 			view: this.frameView,
 		};
+		getFrameTimings(d)?.beginFrame(frame.frame);
 		if (this.offscreenDirty)
 			runOffscreenPasses({
 				device: d,
@@ -164,6 +171,7 @@ export class DirectHost implements Host {
 			.getCurrentFramebuffer({ depthStencilFormat: false });
 		const renderPass = d.beginRenderPass({
 			id: "rigi-screen",
+			...passTimestamps(d, "screen"),
 			framebuffer: fb,
 			clearColor: [0, 0, 0, 1],
 		});
@@ -183,14 +191,16 @@ export class DirectHost implements Host {
 		this.stats.frames++;
 		const requested = this.requestedAt;
 		const waiters = this.waiters.splice(0);
-		(d as unknown as { handle: GPUDevice }).handle.queue
-			.onSubmittedWorkDone()
-			.then(() => {
-				const now = performance.now();
-				this.stats.frameMs = now - requested;
-				this.stats.firstFrameMs ??= now - this.t0;
-				for (const r of waiters) r();
-			});
+		const submitted = (
+			d as unknown as { handle: GPUDevice }
+		).handle.queue.onSubmittedWorkDone();
+		getFrameTimings(d)?.endFrame(submitted);
+		submitted.then(() => {
+			const now = performance.now();
+			this.stats.frameMs = now - requested;
+			this.stats.firstFrameMs ??= now - this.t0;
+			for (const r of waiters) r();
+		});
 	}
 
 	destroy() {
@@ -200,6 +210,7 @@ export class DirectHost implements Host {
 		for (const r of this.waiters.splice(0)) r();
 		for (const c of this.cores) c.destroy();
 		this.cores = [];
+		getFrameTimings(this.device)?.destroy();
 		this.geometry.destroy();
 		this.color.destroy();
 		this.device.destroy();

@@ -12,6 +12,7 @@ import {
 	cameraUniforms,
 } from "../camera";
 import { REVERSED_Z } from "../depth";
+import { passTimestamps } from "../frame-timings";
 import {
 	type FrameState,
 	type GpuLayerCore,
@@ -88,6 +89,7 @@ export function runGeometryPass(o: {
 	runPrepasses(cores, { device, kind: "geometry", camera: cam, target, frame });
 	const renderPass = device.beginRenderPass({
 		id: "rigi-geometry",
+		...passTimestamps(device, "geometry"),
 		framebuffer: geometry.fbo,
 		clearColor: [0, 0, 0, 0],
 		clearDepth: REVERSED_Z.clearDepth,
@@ -127,6 +129,7 @@ export function runColorPass(o: {
 	runPrepasses(cores, { device, kind: "color", camera: cam, target, frame });
 	const renderPass = device.beginRenderPass({
 		id: "rigi-color",
+		...passTimestamps(device, "color"),
 		framebuffer: color.passFbo,
 		clearColor: [0, 0, 0, 0],
 		clearDepth: REVERSED_Z.clearDepth,

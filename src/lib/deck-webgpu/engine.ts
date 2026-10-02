@@ -206,6 +206,7 @@ import {
 } from "./camera";
 import { createLookBridge, type LookBridge } from "./compute-bridge";
 import { deckBuild, releaseForCompute, webgpuAvailable } from "./device";
+import { type FrameTimingsListener, getFrameTimings } from "./frame-timings";
 import { GeoQueryGpu } from "./geo-query-gpu";
 import { HeightGather, replayHeights } from "./height-gather";
 import type { Host, HostStats } from "./hosts/direct";
@@ -1656,6 +1657,24 @@ export class WebGpuEngine implements Renderer {
 	/** The host (debugging, harnesses): its targets, stats and — for the deck host — the Deck. */
 	get hostInstance(): Host | null {
 		return this.host;
+	}
+
+	/**
+	 * Per-render-pass GPU timings (?gpuFrameTimings=on, frame-timings.ts): `cb` gets
+	 * {frame, passes:[{name, gpuMs}], totalGpuMs} after each timed frame (geometry + colour, plus screen
+	 * on the direct host). Returns the unsubscribe function; a no-op subscription (never called) when
+	 * the flag is off, no host runs or the device lacks 'timestamp-query'. Needs the host up: subscribe
+	 * after `ready`.
+	 */
+	onFrameTimings(cb: FrameTimingsListener): () => void {
+		const timer = this.host ? getFrameTimings(this.host.device) : undefined;
+		return timer ? timer.onFrameTimings(cb) : () => {};
+	}
+
+	/** Rolling mean (last 60 timed frames) of the pass timings; null when timings are not running. */
+	get frameTimingsMean() {
+		const timer = this.host ? getFrameTimings(this.host.device) : undefined;
+		return timer?.mean() ?? null;
 	}
 
 	/** The Deck when the deck host runs (null on the direct host). */

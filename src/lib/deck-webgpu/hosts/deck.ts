@@ -30,6 +30,7 @@ import type {
 import type { Pose } from "#/lib/camera";
 import { PhotoView } from "#/lib/deck/photo-view";
 import { createWebgpuDeck } from "../device";
+import { attachFrameTimings, getFrameTimings } from "../frame-timings";
 import type { FrameState, GpuLayerCore } from "../pass";
 import { ColorTargets, GeometryTargets, geometrySize } from "../targets";
 import type { Host, HostStats } from "./direct";
@@ -124,6 +125,7 @@ export class DeckHost implements Host {
 		baseViews: unknown[],
 	) {
 		this.baseViews = baseViews;
+		attachFrameTimings(device);
 		this.photo = pose;
 		this.view = pose;
 		const g = geometrySize(4 / 3);
@@ -257,6 +259,8 @@ export class DeckHost implements Host {
 			time: this.frameStart,
 			view: this.frameView,
 		};
+		// timed frames: the geometry + colour passes of this preRender (deck's canvas pass is not ours)
+		getFrameTimings(this.device)?.beginFrame(this.frame.frame);
 		runOffscreenPasses({
 			device: this.device,
 			cores: this.cores,
@@ -292,14 +296,16 @@ export class DeckHost implements Host {
 		this.stats.frames++;
 		const requested = this.requestedAt;
 		const waiters = this.waiters.splice(0);
-		(this.device as unknown as { handle: GPUDevice }).handle.queue
-			.onSubmittedWorkDone()
-			.then(() => {
-				const now = performance.now();
-				this.stats.frameMs = now - requested;
-				this.stats.firstFrameMs ??= now - this.t0;
-				for (const r of waiters) r();
-			});
+		const submitted = (
+			this.device as unknown as { handle: GPUDevice }
+		).handle.queue.onSubmittedWorkDone();
+		getFrameTimings(this.device)?.endFrame(submitted);
+		submitted.then(() => {
+			const now = performance.now();
+			this.stats.frameMs = now - requested;
+			this.stats.firstFrameMs ??= now - this.t0;
+			for (const r of waiters) r();
+		});
 	}
 
 	destroy() {
@@ -307,6 +313,7 @@ export class DeckHost implements Host {
 		for (const r of this.waiters.splice(0)) r();
 		for (const c of this.cores) c.destroy();
 		this.cores = [];
+		getFrameTimings(this.device)?.destroy();
 		this.geometry.destroy();
 		this.color.destroy();
 		// deck.finalize() (deck 9.4) never destroys the device it created: do it here, or the

@@ -395,6 +395,10 @@ path; "in-app A/B" means compared inside the running engine against `/photo/<id>
 | `engine.ts` WebGpuEngine | DeckEngine | — | ranges identical to WebGL (median/p90 diff 0), 14/14 labels | lab + bench | see gaps |
 | `lab-engine.ts` + route | — | — | `engine-lab.mjs`: errors [] | — | — |
 
+## Per-pass GPU timings (`frame-timings.ts`, `?gpuFrameTimings=on`)
+
+Opt-in, WebGPU only, needs `timestamp-query`. `hosts/passes.ts` and the direct host's screen pass spread `passTimestamps(device, name)` into `beginRenderPass`; it is an empty object unless a frame is open on a timer attached for the device (`attachFrameTimings`, called by both hosts when the flag is on), so the off path is unchanged. A frame leases one 64-slot query set from a ring of 4 (`frame-timings-core.ts`, pure and node-checked); one `readResults` after `queue.onSubmittedWorkDone` yields the samples. All sets in flight, more than 32 passes, or a readback error drops the frame (an error also disables the timer, one warning). Results: `engine.onFrameTimings(cb)`, `engine.frameTimingsMean`, and the table on `/dev/graph`. The deck host times its offscreen geometry and colour passes (from the effect's preRender); deck's own canvas pass is not ours to time. Design after deck.gl PR #10778 (FrameTimer); not browser-verified.
+
 ## Measured (2026-09-30, `scripts/deck-webgpu/bench.mjs`, Chrome / Apple Metal, 1080×810)
 
 WebGPU engine (deck host) vs the WebGL DeckEngine (`/photo/<id>?renderer=deck`) on IMG_7086,
