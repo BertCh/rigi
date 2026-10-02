@@ -104,3 +104,11 @@ AMENDMENTS
       is capped at 75 deg half-field. Plumbing smoke tests (no tuning): a synthetic analytic-feature unit test (8 of 9
       restarts recover the pose to <= 0.17 deg), and two runs on IMG_7033 with a hand-made start (GT + 5 deg) and a
       synthetic 'photo' = render at GT. Those two runs' outputs were deleted and are not part of any score.
+   A4 (2026-10-02 01:45 local, during the secondary run) Budget cut of the SECONDARY set. The machine load average was
+      40-90 on 12 cores (other sessions), so runs took 1-5 min each instead of ~1 min and the disk filled once
+      (one run, wc_0002_s3, failed with ENOSPC and was rerun). The primary set (12 runs) was complete when this was
+      written; its scores were already visible (kill clause 1). Rule: the secondary photos are processed in sorted
+      pid order (wc_0002, wc_0004, ...), all three scales per photo, and the run is stopped at 02:30 local; only photos
+      with all three scales complete are scored; the Spearman clause is computed over the primary runs plus the
+      secondary runs completed by then. The number of secondary photos actually completed is reported with every
+      secondary number. This is a budget cut, not an outcome-based rule.
