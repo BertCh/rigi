@@ -331,6 +331,12 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/smoke.mjs IMG_
   encode + submit per prepass at 400 tiles (noisy machine). Gates: `layers/terrain-cull-math.check.ts`
   (fast tier `terrain-cull`) and `scripts/deck-webgpu/terrain-indirect-check.mjs` (browser batch:
   frames, CPU ms).
+- Terrain LOD on the GPU (`GPUVirtualGeometrySelection`) was evaluated and not built: the streamer
+  (`src/lib/deck/terrain-stream.ts`, `selectDemTiles` in `deck/terrain-data.ts`) already picks one
+  non-overlapping leaf cover per area on the CPU (a stand-in parent drops its children,
+  `emit()`), so the set handed to `BatchedTerrainCore` is a forest of single-node roots and a GPU
+  selection over it equals the frustum cull. It would only have work if the streamer kept parents
+  resident next to their children.
 - GPU Terrarium decode (WAG W2.3 wiring + W2.4): `terrain-gpu-decode.ts` is the terrain stream's
   tile loader (on by default since 3225064; WebGL and
   `?gpu=off` keep the CPU decode). A tile that stands for itself (no ancestor crop) and is 256 or
