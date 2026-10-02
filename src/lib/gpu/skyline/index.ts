@@ -30,9 +30,11 @@ import { GPUConvolution, type GraphBufferHandle } from "#/lib/gpu/core/luma";
 import { withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
 import { getComputeDevice } from "#/lib/gpu/device";
+import { addSobelMagnitude } from "./raster-edges";
 import {
 	SKYLINE_EDGE,
 	SKYLINE_GRAD,
+	SKYLINE_LUM,
 	SKYLINE_MODEL,
 	SKYLINE_PRIOR,
 	SKYLINE_UNPACK,
@@ -69,6 +71,11 @@ const K_GRAD = def("grad", SKYLINE_GRAD, [
 	["rgb", RO],
 	["grad", "storage"],
 ]);
+const K_LUM = def("lum", SKYLINE_LUM, [
+	["prm", "uniform"],
+	["rgb", RO],
+	["lum", "storage"],
+]);
 const K_EDGE = def("edge", SKYLINE_EDGE, [
 	["prm", "uniform"],
 	["cs", RO],
@@ -94,7 +101,20 @@ const F4 = 4;
 /** GPUBufferUsage.UNIFORM | COPY_DST */
 const UNIFORM_COPY_DST = 0x40 | 0x08;
 
-function buildFeatureGraph(g: ComputeGraph<Params>, w: number, h: number) {
+/**
+ * Gradient stage of the local-texture feature. "central" (default): the hand-written blurred-luminance
+ * central difference, border pixels 0 (the CPU twin). "sobel": luma gpu-raster Sobel magnitude on the
+ * blurred luminance (scale 1/4, clamped borders): a [1 2 1] smoothed central difference, so tex differs
+ * from the CPU twin by more than rounding (scripts/gpu/skyline-raster-dawn.ts measures the row shift).
+ */
+export type SkylineGradient = "central" | "sobel";
+
+function buildFeatureGraph(
+	g: ComputeGraph<Params>,
+	w: number,
+	h: number,
+	gradient: SkylineGradient,
+) {
 	const n = w * h;
 	const imp = (id: string, bytes: number, usage?: number) =>
 		g.importBuffer(id, bytes, undefined, usage);
@@ -161,12 +181,22 @@ function buildFeatureGraph(g: ComputeGraph<Params>, w: number, h: number) {
 	blur("bx1", "x", 1, 3, K_FIX_X1, p0, t1);
 	blur("by1", "y", 1, 3, K_FIX_Y1, t1, rgb);
 	blur("bx2", "x", 2, 3, K_FIX_X2, p0, cs);
-	g.addKernel({
-		id: "grad",
-		spec: K_GRAD,
-		bindings: { prm, rgb, grad },
-		workgroups: wg1,
-	});
+	if (gradient === "sobel") {
+		const lum = g.transientBuffer("lum", n * F4);
+		g.addKernel({
+			id: "lum",
+			spec: K_LUM,
+			bindings: { prm, rgb, lum },
+			workgroups: wg1,
+		});
+		addSobelMagnitude(g, "grad-sobel", w, h, lum, grad, 0.25);
+	} else
+		g.addKernel({
+			id: "grad",
+			spec: K_GRAD,
+			bindings: { prm, rgb, grad },
+			workgroups: wg1,
+		});
 	blur("bx3", "x", 3, 1, K_FIX_X3, grad, gt);
 	blur("by3", "y", 3, 1, K_FIX_Y3, gt, tex);
 	g.addKernel({
@@ -237,6 +267,7 @@ export interface SkylineGpuSession {
 export async function openSkylineGpu(
 	device: Device,
 	img: RGBALike,
+	gradient: SkylineGradient = "central",
 ): Promise<SkylineGpuSession> {
 	const { width: w, height: h } = img;
 	const n = w * h;
@@ -261,8 +292,8 @@ export async function openSkylineGpu(
 		const feat = cachedGraph<Params, void>(
 			device,
 			GROUP,
-			`feat-${w}x${h}`,
-			(g) => buildFeatureGraph(g, w, h),
+			`feat-${w}x${h}${gradient === "sobel" ? "-sobel" : ""}`,
+			(g) => buildFeatureGraph(g, w, h, gradient),
 		).graph;
 		await feat.run({}, { buffers: { prm, rgba, rgb, tex, edge, stp, prior } });
 		prm.destroy();
@@ -329,11 +360,12 @@ export async function openSkylineGpu(
 export async function detectSkylineGpu(
 	img: RGBALike,
 	opts: SkylineOptions = {},
+	gradient: SkylineGradient = "central",
 ): Promise<SkylineObservation | null> {
 	const device = await getComputeDevice();
 	if (!device) return null;
 	return withLease(GROUP, async () => {
-		const session = await openSkylineGpu(device, img);
+		const session = await openSkylineGpu(device, img, gradient);
 		try {
 			return await detectSkylineWith(img, opts, session.stages);
 		} finally {

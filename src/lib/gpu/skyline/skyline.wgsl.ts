@@ -97,6 +97,18 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
+/** Luminance of the blurred rgb planes (the input of the gpu-raster Sobel option). */
+export const SKYLINE_LUM = /* wgsl */ `${PARAMS}
+@group(0) @binding(1) var<storage, read> rgb: array<f32>;
+@group(0) @binding(2) var<storage, read_write> lum: array<f32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let i = gid.x;
+  if (i >= prm.n) { return; }
+  lum[i] = 0.3 * rgb[i] + 0.59 * rgb[prm.n + i] + 0.11 * rgb[2u * prm.n + i];
+}
+`;
+
 /** Vertical colour step (3 rows above vs 3 rows at/below, on the 5-column blur `cs`): edge and signed step. */
 export const SKYLINE_EDGE = /* wgsl */ `${PARAMS}
 @group(0) @binding(1) var<storage, read> cs: array<f32>;

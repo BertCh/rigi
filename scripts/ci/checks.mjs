@@ -1191,6 +1191,13 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "skyline-raster-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/skyline-raster-dawn.ts"),
+		timeoutS: 180,
+	},
+	{
 		id: "refine-fft-dawn",
 		tier: "fast",
 		group: "pose",
