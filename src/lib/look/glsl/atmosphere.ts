@@ -86,7 +86,7 @@ vec3 atmAirlight(vec3 viewDir) {
 // Nebelmeer: the valley-fog layer over the hazed colour; the identity at density 0
 vec3 applyNebelmeer(vec3 col, vec3 worldPos) {
   if (atm_nebel.y <= 0.0) return col;
-  float T = nebelRayT(length(worldPos - atm_eye), atmAltitude(atm_eye), atmAltitude(worldPos),
+  float T = heightFog_getRayTransmittance(length(worldPos - atm_eye), atmAltitude(atm_eye), atmAltitude(worldPos),
     atm_nebel.y, atm_nebel.x, atm_nebel.z);
   return mix(atm_nebelColor, col, T);
 }

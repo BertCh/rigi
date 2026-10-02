@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
-// Dash coverage after luma.gl `pathDash` (@luma.gl/shadertools, #3322, MIT, vis.gl contributors).
+// Dash coverage: the luma.gl shadertools `pathDash` module (a dependency, not a copy).
 
 // Hiking trails for the deck photo view: screen-space-width lines (width in target pixels, vertex colours,
 // opacity 0.95).
@@ -19,7 +19,7 @@ import {
 } from "@deck.gl/core";
 import type { Buffer } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
-import type { ShaderModule } from "@luma.gl/shadertools";
+import { pathDash, type ShaderModule } from "@luma.gl/shadertools";
 import { distanceM, type EnuFrame } from "../geodesy";
 import type { TrailStrokeKind } from "../look/trail-stroke";
 import {
@@ -134,8 +134,6 @@ layout(std140) uniform trailUniforms {
   float opacity;
   float logDepthFC;
   float srgbOut;
-  float dashLength;
-  float gapLength;
   float stroke;
   float padPx;
 } trail;
@@ -150,8 +148,6 @@ const trailModule = {
 		opacity: "f32",
 		logDepthFC: "f32",
 		srgbOut: "f32",
-		dashLength: "f32",
-		gapLength: "f32",
 		stroke: "f32",
 		padPx: "f32",
 	},
@@ -220,23 +216,10 @@ in float vDist;
 in float vSide;
 out vec4 fragColor;
 ${TRAIL_STROKE_GLSL}
-// luma pathDash_getCoverage (visgl/luma.gl #3322): filtered dash coverage of the metres along the path
-float dashIntegral(float coordinate, float fraction) {
-  return floor(coordinate) * fraction + min(fract(coordinate), fraction);
-}
-float dashCoverage(float dist) {
-  float period = max(trail.dashLength + trail.gapLength, 0.0001);
-  float coordinate = dist / period;
-  float extent = max(fwidth(coordinate), 0.0001);
-  float center = fract(coordinate);
-  float fraction = trail.dashLength / period;
-  float coverage = (dashIntegral(center + extent * 0.5, fraction) - dashIntegral(center - extent * 0.5, fraction)) / extent;
-  return clamp(coverage, 0.0, 1.0);
-}
 void main() {
-  // derivatives before any divergent branch; trail.gapLength <= 0 (the default) = solid, coverage unused
-  float dash = dashCoverage(vDist);
-  if (trail.gapLength > 0.0 && dash < 0.004) discard;
+  // derivatives before any divergent branch; pathDash.gapLength <= 0 (the default) = solid, coverage 1
+  float dash = pathDash_getCoverage(vDist);
+  if (dash < 0.004) discard;
   // stroke style (look/trail-stroke.ts); derivatives here, in uniform control flow
   float aa = max(fwidth(vSide), 0.0001);
   float grainFade = 1.0 - smoothstep(0.2, 0.6, fwidth(vDist));
@@ -251,7 +234,7 @@ void main() {
     c = mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
   }
   c = mix(c, vec3(1.0), core * ${TRAIL_GLOW_WHITEN});
-  fragColor = vec4(c, trail.opacity * (trail.gapLength > 0.0 ? dash : 1.0) * cover);
+  fragColor = vec4(c, trail.opacity * dash * cover);
 }
 `;
 
@@ -278,7 +261,11 @@ export class TrailLayer extends Layer<TrailLayerProps> {
 	declare state: { model?: Model; buffers?: Buffer[] };
 
 	getShaders() {
-		return super.getShaders({ vs, fs, modules: [project32, trailModule] });
+		return super.getShaders({
+			vs,
+			fs,
+			modules: [project32, trailModule, pathDash],
+		});
 	}
 
 	initializeState() {
@@ -358,10 +345,12 @@ export class TrailLayer extends Layer<TrailLayerProps> {
 				opacity: this.props.lineOpacity ?? 0.95,
 				logDepthFC: 1 / Math.log2(LOG_DEPTH_FAR + 1),
 				srgbOut: this.props.onCanvas ? 1 : 0,
-				dashLength: this.props.dash?.[0] ?? 0,
-				gapLength: Math.max(0, this.props.dash?.[1] ?? 0),
 				stroke: TRAIL_STROKE_MODE[kind],
 				padPx: strokePadPx(kind, width),
+			},
+			pathDash: {
+				dashLength: this.props.dash?.[0] ?? 0,
+				gapLength: this.props.dash?.[1] ?? 0,
 			},
 		});
 		model.draw(this.context.renderPass);

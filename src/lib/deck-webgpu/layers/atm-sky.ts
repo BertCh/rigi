@@ -222,7 +222,7 @@ fn atm_airlight(viewDir: vec3<f32>) -> vec3<f32> {
 // applyNebelmeer (look/nebelmeer): the valley-fog layer over the hazed colour; identity at density 0
 fn atm_nebelmeer(col: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
   if (atmosphere.nebelDensity <= 0.0) { return col; }
-  let T = nebel_ray_t(length(worldPos - atmosphere.eye), atm_altitude(atmosphere.eye),
+  let T = heightFog_getRayTransmittance(length(worldPos - atmosphere.eye), atm_altitude(atmosphere.eye),
     atm_altitude(worldPos), atmosphere.nebelDensity, atmosphere.nebelTop, atmosphere.nebelFalloff);
   return mix(atmosphere.nebelColor, col, T);
 }
@@ -459,7 +459,7 @@ fn atm_fog_terrain(c: vec4<f32>, s: TerrainSample) -> vec4<f32> {
   // premultiplied: the fog colour is scaled by the coverage like the airlight
   let hazed = c.rgb * T + air * (1.0 - T) * c.a;
   if (atmosphere.nebelDensity <= 0.0) { return vec4<f32>(hazed, c.a); }
-  let N = nebel_ray_t(length(s.enu - atmosphere.eye), atm_altitude(atmosphere.eye),
+  let N = heightFog_getRayTransmittance(length(s.enu - atmosphere.eye), atm_altitude(atmosphere.eye),
     atm_altitude(s.enu), atmosphere.nebelDensity, atmosphere.nebelTop, atmosphere.nebelFalloff);
   return vec4<f32>(hazed * N + atmosphere.nebelColor * (1.0 - N) * c.a, c.a);
 }

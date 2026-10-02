@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
-// Dash coverage after luma.gl `pathDash` (@luma.gl/shadertools, #3322, MIT, vis.gl contributors).
+// Dash coverage: the luma.gl shadertools `pathDash` module (a dependency, not a copy).
 
 // Hiking trails on WebGPU: the port of deck/trail-layer.ts. README.md "Layer contract", port row `layers/trail.ts`.
 //
@@ -34,7 +34,7 @@
 //   cores = [terrain, trails, …] → host (hosts/direct.ts or hosts/deck.ts)
 import type { Buffer, Device } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
-import type { ShaderModule } from "@luma.gl/shadertools";
+import { pathDash, type ShaderModule } from "@luma.gl/shadertools";
 import type { TrailSegments } from "#/lib/deck/trail-layer";
 import {
 	strokeKind,
@@ -79,15 +79,12 @@ export type TrailUniforms = {
 	depthBias: number;
 	nearTrim: number;
 	viewport: [number, number];
-	/** dash length m (pathDash); gap ≤ 0 = solid */
-	dashM: number;
-	gapM: number;
 	/** stroke mode id (TRAIL_STROKE_MODE) and the quad's extra half-width in px */
 	stroke: number;
 	padPx: number;
 };
 
-/** `trail` uniform block: 40 bytes (std layout pads to 40), scalars first so the vec2 lands on offset 16. */
+/** `trail` uniform block: 32 bytes, scalars first so the vec2 lands on offset 16 (dashes are luma pathDash, its own block). */
 export const trailModule = {
 	name: "trail",
 	source: /* wgsl */ `\
@@ -97,8 +94,6 @@ struct TrailUniforms {
   depthBias: f32,
   nearTrim: f32,
   viewport: vec2<f32>,
-  dashM: f32,
-  gapM: f32,
   stroke: f32,
   padPx: f32,
 };
@@ -110,8 +105,6 @@ struct TrailUniforms {
 		depthBias: "f32",
 		nearTrim: "f32",
 		viewport: "vec2<f32>",
-		dashM: "f32",
-		gapM: "f32",
 		stroke: "f32",
 		padPx: "f32",
 	},
@@ -184,30 +177,18 @@ var<private> QUAD = array<vec2<f32>, 6>(
   return o;
 }
 
-// luma pathDash_getCoverage (visgl/luma.gl #3322): filtered dash coverage of the metres along the path
-fn dashIntegral(coordinate: f32, fraction: f32) -> f32 {
-  return floor(coordinate) * fraction + min(fract(coordinate), fraction);
-}
-fn dashCoverage(dist: f32) -> f32 {
-  let period = max(trail.dashM + trail.gapM, 0.0001);
-  let coordinate = dist / period;
-  let extent = max(fwidth(coordinate), 0.0001);
-  let center = fract(coordinate);
-  let fraction = trail.dashM / period;
-  let coverage = (dashIntegral(center + extent * 0.5, fraction) - dashIntegral(center - extent * 0.5, fraction)) / extent;
-  return clamp(coverage, 0.0, 1.0);
-}
+// dash coverage: luma pathDash_getCoverage (shadertools pathDash module, gap <= 0 = solid)
 
 ${TRAIL_STROKE_WGSL}
 @fragment fn fragmentMain(v: Varyings) -> @location(0) vec4<f32> {
-  // derivatives in uniform control flow; trail.gapM <= 0 (the default) = solid, coverage unused
-  let dash = dashCoverage(v.dist);
+  // derivatives in uniform control flow; pathDash.gapLength <= 0 (the default) = solid, coverage 1
+  let dash = pathDash_getCoverage(v.dist);
   // linear rgb (vertex colour), premultiplied into the colour target
   // stroke style (look/trail-stroke.ts); derivatives here, in uniform control flow
   let aa = max(fwidth(v.side), 0.0001);
   let grainFade = 1.0 - smoothstep(0.2, 0.6, fwidth(v.dist));
   let st = trail_stroke(trail.stroke, v.side, v.dist, trail.width, aa, grainFade);
-  let a = trail.opacity * select(1.0, dash, trail.gapM > 0.0) * st.x;
+  let a = trail.opacity * dash * st.x;
   let c = mix(max(v.color, vec3<f32>(0.0)), vec3<f32>(1.0), st.y * ${TRAIL_GLOW_WHITEN});
   return vec4<f32>(c * a, a);
 }
@@ -290,7 +271,7 @@ export class TrailCore implements GpuLayerCore {
 				new Model(this.device, {
 					id: `${this.id}-color`,
 					source: TRAIL_WGSL,
-					modules: [cameraModule, trailModule] as never,
+					modules: [cameraModule, trailModule, pathDash] as never,
 					...passModelProps("color", { depth: "test", blend: true }),
 					topology: "triangle-list",
 					bufferLayout: [
@@ -339,8 +320,6 @@ export class TrailCore implements GpuLayerCore {
 			// just past the near plane so the nudged depth stays ≤ 1 (inside the clip volume)
 			nearTrim: ctx.camera.near * (1 + Math.max(1e-3, 2 * this.depthBias)),
 			viewport: [ctx.target.width, ctx.target.height],
-			dashM: Math.max(0, this.style.dash?.[0] ?? 0),
-			gapM: Math.max(0, this.style.dash?.[1] ?? 0),
 			stroke: TRAIL_STROKE_MODE[kind],
 			padPx: strokePadPx(kind, this.style.width),
 		};
@@ -353,6 +332,10 @@ export class TrailCore implements GpuLayerCore {
 		model.shaderInputs.setProps({
 			camera: ctx.camera,
 			trail: this.uniforms(ctx),
+			pathDash: {
+				dashLength: this.style.dash?.[0] ?? 0,
+				gapLength: this.style.dash?.[1] ?? 0,
+			},
 		} as never);
 		model.setAttributes({ instances: this.instances });
 		model.setInstanceCount(this.count);
