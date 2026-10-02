@@ -87,7 +87,7 @@ export function PixelToPlace({ className }: { className?: string }) {
 	if (!hero || !peaks)
 		return (
 			<div
-				className={`aspect-[16/9] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`}
+				className={`aspect-[16/9] animate-pulse rounded-md bg-white/5 ${className ?? ""}`}
 			/>
 		);
 	return <Figure hero={hero} peaks={peaks} className={className} />;
@@ -374,7 +374,7 @@ function Figure({
 		<figure className={className}>
 			{/* the photo's skyline band, banded by distance */}
 			<div
-				className="relative overflow-hidden rounded-2xl bg-[var(--rigi-slate)] ring-1 ring-white/10"
+				className="relative overflow-hidden rounded-md bg-[var(--rigi-slate)]"
 				style={{ aspectRatio: `${W} / ${visH}` }}
 			>
 				<div className="absolute inset-x-0 top-0 aspect-[4/3]">
@@ -441,10 +441,10 @@ function Figure({
 
 			<div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
 				{/* the map: where the pixels land */}
-				<div className="overflow-hidden rounded-2xl bg-[var(--rigi-ink)] ring-1 ring-white/10">
+				<div className="overflow-hidden rounded-md bg-[var(--rigi-ink)]">
 					<MapPanel hero={hero} peaks={peaks} probe={probe} land={land} />
 				</div>
-				<div className="flex flex-col overflow-hidden rounded-2xl bg-white/[0.03] ring-1 ring-white/10">
+				<div className="flex flex-col overflow-hidden rounded-md bg-white/[0.03]">
 					<div className="p-5">
 						<p className="mb-2 font-mono text-[10px] tracking-[0.16em] text-[var(--rigi-lesson)] uppercase">
 							Follow the ray

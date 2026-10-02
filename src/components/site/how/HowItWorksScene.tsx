@@ -126,7 +126,7 @@ export function HowItWorksScene({
 		return (
 			<div
 				ref={holder}
-				className={`aspect-[16/11] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`}
+				className={`aspect-[16/11] animate-pulse rounded-md bg-white/5 ${className ?? ""}`}
 			/>
 		);
 	return (
@@ -463,7 +463,7 @@ function Stage({
 			<div
 				ref={box}
 				data-theme="dark"
-				className={`overflow-hidden rounded-2xl bg-black/30 ring-1 ring-white/10 ${className ?? ""}`}
+				className={`overflow-hidden rounded-md bg-black/30 ${className ?? ""}`}
 			>
 				{/* chapters */}
 				<div className="flex items-center gap-1 border-b border-white/8 px-2 py-2 sm:px-3">

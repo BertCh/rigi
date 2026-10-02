@@ -150,7 +150,7 @@ export function FingerprintRing({ className }: { className?: string }) {
 	if (!roll)
 		return (
 			<div
-				className={`aspect-[16/10] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`}
+				className={`aspect-[16/10] animate-pulse rounded-md bg-white/5 ${className ?? ""}`}
 			/>
 		);
 	const photo = roll.photos.find((p) => p.id === id) ?? roll.photos[0];
@@ -355,7 +355,7 @@ function Fingerprint({ p, children }: { p: RollPhoto; children: ReactNode }) {
 	const yb = PT - 12;
 
 	return (
-		<figure className="overflow-hidden rounded-2xl bg-[var(--rigi-ink)] ring-1 ring-white/10">
+		<figure className="overflow-hidden rounded-md bg-[var(--rigi-ink)]">
 			{/* readout */}
 			<div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-white/8 px-4 py-3 font-mono text-[11px] sm:px-6">
 				<span className="flex items-center gap-2 text-white/45">
@@ -899,7 +899,7 @@ function PhotoStrip({
 	}, [obs, W]);
 	return (
 		<div
-			className="relative overflow-hidden rounded-lg ring-1 ring-white/10"
+			className="relative overflow-hidden rounded-lg"
 			style={{ aspectRatio: `${W} / ${bandH}` }}
 		>
 			<svg

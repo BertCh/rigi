@@ -173,13 +173,13 @@ function RollPage() {
 					onClick={() => downloadRollGeoJSON(roll)}
 					data-testid="export-roll"
 					title="Download cameras, view wedges and the track as GeoJSON"
-					className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/55 ring-1 ring-white/10 hover:text-[var(--rigi-paper)] hover:ring-white/25"
+					className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/55 hover:bg-white/10 hover:text-[var(--rigi-paper)]"
 				>
 					<Download className="size-3.5" /> GeoJSON
 				</button>
 				{isLocalRollId(roll.id) && <DeleteLocalRoll roll={roll} />}
 				<div
-					className="inline-flex rounded-lg bg-white/[0.04] p-0.5 ring-1 ring-white/10"
+					className="inline-flex rounded-lg bg-white/[0.04] p-0.5"
 					role="tablist"
 					aria-label="View"
 				>
@@ -232,7 +232,7 @@ function RollPage() {
 					/>
 				)}
 				{view === "map" && (
-					<div className="h-[calc(100dvh-220px)] min-h-[420px] overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/8">
+					<div className="h-[calc(100dvh-220px)] min-h-[420px] overflow-hidden rounded-md bg-black/40">
 						{map}
 					</div>
 				)}
@@ -247,7 +247,7 @@ function RollPage() {
 								compact
 							/>
 						</div>
-						<div className="h-[60dvh] min-h-[360px] overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/8 lg:sticky lg:top-4 lg:h-[calc(100dvh-220px)]">
+						<div className="h-[60dvh] min-h-[360px] overflow-hidden rounded-md bg-black/40 lg:sticky lg:top-4 lg:h-[calc(100dvh-220px)]">
 							{map}
 						</div>
 					</div>
@@ -322,7 +322,7 @@ function DetailStrip({
 			data-testid="roll-detail"
 		>
 			<div
-				className={`flex items-center gap-3 rounded-xl bg-[#15181c]/95 light:bg-[var(--rigi-slate)]/95 p-2.5 ring-1 ring-white/12 ${inline ? "" : "mx-auto max-w-4xl shadow-2xl backdrop-blur"}`}
+				className={`flex items-center gap-3 rounded-md bg-[var(--rigi-slate)]/95 p-2.5 ${inline ? "" : "mx-auto max-w-4xl shadow-2xl backdrop-blur"}`}
 			>
 				<div
 					data-theme="dark"
@@ -437,7 +437,7 @@ function DeleteLocalRoll({ roll }: { roll: Roll }) {
 				onClick={() => setState("confirm")}
 				data-testid="delete-roll"
 				title={error ?? "Delete this roll from this device"}
-				className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/55 ring-1 ring-white/10 hover:text-red-300 light:hover:text-[var(--rigi-trap)] hover:ring-red-300/40 light:hover:ring-[var(--rigi-trap)]/40"
+				className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white/55 hover:text-red-300 light:hover:text-[var(--rigi-trap)]"
 			>
 				<Trash2 className="size-3.5" />{" "}
 				{error ? "Delete failed, retry" : "Delete roll"}
@@ -445,7 +445,7 @@ function DeleteLocalRoll({ roll }: { roll: Roll }) {
 		);
 	return (
 		<div
-			className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-2.5 py-1 text-xs ring-1 ring-red-300/30 light:ring-[var(--rigi-trap)]/30"
+			className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-2.5 py-1 text-xs"
 			data-testid="delete-roll-confirm"
 		>
 			<span className="text-red-200 light:text-[var(--rigi-trap)]">

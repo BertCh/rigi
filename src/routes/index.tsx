@@ -59,7 +59,7 @@ const HowItWorksScene = lazy(() =>
 	})),
 );
 
-const PLACEHOLDER = "bg-white/[0.03] ring-1 ring-white/10";
+const PLACEHOLDER = "bg-white/[0.03]";
 /** Width variants of the hero and story stills (scripts/demo/make-landing-variants.sh). */
 const variantSet = (name: string) =>
 	[640, 1024, 1440].map((w) => `/demo/w/${name}-${w}.jpg ${w}w`).join(", ");
@@ -68,11 +68,11 @@ const HERO_SIZES =
 const STORY_SIZES =
 	"(min-width: 1280px) 1088px, (min-width: 640px) calc(100vw - 64px), calc(100vw - 32px)";
 
-const PANO_BOX = `h-[380px] rounded-xl ${PLACEHOLDER}`;
-const TOPO_BOX = `h-[min(640px,75vh)] rounded-2xl ${PLACEHOLDER}`;
-const LIVE_BOX = `aspect-[16/10] max-h-[78vh] w-full rounded-2xl ${PLACEHOLDER}`;
-const STEP_BOX = `aspect-[16/9] max-h-[78vh] w-full rounded-2xl ${PLACEHOLDER}`;
-const HOW_BOX = `aspect-[16/11] rounded-2xl ${PLACEHOLDER}`;
+const PANO_BOX = `h-[380px] rounded-md ${PLACEHOLDER}`;
+const TOPO_BOX = `h-[min(640px,75vh)] rounded-md ${PLACEHOLDER}`;
+const LIVE_BOX = `aspect-[16/10] max-h-[78vh] w-full rounded-md ${PLACEHOLDER}`;
+const STEP_BOX = `aspect-[16/9] max-h-[78vh] w-full rounded-md ${PLACEHOLDER}`;
+const HOW_BOX = `aspect-[16/11] rounded-md ${PLACEHOLDER}`;
 
 // The landing page, one scroll: the sample trip (src/lib/demo, a real day on Niederhorn) shows the
 // features live (before/after, the overlay reveal, the photos on the topo map, the roll draped in
@@ -143,7 +143,7 @@ function Home() {
 						</a>
 						<a
 							href="#story"
-							className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white/70 ring-1 ring-white/15 hover:text-[var(--rigi-paper)] hover:ring-white/30"
+							className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white/70 bg-white/[0.06] hover:bg-white/10 hover:text-[var(--rigi-paper)]"
 						>
 							See an example <ArrowDown className="size-4" />
 						</a>
@@ -167,7 +167,7 @@ function Home() {
 								priority
 								alt="A photo from Niederhorn with the Bernese Alps' peaks named"
 								aspect={4 / 3}
-								className="rounded-xl ring-1 ring-white/10"
+								className="rounded-md"
 							/>
 						</Surround>
 						<figcaption className="mt-2.5 font-mono text-[10.5px] text-white/40">
@@ -193,7 +193,7 @@ function Home() {
 					sizes={STORY_SIZES}
 					alt="Contours, ridgelines and peak names blooming out over Lake Thun"
 					aspect={4 / 3}
-					className="rounded-2xl ring-1 ring-white/10"
+					className="rounded-md"
 					surround={story as SurroundBake}
 					surroundClassName="md:mt-14"
 				/>
@@ -238,7 +238,7 @@ function Home() {
 					<Suspense fallback={<div className={LIVE_BOX} />}>
 						<LiveRollMap
 							poster="/demo/shots/drape.jpg"
-							className="aspect-[16/10] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10"
+							className="aspect-[16/10] max-h-[78vh] w-full rounded-md"
 						/>
 					</Suspense>
 				</NearViewport>
@@ -252,7 +252,7 @@ function Home() {
 			>
 				<NearViewport placeholder={<div className={STEP_BOX} />} margin={400}>
 					<Suspense fallback={<div className={STEP_BOX} />}>
-						<StepInsideDemo className="aspect-[16/9] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10" />
+						<StepInsideDemo className="aspect-[16/9] max-h-[78vh] w-full rounded-md" />
 					</Suspense>
 				</NearViewport>
 			</Story>
@@ -277,7 +277,7 @@ function Home() {
 				title="Processing is local."
 				body="Every step shown above ran in this tab. Your own photos are processed the same way and stay on your device."
 			>
-				<div className="grid gap-px overflow-hidden rounded-2xl bg-white/8 ring-1 ring-white/8 sm:grid-cols-2 lg:grid-cols-4">
+				<div className="grid gap-px overflow-hidden rounded-md bg-white/8 sm:grid-cols-2 lg:grid-cols-4">
 					{local.map((f) => (
 						<div key={f.title} className="bg-[var(--rigi-ink)] p-5">
 							<f.icon
@@ -439,9 +439,9 @@ function Pitch({
 		<Link
 			to={to}
 			data-testid={testId}
-			className="group flex h-full flex-col rounded-2xl bg-white/[0.03] p-6 ring-1 ring-white/10 transition hover:bg-white/[0.05] hover:ring-[var(--rigi-glow)]/50"
+			className="group flex h-full flex-col rounded-md bg-white/[0.03] p-6 transition hover:bg-white/[0.05] hover:ring-1 hover:ring-[var(--rigi-glow)]/50"
 		>
-			<span className="flex size-11 items-center justify-center rounded-xl bg-[var(--rigi-glow)]/12 text-[var(--rigi-glow)]">
+			<span className="flex size-11 items-center justify-center rounded-md bg-[var(--rigi-glow)]/12 text-[var(--rigi-glow)]">
 				<Icon className="size-5" strokeWidth={1.5} />
 			</span>
 			<span className="mt-5 text-lg font-semibold">{title}</span>

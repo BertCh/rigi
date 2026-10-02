@@ -12,9 +12,8 @@ import { TopoBoard } from "./TopoBoard";
 // section nears the viewport, so the manifest, the panorama and the topo board stay out of the
 // initial bundle and start no work at page mount.
 
-const PANO_BOX = "h-[380px] rounded-xl bg-white/[0.03] ring-1 ring-white/10";
-const TOPO_BOX =
-	"h-[min(640px,75vh)] rounded-2xl bg-white/[0.03] ring-1 ring-white/10";
+const PANO_BOX = "h-[380px] rounded-md bg-white/[0.03]";
+const TOPO_BOX = "h-[min(640px,75vh)] rounded-md bg-white/[0.03]";
 
 export function PanoramaSection() {
 	const roll = useDemoRoll();
@@ -46,7 +45,7 @@ export function TopoSection({
 		<TopoBoard
 			demo={demo}
 			onPan={onPan}
-			className="h-[min(640px,75vh)] rounded-2xl ring-1 ring-white/10"
+			className="h-[min(640px,75vh)] rounded-md"
 		/>
 	) : (
 		<div className={TOPO_BOX} />

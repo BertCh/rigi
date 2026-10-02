@@ -89,7 +89,7 @@ export function SideSection({ className }: { className?: string }) {
 	if (!hero)
 		return (
 			<div
-				className={`aspect-[16/12] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`}
+				className={`aspect-[16/12] animate-pulse rounded-md bg-white/5 ${className ?? ""}`}
 			/>
 		);
 	return <Figure hero={hero} peaks={peaks} className={className} />;
@@ -146,7 +146,7 @@ function Figure({
 
 	return (
 		<figure
-			className={`overflow-hidden rounded-2xl bg-[var(--rigi-ink)] ring-1 ring-white/10 ${className ?? ""}`}
+			className={`overflow-hidden rounded-md bg-[var(--rigi-ink)] ${className ?? ""}`}
 		>
 			<div
 				ref={ref}

@@ -80,7 +80,7 @@ function Library() {
 
 			{empty && (
 				<section className="mx-auto max-w-6xl px-4 pb-10 sm:px-8">
-					<div className="rounded-xl border border-dashed border-white/15 px-5 py-8 text-center text-sm text-white/55">
+					<div className="rounded-md border border-dashed border-white/15 px-5 py-8 text-center text-sm text-white/55">
 						Nothing here yet. Add a photo above, or look around the sample trip
 						first.
 					</div>
@@ -138,7 +138,7 @@ function Library() {
 						<a
 							key={t.to}
 							href={t.to}
-							className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/8 transition hover:bg-white/[0.07] hover:ring-[var(--rigi-glow)]/50"
+							className="rounded-md bg-white/[0.04] p-4 transition hover:bg-white/[0.07] hover:ring-1 hover:ring-[var(--rigi-glow)]/50"
 						>
 							<span className="block text-sm font-semibold">{t.title}</span>
 							<span className="mt-1 block text-xs leading-relaxed text-white/55">
@@ -178,7 +178,7 @@ function Samples() {
 						<Link
 							to="/photo/$id"
 							params={{ id: "demo-09" }}
-							className="flex flex-col justify-center rounded-xl p-5 ring-1 ring-white/10 transition hover:bg-white/[0.03] hover:ring-[var(--rigi-glow)]/50"
+							className="flex flex-col justify-center rounded-md p-5 transition hover:bg-white/[0.03] hover:ring-1 hover:ring-[var(--rigi-glow)]/50"
 						>
 							<span className="flex items-center gap-2 text-sm font-semibold">
 								<GalleryHorizontalEnd className="size-4 text-[var(--rigi-glow)]" />
@@ -253,7 +253,7 @@ function AddCard({
 		<Link
 			to={to}
 			data-testid={testId}
-			className="group flex flex-col rounded-xl p-5 ring-1 ring-white/10 transition hover:bg-white/[0.03] hover:ring-[var(--rigi-glow)]/50"
+			className="group flex flex-col rounded-md p-5 transition hover:bg-white/[0.03] hover:ring-1 hover:ring-[var(--rigi-glow)]/50"
 		>
 			<span className="flex size-10 items-center justify-center rounded-lg bg-[var(--rigi-glow)]/12 text-[var(--rigi-glow)]">
 				<Icon className="size-5" strokeWidth={1.5} />
@@ -284,7 +284,7 @@ function PhotoTile({
 		<Link
 			to="/photo/$id"
 			params={{ id }}
-			className="group overflow-hidden rounded-xl bg-white/[0.04] ring-1 ring-white/8 transition hover:ring-[var(--rigi-glow)]/50"
+			className="group overflow-hidden rounded-md bg-white/[0.04] transition hover:ring-1 hover:ring-[var(--rigi-glow)]/50"
 		>
 			<div data-theme="dark" className="aspect-[4/3] overflow-hidden bg-black">
 				{src && (

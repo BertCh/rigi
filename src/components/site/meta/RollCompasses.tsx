@@ -314,7 +314,7 @@ export function RollCompasses({
 				className={
 					sketch
 						? `aspect-[16/10] animate-pulse bg-[var(--gb-paper-deep)] ${className ?? ""}`
-						: `aspect-[16/10] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`
+						: `aspect-[16/10] animate-pulse rounded-md bg-white/5 ${className ?? ""}`
 				}
 			/>
 		);
@@ -330,7 +330,7 @@ export function RollCompasses({
 			className={
 				sketch
 					? `${className ?? ""}`
-					: `overflow-hidden rounded-2xl bg-white/[0.02] ring-1 ring-white/10 ${className ?? ""}`
+					: `overflow-hidden rounded-md bg-white/[0.02] ${className ?? ""}`
 			}
 			style={{ touchAction: "pan-y" }}
 		>

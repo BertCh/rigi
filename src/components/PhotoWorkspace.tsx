@@ -1356,7 +1356,7 @@ export function PhotoWorkspace({
 
 	return (
 		<div
-			className="flex h-dvh w-full flex-col bg-[#0b0f14] text-white md:flex-row light:bg-[var(--rigi-ink)]"
+			className="flex h-dvh w-full flex-col bg-[var(--rigi-ink)] text-white md:flex-row"
 			data-ready={status || error ? undefined : ""}
 			data-renderer={rendererUsed?.renderer}
 			data-renderer-reason={rendererUsed?.reason}
@@ -1364,7 +1364,10 @@ export function PhotoWorkspace({
 			data-verify={verify ?? undefined}
 		>
 			{/* stage */}
-			<div className="relative min-h-0 flex-1 bg-[#0b0f14]" data-theme="dark">
+			<div
+				className="relative min-h-0 flex-1 bg-[var(--rigi-ink)]"
+				data-theme="dark"
+			>
 				<header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 p-3">
 					<Link
 						to="/library"

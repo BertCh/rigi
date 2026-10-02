@@ -57,7 +57,7 @@ export function LandscapeView({ children }: { children: ReactNode }) {
 	return (
 		<div>
 			{portraitPhone && !full && (
-				<div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-white/[0.04] px-3 py-2 ring-1 ring-white/10">
+				<div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-white/[0.04] px-3 py-2">
 					<span className="flex items-center gap-2 text-xs text-white/60">
 						<Smartphone className="size-4 shrink-0 rotate-90 text-[var(--rigi-glow)]" />
 						Turn your phone sideways for a wider view.
@@ -66,7 +66,7 @@ export function LandscapeView({ children }: { children: ReactNode }) {
 						<button
 							type="button"
 							onClick={enter}
-							className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--rigi-paper)] ring-1 ring-white/20 hover:ring-white/40"
+							className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--rigi-paper)] hover:ring-1 hover:ring-white/40"
 						>
 							<Maximize2 className="size-3.5" /> Full screen
 						</button>
@@ -88,7 +88,7 @@ export function LandscapeView({ children }: { children: ReactNode }) {
 						type="button"
 						onClick={exit}
 						aria-label="Exit full screen"
-						className="absolute top-3 right-3 rounded-md bg-black/50 p-2 text-white/80 ring-1 ring-white/20"
+						className="absolute top-3 right-3 rounded-md bg-black/50 p-2 text-white/80"
 					>
 						<Minimize2 className="size-4" />
 					</button>

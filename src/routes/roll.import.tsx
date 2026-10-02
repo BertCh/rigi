@@ -410,7 +410,7 @@ function ImportPage() {
 							setDragOver(false);
 							addFiles(e.dataTransfer.files);
 						}}
-						className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-8 text-center transition ${
+						className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-6 py-8 text-center transition ${
 							dragOver
 								? "border-[var(--rigi-glow)] bg-[var(--rigi-glow)]/10"
 								: "border-white/15 bg-white/[0.03] hover:border-white/30"
@@ -493,7 +493,7 @@ function ImportPage() {
 				{pinItem && editing && (
 					<div
 						ref={pinPanel}
-						className="mt-5 scroll-mt-4 rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10"
+						className="mt-5 scroll-mt-4 rounded-md bg-white/[0.04] p-3"
 						data-testid="pin-panel"
 					>
 						<div className="mb-2 flex items-center gap-3 text-xs">
@@ -581,7 +581,7 @@ function ImportPage() {
 						{previews.map(({ roll, count, estimated }) => (
 							<div
 								key={roll.id}
-								className="rounded-xl bg-white/[0.04] px-4 py-3 ring-1 ring-white/8"
+								className="rounded-md bg-white/[0.04] px-4 py-3"
 								data-testid="preview-roll"
 							>
 								<div className="flex items-baseline justify-between gap-3">
@@ -656,7 +656,7 @@ function ImportPage() {
 					)}
 					{phase.kind === "done" && (
 						<div
-							className="rounded-xl bg-emerald-400/10 p-4 ring-1 ring-emerald-300/25 light:ring-[var(--rigi-result)]/25"
+							className="rounded-md bg-emerald-400/10 p-4"
 							data-testid="import-done"
 						>
 							<p className="text-sm font-semibold text-emerald-200 light:text-[var(--rigi-result)]">

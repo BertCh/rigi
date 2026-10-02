@@ -47,7 +47,7 @@ import { SlippyMap } from "#/lib/upload/SlippyMap";
 
 export const Route = createFileRoute("/upload")({
 	ssr: false,
-	head: () => ({ meta: [{ title: "Upload · Summit Lens" }] }),
+	head: () => ({ meta: [{ title: "Upload · Rigi" }] }),
 	component: UploadPage,
 });
 
@@ -221,7 +221,7 @@ function UploadPage() {
 
 	return (
 		<main
-			className="min-h-dvh bg-[#0b0f14] light:bg-[var(--rigi-ink)] px-4 pb-16 text-white sm:px-8"
+			className="min-h-dvh bg-[var(--rigi-ink)] px-4 pb-16 text-white sm:px-8"
 			data-ready={settled ? "" : undefined}
 			data-stage={
 				stage ??
@@ -239,10 +239,10 @@ function UploadPage() {
 					to="/"
 					className="flex items-center gap-2 text-sm text-white/60 hover:text-white"
 				>
-					<ArrowLeft className="size-4" /> Summit Lens
+					<ArrowLeft className="size-4" /> Rigi
 				</Link>
 				<div className="flex items-center gap-4">
-					<p className="flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-cyan-300/80 light:text-[var(--rigi-glow)]/80 uppercase">
+					<p className="flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-[var(--rigi-glow)] uppercase">
 						<Compass className="size-3.5" /> Add a photo
 					</p>
 					<ThemeToggle />
@@ -262,16 +262,16 @@ function UploadPage() {
 						setDragOver(false);
 						onFile(e.dataTransfer.files[0]);
 					}}
-					className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition ${
+					className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-6 py-10 text-center transition ${
 						dragOver
-							? "border-cyan-300 light:border-[var(--rigi-glow)] bg-cyan-300/5"
+							? "border-[var(--rigi-glow)] bg-[var(--rigi-glow)]/10"
 							: "border-white/15 bg-white/[0.03] hover:border-white/30"
 					}`}
 				>
 					{stage ? (
-						<Loader2 className="size-7 animate-spin text-cyan-300 light:text-[var(--rigi-glow)]" />
+						<Loader2 className="size-7 animate-spin text-[var(--rigi-glow)]" />
 					) : (
-						<ImagePlus className="size-7 text-cyan-300 light:text-[var(--rigi-glow)]" />
+						<ImagePlus className="size-7 text-[var(--rigi-glow)]" />
 					)}
 					<span className="text-base font-semibold">
 						{stage
@@ -300,7 +300,7 @@ function UploadPage() {
 
 				{error && (
 					<div
-						className="mt-4 rounded-xl bg-red-500/10 p-4 text-sm text-red-200 light:text-[var(--rigi-trap)] ring-1 ring-red-400/30 light:ring-[var(--rigi-trap)]/30"
+						className="mt-4 rounded-md bg-red-500/10 p-4 text-sm text-red-200 light:text-[var(--rigi-trap)]"
 						data-testid="upload-error"
 					>
 						<p className="flex items-center gap-2 font-semibold">
@@ -334,7 +334,7 @@ function UploadPage() {
 						>
 							<div
 								data-theme="dark"
-								className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10"
+								className="overflow-hidden rounded-md bg-black"
 							>
 								{previewUrl && (
 									<img
@@ -365,7 +365,7 @@ function UploadPage() {
 							onRetry={() => setRegionNonce((n) => n + 1)}
 							onSkip={() => skipRef.current?.()}
 						/>
-						<div className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/8">
+						<div className="rounded-md bg-white/[0.04] p-4">
 							{!hasPosition(meta) ? (
 								<p className="text-sm text-amber-200 light:text-[var(--rigi-lesson)]">
 									Place the camera position on the map to continue.
@@ -388,7 +388,7 @@ function UploadPage() {
 										disabled={!hook}
 										data-testid="open-workspace"
 										onClick={() => openInWorkspace(saved.meta, saved.region)}
-										className="w-full rounded-lg bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-black light:text-[var(--rigi-paper)] transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+										className="w-full rounded-lg bg-[var(--rigi-glow)] px-4 py-2.5 text-sm font-semibold text-[var(--rigi-ink)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
 									>
 										Open in workspace
 									</button>
@@ -420,7 +420,7 @@ function UploadPage() {
 						{library.map((p) => (
 							<div
 								key={p.id}
-								className="overflow-hidden rounded-xl bg-white/[0.04] ring-1 ring-white/8"
+								className="overflow-hidden rounded-md bg-white/[0.04]"
 							>
 								<button
 									type="button"
@@ -483,7 +483,7 @@ function Credits() {
 					HEIC decoding in browsers without native support uses the following
 					libraries, loaded unmodified as a separate file (
 					<a
-						className="text-cyan-300/80 light:text-[var(--rigi-glow)]/80 hover:underline"
+						className="text-[var(--rigi-glow)] hover:underline"
 						href={LIBHEIF_FILE_URL}
 					>
 						libheif bundle
@@ -496,7 +496,7 @@ function Credits() {
 							<b className="text-white/60">{n.name}</b> {n.version} ·{" "}
 							{n.license} · source:{" "}
 							<a
-								className="text-cyan-300/80 light:text-[var(--rigi-glow)]/80 hover:underline"
+								className="text-[var(--rigi-glow)] hover:underline"
 								href={n.source}
 								target="_blank"
 								rel="noreferrer"
@@ -594,7 +594,7 @@ function Warnings({
 			{items.map((w) => (
 				<div
 					key={w.title}
-					className={`rounded-xl p-3 text-xs leading-relaxed ring-1 ${w.tone === "amber" ? "bg-amber-400/10 text-amber-100/85 light:text-[var(--rigi-lesson)]/85 ring-amber-300/25 light:ring-[var(--rigi-lesson)]/25" : "bg-sky-400/10 text-sky-100/80 light:text-[var(--rigi-glow)]/80 ring-sky-300/20 light:ring-[var(--rigi-glow)]/20"}`}
+					className={`rounded-md p-3 text-xs leading-relaxed ${w.tone === "amber" ? "bg-amber-400/10 text-amber-100/85 light:text-[var(--rigi-lesson)]/85 " : "bg-sky-400/10 text-sky-100/80 light:text-[var(--rigi-glow)]/80 "}`}
 				>
 					<p className="mb-0.5 flex items-center gap-1.5 font-semibold">
 						<AlertTriangle className="size-3.5" /> {w.title}
@@ -632,7 +632,7 @@ function PositionPanel({
 		if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) onPick({ lat, lon });
 	};
 	return (
-		<div className="rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/8">
+		<div className="rounded-md bg-white/[0.04] p-3">
 			<div className="mb-2 flex items-center justify-between text-xs">
 				<span className="flex items-center gap-1.5 font-semibold text-white/80">
 					<MapPin className="size-3.5 text-red-400 light:text-[var(--rigi-trap)]" />
@@ -645,7 +645,7 @@ function PositionPanel({
 				{canReset && (
 					<button
 						type="button"
-						className="text-cyan-300 light:text-[var(--rigi-glow)] hover:underline"
+						className="text-[var(--rigi-glow)] hover:underline"
 						onClick={onReset}
 					>
 						Reset to GPS
@@ -672,7 +672,7 @@ function PositionPanel({
 					value={text}
 					onChange={(e) => setText(e.target.value)}
 					placeholder="or type lat, lon  (e.g. 46.6717, 7.7094)"
-					className="min-w-0 flex-1 rounded-md bg-black/40 px-2 py-1.5 font-mono text-xs text-white ring-1 ring-white/10 outline-none focus:ring-cyan-300/60 light:focus:ring-[var(--rigi-glow)]/60"
+					className="min-w-0 flex-1 rounded-md bg-black/40 px-2 py-1.5 font-mono text-xs text-white outline-none focus:ring-1 focus:ring-[var(--rigi-glow)]/60"
 				/>
 				<button
 					type="submit"
@@ -713,10 +713,7 @@ function MetaTable({
 	const f = (v: number | null | undefined, d = 1, u = "") =>
 		v == null || !Number.isFinite(v) ? "—" : `${v.toFixed(d)}${u}`;
 	return (
-		<div
-			className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/8"
-			data-testid="upload-meta"
-		>
+		<div className="rounded-md bg-white/[0.04] p-4" data-testid="upload-meta">
 			<h3 className="mb-2 text-sm font-semibold">
 				{meta.local.fileName || meta.id}
 			</h3>
@@ -778,10 +775,7 @@ function PriorPose({ meta }: { meta: LocalPhotoMeta }) {
 		</div>
 	);
 	return (
-		<div
-			className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/8"
-			data-testid="upload-prior"
-		>
+		<div className="rounded-md bg-white/[0.04] p-4" data-testid="upload-prior">
 			<h3 className="mb-2 text-sm font-semibold">Prior camera pose</h3>
 			<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
 				{cell(
@@ -835,13 +829,10 @@ function RegionPanel({
 			.slice(0, 6);
 	}, [state, meta]);
 	return (
-		<div
-			className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/8"
-			data-testid="upload-region"
-		>
+		<div className="rounded-md bg-white/[0.04] p-4" data-testid="upload-region">
 			<h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-				<Mountain className="size-4 text-cyan-300 light:text-[var(--rigi-glow)]" />{" "}
-				Map data (OpenStreetMap)
+				<Mountain className="size-4 text-[var(--rigi-glow)]" /> Map data
+				(OpenStreetMap)
 			</h3>
 			{state.kind === "idle" && (
 				<p className="text-xs text-white/45">Waiting for a position.</p>
