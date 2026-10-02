@@ -24,6 +24,9 @@ import { submit } from "#/lib/gpu/core/queue";
 import { stageReads } from "#/lib/gpu/core/readback";
 import { numel } from "../shape";
 import type { DType, Tensor } from "../types";
+import { fuseElementwise, fuseLayerNorm } from "./fusion";
+import type { EwDesc } from "./k-elementwise";
+import type { LayerNormDesc } from "./k-fused";
 
 const STORAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
 
@@ -118,6 +121,12 @@ export type Node = {
 	wg: [number, number, number];
 	/** a unary elementwise node: its op (a candidate for epilogue fusion) */
 	act?: Activation;
+	/** an elementwise node (unary / binary / where, also a luma add / mul): fusable (fusion.ts) */
+	ew?: EwDesc;
+	/** a layerNorm node: what fusion needs to rebuild it around a producer (fusion.ts) */
+	ln?: LayerNormDesc;
+	/** the caller's `nn.scope(name, …)` path when it was recorded (profiler labels) */
+	scope?: string;
 	/** a node with an activation epilogue: the same node with `act` fused into its output */
 	fuse?: (act: Activation) => {
 		spec: KernelSpec;
@@ -158,6 +167,16 @@ export function fuseEpilogues(nodes: Node[], outputs: Set<Storage>): Node[] {
 		dropped.add(u);
 	}
 	return dropped.size ? nodes.filter((n) => !dropped.has(n)) : nodes;
+}
+
+/**
+ * A graph node's id: scope path, position and op name (`encoder.block3/n12:ew-bin-add-ff`), so the
+ * profiler (getGpuProfile `${graph}/${node}`) and the /dev/graph inspector rows map to layers.
+ */
+export function nodeLabel(n: Node, i: number): string {
+	const op = n.luma ? n.luma.key : (n.spec as KernelSpec).id;
+	const name = op.replace(/^nn\//, "").replace(/\|.*$/, "").slice(0, 48);
+	return `${n.scope ? `${n.scope}/` : ""}n${i}:${name}`;
 }
 
 export class Recording {
@@ -218,10 +237,36 @@ export class Runtime {
 		this.align = device.limits.minStorageBufferOffsetAlignment || 256;
 	}
 
-	/** Run `step` after every earlier step; its error goes to its caller only. */
+	/** Steps queued or running (a synchronous step on an idle runtime runs at once, in the caller's turn). */
+	private active = 0;
+
+	/**
+	 * Run `step` after every earlier step; its error goes to its caller only. With nothing queued the
+	 * step starts right now, so a synchronous step (a persistent forward's write + encode + submit)
+	 * is on the GPU queue before this returns: a frame loop's N+1 never waits a microtask hop on N.
+	 */
 	enqueue<T>(step: () => T | Promise<T>): Promise<T> {
+		if (this.active === 0) {
+			let r: T | Promise<T>;
+			try {
+				r = step();
+			} catch (e) {
+				return Promise.reject(e);
+			}
+			if (!(r instanceof Promise)) return Promise.resolve(r);
+			this.active++;
+			const settle = () => {
+				this.active--;
+			};
+			this.chain = r.then(settle, settle);
+			return r;
+		}
+		this.active++;
 		const p = this.chain.then(step);
-		this.chain = p.catch(() => {});
+		const settle = () => {
+			this.active--;
+		};
+		this.chain = p.then(settle, settle);
 		return p;
 	}
 
@@ -319,7 +364,10 @@ export class Runtime {
 		// dead-code elimination: keep nodes that (transitively) feed an output
 		const live = new Set<Storage>(outputs);
 		const keep: Node[] = [];
-		const nodes = fuseEpilogues(rec.nodes, outputs);
+		const nodes = fuseLayerNorm(
+			fuseElementwise(fuseEpilogues(rec.nodes, outputs), outputs),
+			outputs,
+		);
 		for (let i = nodes.length - 1; i >= 0; i--) {
 			const n = nodes[i];
 			if (!n.outputs.some((o) => live.has(o))) continue;
@@ -345,9 +393,14 @@ export class Runtime {
 	 * (`Storage.view`), the rest is graph scratch. The caller compiles and runs the graph; outputs are
 	 * valid after that run.
 	 */
-	lowerInto(g: ComputeGraph, rec: Recording, outputs: Set<Storage>) {
+	lowerInto(
+		g: ComputeGraph,
+		rec: Recording,
+		outputs: Set<Storage>,
+	): Map<Storage, string> {
 		const keep = this.prepare(rec, outputs);
-		if (!keep.length) return;
+		const imported = new Map<Storage, string>();
+		if (!keep.length) return imported;
 		const k = (graphSerial.get(g) ?? 0) + 1;
 		graphSerial.set(g, k);
 		const pre = `nn${k}/`;
@@ -384,6 +437,7 @@ export class Runtime {
 				s.viewGraph = g;
 			} else if (s.state === "ready" && !produced.has(s)) {
 				b = g.importBuffer(id, s.bytes, s.buffer as Buffer);
+				imported.set(s, id);
 			} else if (s.state === "dead" && produced.has(s)) {
 				b = g.transientBuffer(id, s.bytes);
 			} else
@@ -430,13 +484,14 @@ export class Runtime {
 				bindings[nm] = name(all[j]);
 			});
 			g.addKernel({
-				id: `${pre}n${i}`,
+				id: `${pre}${nodeLabel(n, i)}`,
 				spec,
 				bindings: bindings as never,
 				workgroups: n.wg,
 			});
 		});
 		this.stats.nodes += keep.length;
+		return imported;
 	}
 
 	/** `once`: an eager (implicit) recording, cached under `${graphGroup}/once` with a small cap. */
@@ -495,7 +550,7 @@ export class Runtime {
 			metaOffsets.push(metaWords);
 			metaWords += Math.ceil(Math.max(1, n.meta.length) / words) * words;
 			parts.push(
-				`${n.luma ? n.luma.key : (n.spec as KernelSpec).id}(${ins})>${os}@${n.meta.join(",")}/${n.wg.join(",")}`,
+				`${n.luma ? n.luma.key : (n.spec as KernelSpec).id}(${ins})>${os}@${n.meta.join(",")}/${n.wg.join(",")}${n.scope ? `#${n.scope}` : ""}`,
 			);
 		}
 		const full = `${decl.join(" ")}\n${parts.join("\n")}`;
@@ -574,7 +629,7 @@ export class Runtime {
 					bindings[nm] = handles.get(slot.get(all[j]) as string);
 				});
 				g.addKernel({
-					id: `n${i}`,
+					id: nodeLabel(n, i),
 					spec,
 					bindings: bindings as never,
 					workgroups: n.wg,

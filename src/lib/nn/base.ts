@@ -21,9 +21,12 @@ import {
 	resolveShape,
 	stridesOf,
 } from "./shape";
+import { mapTensorsAsync } from "./tree";
 import type {
 	AttentionOptions,
 	BinaryOp,
+	CompiledForward,
+	CompiledInput,
 	Conv2dOptions,
 	ConvTranspose2dOptions,
 	DeformConv2dOptions,
@@ -33,6 +36,7 @@ import type {
 	NnBackend,
 	PadOptions,
 	Pool2dOptions,
+	Readback,
 	ReduceOp,
 	RotaryOptions,
 	Tensor,
@@ -148,6 +152,46 @@ export abstract class BaseNn<T extends Tensor = Tensor> implements Nn {
 	abstract read(t: Tensor): Promise<Float32Array>;
 	abstract dispose(t: Tensor | Weights | readonly Tensor[]): void;
 	abstract forward<R>(fn: () => R): Promise<R>;
+
+	scope<R>(_name: string, fn: () => R): R {
+		return fn();
+	}
+
+	async readLater(t: Tensor, into?: Float32Array): Promise<Float32Array> {
+		const values = await this.read(t);
+		if (!into) return values;
+		into.set(values);
+		return into;
+	}
+
+	/** Eager default (the CPU backend): every run feeds fresh tensors through `fn` and reads the result. */
+	async compile<R>(
+		_key: string,
+		inputShapes: readonly (readonly number[])[],
+		fn: (inputs: Tensor[]) => R,
+	): Promise<CompiledForward<R>> {
+		const run = async (inputs: readonly CompiledInput[] = []) => {
+			const made: Tensor[] = [];
+			const tensors = inputShapes.map((shape, i) => {
+				const v = inputs[i];
+				if (v && !(v instanceof Float32Array)) return v;
+				const t = this.fromArray(v ?? new Float32Array(numel(shape)), shape);
+				made.push(t);
+				return t;
+			});
+			const out = await this.forward(() => fn(tensors));
+			const values = await mapTensorsAsync(out, (t) => this.read(t));
+			this.dispose(made);
+			return values as Readback<R>;
+		};
+		return {
+			run,
+			submit: async (inputs) => {
+				await run(inputs);
+			},
+			dispose() {},
+		};
+	}
 
 	// ---- primitives -------------------------------------------------------------------------
 	abstract pFull(shape: number[], value: number): T;

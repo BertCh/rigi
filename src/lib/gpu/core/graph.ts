@@ -59,12 +59,13 @@ import { type ClearAudit, clearLintError } from "./clear-lint";
 import { observeCompiledGraph } from "./inspector";
 import {
 	type BindKind,
-	encodeDispatch,
+	encodeDispatchMemo,
 	isTextureKind,
 	type Kernel,
 	type KernelSpec,
 	kernel,
 	kernelAsync,
+	newBindGroupMemo,
 } from "./kernel";
 import { onLost, untilLost } from "./lifecycle";
 import {
@@ -322,30 +323,33 @@ function buildKernelNode<P>(label: string, node: KernelNode<P>) {
 			usage: USE[kind as keyof typeof USE],
 		};
 	});
-	const executable = (k: Kernel): GPUCommandGraphComputeExecutable<P> => ({
-		encode: ({ computePass, getBuffer, getTextureView, parameters }) => {
-			const b: Bindings = {};
-			for (const [name] of spec.layout) {
-				// handles: their declared byteLength; views: their exact range; explicit ranges: the
-				// run's { offset, size } (a binding narrower than a capacity-keyed buffer); textures:
-				// their (or the view's) TextureView
-				const v = node.bindings[name];
-				if (isTexture(v)) {
-					b[name] = getTextureView(v);
-					continue;
+	const executable = (k: Kernel): GPUCommandGraphComputeExecutable<P> => {
+		const memo = newBindGroupMemo();
+		return {
+			encode: ({ computePass, getBuffer, getTextureView, parameters }) => {
+				const b: Bindings = {};
+				for (const [name] of spec.layout) {
+					// handles: their declared byteLength; views: their exact range; explicit ranges: the
+					// run's { offset, size } (a binding narrower than a capacity-keyed buffer); textures:
+					// their (or the view's) TextureView
+					const v = node.bindings[name];
+					if (isTexture(v)) {
+						b[name] = getTextureView(v);
+						continue;
+					}
+					b[name] = {
+						buffer: getBuffer(v instanceof GraphDataView ? v : handleOf(v)),
+						...rangeOf(v, parameters),
+					};
 				}
-				b[name] = {
-					buffer: getBuffer(v instanceof GraphDataView ? v : handleOf(v)),
-					...rangeOf(v, parameters),
-				};
-			}
-			const w =
-				typeof node.workgroups === "function"
-					? node.workgroups(parameters)
-					: node.workgroups;
-			encodeDispatch(computePass, k, b, w[0], w[1] ?? 1, w[2] ?? 1);
-		},
-	});
+				const w =
+					typeof node.workgroups === "function"
+						? node.workgroups(parameters)
+						: node.workgroups;
+				encodeDispatchMemo(computePass, k, b, w[0], w[1] ?? 1, w[2] ?? 1, memo);
+			},
+		};
+	};
 	const computeNode: Omit<GPUCommandGraphComputeNode<P>, "type"> = {
 		id: node.id,
 		dependsOn: node.dependsOn,
@@ -1074,6 +1078,22 @@ export class ComputeGraph<P = void> {
 		const s = this.compile().compiled?.stats;
 		if (s && (s.logicalTransientBufferCount || s.logicalTransientTextureCount))
 			throw new Error(`${this.id}: runNow() needs a graph without transients`);
+		return this.execute(parameters, opts);
+	}
+
+	/**
+	 * A frame loop's run: like runNow() but also for graphs WITH transients. Compile, encode, stage and
+	 * submit happen synchronously in this call (a caller may queue.writeBuffer its imports right before
+	 * it), and nothing is serialised through the lease, so back-to-back calls are encoded and submitted
+	 * back to back while earlier reads still map. Safe because queue order already serialises the GPU
+	 * work that shares the transients; the caller must not destroy the graph (or a cache evict it)
+	 * while a run is in flight, i.e. the graph is owned, not in cachedGraph. The returned promise only
+	 * reads back.
+	 */
+	runOwned(
+		parameters: P,
+		opts: GraphRunOptions<P> = {},
+	): Promise<GraphRunResult> {
 		return this.execute(parameters, opts);
 	}
 

@@ -1328,6 +1328,14 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "nn-compile",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/nn/compile.check.ts"),
+		note: "nn.compile (persistent forward) over Dawn: a compiled block (bias + gelu, layer-scaled residual, layerNorm) replays with new inputs vs the CPU reference (<= 1e-4), 8 runs in flight each read their own frame, ready-tensor inputs rebind, same key + shapes is the same compiled forward, scope() labels reach the graph node ids; SKIP without DAWN_DIR",
+		timeoutS: 120,
+	},
+	{
 		id: "nn-interop",
 		tier: "fast",
 		group: "gpu",

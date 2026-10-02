@@ -20,6 +20,7 @@
 //   core/pool.ts and the ring readback in core/readback.ts.
 // look/kernel.ts maps 1:1 onto this: see core/README.md.
 import {
+	_getDefaultBindGroupFactory,
 	type BindingDeclaration,
 	type Bindings,
 	Buffer,
@@ -365,6 +366,95 @@ export function encodeDispatch(
 		pass.setBindings(bindings);
 		pass.dispatch(x, y, z);
 	}
+}
+
+/**
+ * A graph node's last bind groups. A graph re-encoded every frame binds the same buffers to the same
+ * node each time; creating the GPUBindGroup again per node per frame was the largest CPU cost of an
+ * encode (~6 µs a node on Dawn). encodeDispatchMemo keeps the groups while every bound GPU resource
+ * (buffer handle, range, texture view handle) and the pipeline are unchanged.
+ */
+export type BindGroupMemo = {
+	pipeline: unknown;
+	sig: unknown[];
+	groups: [number, unknown][];
+};
+
+export const newBindGroupMemo = (): BindGroupMemo => ({
+	pipeline: null,
+	sig: [],
+	groups: [],
+});
+
+/** The GPU objects behind `bindings`, in layout order (buffer handle, offset, size / view handle). */
+function bindingSignature(k: Kernel, bindings: Bindings, into: unknown[]) {
+	let i = 0;
+	for (const [name] of k.spec.layout) {
+		const v = bindings[name] as {
+			buffer?: Buffer;
+			handle?: unknown;
+			offset?: number;
+			size?: number;
+		};
+		if (v.buffer) {
+			into[i++] = v.buffer.handle;
+			into[i++] = v.offset;
+			into[i++] = v.size;
+		} else {
+			into[i++] = v.handle;
+			into[i++] = undefined;
+			into[i++] = undefined;
+		}
+	}
+	into.length = i;
+}
+
+/**
+ * encodeDispatch that reuses the bind groups of the previous encode of the same node (`memo`) when
+ * its resources are the same GPU objects: the pass handle gets setPipeline / setBindGroup
+ * directly and the luma pass the dispatch. A changed resource (an overridden import, a reallocated transient)
+ * makes a new group, so results never differ from encodeDispatch.
+ */
+export function encodeDispatchMemo(
+	pass: ComputePass,
+	k: Kernel,
+	bindings: Bindings,
+	x: number,
+	y: number,
+	z: number,
+	memo: BindGroupMemo,
+) {
+	const raw = (pass as unknown as { handle?: GPUComputePassEncoder }).handle;
+	const device = k.device;
+	if (!k.engine || !raw || !device)
+		return encodeDispatch(pass, k, bindings, x, y, z);
+	const sig: unknown[] = [];
+	bindingSignature(k, bindings, sig);
+	let same = memo.pipeline === k.pipeline && memo.sig.length === sig.length;
+	for (let i = 0; same && i < sig.length; i++) same = memo.sig[i] === sig[i];
+	if (!same) {
+		checkStorageBindings(
+			k.spec,
+			bindings,
+			device.limits.minStorageBufferOffsetAlignment ?? 256,
+		);
+		const groups = _getDefaultBindGroupFactory(device).getBindGroups(
+			k.pipeline,
+			bindings,
+		);
+		memo.pipeline = k.pipeline;
+		memo.sig = sig;
+		memo.groups = Object.entries(groups)
+			.filter(([, g]) => g)
+			.map(([g, bg]) => [Number(g), bg]);
+	}
+	checkWorkgroups(k, x, y, z);
+	raw.setPipeline(
+		(k.pipeline as unknown as { handle: GPUComputePipeline }).handle,
+	);
+	for (const [g, bg] of memo.groups) raw.setBindGroup(g, bg as GPUBindGroup);
+	// the luma pass method: conditional (GPU-predicate) nodes count their dispatches there
+	pass.dispatch(x, y, z);
 }
 
 /**

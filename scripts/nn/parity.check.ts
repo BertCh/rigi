@@ -649,6 +649,36 @@ const cases: Case[] = [
 		},
 	},
 	// a transformer block in one forward (transients aliased across ~20 nodes)
+	// elementwise chain fusion (gpu/fusion.ts): bias + gelu, a * gamma + r, trees, scalars, a shared intermediate
+	{
+		name: "fuse-ew-chain",
+		shapes: [[4, 30], [30], [4, 30], [30], [4, 1]],
+		fn: (nn, x, bias, r, gamma, col) => {
+			const shared = nn.add(x, 1.5);
+			return [
+				nn.gelu(nn.add(x, bias)),
+				nn.add(nn.mul(x, gamma), r),
+				nn.sub(nn.maximum(x, 0.1), nn.mul(r, 2)),
+				nn.unary("neg", nn.unary("exp", nn.clamp(x, -1, 1))),
+				nn.mul(nn.add(x, 1), 3),
+				nn.where(nn.compare("gt", x, 0), nn.add(x, col), nn.mul(r, col)),
+				nn.mul(shared, shared),
+				nn.relu(nn.add(shared, r)),
+			];
+		},
+	},
+	// layerNorm over an elementwise expression, with and without the expression's value also read
+	{
+		name: "fuse-ln-residual",
+		shapes: [[3, 50, 64], [3, 50, 64], [64], [64], [64]],
+		fn: (nn, x, r, gamma, g, b) => {
+			const s = nn.add(x, nn.mul(r, gamma));
+			const kept = nn.layerNorm(s, g, b);
+			const alone = nn.layerNorm(nn.add(x, r), null, null, 1e-6);
+			const only = nn.layerNorm(nn.add(r, 0.5), g, null);
+			return [kept, nn.add(s, nn.relu(kept)), alone, only];
+		},
+	},
 	{
 		name: "block",
 		shapes: [

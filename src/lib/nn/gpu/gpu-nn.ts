@@ -7,7 +7,7 @@
 // their results kept) before the next forward, read, or explicit sync().
 
 import type { Buffer, Device, Texture } from "@luma.gl/core";
-import type { ComputeGraph } from "#/lib/gpu/core/graph";
+import { ComputeGraph } from "#/lib/gpu/core/graph";
 import type { GraphDataView } from "#/lib/gpu/core/luma";
 import {
 	type AttentionParams,
@@ -33,17 +33,30 @@ import {
 	type PoolParams,
 	stridesOf,
 } from "../shape";
-import type { BinaryOp, DType, NnBackend, Tensor, Weights } from "../types";
+import { collectTensors, mapTensors } from "../tree";
+import type {
+	BinaryOp,
+	CompiledForward,
+	CompiledInput,
+	DType,
+	NnBackend,
+	Readback,
+	Tensor,
+	Weights,
+} from "../types";
 import { attentionKernel } from "./k-attention";
 import {
 	binaryExpr,
 	coalesce,
 	copyIntoKernel,
+	type EwDesc,
+	ewKernel,
 	fillKernel,
 	type KernelCall,
-	naryKernel,
+	naryDesc,
 	type Operand,
 	stridedCopyKernel,
+	unaryDesc,
 	unaryKernel,
 } from "./k-elementwise";
 import {
@@ -135,6 +148,12 @@ export class GpuNn extends BaseNn<GpuTensor> {
 	};
 	private rec: Recording | null = null;
 	private implicit: Recording | null = null;
+	/** the active `scope()` path, stamped on recorded nodes */
+	private scopePath: string | undefined;
+	private readonly compiledForwards = new Map<
+		string,
+		Promise<GpuCompiled<unknown>>
+	>();
 
 	/** `graphGroup`: the cachedGraph group of this runtime's graphs (default "nn"; nn/registry.ts gives each consumer its own). */
 	constructor(
@@ -159,7 +178,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		call: KernelCall,
 		inputs: GpuTensor[],
 		shapes: number[][],
-		extra: Pick<Node, "act" | "fuse"> = {},
+		extra: Pick<Node, "act" | "fuse" | "ew" | "ln"> = {},
 	): GpuTensor[] {
 		const rec = this.current();
 		const outs = shapes.map((s) => {
@@ -173,6 +192,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			outputs: outs.map((t) => t.st),
 			meta: call.meta,
 			wg: call.wg,
+			scope: this.scopePath,
 			...extra,
 		});
 		return outs;
@@ -181,7 +201,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		call: KernelCall,
 		inputs: GpuTensor[],
 		shape: number[],
-		extra: Pick<Node, "act" | "fuse"> = {},
+		extra: Pick<Node, "act" | "fuse" | "ew" | "ln"> = {},
 	): GpuTensor {
 		return this.node(call, inputs, [shape], extra)[0];
 	}
@@ -191,6 +211,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		call: LumaCall,
 		inputs: GpuTensor[],
 		shapes: number[][],
+		ew?: EwDesc,
 	): GpuTensor[] {
 		const rec = this.current();
 		const outs = shapes.map((sh) => {
@@ -204,6 +225,8 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			outputs: outs.map((t) => t.st),
 			meta: [],
 			wg: [1, 1, 1],
+			scope: this.scopePath,
+			ew,
 		});
 		return outs;
 	}
@@ -353,6 +376,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		const st = new Storage(C * H * W * 4, "f32", rec);
 		rec.produced.push(st);
 		rec.nodes.push({
+			scope: this.scopePath,
 			spec: call.spec,
 			textures: [t],
 			inputs: [],
@@ -538,6 +562,76 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		return out;
 	}
 
+	scope<R>(name: string, fn: () => R): R {
+		const outer = this.scopePath;
+		this.scopePath = outer ? `${outer}/${name}` : name;
+		try {
+			return fn();
+		} finally {
+			this.scopePath = outer;
+		}
+	}
+
+	async readLater(t: Tensor, into?: Float32Array): Promise<Float32Array> {
+		const values = await this.read(t);
+		if (!into) return values;
+		into.set(values);
+		return into;
+	}
+
+	compile<R>(
+		key: string,
+		inputShapes: readonly (readonly number[])[],
+		fn: (inputs: Tensor[]) => R,
+	): Promise<GpuCompiled<R>> {
+		const id = `${key}|${inputShapes.map((s) => s.join("x")).join(";")}`;
+		let c = this.compiledForwards.get(id);
+		if (!c) {
+			c = this.buildCompiled(id, inputShapes, fn as (i: Tensor[]) => unknown);
+			this.compiledForwards.set(id, c);
+			c.catch(() => this.compiledForwards.delete(id));
+		}
+		return c as Promise<GpuCompiled<R>>;
+	}
+
+	private async buildCompiled(
+		id: string,
+		inputShapes: readonly (readonly number[])[],
+		fn: (inputs: Tensor[]) => unknown,
+	): Promise<GpuCompiled<unknown>> {
+		await this.flushImplicit();
+		if (this.rec) throw new Error("nn: compile() inside forward()");
+		const rec = new Recording();
+		const inputs = inputShapes.map((shape) => {
+			const st = new Storage(Math.max(4, numel(shape) * 4), "f32", null);
+			st.buffer = this.runtime.allocateExact(st.bytes);
+			st.pinned = true;
+			return new GpuTensor([...shape], "f32", st);
+		});
+		this.rec = rec;
+		let out: unknown;
+		try {
+			out = fn(inputs);
+		} catch (e) {
+			for (const s of rec.produced) s.state = "dead";
+			for (const t of inputs) t.st.buffer?.destroy();
+			throw e;
+		} finally {
+			this.rec = null;
+		}
+		const outs = this.collectOutputs(out, rec);
+		for (const s of outs) s.pinned = true;
+		const graph = new ComputeGraph<void>(this.device, `nn-compiled/${id}`);
+		const imported = this.runtime.lowerInto(graph, rec, outs);
+		await graph.compileAsync();
+		return new GpuCompiled(this, graph, id, inputs, imported, out, outs);
+	}
+
+	/** @internal GpuCompiled */
+	forgetCompiled(id: string) {
+		this.compiledForwards.delete(id);
+	}
+
 	// ---- primitives ---------------------------------------------------------------------------
 	pFull(shape: number[], value: number) {
 		return this.one(fillKernel(numel(shape), value), [], shape);
@@ -628,6 +722,13 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		out: number[],
 	) {
 		const lumaOp = lumaBinaryOp(op);
+		const desc = naryDesc(
+			`bin-${op}`,
+			["a", "b"],
+			[this.operand(a, out), this.operand(b, out)],
+			out,
+			binaryExpr(op),
+		);
 		if (
 			this.lumaOps.enabled &&
 			lumaOp &&
@@ -638,16 +739,14 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			numel(a.shape) === numel(out) &&
 			numel(b.shape) === numel(out)
 		)
-			return this.lumaNode(lumaBinary(lumaOp, numel(out)), [a, b], [out])[0];
-		const call = naryKernel(
-			`bin-${op}`,
-			["a", "b"],
-			[this.operand(a, out), this.operand(b, out)],
-			out,
-			binaryExpr(op),
-		);
+			return this.lumaNode(
+				lumaBinary(lumaOp, numel(out)),
+				[a, b],
+				[out],
+				desc,
+			)[0];
 		const ins = [a, b].filter((v): v is GpuTensor => typeof v !== "number");
-		return this.one(call, ins, out);
+		return this.one(ewKernel(desc), ins, out, { ew: desc });
 	}
 
 	pWhere(
@@ -656,7 +755,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		b: GpuTensor | number,
 		out: number[],
 	) {
-		const call = naryKernel(
+		const desc = naryDesc(
 			"where",
 			["c", "a", "b"],
 			[this.operand(c, out), this.operand(a, out), this.operand(b, out)],
@@ -664,7 +763,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			"select(b, a, c != 0.0)",
 		);
 		const ins = [c, a, b].filter((v): v is GpuTensor => typeof v !== "number");
-		return this.one(call, ins, out);
+		return this.one(ewKernel(desc), ins, out, { ew: desc });
 	}
 
 	pUnary(op: UnaryPrim, x: GpuTensor, alpha: number, beta: number) {
@@ -672,7 +771,10 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			unaryKernel(op, x.dtype, numel(x.shape), alpha, beta),
 			[x],
 			[...x.shape],
-			{ act: { op, alpha, beta } },
+			{
+				act: { op, alpha, beta },
+				ew: unaryDesc(op, x.dtype, [...x.shape], alpha, beta),
+			},
 		);
 	}
 
@@ -709,6 +811,15 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			),
 			[x, ...(w ? [w] : []), ...(b ? [b] : [])],
 			[...x.shape],
+			{
+				ln: {
+					dw: w?.dtype ?? null,
+					db: b?.dtype ?? null,
+					rows,
+					C,
+					eps,
+				},
+			},
 		);
 	}
 
@@ -837,6 +948,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		for (const x of xs) {
 			const call = copyIntoKernel(x.dtype, [...x.shape], os, at * os[axis]);
 			rec.nodes.push({
+				scope: this.scopePath,
 				spec: call.spec,
 				inputs: [x.st],
 				outputs: [st],
@@ -975,6 +1087,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		const rec = this.current();
 		for (const s of plan.steps)
 			rec.nodes.push({
+				scope: this.scopePath,
 				spec: s.spec,
 				inputs: [],
 				outputs: [keys.st, idx.st],
@@ -983,5 +1096,121 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			});
 		const [values, indices] = this.node(plan.final, [keys, idx], [out, out]);
 		return { values, indices };
+	}
+}
+
+/**
+ * A forward compiled by GpuNn.compile: one owned ComputeGraph over persistent input buffers (written
+ * with queue writes) and persistent output buffers (`outputs`, valid after a run's submit, overwritten
+ * by the next run: read them on the GPU in queue order, or through run()). Every call is encoded and
+ * submitted synchronously when the runtime is idle, so calls pipeline: while run N's readback maps,
+ * run N+1 is already on the queue.
+ */
+export class GpuCompiled<R> implements CompiledForward<R> {
+	private readonly tensors: GpuTensor[];
+	private readonly reads: { buffer: Buffer; size: number }[];
+	private disposed = false;
+
+	constructor(
+		private readonly nn: GpuNn,
+		private readonly graph: ComputeGraph<void>,
+		private readonly id: string,
+		private readonly inputs: GpuTensor[],
+		private readonly imported: Map<Storage, string>,
+		/** the persistent output tensors, shaped like fn's return value */
+		readonly outputs: R,
+		private readonly outStorages: Set<Storage>,
+	) {
+		this.tensors = collectTensors(outputs) as GpuTensor[];
+		this.reads = this.tensors.map((t) => {
+			if (t.st.state !== "ready" || !t.st.buffer)
+				throw new Error(`nn: compiled output is a ${t.st.state} tensor`);
+			return {
+				buffer: t.st.buffer,
+				size: numel(t.shape) * (t.dtype === "f16" ? 2 : 4),
+			};
+		});
+	}
+
+	/** Write / rebind the inputs; the buffer overrides for graph.runOwned. */
+	private bind(values: readonly CompiledInput[]) {
+		let buffers: Record<string, Buffer> | undefined;
+		values.forEach((v, i) => {
+			const input = this.inputs[i];
+			if (!input)
+				throw new Error(
+					`nn: compiled forward has ${this.inputs.length} inputs`,
+				);
+			if (v instanceof Float32Array) {
+				if (v.length !== numel(input.shape))
+					throw new Error(
+						`nn: compiled input ${i} has ${v.length} values for [${input.shape.join(",")}]`,
+					);
+				(input.st.buffer as Buffer).write(v);
+				return;
+			}
+			const t = v as GpuTensor;
+			// rebinding an imported buffer builds a new bind group for the nodes that read it
+			if (t.st.state !== "ready" || !t.st.buffer || t.dtype !== "f32")
+				throw new Error(
+					`nn: compiled input ${i} is a ${t.st.state} ${t.dtype} tensor`,
+				);
+			const handle = this.imported.get(input.st);
+			if (handle) {
+				buffers ??= {};
+				buffers[handle] = t.st.buffer;
+			}
+		});
+		return buffers;
+	}
+
+	run(values: readonly CompiledInput[] = []): Promise<Readback<R>> {
+		return this.nn.runtime
+			.enqueue(() => ({
+				// wrapped: enqueue must not wait for the readback (the next frame encodes meanwhile)
+				done: this.graph.runOwned(undefined, {
+					buffers: this.bind(values),
+					read: this.reads,
+				}),
+			}))
+			.then(({ done }) => done)
+			.then(({ data }) => {
+				const out = new Map<Tensor, Float32Array>();
+				this.tensors.forEach((t, i) => {
+					const n = numel(t.shape);
+					out.set(
+						t,
+						t.dtype === "f16"
+							? halfToFloat32(new Uint16Array(data[i], 0, n))
+							: new Float32Array(data[i], 0, n),
+					);
+				});
+				return mapTensors(this.outputs, (t) => out.get(t)) as Readback<R>;
+			});
+	}
+
+	submit(values: readonly CompiledInput[] = []): Promise<void> {
+		return this.nn.runtime
+			.enqueue(() => ({
+				done: this.graph.runOwned(undefined, { buffers: this.bind(values) }),
+			}))
+			.then(({ done }) => done)
+			.then(() => undefined);
+	}
+
+	dispose() {
+		if (this.disposed) return;
+		this.disposed = true;
+		this.nn.forgetCompiled(this.id);
+		this.graph.destroy();
+		for (const t of this.inputs) t.st.buffer?.destroy();
+		for (const s of this.outStorages) {
+			if (s.buffer) {
+				if (s.exact) s.buffer.destroy();
+				else this.nn.runtime.recycle(s.buffer);
+			}
+			s.buffer = null;
+			s.state = "disposed";
+		}
 	}
 }

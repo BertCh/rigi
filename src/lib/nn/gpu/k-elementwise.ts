@@ -7,6 +7,7 @@
 // shape coalesced to at most MAX_RANK dims.
 
 import type { UnaryPrim } from "../base";
+import { stridesOf } from "../shape";
 import type { BinaryOp, DType } from "../types";
 import { fbits, grid1d, nnKernel } from "./wgsl";
 
@@ -49,18 +50,21 @@ export function coalesce(
 	return { shape: sh, sets: st };
 }
 
-const padTo = (a: number[], v = 0) => [
+export const padTo = (a: number[], v = 0) => [
 	...a,
 	...new Array(MAX_RANK - a.length).fill(v),
 ];
 
-/** WGSL that decomposes `i` over the shape at M[2..8) into offsets over k stride sets at M[8+6j..]. */
-function decompose(k: number): string {
+/**
+ * WGSL that decomposes `i` over the shape at M[base+2..base+8) into offsets over k stride sets at
+ * M[base+8+6j..]; `base` is where the elementwise header (n, rank, shape, strides) starts in M.
+ */
+export function decompose(k: number, base = 0): string {
 	let s = "  var r = i;\n";
 	for (let j = 0; j < k; j++) s += `  var o${j} = 0u;\n`;
-	s +=
-		"  let rank = mu(1u);\n  for (var d = 0u; d < rank; d++) {\n    let dd = rank - 1u - d;\n    let c = r % mu(2u + dd);\n    r = r / mu(2u + dd);\n";
-	for (let j = 0; j < k; j++) s += `    o${j} += c * mu(${8 + 6 * j}u + dd);\n`;
+	s += `  let rank = mu(${base + 1}u);\n  for (var d = 0u; d < rank; d++) {\n    let dd = rank - 1u - d;\n    let c = r % mu(${base + 2}u + dd);\n    r = r / mu(${base + 2}u + dd);\n`;
+	for (let j = 0; j < k; j++)
+		s += `    o${j} += c * mu(${base + 8 + 6 * j}u + dd);\n`;
 	s += "  }\n";
 	return s;
 }
@@ -184,6 +188,117 @@ export type Operand =
 	| { kind: "tensor"; dtype: DType; strides: number[] };
 
 /**
+ * An elementwise computation over `shape`, described so that chains of them can fuse into one kernel
+ * (gpu/fusion.ts). `ops` are the operands in kernel order (tensor operands match the node's inputs
+ * one to one, in order). `stmt(names, out, uid)` returns WGSL statements that assign the result to
+ * the f32 variable `out`, reading operand j from the f32 expression `names[j]`; it opens its own
+ * block for locals, and takes unique variable names from `uid`. `key` identifies `stmt` (and the
+ * operand layout) for kernel memoisation: equal keys must generate equal code.
+ */
+export type EwDesc = {
+	shape: number[];
+	ops: Operand[];
+	key: string;
+	stmt: (names: string[], out: string, uid: () => string) => string;
+};
+
+/** The kernel of an elementwise description: out[i] = stmt over the (coalesced) broadcast index. */
+export function ewKernel(d: EwDesc): KernelCall {
+	const tensorSets = d.ops.flatMap((o) =>
+		o.kind === "tensor" ? [o.strides] : [],
+	);
+	const { shape, sets } = coalesce(d.shape, tensorSets);
+	const n = d.shape.reduce((a, b) => a * b, 1);
+	const contiguous = (s: number[]) => {
+		let acc = 1;
+		for (let k = shape.length - 1; k >= 0; k--) {
+			if (s[k] !== acc) return false;
+			acc *= shape[k];
+		}
+		return true;
+	};
+	const flat = sets.map(contiguous);
+	const general = flat.some((f) => !f);
+	const meta = [n, shape.length, ...padTo(shape, 1)];
+	for (const s of sets) meta.push(...padTo(s));
+	let body = "";
+	let ti = 0;
+	let si = 0;
+	const inputs: { name: string; dtype: DType }[] = [];
+	const variant: string[] = [];
+	const names: string[] = [];
+	d.ops.forEach((o, j) => {
+		const nm = `x${j}`;
+		names.push(nm);
+		if (o.kind === "scalar") {
+			body += `  let ${nm} = mf(${meta.length + si++}u);\n`;
+			variant.push("s");
+		} else {
+			inputs.push({ name: `in${ti}`, dtype: o.dtype });
+			const f = flat[ti];
+			body += `  let ${nm} = ld_in${ti}(${f ? "i" : `o${ti}`});\n`;
+			variant.push(f ? "f" : "g");
+			ti++;
+		}
+	});
+	// scalar words follow the stride sets (the indices above were taken before these pushes)
+	for (const o of d.ops) if (o.kind === "scalar") meta.push(fbits(o.value));
+	let uidCount = 0;
+	const stmt = d.stmt(names, "acc", () => `w${uidCount++}`);
+	const spec = nnKernel(
+		`ew-${d.key}-${variant.join("")}`,
+		inputs,
+		["out"],
+		`${ENTRY} {
+  let i = lin(wid, nwg, lid);
+  if (i >= mu(0u)) { return; }
+${general ? decompose(sets.length) : ""}${body}  var acc = 0.0;
+  ${stmt}
+  out[i] = acc;
+}`,
+	);
+	return { spec, meta, wg: grid1d(n) };
+}
+
+/** Description of a unary op over `shape` (alpha / beta are scalar operands, not baked in). */
+export function unaryDesc(
+	op: UnaryPrim,
+	dtype: DType,
+	shape: number[],
+	alpha: number,
+	beta: number,
+): EwDesc {
+	return {
+		shape,
+		ops: [
+			{ kind: "tensor", dtype, strides: stridesOf(shape) },
+			{ kind: "scalar", value: alpha },
+			{ kind: "scalar", value: beta },
+		],
+		key: `u-${op}`,
+		stmt: (n, out) =>
+			`{ let v = ${n[0]}; let al = ${n[1]}; let be = ${n[2]}; ${out} = ${unaryExpr(op)}; }`,
+	};
+}
+
+/** Description of an n-ary op (binary: names [a, b]; where: [c, a, b]) with broadcasting operands. */
+export function naryDesc(
+	key: string,
+	names: string[],
+	ops: Operand[],
+	out: number[],
+	expr: string,
+): EwDesc {
+	return {
+		shape: out,
+		ops,
+		key,
+		stmt: (n, o) =>
+			`{ ${names.map((nm, j) => `let ${nm} = ${n[j]};`).join(" ")} ${o} = ${expr}; }`,
+	};
+}
+
+/**
  * Broadcasting n-ary kernel (binary: [a, b], where: [c, a, b]): `expr` combines locals named by
  * `names`. Operands equal in shape to the output (strides = contiguous) are read flat.
  */
@@ -194,56 +309,7 @@ export function naryKernel(
 	out: number[],
 	expr: string,
 ): KernelCall {
-	const tensorSets = ops.flatMap((o) =>
-		o.kind === "tensor" ? [o.strides] : [],
-	);
-	const { shape, sets } = coalesce(out, tensorSets);
-	const n = out.reduce((a, b) => a * b, 1);
-	const contiguous = (s: number[]) => {
-		let acc = 1;
-		for (let d = shape.length - 1; d >= 0; d--) {
-			if (s[d] !== acc) return false;
-			acc *= shape[d];
-		}
-		return true;
-	};
-	const flat = sets.map(contiguous);
-	const general = flat.some((f) => !f);
-	const meta = [n, shape.length, ...padTo(shape, 1)];
-	for (const s of sets) meta.push(...padTo(s));
-	while (meta.length < 8 + 6 * 3) meta.push(0);
-	const scalarBase = meta.length;
-	let body = "";
-	let ti = 0;
-	const inputs: { name: string; dtype: DType }[] = [];
-	const variant: string[] = [];
-	ops.forEach((o, j) => {
-		const nm = names[j];
-		if (o.kind === "scalar") {
-			body += `  let ${nm} = mf(${scalarBase + j}u);\n`;
-			variant.push("s");
-		} else {
-			inputs.push({ name: `in_${nm}`, dtype: o.dtype });
-			const f = flat[ti];
-			body += `  let ${nm} = ld_in_${nm}(${f ? "i" : `o${ti}`});\n`;
-			variant.push(f ? "f" : "g");
-			ti++;
-		}
-	});
-	ops.forEach((o) => {
-		meta.push(o.kind === "scalar" ? fbits(o.value) : 0);
-	});
-	const spec = nnKernel(
-		`${key}-${variant.join("")}`,
-		inputs,
-		["out"],
-		`${ENTRY} {
-  let i = lin(wid, nwg, lid);
-  if (i >= mu(0u)) { return; }
-${general ? decompose(sets.length) : ""}${body}  out[i] = ${expr};
-}`,
-	);
-	return { spec, meta, wg: grid1d(n) };
+	return ewKernel(naryDesc(key, names, ops, out, expr));
 }
 
 /** out[i] = x[offset + Σ c_d · strides_d] over `out` (permute, slice, expand). */

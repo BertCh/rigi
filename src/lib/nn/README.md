@@ -43,8 +43,46 @@ App consumers do not call `createNn` themselves: `getNn(consumer, device?)` (`re
   is fused into that kernel's store automatically (when nothing else reads the pre-activation).
 - Fold BatchNorm into the preceding conv in the producer script; `batchNorm` exists but costs
   elementwise passes.
+- Elementwise chains fuse into one kernel (bias + gelu, `a * gamma + r`, trees of unary / binary / where
+  over same-shape operands that feed nothing else), and a layerNorm over an elementwise expression
+  (the residual add) becomes one kernel that still writes the sum when something else reads it
+  (`gpu/fusion.ts`, planning is pure CPU and specced in `__tests__/gpu-fusion.spec.ts`). Kernels are
+  limited to 8 storage bindings, so wide expressions split.
 - Missing an op? Add it to `types.ts` + `base.ts` (shape logic) + `cpu.ts` + `gpu/`, with a
   `scripts/nn/parity.check.ts` case. Keep signatures stable; other units build on them.
+
+## Frame loops: `compile`, `scope`, `readLater`
+
+`forward(fn)` re-runs `fn`, re-records, plans fusion and hashes the graph on every call. For a loop that
+runs the same net per frame, record once:
+
+```ts
+const net = await nn.compile("pose/encoder", [[1, 3, 224, 224]], ([img]) =>
+  nn.scope("encoder", () => ({ heat: head(backbone(img)) })));   // fn runs once per (key, shapes)
+const out = await net.run([frameFloats]);     // Float32Array in (queue write), { heat: Float32Array } out
+await net.submit([frameFloats]);              // GPU consumers: net.outputs.heat is a persistent tensor (GpuNn)
+net.dispose();                                // awaits are the caller's: no run may be in flight
+```
+
+- Inputs are persistent buffers written in place (a `Float32Array`), or a ready f32 tensor that is
+  rebound for that run (its nodes build a new bind group). Outputs are persistent buffers: the next
+  run overwrites them, `run()` copies them into its staging slot in the same submission. Weights and
+  constants `fn` captures stay alive; keep them until `dispose()`.
+- The graph is owned (not in the `cachedGraph` LRU) and run with `runOwned`: compile, encode and submit
+  are synchronous in the call, so `run` N+1 is on the GPU queue before run N's readback maps. Do not
+  `await` between frames; consume each promise a frame later (`Promise.all` of 32 runs of a 100-node
+  chain: 0.45 ms/frame against 1.4 ms awaited one by one on Dawn, noisy shared machine).
+- `Runtime.enqueue` starts a step at once when nothing is queued, so `forward`, `read` and eager
+  uploads also skip a microtask hop when idle. The queue still orders every step.
+- Bind groups of a graph node are reused while its buffers are unchanged (`encodeDispatchMemo` in
+  `gpu/core/kernel.ts`, all ComputeGraph users), which removed most of the per-node encode cost.
+- `nn.scope("encoder.block3", () => ...)` stamps the path on the nodes; node ids read
+  `encoder.block3/n12:ew-bin-add...`, so `getGpuProfile()` (`__RIGI_GPU_PROFILE__ = true`) and the
+  /dev/graph inspector map to layers.
+- `nn.readLater(t, into?)` starts a copy now and resolves later; several can be in flight (the readback
+  ring grows on demand). On the CPU backend `compile().run` is eager `forward` + `read`.
+- `scripts/nn/frame-loop.bench.ts` measures per-call overhead, pipelining and the MoGe depth net warm.
+  `MogeDepthNet.runCompiled` is the depth net on this path.
 
 ## Sharing a ComputeGraph with luma operators (GpuNn)
 
@@ -109,7 +147,8 @@ rows of `scripts/nn/parity.check.ts`.
 | `k-attention.ts` | flash attention (online softmax, K/V tiles in workgroup memory, vec4 rows), optional additive mask |
 | `k-reduce.ts` | softmax / logSoftmax, layerNorm, groupNorm, l2Normalize, sum / mean / max / min / argmax |
 | `k-spatial.ts` | max / avg pool, interpolate (nearest, bilinear, bicubic), gridSample, NMS max-pool, pad, gather, rotary, fromTexture |
-| `k-elementwise.ts` | unary, broadcasting binary / where, strided copies (permute, slice, expand, concat) |
+| `k-elementwise.ts` | unary, broadcasting binary / where (as fusable `EwDesc`s), strided copies (permute, slice, expand, concat) |
+| `k-fused.ts`, `fusion.ts` | layerNorm over an elementwise expression (+ residual sum); the CPU planner that fuses elementwise chains and layerNorm + residual |
 | `k-topk.ts` | bitonic topk with in-workgroup stages |
 | `k-quant.ts` | load-time int8 / int4 → f16 / f32 weight expansion |
 
@@ -118,6 +157,8 @@ rows of `scripts/nn/parity.check.ts`.
 - `npx vitest run src/lib/nn`: CPU reference against hand-computed values, GPU planning logic.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/parity.check.ts` (fast row `nn-parity`): every GPU op vs
   the CPU reference over Dawn in node, max abs / rel error per case; SKIP without `DAWN_DIR`.
+- `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/compile.check.ts` (fast row `nn-compile`): persistent forward vs CPU, pipelined runs, rebinding, scope labels.
+- `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/frame-loop.bench.ts [--only tiny,chain,pipeline,depth]`: frame-loop CPU overhead and the depth net warm run.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/bench.ts [--f16]`: GFLOP/s of linear, conv, attention.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/wgsl-lint.ts`: compile messages of every nn kernel.
 

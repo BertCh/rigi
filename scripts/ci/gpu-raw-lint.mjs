@@ -56,6 +56,10 @@ const WHY = [
 		"src/lib/gpu/adapter-peek.ts",
 		"the one raw navigator.gpu.requestAdapter: adapter limits/features before device creation; @luma.gl/webgpu exports WebGPUAdapter as a type only and requestGPUAdapter is protected",
 	],
+	[
+		"src/lib/gpu/core/kernel.ts",
+		"encodeDispatchMemo: replays a node's cached GPUBindGroup on the pass / pipeline handles; luma's pass.setBindings makes a new bind group per dispatch (the largest CPU cost of re-encoding a graph, ~6 us a node on Dawn) and its bind-group cache keys exist only for pipeline-held bindings",
+	],
 	["src/lib/gpu/core/selftest.ts", "selftest drives the raw device on purpose"],
 	[
 		"src/lib/gpu/sky/refine-graph.ts",

@@ -141,6 +141,38 @@ export type RotaryOptions = {
 
 export type TensorOrScalar = Tensor | number;
 
+/** What `CompiledForward.run` returns: the forward's result with every tensor replaced by its values. */
+export type Readback<R> = R extends Tensor
+	? Float32Array
+	: R extends null | undefined
+		? R
+		: R extends readonly (infer U)[]
+			? Readback<U>[]
+			: R extends object
+				? { [K in keyof R]: Readback<R[K]> }
+				: R;
+
+/** An input of a compiled forward: values (uploaded in place) or a ready f32 tensor of that shape. */
+export type CompiledInput = Float32Array | Tensor;
+
+/**
+ * A forward recorded once (`Nn.compile`) and replayed per frame: persistent input and output
+ * buffers, a compiled graph with stable bind groups, no re-recording, hashing or fusion planning.
+ * Calls do not wait for one another (only for the previous call's GPU submission order): a frame
+ * loop may call `run` every frame and consume the promise a frame later.
+ */
+export interface CompiledForward<R> {
+	/**
+	 * Upload `inputs` (Float32Array values, or ready tensors rebound for this run), run the graph and
+	 * read every output tensor back. Resolves when this run's results are mapped.
+	 */
+	run(inputs?: readonly CompiledInput[]): Promise<Readback<R>>;
+	/** Like run without the readback, for consumers that use the outputs on the GPU (GpuNn `outputs`). Resolves once submitted. */
+	submit(inputs?: readonly CompiledInput[]): Promise<void>;
+	/** Free the persistent buffers and graph. Await every run first. */
+	dispose(): void;
+}
+
 export interface Nn {
 	readonly backend: NnBackend;
 
@@ -182,6 +214,29 @@ export interface Nn {
 	 * tensor created inside is graph scratch and must not be used afterwards. Eager on the CPU.
 	 */
 	forward<T>(fn: () => T): Promise<T>;
+	/**
+	 * Record `fn` once per (`key`, input shapes) and return a replayable forward (see
+	 * CompiledForward). `fn` receives one persistent f32 tensor per entry of `inputShapes`; tensors
+	 * it returns (a tensor, array or plain object of them) are the persistent outputs. Same
+	 * `key` + shapes again returns the same compiled forward (fn is not called). On the CPU backend
+	 * `run` simply runs `fn` eagerly.
+	 */
+	compile<R>(
+		key: string,
+		inputShapes: readonly (readonly number[])[],
+		fn: (inputs: Tensor[]) => R,
+	): Promise<CompiledForward<R>>;
+	/**
+	 * Name a group of ops (`encoder.block3`): the GPU backend puts the path into its graph node ids,
+	 * so getGpuProfile() and the /dev/graph inspector rows map to layers. Nests with "/".
+	 */
+	scope<T>(name: string, fn: () => T): T;
+	/**
+	 * `read` for frame loops: starts the copy now (several may be in flight; nothing is held back
+	 * for an earlier one) and resolves a frame later. With `into` the values land in that array
+	 * (numel long) instead of a fresh one.
+	 */
+	readLater(t: Tensor, into?: Float32Array): Promise<Float32Array>;
 
 	// convolutions and products
 	conv2d(x: Tensor, w: Tensor, b?: Tensor | null, o?: Conv2dOptions): Tensor;

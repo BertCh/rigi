@@ -21,6 +21,10 @@
 		"rawWebGpu": 1,
 		"why": "the one raw navigator.gpu.requestAdapter: adapter limits/features before device creation; @luma.gl/webgpu exports WebGPUAdapter as a type only and requestGPUAdapter is protected"
 	},
+	"src/lib/gpu/core/kernel.ts": {
+		"handle": 2,
+		"why": "encodeDispatchMemo: replays a node's cached GPUBindGroup on the pass / pipeline handles; luma's pass.setBindings makes a new bind group per dispatch (the largest CPU cost of re-encoding a graph, ~6 us a node on Dawn) and its bind-group cache keys exist only for pipeline-held bindings"
+	},
 	"src/lib/gpu/core/luma.ts": {
 		"handle": 1,
 		"why": "WebGPUAdapter.attach(handle: GPUDevice) wrapper for ORT / ownsHandle; the one sanctioned attach point (nativeWebGPUDevice / nativeWebGPUBuffer next to it hand ORT native objects)"
