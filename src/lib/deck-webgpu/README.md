@@ -14,8 +14,8 @@ Layers are host-agnostic `GpuLayerCore`s on plain luma.gl 10 (`Model`, WGSL). Th
 also run under a luma-direct host with no deck at all (`hosts/direct.ts`). That host is the
 fallback when the deck host fails to boot.
 
-What the spike showed with Chrome and Metal (first on deck 9.4.0 / luma 9.4.2, history; re-run on
-luma 10.0.0-alpha.2 + the vendored deck PR #10752, `vendor/deck/README.md`, with the same results):
+What the spike showed with Chrome and Metal (deck 9.4.0 with luma 10.0.0-alpha.2 + the vendored deck
+PR #10752, `vendor/deck/README.md`):
 
 | Check | Result |
 |---|---|
@@ -182,7 +182,7 @@ where nothing else did.
   the `gpu/ingest` adapters (`uploadRaster` / `uploadBitmap` with `into`); a grow re-creates the
   texture and copies every mip of the old layers with `copyTextureToTexture` on a ComputeGraph copy
   node (`atlas-resize|<id>`), so nothing re-uploads; `compact()` is the reverse (live layers down
-  to 0 … n−1 in a smaller texture). Under `terrainGpuDecode` a tile leases its height layer
+  to 0 … n−1 in a smaller texture). With GPU decode a tile leases its height layer
   (`AtlasLease` / `TileLayerRef`, reference-counted between the tile and the TileStore).
   The pure math (allocation order, growth, grow copies, the ancestor uv window) is in
   `atlas-layout.ts`, checked by `atlas-layout.check.ts`; the frame gate is
@@ -260,7 +260,7 @@ interface GpuLayerCore {
     - its screenshots match the WebGL deck renderer on the same photo and pose
       (`/photo/<id>?renderer=deck`);
     - geometry-pass ports keep `checkGeometry().maxErrPx ≤ 0.1`.
-11. **Never create a mipmapped texture inside `draw()`.** luma 9.4.2's `generateMipmapsWebGPU` (found on 9.4.2; rule unchanged on luma 10 rigi.4)
+11. **Never create a mipmapped texture inside `draw()`.** luma's `generateMipmapsWebGPU`
     encodes its own render passes and submits, which invalidates the open pass ("CommandEncoder
     locked while RenderPassEncoder … is open" / "Parent encoder already finished"). Upload in a
     setter (pass the device to the factory: composite, gizmo), or draw one frame with
@@ -276,7 +276,7 @@ interface GpuLayerCore {
     colour camera is the orbit camera (`host.frameView`, set by the engine). The geometry pass
     always sees `"photo"` (hosts/passes.ts forces it). World-only cores may also keep their own
     `view` prop (gizmo) — both agree under the engine.
-14. **Texture sample types.** luma 9.4 reflects `texture_2d<f32>` as sampleType `'float'`, so
+14. **Texture sample types.** luma reflects `texture_2d<f32>` as sampleType `'float'`, so
     binding an `r32float` / `rgba32float` texture (geometry target, batched heights, range atlas)
     needs the device feature `float32-filterable` (requested in `device.ts`; Apple has it). Use
     `textureLoad` on them anyway. Devices without it need an `unfilterable-float` layout
@@ -322,11 +322,11 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/smoke.mjs IMG_
   writes one indexed indirect record per mesh resolution; `BatchedTerrainCore.draw` draws them with
   luma's `Model.setIndirectBuffer` (#3328). It is recorded by the optional
   `GpuLayerCore.prepass(ctx)`, which `hosts/passes.ts` calls on the pass's encoder right before the
-  geometry / colour render pass. Flag `terrainGpuCull` (default **on** since 2026-10-01, 3225064: byte-identical, no CPU saving at ~350–390 tiles, 0.15–0.19 vs 0.12–0.14 ms per frame, but GPU-graph first; WebGPU only, `?gpu=off` and
+  geometry / colour render pass. On by default (3225064: byte-identical, no CPU saving at ~350–390 tiles, 0.15–0.19 vs 0.12–0.14 ms per frame, but GPU-graph first; WebGPU only, `?gpu=off` and
   WebGL keep the CPU cull). Gates: `layers/terrain-cull-math.check.ts` (fast tier `terrain-cull`)
   and `scripts/deck-webgpu/terrain-indirect-check.mjs` (byte-equal frames, CPU ms).
 - GPU Terrarium decode (WAG W2.3 wiring + W2.4): `terrain-gpu-decode.ts` is the terrain stream's
-  tile loader under flag `terrainGpuDecode` (default **on** since 3225064; batched terrain; WebGL and
+  tile loader (on by default since 3225064; WebGL and
   `?gpu=off` keep the CPU decode). A tile that stands for itself (no ancestor crop) and is 256 or
   512 px is decoded from its `ImageBitmap` on the GPU (`gpu/ingest/terrarium-tile.ts`), halved when
   the mesh wants 256 px, and only its statistics come back (validateTile's out-of-range count, exact
@@ -336,7 +336,7 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/smoke.mjs IMG_
   `getCpuHeights(tile)` (`dem/cpu-heights.ts`; heightAt / localMax for peaks, trails, the lake floor,
   the CPU relief raster). Bit identity rests on the f32 argument (`ingest.check.ts`) and the browser
   byte / layer / lazy-heights gate `scripts/gpu/terrarium-ingest-check.mjs`; the frame A/B is
-  `scripts/deck-webgpu/atlas-frames-check.mjs --query terrainGpuDecode=on`. Counters:
+  `scripts/deck-webgpu/atlas-frames-check.mjs`. Counters:
   `globalThis.__rigiTerrainGpuDecode`. Measured 2026-10-01 (Apple / Metal, IMG_7086 / 6958 / 3304):
   frames byte-identical to the flag-off path, but 165–206 of 331–368 query tiles (~50 %) are
   materialised on the main thread within 8 s of ready (peaks, trails, lake floor), 298–349 ms in
@@ -353,7 +353,7 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/smoke.mjs IMG_
   runs, exclusive lock): ready median 4006 ms on vs 4019 off, terrain generation 2091 vs 2185 ms;
   atlas bytes at ready 353–416 MB on vs 95–110 off, after a 4-yaw pan 963–1060 vs 248–271 (plus
   one uncounted stats upload per tile on). After: not yet measured.
-- GPU height gathers (WAG W2.4 second half, under `terrainGpuDecode`): `height-gather.ts`
+- GPU height gathers (WAG W2.4 second half, with GPU decode): `height-gather.ts`
   `HeightGather.heightsAt(set, lats, lons)` answers TerrainSet.heightAt bit for bit (NaN = null)
   without materialising lazy tiles. Plan and blend stay on the CPU in f64 (`TerrainSet.locate`,
   `dem/grid.ts` `gridCorners` / `blendCorners` = `sampleGrid`); the kernel (core cachedGraph group

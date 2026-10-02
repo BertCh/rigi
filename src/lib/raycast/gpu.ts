@@ -22,9 +22,9 @@ import {
 	release,
 	stage,
 	storage,
-	submit,
 	uniform,
 } from "../gpu/core/kernel";
+import { submit } from "../gpu/core/queue";
 import { uploadMosaics } from "../gpu/horizon";
 import type { Mosaic } from "../horizon-fast/mosaic";
 import type { RayCamera, RayScene } from "./cpu";

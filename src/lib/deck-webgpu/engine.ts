@@ -73,7 +73,6 @@ import {
 	touchImagery,
 } from "#/lib/deck/imagery-cache";
 import {
-	eyeAltitude,
 	localElevRange,
 	nearFadeFor,
 	type Peak,
@@ -92,7 +91,6 @@ import {
 import {
 	type ImagerySource,
 	loadImagery,
-	localMaxOf,
 	type TerrainSet,
 	type TileMesh,
 	type ViewWedge,
@@ -107,12 +105,14 @@ import { poseQuaternion, WorldCamera } from "#/lib/deck/world-view";
 import { tileBounds } from "#/lib/dem";
 import { heightFromTile } from "#/lib/dem/height-from-tile";
 import { getFlag } from "#/lib/flags";
+import { eyeAltitude } from "#/lib/geo/eye-rule";
+import { localMaxOf } from "#/lib/geo/peaks";
 import { startLakeFloor } from "#/lib/geocam/lakes/fetch";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import { autoAlignAsync, warmAlignGpu } from "#/lib/gpu/align";
-import { gpuEnabled } from "#/lib/gpu/core/device";
 import { submitWithDefault } from "#/lib/gpu/core/queue";
+import { gpuEnabled } from "#/lib/gpu/device";
 import { lookIdle } from "#/lib/gpu/look/opt-in";
 import {
 	buildPhotoPrepAsync,
@@ -206,6 +206,7 @@ import { type TerroirShader, terroirShader } from "#/lib/terroir/glsl/values";
 import type { CoverGrid } from "#/lib/terroir/pack";
 import { tiles3dConfig } from "#/lib/tiles3d/config";
 import { DeckTiles3D } from "#/lib/tiles3d/deck-tiles";
+import { replayHeights } from "../dem/replay-heights";
 import {
 	type CameraUniforms,
 	cameraUniforms,
@@ -217,7 +218,7 @@ import { createLookBridge, type LookBridge } from "./compute-bridge";
 import { releaseForCompute, webgpuAvailable } from "./device";
 import { type FrameTimingsListener, getFrameTimings } from "./frame-timings";
 import { GeoQueryGpu } from "./geo-query-gpu";
-import { HeightGather, replayHeights } from "./height-gather";
+import { HeightGather } from "./height-gather";
 import type { Host, HostStats } from "./hosts/direct";
 import { type FrameScope, mergeScope } from "./hosts/frame-scope";
 import {
@@ -546,7 +547,7 @@ export class WebGpuEngine implements Renderer {
 	private geoQuery: GeoQueryGpu | null = null;
 	/**
 	 * WAG W2.4: the CPU height readers (camera DEM height, trails, peak snapping) gather lazy tiles'
-	 * heights from the atlas (height-gather.ts) while the terrainGpuDecode loader streams; null = heightAt.
+	 * heights from the atlas (height-gather.ts) while the GPU decode loader streams; null = heightAt.
 	 */
 	private heightGather: HeightGather | null = null;
 	private heightGatherCore: object | null = null;
@@ -1057,7 +1058,7 @@ export class WebGpuEngine implements Renderer {
 		if (this.disposed || this.host !== host) return;
 		this.lost = true;
 		this.counters.contextLost++;
-		// same budget as the compute realm (gpu/core/device.ts MAX_LOSSES): a device that keeps dying
+		// same budget as the compute realm (gpu/device.ts MAX_LOSSES): a device that keeps dying
 		// is not worth another rebuild
 		if (this.counters.contextLost > MAX_DEVICE_LOSSES) {
 			console.warn(
@@ -1271,7 +1272,7 @@ export class WebGpuEngine implements Renderer {
 		this.demKnown = demHere != null;
 		this.setEye(eyeAltitude(this.photo.alt, dem));
 		this.elevRange = localElevRange(terrain);
-		// under terrainGpuDecode the camera gather above spans a GPU round trip, in which onUpdate may
+		// with GPU decode the camera gather above spans a GPU round trip, in which onUpdate may
 		// have rendered a newer set: keep that one (re-setting the first set would drop its new tiles
 		// until the next update). The default path is left as it was.
 		this.gpu?.terrain.setTiles(
@@ -1447,7 +1448,7 @@ export class WebGpuEngine implements Renderer {
 			this.gpu?.trails.setSegments(this.trails);
 			return;
 		}
-		// terrainGpuDecode: the same segments, every height in one batched lookup (height-gather.ts)
+		// GPU decode: the same segments, every height in one batched lookup (height-gather.ts)
 		const built = replayHeights(
 			(heightAt) =>
 				buildTrailSegments(
@@ -1478,7 +1479,7 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/**
-	 * The gathers of height-gather.ts while the terrainGpuDecode loader streams on the batched terrain
+	 * The gathers of height-gather.ts while the GPU decode loader streams on the batched terrain
 	 * (whose atlas holds the lazy tiles' heights), else null: the CPU readers call heightAt.
 	 */
 	private heights(): HeightGather | null {
@@ -1499,7 +1500,7 @@ export class WebGpuEngine implements Renderer {
 		return this.heightGather;
 	}
 
-	/** heightAt at the camera (init) from the atlas under terrainGpuDecode (one gather). */
+	/** heightAt at the camera (init) from the atlas with GPU decode (one gather). */
 	private async cameraDemHeight(hg: HeightGather, terrain: TerrainSet) {
 		const { lat, lon } = this.photo;
 		// the stream's first set may have arrived before the device: make it resident first
@@ -1510,7 +1511,7 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/**
-	 * snapPeaksNear's localMax under terrainGpuDecode: localMaxOf over one batched lookup. Synchronous
+	 * snapPeaksNear's localMax with GPU decode: localMaxOf over one batched lookup. Synchronous
 	 * when every sample's tile has CPU heights; else the peak is gathered (all peaks of one call share
 	 * one dispatch), skipped for now, and handed over on a later call once its summit is known.
 	 */
@@ -2751,13 +2752,13 @@ export class WebGpuEngine implements Renderer {
 	 * sampleAtAsync. Under the geometry diet that is the GPU queries only: no full readback.
 	 */
 	async settle(): Promise<boolean> {
-		// terrainGpuDecode: a trail build waiting for its height gather lands before the frame is read
+		// GPU decode: a trail build waiting for its height gather lands before the frame is read
 		while (this.trailFlight) {
 			await this.trailFlight;
 			if (this.disposed) return false;
 		}
 		if (!(await this.gens.readback())) return false;
-		// terrainGpuDecode: the pose's peaks whose summits are being gathered join the list first
+		// GPU decode: the pose's peaks whose summits are being gathered join the list first
 		if (this.terrain && this.heights()) {
 			this.snapped(this.pose);
 			if (this.snapFlights.size) await Promise.all(this.snapFlights);
@@ -3584,7 +3585,7 @@ export class WebGpuEngine implements Renderer {
 		const dist = distanceM(this.photo, p);
 		if (dist > 110000 || dist < 150) return null;
 		const radiusM = Math.min(250, 60 + dist * 0.004);
-		// terrainGpuDecode: a gathered summit (no CPU tile materialisation) when snapPeaksNear has one
+		// GPU decode: a gathered summit (no CPU tile materialisation) when snapPeaksNear has one
 		// ready; else the CPU localMax (the reference), since pins need an answer now
 		const hg = this.heights();
 		const snap =
@@ -4020,21 +4021,6 @@ export class WebGpuEngine implements Renderer {
 
 	// =============================================================================================
 	// offscreen pose renders (tools/matcher/server/render_worker.mjs): deck/engine.ts contract
-
-	/** renderer.ts retraceHorizon: the horizon re-traced under the current flags (precision gates). */
-	async retraceHorizon(): Promise<"fast" | "cpu" | null> {
-		await this.ready;
-		if (!this.horizonDirs || this.disposed) return null;
-		// as init (horizon-fast over the initial wedge) or as loadFullTerrain (the CPU horizon, 360° set)
-		if (!this.fullTerrainDone) {
-			this.fastHorizon?.dispose();
-			this.fastHorizon = this.startFastHorizon();
-		}
-		const dirs = await this.traceHorizon();
-		if (this.disposed) return null;
-		this.horizonDirs = dirs;
-		return this.horizonSource;
-	}
 
 	/**
 	 * deck/engine.ts loadFullTerrain: the terrain all around the eye. The streamer's high-detail wedge

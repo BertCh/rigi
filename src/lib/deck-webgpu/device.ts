@@ -9,8 +9,11 @@ import { Deck } from "@deck.gl/core";
 import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { getFlag } from "#/lib/flags";
-import { RAISED_LIMITS, resetComputeDevice } from "#/lib/gpu/core/device";
-import { adoptRenderDevice } from "#/lib/gpu/device";
+import {
+	adoptRenderDevice,
+	RAISED_LIMITS,
+	resetComputeDevice,
+} from "#/lib/gpu/device";
 import { applyColorTargetFormat } from "./targets";
 
 /** Features the renderer cannot run without: rgba32float geometry targets and r32float height

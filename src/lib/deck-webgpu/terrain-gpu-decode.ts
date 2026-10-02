@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // GPU Terrarium decode for the WebGPU engine's terrain stream (WAG W2.3 wiring + W2.4 lazy CPU view),
-// flag terrainGpuDecode (default on; WebGPU engine, batched terrain, ?gpu=on only; WebGL and ?gpu=off
+// (WebGPU engine, batched terrain, ?gpu=on only; WebGL and ?gpu=off
 // always decode on the CPU).
 //
 // Per tile (deck/terrain-stream.ts StreamOptions.loadTile):
@@ -86,7 +86,7 @@ export type HeightAtlases = {
 };
 
 /**
- * The stream loader for terrainGpuDecode. `device()` resolves the render device (null: the CPU path
+ * The stream loader for the GPU decode. `device()` resolves the render device (null: the CPU path
  * for this tile, e.g. while the device is lost); `atlases()` the batched terrain's height arrays on
  * that device (null: no resident decode, the stats alone).
  */

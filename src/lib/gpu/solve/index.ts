@@ -21,9 +21,9 @@ import type { Device } from "@luma.gl/core";
 import type { Camera } from "#/lib/geo/camera";
 import type { HorizonProfile } from "#/lib/geo/horizon";
 import type { SkylineRows, SolveOptions } from "#/lib/geo/solve";
-import { getComputeDevice } from "../core/device";
 import { defineKernel, kernelAsync } from "../core/kernel";
 import { withLease } from "../core/pool";
+import { getComputeDevice } from "../device";
 import { COARSE_WGSL, PITCH_BLOCK } from "./coarse.wgsl";
 import {
 	type CoarsePlan,

@@ -54,12 +54,6 @@ import {
 	passModelProps,
 } from "../pass";
 
-export type { TrailSegments } from "#/lib/deck/trail-layer";
-export {
-	buildTrailSegments,
-	recolorTrailSegments,
-} from "#/lib/deck/trail-layer";
-
 /** style.trails as the layer reads it (ViewStyle['trails'] minus the palette). */
 export type TrailStyle = {
 	/** Line width in render-target pixels (three / classic: 2.2). */

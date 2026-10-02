@@ -5,12 +5,12 @@
 import { describe, expect, it } from "vitest";
 import { sampleGrid } from "#/lib/dem";
 import { seededRandom, uniform } from "#/test/helpers";
+import { replayHeights } from "../../dem/replay-heights";
 import {
 	finishHeights,
 	type HeightPlan,
 	heightGatherCounters,
 	planHeights,
-	replayHeights,
 	type SlotOf,
 	texelWord,
 } from "../height-gather";

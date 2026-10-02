@@ -39,9 +39,6 @@ import {
 import { poseBasis } from "../pose";
 import { LOG_DEPTH_FAR } from "./terrain-layer";
 
-/** The flat sky behind the world view, classic style (style/palette.ts). */
-export { WORLD_SKY } from "../style/palette";
-
 export type WorldViewState = {
 	eye: [number, number, number];
 	forward: [number, number, number];

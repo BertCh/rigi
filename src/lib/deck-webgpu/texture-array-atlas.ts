@@ -20,7 +20,7 @@
 //   texture on the same kind of copy node, and the owners re-point their layers from the returned
 //   map (ImageryArray on idle). Copies are exact, so frames do not change.
 // - compactLeased() is compact() for an atlas whose layers are partly AtlasLeases (the height arrays
-//   under terrainGpuDecode): the atlas knows every live lease, moves them with the owner's layers
+//   with GPU decode): the atlas knows every live lease, moves them with the owner's layers
 //   and re-points them itself; it refuses (null) while a leased write is in flight or whenever the
 //   live layers it can see are not exactly the layers the allocator has handed out. The old texture
 //   is kept alive for a moment (consumers that planned against it finish on it, layers and all).
@@ -170,7 +170,7 @@ export class TextureArrayAtlas {
 	 * the smallest `quantum` multiple that holds them, by copy. Returns old → new layer for the owners
 	 * to re-point (ImageryArray ids), or null when it would not free a quantum. The free list restarts
 	 * packed: every layer not in `live` is gone. Not for an atlas with AtlasLeases (the height arrays
-	 * under terrainGpuDecode): a lease's layer index is fixed.
+	 * with GPU decode): a lease's layer index is fixed.
 	 */
 	compact(live: readonly number[], quantum: number) {
 		// a lease's layer index is fixed here: compactLeased moves leases with the owner's layers
@@ -323,7 +323,7 @@ export class TextureArrayAtlas {
 
 	/**
 	 * A Terrarium tile bitmap decoded on the GPU (halved when `down` = 2) into the top-left of `layer`
-	 * (gpu/ingest TerrariumLayerWriter; r32float atlases only; flag terrainGpuDecode).
+	 * (gpu/ingest TerrariumLayerWriter; r32float atlases only).
 	 */
 	writeTerrarium(layer: number, src: { bitmap: ImageBitmap; down: 1 | 2 }) {
 		this.terrarium ??= new TerrariumLayerWriter(this.device, this.props.id);
@@ -336,7 +336,7 @@ export class TextureArrayAtlas {
 	}
 
 	/**
-	 * Load time (flag terrainGpuDecode): allocate a layer (growing the atlas by copy when needed),
+	 * Load time: allocate a layer (growing the atlas by copy when needed),
 	 * decode the Terrarium `src` into it and read back its statistics, with one upload of the bitmap.
 	 * Returns the lease on the layer and the stats, or null when no layer fits (device limit, with
 	 * leaseFits' headroom). The
@@ -390,7 +390,7 @@ export class TextureArrayAtlas {
 }
 
 /**
- * A reference-counted hold on one atlas layer (flag terrainGpuDecode): the tile that was decoded
+ * A reference-counted hold on one atlas layer: the tile that was decoded
  * into it holds one reference for as long as the streamer keeps its mesh, and the batched terrain's
  * TileStore holds one while it draws the tile. The layer returns to the free list when the last
  * reference goes, so a tile that leaves the drawn set and comes back re-enters with no upload.
@@ -433,7 +433,7 @@ export class AtlasLease {
 }
 
 /**
- * A tile's own hold on its atlas layer (dem/cpu-heights.ts GpuLayerRef, set by the terrainGpuDecode
+ * A tile's own hold on its atlas layer (dem/cpu-heights.ts GpuLayerRef, set by the GPU decode
  * loader): released once, by whoever drops the tile for good; idempotent.
  */
 export class TileLayerRef {

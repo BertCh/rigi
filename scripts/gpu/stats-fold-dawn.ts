@@ -20,8 +20,8 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { Buffer, type Device } from "@luma.gl/core";
-import { COMPUTE_FEATURES } from "../../src/lib/gpu/core/device";
 import { attachWebGPUDevice } from "../../src/lib/gpu/core/luma";
+import { COMPUTE_FEATURES } from "../../src/lib/gpu/device";
 import { statsParamWords } from "../../src/lib/gpu/look/color-stats";
 import { STATS_VALUES } from "../../src/lib/gpu/look/color-stats.wgsl";
 import {

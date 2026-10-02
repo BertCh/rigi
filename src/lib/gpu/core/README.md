@@ -215,7 +215,7 @@ Types are luma shader types (`f32`, `u32`, `i32`, `vec2<f32>`, `vec3<f32>`, `vec
 
 ## Rules for migrating a kernel
 
-1. **Device.** Import `getComputeDevice` from `#/lib/gpu/core/device` (`src/lib/gpu/device.ts` will re-export it). Branch on `hasFeature(device, …)` before using `subgroups` or `shader-f16`: an adopted render device may not have them.
+1. **Device.** Import `getComputeDevice` from `#/lib/gpu/device`. Branch on `hasFeature(device, …)` before using `subgroups` or `shader-f16`: an adopted render device may not have them.
 2. **Pipelines.** Use `defineKernel(id, WGSL, layout, { group, label })` at module level, and fetch the pipeline with `kernel(device, spec)`. Warm up with `warmKernelsAsync(device, group)`.
 3. **Dispatch.** Run kernels as `ComputeGraph` nodes. `encodeDispatch(pass, k, bindings, x, y, z)` sets the bindings on the pass (never on shared pipeline state) and refuses, by throwing, a dispatch over `maxComputeWorkgroupsPerDimension`, a zero-size storage binding (luma #3338: it invalidates the whole submit) and a storage binding offset that is not a multiple of `minStorageBufferOffsetAlignment` (luma #3332); the two binding rules live in `binding-guard.ts` (pure, fast-tier check `gpu-binding-guard`). The standalone `dispatch` / `dispatchAll` were deleted from `kernel.ts` (no app callers); `test-dispatch.ts` keeps them for `selftest.ts` and `scripts/gpu/*-page.ts` only.
 4. **Buffers.** For steady-state calls, use `pooledStorage` / `pooledUniform` / `acquire` with keys `"<owner>/<slot>"`, and wrap the whole acquire → encode → submit → read sequence in `withLease("<owner>", …)` whenever calls can overlap (async callers, workers sharing a module). Two traps can break bit-identity:

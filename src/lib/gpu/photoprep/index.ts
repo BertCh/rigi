@@ -89,7 +89,6 @@ import {
 	skylineRows,
 } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
-import { getComputeDevice } from "#/lib/gpu/core/device";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import {
 	type BindKind,
@@ -98,6 +97,7 @@ import {
 } from "#/lib/gpu/core/kernel";
 import { acquire, pooledUniform, withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
+import { getComputeDevice } from "#/lib/gpu/device";
 import * as K from "./kernels.wgsl";
 import { bandLimits, photoPrepDims, photoPrepSupported } from "./plan";
 import {

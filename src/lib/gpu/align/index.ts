@@ -56,7 +56,7 @@ import {
 	type SkipVerifier,
 } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
-import { getComputeDevice } from "#/lib/gpu/core/device";
+import { getComputeDevice } from "#/lib/gpu/device";
 import { fitPriorSkyGpu } from "#/lib/gpu/photoprep";
 import { probeStrictIeee } from "#/lib/gpu/precision/ieee-probe";
 import {

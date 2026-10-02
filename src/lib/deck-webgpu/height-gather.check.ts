@@ -19,7 +19,6 @@ import {
 	type StreamRaster,
 } from "#/lib/deck/batched-terrain-grid";
 import {
-	localMaxOf,
 	TerrainSet,
 	type TileLocation,
 	type TileMesh,
@@ -35,13 +34,14 @@ import {
 	sampleGrid,
 	type TileKey,
 } from "#/lib/dem";
+import { localMaxOf } from "#/lib/geo/peaks";
 import { EnuFrame } from "#/lib/geodesy";
 import type { RegionData } from "#/lib/photos";
+import { replayHeights } from "../dem/replay-heights";
 import {
 	finishHeights,
 	heightGatherCounters,
 	planHeights,
-	replayHeights,
 	type SlotOf,
 } from "./height-gather";
 

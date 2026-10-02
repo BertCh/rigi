@@ -128,7 +128,7 @@ function writePadded(b: Buffer, data: ArrayBufferView) {
 		b.write(data);
 		return;
 	}
-	// luma 10.0.0-alpha.2's WebGPUBuffer constructor ignores `props.byteOffset` when initialising from `data` (luma PR #3287), so never pass createBuffer({data, byteOffset}); copy into a 0-offset view as done here.
+	// copy into a zero-offset, 4-byte padded view (never createBuffer({data, byteOffset}))
 	const p = new Uint8Array(Math.ceil(data.byteLength / 4) * 4);
 	p.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
 	b.write(p);

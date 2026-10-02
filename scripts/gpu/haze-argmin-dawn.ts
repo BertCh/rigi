@@ -19,8 +19,8 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Device } from "@luma.gl/core";
-import { COMPUTE_FEATURES } from "../../src/lib/gpu/core/device";
 import { attachWebGPUDevice } from "../../src/lib/gpu/core/luma";
+import { COMPUTE_FEATURES } from "../../src/lib/gpu/device";
 import {
 	GRID_CELLS,
 	GRID_PICK_CAP,

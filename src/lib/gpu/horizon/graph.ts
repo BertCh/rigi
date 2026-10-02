@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { Buffer, type Device } from "@luma.gl/core";
+import { cachedGraph } from "#/lib/gpu/core/graph";
+import type { KernelSpec } from "#/lib/gpu/core/kernel";
+import { acquire, capacityFor, pooledUniform } from "#/lib/gpu/core/pool";
 // Horizon march chunks on a core ComputeGraph: the GPU path of computeHorizonGpu (./index.ts).
 //
 // Each chunk is one encoding of a 1-kernel graph:
@@ -23,11 +27,7 @@
 //
 // Per-call overhead: the u slot is only sized here (not written twice), and the run parameters and
 // bindings record are built once per call and reused by every chunk.
-import { Buffer, type Device } from "@luma.gl/core";
-import { cachedGraph } from "#/lib/gpu/core/graph";
-import type { KernelSpec } from "#/lib/gpu/core/kernel";
-import { submit } from "#/lib/gpu/core/kernel";
-import { acquire, capacityFor, pooledUniform } from "#/lib/gpu/core/pool";
+import { submit } from "#/lib/gpu/core/queue";
 import type { StagedRead } from "#/lib/gpu/core/readback";
 
 type Params = {

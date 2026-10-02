@@ -16,7 +16,6 @@ import {
 	type SkylineStages,
 	type SkyModel,
 } from "#/lib/geo/skyline";
-import { getComputeDevice } from "#/lib/gpu/core/device";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import {
 	type BindKind,
@@ -26,6 +25,7 @@ import {
 } from "#/lib/gpu/core/kernel";
 import { withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
+import { getComputeDevice } from "#/lib/gpu/device";
 import {
 	SKYLINE_EDGE,
 	SKYLINE_GRAD,

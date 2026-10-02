@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { DemRaster, TileKey } from "../../dem";
 import { latToTileY, lonToTileX, tileBounds, tileId } from "../../dem";
+import { localMaxOf } from "../../geo/peaks";
 import { EnuFrame } from "../../geodesy";
 import {
 	BASE_MAX,
@@ -18,7 +19,6 @@ import {
 import { CpuGeometrySource, TerrainProfiles } from "../cpu-geometry";
 import {
 	buildMesh,
-	localMaxOf,
 	segmentsFor,
 	selectDemTiles,
 	TerrainSet,

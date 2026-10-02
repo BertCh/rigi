@@ -4,6 +4,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { EdgeMap } from "../../align";
+import { eyeAltitude } from "../../geo/eye-rule";
 import { EnuFrame } from "../../geodesy";
 import {
 	pendingPrograms,
@@ -11,7 +12,6 @@ import {
 	watchContextLoss,
 } from "../device-lost";
 import {
-	eyeAltitude,
 	localElevRange,
 	nearFadeFor,
 	type Peak,

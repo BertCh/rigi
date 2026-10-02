@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// GPU Terrarium tile ingest (WAG W2.3 wiring, flag terrainGpuDecode): one kernel decodes a Terrarium
+// GPU Terrarium tile ingest (WAG W2.3 wiring): one kernel decodes a Terrarium
 // tile texture, optionally halves it with the streamer's 2× box filter, and reduces the statistics the
 // CPU needs without the heights (validateTile's out-of-range count, lo / hi, the stride-7 lo / hi).
 // Three graphs use it:

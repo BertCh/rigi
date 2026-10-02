@@ -29,8 +29,6 @@ import { onLost, untilLost } from "./lifecycle";
 import { isPooled } from "./pool";
 import { stageReads } from "./readback";
 
-export { submit } from "./queue";
-
 /**
  * "texture" is a 2-D unfilterable-float sampled texture (textureLoad only; the render device's
  * rgba32float targets): a kernel dispatch binds a luma Texture for it; a ComputeGraph kernel node binds a
@@ -156,8 +154,6 @@ const kernelProps = (spec: KernelSpec) => ({
 	shaderLayout: shaderLayout(spec),
 });
 
-// luma 9.4 shared one module-level bindings object across every WebGPUComputePipeline (we reset
-// `_bindingsByGroup` here); luma 10 gives each pipeline its own, so no workaround is needed.
 const wrap = (spec: KernelSpec, engine: EngineKernel): Kernel => ({
 	pipeline: engine.pipeline,
 	device: engine.device,
@@ -274,7 +270,7 @@ export function encodeDispatch(
 		bindings,
 		k.device?.limits.minStorageBufferOffsetAlignment ?? 256,
 	);
-	// per-pass bindings (ComputePass.setBindings is abstract in luma 10; 9.4 had it on WebGPU only)
+	// per-pass bindings (ComputePass.setBindings is abstract in luma 10)
 	pass.setPipeline(k.pipeline);
 	pass.setBindings(bindings);
 	pass.dispatch(x, y, z);

@@ -41,7 +41,7 @@ export type ImagerySource = "satellite" | "topo";
 /**
  * A streamed tile. Heights are size × size (512 near the camera, 256 elsewhere, less on fallback),
  * read through getCpuHeights(tile) (dem/cpu-heights.ts): `heights` for a CPU-decoded tile, or
- * materialised on first use from `lazyHeights` for a GPU-decoded one (flag terrainGpuDecode), whose
+ * materialised on first use from `lazyHeights` for a GPU-decoded one, whose
  * `heightStats` carry the exact lo / hi the batch grid and the colour ramp need.
  */
 export type TileMesh = CpuHeightsTile & {
@@ -94,8 +94,6 @@ export type TerrainStats = {
 
 /** TerrainSet.locate's result (reused across calls by the caller). */
 export type TileLocation = { tile: TileMesh; px: number; py: number };
-
-export { localMaxOf };
 
 async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
 	let i = 0;

@@ -20,15 +20,15 @@ import {
 } from "#/lib/deck/silhouette-mask";
 import { GeoQueryGpu } from "#/lib/deck-webgpu/geo-query-gpu";
 import { SilhouetteMaskGpu } from "#/lib/deck-webgpu/silhouette-gpu";
-import { getComputeDevice } from "#/lib/gpu/core/device";
 import {
 	definedKernels,
 	type KernelSpec,
 	kernelAsync,
-	submit,
 } from "#/lib/gpu/core/kernel";
+import { submit } from "#/lib/gpu/core/queue";
 import { stageReads } from "#/lib/gpu/core/readback";
 import { dispatch } from "#/lib/gpu/core/test-dispatch";
+import { getComputeDevice } from "#/lib/gpu/device";
 
 const WG = 64;
 

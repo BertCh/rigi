@@ -25,7 +25,7 @@
 		"rawGl": 85,
 		"why": "WebGL2 fallback: MSAA renderbuffer + blit, glFence/readbackQuiet probes, the RGBA/FLOAT readPixels fallback (luma readBuffer reads only the texture's own format); PBO pool retired in 888be38"
 	},
-	"src/lib/gpu/core/device.ts": {
+	"src/lib/gpu/device.ts": {
 		"rawWebGpu": 1,
 		"why": "sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)"
 	},

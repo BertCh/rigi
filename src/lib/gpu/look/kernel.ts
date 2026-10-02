@@ -10,9 +10,6 @@
 import type { Device } from "@luma.gl/core";
 import * as core from "#/lib/gpu/core/kernel";
 
-export { pooledStorage, pooledUniform, withLease } from "#/lib/gpu/core/pool";
-export { type ReadRange, readBack } from "#/lib/gpu/core/readback";
-
 /** The look kernels' warm-up group. */
 export const LOOK_GROUP = "look";
 

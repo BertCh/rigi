@@ -2,6 +2,19 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import type { Pose } from "../camera";
+import {
+	CpuGeometrySource,
+	type ProfileTerrain,
+	TerrainProfiles,
+} from "../deck/cpu-geometry";
+import {
+	latToTileY,
+	loadDemTile,
+	lonToTileX,
+	sampleGrid,
+	type TileKey,
+} from "../dem";
 // Step Inside's terrain range near the camera, ONE source for both renderers (three + deck).
 //
 // The anchor fit, the depth split and object grounding all compare the model's depth with the DEM range per
@@ -14,20 +27,7 @@
 // same DEM, loadNearDem (Mapterhorn at NEAR_DEM_ZOOM around the photo, via the shared dem loader), from the
 // same eye (eyeAltitude over that DEM). Beyond it (or where the profiles see no terrain) the engine's own
 // sampleAt answers, where the two agree.
-import type { Pose } from "../camera";
-import {
-	CpuGeometrySource,
-	type ProfileTerrain,
-	TerrainProfiles,
-} from "../deck/cpu-geometry";
-import { eyeAltitude } from "../deck/scene";
-import {
-	latToTileY,
-	loadDemTile,
-	lonToTileX,
-	sampleGrid,
-	type TileKey,
-} from "../dem";
+import { eyeAltitude } from "../geo/eye-rule";
 import { EARTH_R } from "../geodesy";
 
 /** Ranges (m) up to this come from the CPU profiles in both engines. */

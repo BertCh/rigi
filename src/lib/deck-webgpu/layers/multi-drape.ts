@@ -50,7 +50,7 @@
 //     GLSL the world footprint (dpdx / dpdy of the position) is taken first and every photo read
 //     is textureSampleGrad; the mask read is textureSampleLevel(0) (the mask atlas has no mips);
 //     the range atlas (r32float, unfilterable) is read with textureLoad.
-//   - device: luma 9.4 derives sampleType "float" for every texture_2d<f32>, so the r32float range
+//   - device: luma derives sampleType "float" for every texture_2d<f32>, so the r32float range
 //     atlas binds only on a device with 'float32-filterable' (device.ts requests it; Apple / Metal
 //     has it). Same constraint as the geometry target and the batched heights.
 //   - mips: DrapeAtlas only generates photo mips on WebGL. Build the atlas with WebGpuDrapeAtlas

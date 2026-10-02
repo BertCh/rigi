@@ -78,7 +78,7 @@ try {
 			async ({ REPS, PERTURB }) => {
 				const A = await import("/src/lib/align.ts");
 				const G = await import("/src/lib/gpu/align/index.ts");
-				const DEV = await import("/src/lib/gpu/core/device.ts");
+				const DEV = await import("/src/lib/gpu/device.ts");
 				const PR = await import("/src/lib/gpu/precision/ieee-probe.ts");
 				const e = window.__engine;
 				const renderer = document

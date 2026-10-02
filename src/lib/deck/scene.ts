@@ -52,9 +52,6 @@ export type PeakLabel = {
 	v: number;
 };
 
-/** The eye rule (geo/eye-rule.ts), re-exported for the engines, roll, lab and near field. */
-export { eyeAltitude } from "../geo/eye-rule";
-
 /** Contour near-fade from the GPS horizontal accuracy (PhotoWorkspace's nearFade default). */
 export function nearFadeFor(hAccuracy: number | null | undefined) {
 	return (

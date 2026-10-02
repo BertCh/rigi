@@ -12,7 +12,7 @@ const gpu = vi.hoisted(() => ({
 	device: null as object | null,
 	gridError: false,
 }));
-vi.mock("#/lib/gpu/core/device", () => ({
+vi.mock("#/lib/gpu/device", () => ({
 	getComputeDevice: async () => gpu.device,
 }));
 vi.mock("#/lib/gpu/photoprep", () => ({

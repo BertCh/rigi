@@ -18,8 +18,12 @@ import { pathToFileURL } from "node:url";
 import type { Device } from "@luma.gl/core";
 import { MAPTERHORN } from "../../src/lib/dem";
 import { DEG } from "../../src/lib/geodesy";
-import { COMPUTE_FEATURES, RAISED_LIMITS } from "../../src/lib/gpu/core/device";
-import { adoptRenderDevice, gpuEnabled } from "../../src/lib/gpu/device";
+import {
+	adoptRenderDevice,
+	COMPUTE_FEATURES,
+	gpuEnabled,
+	RAISED_LIMITS,
+} from "../../src/lib/gpu/device";
 import {
 	computeHorizonGpu,
 	releaseHorizonGpu,
@@ -275,7 +279,7 @@ async function dawnDevice(): Promise<Device | null> {
 		value: { gpu: gpuApi, userAgent: "node" },
 		configurable: true,
 	});
-	// the app's sidecar request (gpu/core/device.ts createSidecar): adapter-maximum limits, optional features
+	// the app's sidecar request (gpu/device.ts createSidecar): adapter-maximum limits, optional features
 	const peek = await (gpuApi as unknown as GPU).requestAdapter({
 		powerPreference: "high-performance",
 	} as GPURequestAdapterOptions);

@@ -53,7 +53,7 @@ const WHY = [
 		"raw encoder.clearBuffer via handle; luma has no CommandEncoder.clearBuffer (audit-gpu A6)",
 	],
 	[
-		"src/lib/gpu/core/device.ts",
+		"src/lib/gpu/device.ts",
 		"sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)",
 	],
 	["src/lib/gpu/core/selftest.ts", "selftest drives the raw device on purpose"],

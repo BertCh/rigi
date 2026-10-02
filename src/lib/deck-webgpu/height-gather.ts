@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Batched DEM height lookups from the resident height atlas (WAG W2.4, flag terrainGpuDecode): the
+// Batched DEM height lookups from the resident height atlas (WAG W2.4): the
 // WebGPU photo view's load-time and per-view CPU height readers (camera DEM height, trails, peak
 // snapping) ask for TerrainSet.heightAt at many points; a tile decoded straight into the atlas
 // (terrain-gpu-decode.ts) has no CPU heights, and heightAt would materialise the whole tile on the
@@ -17,7 +17,7 @@
 //     (core cachedGraph group "height-gather", one read node; no arithmetic on the GPU);
 //   blend (CPU, f64): dem/grid.ts blendCorners on the gathered float32 values = sampleGrid bit for bit.
 // So a gathered height equals heightAt's whenever the atlas layer holds the tile's CPU heights, which
-// is the terrainGpuDecode premise itself (texel bytes == canvas bytes; terrarium-tile.ts). Requests of
+// is the GPU decode premise itself (texel bytes == canvas bytes; terrarium-tile.ts). Requests of
 // one tick share one dispatch. Every result is certified before use: each word carries the call's
 // nonce (a failed dispatch leaves zeros), and each tile must hold the slot the plan read at the moment
 // the gather is submitted (taken inside the graph's lease, synchronously with the submit: a tile
@@ -36,13 +36,14 @@ import {
 	sampleGrid,
 } from "#/lib/dem";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
-import { defineKernel, submit } from "#/lib/gpu/core/kernel";
+import { defineKernel } from "#/lib/gpu/core/kernel";
 import {
 	acquire,
 	pooledStorage,
 	pooledUniform,
 	releasePool,
 } from "#/lib/gpu/core/pool";
+import { submit } from "#/lib/gpu/core/queue";
 import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import { importSampledTexture, textureShapeKey } from "./graph-texture";
 import type { ResidentHeights } from "./layers/batched-terrain";
@@ -486,5 +487,3 @@ export class HeightGather {
 		if (!this.device.isLost) releasePool(this.device, `${this.pool}/`);
 	}
 }
-
-export { replayHeights } from "../dem/replay-heights";

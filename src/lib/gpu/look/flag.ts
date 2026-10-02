@@ -9,8 +9,6 @@ import type { Device } from "@luma.gl/core";
 import { getComputeDevice } from "../device";
 import { lookGpuOn } from "./opt-in";
 
-export { lookGpuOn };
-
 /**
  * GPU off: null. GPU on: a promise of the GPU result, falling back to `cpu()` when there is no
  * device or the kernel throws (warned once per pass name).

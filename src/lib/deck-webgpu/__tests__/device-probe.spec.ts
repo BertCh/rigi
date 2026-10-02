@@ -4,7 +4,7 @@
 
 import type { Device } from "@luma.gl/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RAISED_LIMITS } from "#/lib/gpu/core/device";
+import { RAISED_LIMITS } from "#/lib/gpu/device";
 import {
 	assertRequiredFeatures,
 	IMPLICIT_MAX_FEATURES,

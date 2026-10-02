@@ -2,22 +2,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The ONE module that imports @luma.gl/gpgpu/gpu-core. That subpath is experimental in luma 9.4
+// The ONE module that imports @luma.gl/gpgpu/gpu-core. That subpath is experimental in luma 10
 // (no semver promise, WebGPU only), so everything else in the repo imports these names from here,
 // and a luma bump touches this file only.
 //
-// luma 10 (10.0.0-alpha.2) notes:
-// - npm 10.0.0-alpha.2 packaging is broken (yarn `patch:` @math.gl/core deps, ~9.4.0-alpha.1 peer
-//   ranges): package.json pins @math.gl/core 5.0.0-alpha.9 with npm overrides, and .npmrc sets
-//   legacy-peer-deps.
-// - #3258: ops no longer have addToGraph(graph); GPUCommandGraph.add(node) takes any GPUNode (an op
-//   with getCommandNodes(graph), a raw node, or a group). core/graph.ts GraphOp = GPUNode.
-// - Workarounds retired on the bump: ComputePass.setBindings is abstract (core/kernel.ts no longer
-//   duck-types it); Device.createComputePipelineAsync is native (#3204, core/kernel.ts kernelAsync);
-//   each WebGPUComputePipeline owns its bindings (core/kernel.ts no longer resets them).
-// - #3312 (props.requiredLimits) and #3313 (WebGPUAdapter.attach) retired the requestDevice patch:
-//   core/device.ts requests the device itself (features + RAISED_LIMITS) and wraps it with
-//   attachWebGPUDevice below; sky/model.ts attaches ORT's device the same way.
+// luma 10 notes:
+// - GPUCommandGraph.add(node) takes any GPUNode (an op with getCommandNodes(graph), a raw node, or a
+//   group). core/graph.ts GraphOp = GPUNode.
+// - gpu/device.ts requests the device itself (features + RAISED_LIMITS, props.requiredLimits) and
+//   wraps it with attachWebGPUDevice below; sky/model.ts attaches ORT's device the same way.
 // - rigi.3 re-audit (LF7, vs luma master 7289d961 + #3313 #3302 #3287 #3328 #3333 #3334 #3330):
 //   retired nothing, each item below was re-read in node_modules/@luma.gl/*/dist.
 //   - Buffer.readAsync on a non-MAP_READ buffer: #3330 stages only the requested range, but it still

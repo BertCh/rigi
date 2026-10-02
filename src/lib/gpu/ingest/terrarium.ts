@@ -9,7 +9,7 @@
 // so heights are bit-identical to decodeTerrarium OF THE SAME RGBA BYTES. Whether the texture holds
 // the same bytes as the canvas getImageData path is measured by scripts/gpu/terrarium-ingest-check.mjs.
 //
-// The app's GPU decode path is terrarium-tile.ts (flag terrainGpuDecode: decode + 2× downsample +
+// The app's GPU decode path is terrarium-tile.ts (flag GPU decode: decode + 2× downsample +
 // stats, written into the terrain height atlas with addHeightsToTexture); the node and the one-shot
 // decodeTerrariumTileGpu here are the reference the browser gate compares it with. validateTile
 // (NO_DATA fill, ±256 m R-channel repair) stays on the CPU: decodeTerrariumTileGpu returns heights the

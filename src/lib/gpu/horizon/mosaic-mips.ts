@@ -17,7 +17,8 @@
 // them (storage read-write barrier), each reads the cells the previous one wrote.
 import { Buffer, type Device } from "@luma.gl/core";
 import { cachedGraph } from "#/lib/gpu/core/graph";
-import { defineKernel, submit } from "#/lib/gpu/core/kernel";
+import { defineKernel } from "#/lib/gpu/core/kernel";
+import { submit } from "#/lib/gpu/core/queue";
 import { MIP_MAX_LEVEL, MIP_MIN_LEVEL } from "#/lib/horizon-fast/mosaic";
 import { MOSAIC_MIP_P } from "./uniforms";
 

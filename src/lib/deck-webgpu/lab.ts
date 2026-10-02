@@ -7,13 +7,14 @@
 // terrain through the photo camera with the batched WGSL terrain core, then presents colour or a debug
 // view of the geometry targets. Host: deck.gl on WebGPU, or the luma-direct host (?host=direct).
 import { hfovFromAspect, type Pose } from "#/lib/camera";
-import { eyeAltitude, localElevRange } from "#/lib/deck/scene";
+import { localElevRange } from "#/lib/deck/scene";
 import {
 	type ImagerySource,
 	loadImagery,
 	type TerrainSet,
 } from "#/lib/deck/terrain-data";
 import { TerrainStreamer } from "#/lib/deck/terrain-stream";
+import { eyeAltitude } from "#/lib/geo/eye-rule";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import { EnuFrame } from "#/lib/geodesy";
 import { getPhoto } from "#/lib/photos";

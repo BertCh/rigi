@@ -26,7 +26,7 @@ import { BRAND } from "#/brand/khipu";
 import type { Pose } from "#/lib/camera";
 import { GpuGeometrySource, rangeMapFrom } from "#/lib/deck/geometry-pass";
 import { photoViewProjection } from "#/lib/deck/photo-view";
-import { eyeAltitude, localElevRange } from "#/lib/deck/scene";
+import { localElevRange } from "#/lib/deck/scene";
 import {
 	type ImagerySource,
 	loadImagery,
@@ -36,14 +36,15 @@ import {
 import { TerrainLayer } from "#/lib/deck/terrain-layer";
 import {
 	LogDepthExtension,
-	WORLD_SKY,
 	WorldCamera,
 	WorldGizmoLayer,
 	WorldView,
 } from "#/lib/deck/world-view";
 import { type DemRaster, tileBounds } from "#/lib/dem";
+import { eyeAltitude } from "#/lib/geo/eye-rule";
 import { EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import type { ForegroundMask } from "#/lib/segment";
+import { WORLD_SKY } from "#/lib/style/palette";
 import { hexToRgb255 } from "../mosaic/cvd";
 import { vpColor } from "../mosaic/style";
 import type { Roll, RollPhoto } from "../types";

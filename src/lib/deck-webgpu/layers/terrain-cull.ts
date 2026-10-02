@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// GPU frustum cull + indirect draws for the batched terrain (WAG W1.5; flag terrainGpuCull, on).
+// GPU frustum cull + indirect draws for the batched terrain (WAG W1.5; on).
 // Per pass (geometry, colour) a two-node ComputeGraph on the RENDER device, recorded on the pass's
 // command encoder right before its render pass (GpuLayerCore.prepass):
 //   cull     one invocation per resident tile: the conservative f32 twin of sphereInView → vis[i]
@@ -13,7 +13,7 @@
 // calls through luma's Model.setIndirectBuffer (luma #3328, vendored since rigi.2). The index buffer is the
 // segs' gridMesh indices concatenated (firstIndex selects the seg; baseVertex = firstInstance = 0).
 // No count is read back. WebGPU only; the CPU cull stays the path for WebGL, ?gpu=off,
-// terrainGpuCull=off, a custom `cull` hook, > CULL_SLOTS segs, and any failure here.
+// a custom `cull` hook, > CULL_SLOTS segs, and any failure here.
 //
 // Encoder ring: a host may record several passes of one kind before it submits (off-frame geometry
 // renders, prewarm), so every prepass takes the next entry (uniform, instance and record buffers)

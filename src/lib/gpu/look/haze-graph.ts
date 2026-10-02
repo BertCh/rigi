@@ -68,6 +68,8 @@ import {
 	type GraphRange,
 } from "../core/graph";
 import { GPUScan, type GraphBufferHandle } from "../core/luma";
+import { pooledStorage, pooledUniform, withLease } from "../core/pool";
+import { type ReadRange, readBack } from "../core/readback";
 import {
 	addListOffsets,
 	airlightBand,
@@ -113,13 +115,6 @@ import {
 	SPOT_COLUMNS,
 	verifyBand,
 } from "./haze-band";
-import {
-	pooledStorage,
-	pooledUniform,
-	type ReadRange,
-	readBack,
-	withLease,
-} from "./kernel";
 import {
 	type HazePrepResult,
 	type HazeTexInput,

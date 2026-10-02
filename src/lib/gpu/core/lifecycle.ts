@@ -8,7 +8,7 @@
 //   and async pipeline builds go through it, so a caller in flight when the device dies rejects
 //   (and falls back to its CPU twin) instead of waiting on a promise that may never settle.
 // - onLost(device, fn): run fn once when `device` is lost (one listener per device, not per call).
-// - busy()/idle(): the registry's idle release (core/device.ts releaseWhenIdle) must not destroy a
+// - busy()/idle(): the registry's idle release (gpu/device.ts releaseWhenIdle) must not destroy a
 //   device while a lease is held or a readback is in flight.
 import type { Device } from "@luma.gl/core";
 

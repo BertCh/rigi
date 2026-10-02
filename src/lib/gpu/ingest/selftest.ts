@@ -13,7 +13,7 @@
 //  c. the r32float copy node round trip, and decodeTerrariumTileGpu (the one-shot API) against the
 //     graph's heights;
 //  d. validateTile on the CPU heights: how often the repair / fill fires (info for keeping it on CPU);
-//  e. the terrainGpuDecode path (terrarium-tile.ts), for down = 1 and 2: the worker-pool decode the app
+//  e. the GPU decode path (terrarium-tile.ts), for down = 1 and 2: the worker-pool decode the app
 //     uses (dem/load decodeHeights) against the page canvas decode; the load-time stats
 //     (terrariumTileStatsGpu) against validateTile's fill count and heightStats of the CPU heights; the
 //     TerrariumLayerWriter layer (read back) and GpuDecodedHeights.materialize against the CPU heights
@@ -24,9 +24,9 @@ import { decodeTerrarium, validateTile } from "#/lib/dem/decode";
 import { downsampleHeights2 } from "#/lib/dem/grid";
 import { bitmapHeights } from "#/lib/dem/image";
 import { decodeHeights } from "#/lib/dem/load";
-import { getComputeDevice } from "../core/device";
 import { ComputeGraph } from "../core/graph";
 import { readBack } from "../core/readback";
+import { getComputeDevice } from "../device";
 import {
 	addHeightsToTexture,
 	addTerrariumDecode,
@@ -61,7 +61,7 @@ export type TileResult = {
 	validate: { repaired: number; filled: number; remaining: number };
 	/** heights whose bits differ between the worker-pool decode (the app's) and the page decode */
 	workerDiff: number;
-	/** terrainGpuDecode path, summed over down = 1, 2: stats fields that differ from the CPU twin */
+	/** GPU decode path, summed over down = 1, 2: stats fields that differ from the CPU twin */
 	tileStatsDiff: number;
 	/** its out-of-range count != validateTile's fills (jump ∞, the app's call) */
 	tileInvalidDiff: number;
@@ -301,7 +301,7 @@ export async function terrariumIngestSelftest(
 						break;
 					}
 			}
-			// e. the app's worker decode, and the terrainGpuDecode path
+			// e. the app's worker decode, and the GPU decode path
 			r.workerDiff = countDiff(
 				bitsOf(await decodeHeights(encoded.slice(0))),
 				bitsOf(cpu),

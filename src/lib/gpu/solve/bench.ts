@@ -20,7 +20,7 @@ import { fetchDemTile, MAPTERHORN } from "#/lib/dem";
 import { loadScene, sceneHorizon } from "#/lib/geo/pipeline";
 import { detectSkyline } from "#/lib/geo/skyline";
 import { type SolveOptions, solvePose } from "#/lib/geo/solve";
-import { getComputeDevice } from "../core/device";
+import { getComputeDevice } from "../device";
 import {
 	type CoarseGpuStats,
 	type CoarseResult,

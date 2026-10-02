@@ -60,7 +60,7 @@ export type StreamOptions = {
 	previewMaxZoom?: number;
 	/**
 	 * Loads one tile at the size its `seg`-segment mesh uses (default: defaultStreamTile =
-	 * loadDemTile + the 2× downsamples). The WebGPU engine's terrainGpuDecode loader returns lazy
+	 * loadDemTile + the 2× downsamples). The WebGPU engine's GPU decode loader returns lazy
 	 * rasters (no CPU heights; deck-webgpu/terrain-gpu-decode.ts). Null = no data / aborted.
 	 */
 	loadTile?: StreamTileLoader;

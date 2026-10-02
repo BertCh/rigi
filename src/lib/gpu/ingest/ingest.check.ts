@@ -12,7 +12,7 @@
 //     up to ±4 ULP;
 //  3. the WGSL multiplies by 1/256 (never divides) and uses the twin's constants;
 //  4. layout math: raster formats, byte sizes, copy alignment, workgroups;
-//  5. the tile kernel (terrarium-tile.ts, flag terrainGpuDecode): its f32 twin (terrariumTileF32) ==
+//  5. the tile kernel (terrarium-tile.ts): its f32 twin (terrariumTileF32) ==
 //     decodeTerrarium + downsampleHeights2 + heightStats bit for bit on tiles validateTile leaves alone,
 //     its out-of-range count == validateTile's fill count, every partial sum of a 2×2 block is f32-exact,
 //     order keys, WGSL constants.

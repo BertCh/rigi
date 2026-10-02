@@ -16,6 +16,7 @@ import { type Device, luma, type Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
+import type { TrailSegments } from "../../deck/trail-layer";
 import { cameraModule, projectToPixel } from "../camera";
 import { camerasFor, runColorPass } from "../hosts/passes";
 import {
@@ -25,7 +26,7 @@ import {
 	passModelProps,
 } from "../pass";
 import { ColorTargets, GeometryTargets } from "../targets";
-import { TrailCore, type TrailSegments } from "./trail";
+import { TrailCore } from "./trail";
 
 /** Opaque wall in the plane y = WALL_Y, x ∈ [-1000, 0], z ∈ [-200, 300], blue. */
 const WALL_Y = 500;

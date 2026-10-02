@@ -20,7 +20,7 @@ const LINEAR_CLAMP = {
  * LINEAR (hardware decode), filtering is gamma-correct. Rows top → bottom (uv v down).
  *
  * NEVER call this with mips (the default) from inside a GpuLayerCore.draw(), i.e. while a render
- * pass is open: luma 9.4.2's generateMipmapsWebGPU encodes its own render passes and submits,
+ * pass is open: luma's generateMipmapsWebGPU encodes its own render passes and submits,
  * which invalidates the open pass ("CommandEncoder locked while RenderPassEncoder … is open" /
  * "Parent encoder already finished"). Upload in a setter outside the frame, or draw one frame
  * with `mips: false` and swap the mipmapped texture in afterwards (layers/tiles3d.ts flushMips).

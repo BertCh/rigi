@@ -33,7 +33,7 @@
 // Meshes must carry a batch grid (the streamer's lite meshes have empty vertex arrays; roll-terrain's
 // full meshes carry both). Tiles without `grid` are ignored here.
 //
-// Device note: the height arrays are bound as texture_2d_array<f32> (luma 9.4 derives sampleType
+// Device note: the height arrays are bound as texture_2d_array<f32> (luma derives sampleType
 // "float" from the WGSL), which accepts r32float only with the 'float32-filterable' feature;
 // device.ts requests it (Apple / Metal has it). Same constraint as every rgba32float binding in the
 // foundation.
@@ -57,7 +57,7 @@ import type { TileMesh } from "#/lib/deck/terrain-data";
 import { getCpuHeights } from "#/lib/dem/cpu-heights";
 import { getFlag } from "#/lib/flags";
 import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
-import { gpuEnabled } from "#/lib/gpu/core/device";
+import { gpuEnabled } from "#/lib/gpu/device";
 import { GpuDecodedHeights } from "#/lib/gpu/ingest/terrarium-tile";
 import { nearestWithin } from "../atlas-layout";
 import { BaseSlotAllocator, baseSlotVec4, placeSlots } from "../base-slots";
@@ -275,7 +275,7 @@ type Slot = {
 	big: boolean;
 	size: number;
 	base: number;
-	/** the layer belongs to the tile (decoded into at load, flag terrainGpuDecode): this slot holds a
+	/** the layer belongs to the tile (decoded into at load): this slot holds a
 	 * reference instead of owning the layer, and the tile needs no upload */
 	lease?: AtlasLease;
 };
@@ -544,7 +544,7 @@ class TileStore {
 			}
 			const isFresh = freshSet.has(m);
 			if (isFresh && !s.lease) {
-				// a GPU-decoded tile (flag terrainGpuDecode) whose CPU heights nobody asked for yet:
+				// a GPU-decoded tile whose CPU heights nobody asked for yet:
 				// decode its bitmap straight into the layer; else upload the CPU heights
 				const gpu = m.heights ? undefined : m.lazyHeights;
 				if (
@@ -818,7 +818,7 @@ export class BatchedTerrainCore implements GpuLayerCore {
 	}
 
 	/**
-	 * The two height arrays themselves, for the terrainGpuDecode loader: it decodes each tile into a
+	 * The two height arrays themselves, for the GPU decode loader: it decodes each tile into a
 	 * layer it leases there (TextureArrayAtlas.writeTerrariumLeased), which TileStore then draws.
 	 */
 	heightAtlases() {

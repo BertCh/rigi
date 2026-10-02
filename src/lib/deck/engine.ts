@@ -39,6 +39,7 @@ import {
 import { hfovFromAspect, type Pose } from "../camera";
 import { tileBounds } from "../dem";
 import { heightFromTile } from "../dem/height-from-tile";
+import { eyeAltitude } from "../geo/eye-rule";
 import { startLakeFloor } from "../geocam/lakes/fetch";
 import { priorHeading } from "../geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT, wrap180 } from "../geodesy";
@@ -158,7 +159,6 @@ import {
 } from "./imagery-cache";
 import { PhotoView, photoViewProjection } from "./photo-view";
 import {
-	eyeAltitude,
 	localElevRange,
 	nearFadeFor,
 	type Peak,
@@ -569,7 +569,7 @@ export class DeckEngine implements Renderer {
 		this.pose = { ...this.prior };
 		this.unknowns = photoUnknowns(photo);
 		this.frame = new EnuFrame(photo.lat, photo.lon, 0);
-		// opt-in look passes on the GPU (gpu/look, ?lookgpu=1): results land after the settle frame
+		// opt-in look passes on the GPU (gpu/look): results land after the settle frame
 		this.haze.onAsync = () => {
 			if (this.disposed) return;
 			this.looks.clear();
@@ -1476,7 +1476,7 @@ export class DeckEngine implements Renderer {
 	 * engine.ts layerStats: band stats (LOOK_HARMONIZE) of the replace layer or the world's own
 	 * render, drawn at ≤ 256 px through the photo camera once the pose settles (and as imagery streams in).
 	 * The layer is read back fenced (compositor.readLayerAsync): the stats land a
-	 * frame or more after the settle frame (with ?lookgpu they already did) and only if the key still
+	 * frame or more after the settle frame and only if the key still
 	 * stands (otherwise the newer state is scheduled); export waits for them (trackLook → lookIdle).
 	 */
 	private scheduleStats() {
@@ -3366,21 +3366,6 @@ export class DeckEngine implements Renderer {
 	 * In world mode (as three): the current world frame as a PNG, without labels.
 	 */
 	// ---------------- offscreen pose renders (tools/matcher/server/render_worker.mjs) ----------------
-
-	/** renderer.ts retraceHorizon: the horizon re-traced under the current flags (precision gates). */
-	async retraceHorizon(): Promise<"fast" | "cpu" | null> {
-		await this.deckReady;
-		if (!this.horizonDirs || this.disposed) return null;
-		// as init (horizon-fast over the initial wedge) or as loadFullTerrain (the CPU horizon, 360° set)
-		if (!this.fullTerrainDone) {
-			this.fastHorizon?.dispose();
-			this.fastHorizon = this.startFastHorizon();
-		}
-		const dirs = await this.traceHorizon();
-		if (this.disposed) return null;
-		this.horizonDirs = dirs;
-		return this.horizonSource;
-	}
 
 	/**
 	 * The terrain all around the eye: the streamer's high-detail wedge becomes 360° (and stays so),

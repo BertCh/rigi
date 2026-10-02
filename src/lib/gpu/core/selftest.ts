@@ -21,7 +21,7 @@ import {
 	hasFeature,
 	RAISED_LIMITS,
 	releaseWhenIdle,
-} from "./device";
+} from "../device";
 import {
 	ComputeGraph,
 	cachedGraph,
@@ -38,7 +38,6 @@ import {
 	release,
 	stage,
 	storage,
-	submit,
 	uniform,
 	warmKernelsAsync,
 } from "./kernel";
@@ -54,7 +53,7 @@ import {
 	withLease,
 } from "./pool";
 import { getGpuGraphProfile, getGpuProfile, resetGpuProfile } from "./profile";
-import { GpuValidationError } from "./queue";
+import { GpuValidationError, submit } from "./queue";
 import {
 	readBack,
 	readbackStats,

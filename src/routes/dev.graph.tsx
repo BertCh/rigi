@@ -107,7 +107,7 @@ function GraphPage() {
 			try {
 				const [{ inspectGraphs }, { adoptedRenderDevice }] = await Promise.all([
 					import("#/lib/gpu/core/inspect"),
-					import("#/lib/gpu/core/device"),
+					import("#/lib/gpu/device"),
 				]);
 				if (!stop)
 					setLive({

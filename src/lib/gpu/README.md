@@ -35,8 +35,8 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
 - **`splat-sort/`**: the GPU back-to-front sort of the Step Inside splats on the render device
   (stable radix, order buffer written in place, no readback); see its README for the key identity
   with the worker's counting sort.
-- **`device.ts`** re-exports `core/device`. This is the stable import path that callers outside
-  `src/lib/gpu` use (the app workers, the look controller, deck-webgpu).
+- **`device.ts`** is the compute device registry (`getComputeDevice`, `adoptRenderDevice`, …), imported by every
+  caller (the app workers, the look controller, deck-webgpu).
 
 ## Rules
 

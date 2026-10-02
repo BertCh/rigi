@@ -29,10 +29,10 @@
 // instances; there is no kept-count readback.
 import type { Buffer, Device, QuerySet } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
-import { type BindKind, defineKernel, submit } from "../core/kernel";
+import { type BindKind, defineKernel } from "../core/kernel";
 import { GPUSort } from "../core/luma";
 import { profiling, recordGpuTime } from "../core/profile";
-import { errorChecks, submitted } from "../core/queue";
+import { errorChecks, submit, submitted } from "../core/queue";
 import { DEPTH_WGSL, KEYS_WGSL, TILE } from "./splat-sort.wgsl";
 
 /** The kernels' group and the core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "splat-sort"). */
