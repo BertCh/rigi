@@ -24,7 +24,12 @@ describe.skipIf(!python)("v3 tooling python unit tests", () => {
 				{
 					cwd: repoRoot,
 					encoding: "utf8",
-					env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+					// PYTHON_COLORS=0: Python 3.13+ colours unittest output under FORCE_COLOR, which hides "\nOK"
+					env: {
+						...process.env,
+						PYTHONDONTWRITEBYTECODE: "1",
+						PYTHON_COLORS: "0",
+					},
 				},
 			);
 			expect(result.stderr + result.stdout).toMatch(/\nOK\b/);
