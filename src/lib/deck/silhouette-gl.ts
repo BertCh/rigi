@@ -9,11 +9,19 @@
 // re-rank land in one target (pose k = rows [k·H, (k+1)·H), top-down) and come back in ONE
 // asynchronous readPixels (PBO + fence, geometry-pass.ts glFence / readbackQuiet).
 //
-// Raw GL, like GpuGeometrySource.copyRangeTo: luma's WebGL state tracker wraps the context's
-// setters, so these calls keep its cache coherent, and every binding / capability touched is
-// restored afterwards.
-import type { Device } from "@luma.gl/core";
-import { glFence, readbackQuiet } from "./geometry-pass";
+// A luma Model on the deck device (no hand-written GL): the GLSL is the former program verbatim
+// except that its uniforms are one std140 block (luma 10 has no plain-uniform path; identical
+// values, identical math). The range targets come in as luma Textures or as borrowed WebGLTexture
+// handles (what DeckEngine passes). The readback is texture.readBuffer into a fresh luma Buffer
+// (orphaned per read), behind the same glFence / readbackQuiet queue probes.
+import {
+	type Buffer,
+	type Device,
+	type Framebuffer,
+	Texture,
+} from "@luma.gl/core";
+import { Model } from "@luma.gl/engine";
+import { glFence, readbackBuffer, readbackQuiet } from "./geometry-pass";
 import { glOf } from "./gl";
 import {
 	SIL_GROUP,
@@ -34,12 +42,16 @@ precision highp float;
 precision highp int;
 precision highp sampler2D;
 uniform highp sampler2D uRange;
-uniform int uW;
-uniform int uH;
-uniform int uBase;     // first target row of this pose
-uniform uint uNonce;
-// rmax, khi, klo, zlo, zhi, flo, fhi
-uniform float uT[7];
+// std140 block (luma 10 feeds uniforms through blocks only); uTa = rmax, khi, klo, zlo and
+// uTb = zhi, flo, fhi, 0 are the former float uT[7]
+layout(std140) uniform silUniforms {
+	int uW;
+	int uH;
+	int uBase;     // first target row of this pose
+	uint uNonce;
+	vec4 uTa;
+	vec4 uTb;
+};
 layout(location = 0) out uvec4 outMask;
 
 // 0 = surely fail, 1 = surely pass, 2 = undecided
@@ -58,8 +70,8 @@ float rangeAt(int x, int yTop) {
 int nb(float rn, float rc, int z) {
 	if (odd(rn)) return U;
 	if (!(rn > 0.0)) return z;
-	int lt = rn <= uT[5] ? T : (rn >= uT[6] ? F : U);
-	int r = rn >= rc * uT[1] ? T : (rn <= rc * uT[2] ? F : U);
+	int lt = rn <= uTb.y ? T : (rn >= uTb.z ? F : U);
+	int r = rn >= rc * uTa.y ? T : (rn <= rc * uTa.z ? F : U);
 	if (lt == T) return r;
 	if (lt == F) return z;
 	return (r == z && r != U) ? r : U;
@@ -84,8 +96,8 @@ void main() {
 			if (x < 1 || x > uW - 2) continue;
 			float rc = rangeAt(x, y);
 			if (odd(rc)) { und++; continue; }
-			if (!(rc > 0.0) || rc > uT[0]) continue;
-			int z = rc <= uT[3] ? T : (rc >= uT[4] ? F : U);
+			if (!(rc > 0.0) || rc > uTa.x) continue;
+			int z = rc <= uTa.w ? T : (rc >= uTb.x ? F : U);
 			int a = nb(rangeAt(x, y - 1), rc, z);
 			int b = nb(rangeAt(x + 1, y), rc, z);
 			int c = nb(rangeAt(x - 1, y), rc, z);
@@ -96,83 +108,88 @@ void main() {
 	outMask = uvec4(bits[0], bits[1], bits[2], (uNonce << 16) | (pos << 8) | min(und, 255u));
 }`;
 
-type Prog = {
-	program: WebGLProgram;
-	vao: WebGLVertexArrayObject;
-	loc: Record<string, WebGLUniformLocation | null>;
-};
+const silModule = {
+	name: "sil",
+	uniformTypes: {
+		uW: "i32",
+		uH: "i32",
+		uBase: "i32",
+		uNonce: "u32",
+		uTa: "vec4<f32>",
+		uTb: "vec4<f32>",
+	},
+} as const;
+
+const NEAREST = {
+	minFilter: "nearest",
+	magFilter: "nearest",
+	mipmapFilter: "none",
+	addressModeU: "clamp-to-edge",
+	addressModeV: "clamp-to-edge",
+} as const;
 
 /** One per DeckEngine (one GL context). */
 export class SilhouetteMaskGL {
-	private prog: Prog | null = null;
+	private model: Model | null = null;
+	private compiling: Promise<Model | null> | null = null;
 	private failed = false;
-	private tex: WebGLTexture | null = null;
-	private fbo: WebGLFramebuffer | null = null;
+	private tex: Texture | null = null;
+	private fbo: Framebuffer | null = null;
 	private size = { w: 0, h: 0 };
-	private pbo: WebGLBuffer | null = null;
 	private pboBytes = 0;
 	private busy = false;
 	private destroyed = false;
 
 	constructor(readonly device: Device) {}
 
-	private get gl() {
-		return glOf(this.device);
-	}
-
-	private compile(): Prog | null {
-		if (this.prog || this.failed) return this.prog;
-		const gl = this.gl;
-		const sh = (type: number, src: string) => {
-			const s = gl.createShader(type);
-			if (!s) return null;
-			gl.shaderSource(s, src);
-			gl.compileShader(s);
-			return s;
-		};
-		const vs = sh(gl.VERTEX_SHADER, VS);
-		const fs = sh(gl.FRAGMENT_SHADER, FS);
-		const program = gl.createProgram();
-		const vao = gl.createVertexArray();
-		if (!vs || !fs || !program || !vao) {
-			this.failed = true;
-			return null;
-		}
-		gl.attachShader(program, vs);
-		gl.attachShader(program, fs);
-		gl.linkProgram(program);
-		// once per engine: the only synchronous status query
-		if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-			console.warn(
-				"[silhouette-gl] link failed, CPU re-rank",
-				gl.getShaderInfoLog(fs),
-				gl.getProgramInfoLog(program),
-			);
-			this.failed = true;
-			return null;
-		}
-		gl.deleteShader(vs);
-		gl.deleteShader(fs);
-		const loc: Prog["loc"] = {};
-		for (const n of ["uRange", "uW", "uH", "uBase", "uNonce", "uT"])
-			loc[n] = gl.getUniformLocation(program, n);
-		this.prog = { program, vao, loc };
-		return this.prog;
+	/** Compiled once per engine (asynchronously where the driver links in parallel). */
+	private compile(): Promise<Model | null> {
+		if (this.model || this.failed) return Promise.resolve(this.model);
+		this.compiling ??= Model.createAsync(this.device, {
+			id: "silhouette-mask",
+			vs: VS,
+			fs: FS,
+			modules: [silModule],
+			bufferLayout: [],
+			topology: "triangle-list",
+			vertexCount: 3,
+		})
+			.then((m) => {
+				if (this.destroyed) {
+					m.destroy();
+					return null;
+				}
+				this.model = m;
+				return m;
+			})
+			.catch((e) => {
+				console.warn("[silhouette-gl] link failed, CPU re-rank", e);
+				this.failed = true;
+				return null;
+			});
+		return this.compiling;
 	}
 
 	/** The RGBA32UI target, `w` groups × `h` rows (grown, never shrunk). */
 	private target(w: number, h: number) {
-		const gl = this.gl;
 		if (this.tex && this.size.w === w && this.size.h >= h) return true;
-		if (h > gl.getParameter(gl.MAX_TEXTURE_SIZE)) return false;
-		if (this.tex) gl.deleteTexture(this.tex);
-		this.fbo ??= gl.createFramebuffer();
-		this.tex = gl.createTexture();
-		if (!this.tex || !this.fbo) return false;
-		const prevTex = gl.getParameter(gl.TEXTURE_BINDING_2D);
-		gl.bindTexture(gl.TEXTURE_2D, this.tex);
-		gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, w, h);
-		gl.bindTexture(gl.TEXTURE_2D, prevTex);
+		if (h > this.device.limits.maxTextureDimension2D) return false;
+		this.fbo?.destroy();
+		this.tex?.destroy();
+		this.tex = this.device.createTexture({
+			id: "silhouette-mask-target",
+			format: "rgba32uint",
+			width: w,
+			height: h,
+			usage: Texture.SAMPLE | Texture.RENDER | Texture.COPY_SRC,
+			sampler: NEAREST,
+		});
+		this.fbo = this.device.createFramebuffer({
+			id: "silhouette-mask-fbo",
+			width: w,
+			height: h,
+			colorAttachments: [this.tex],
+		});
 		this.size = { w, h };
 		return true;
 	}
@@ -183,54 +200,57 @@ export class SilhouetteMaskGL {
 	 * lost / superseded): the caller scores on the CPU.
 	 */
 	async run(
-		ranges: WebGLTexture[],
+		ranges: (Texture | WebGLTexture)[],
 		W: number,
 		H: number,
 		nonce: number,
 	): Promise<Uint32Array | null> {
 		if (this.destroyed || this.busy || !ranges.length) return null;
-		const gl = this.gl;
-		if (gl.isContextLost()) return null;
-		const prog = this.compile();
+		if (this.device.isLost) return null;
 		const G = silGroups(W);
 		const rows = H * ranges.length;
-		if (!prog || !this.target(G, rows)) return null;
 		this.busy = true;
+		// borrowed handles are wrapped for the run only (luma never deletes them)
+		const wrapped: Texture[] = [];
+		let readback: Buffer | null = null;
 		try {
-			this.draw(prog, ranges, W, H, nonce);
+			const model = await this.compile();
+			if (!model || this.destroyed || !this.target(G, rows)) return null;
+			const sources = ranges.map((r) => {
+				if (r instanceof Texture) return r;
+				const t = this.device.createTexture({
+					id: "silhouette-range-borrowed",
+					handle: r,
+					_isHandleBorrowed: true,
+					format: "r32float",
+					width: W,
+					height: H,
+					sampler: NEAREST,
+				} as never);
+				wrapped.push(t);
+				return t;
+			});
+			if (!this.draw(model, sources, W, H, nonce)) return null;
 			const words = silMaskWords(W, H) * ranges.length;
 			const bytes = words * 4;
-			// read into a STREAM_READ pack buffer, orphaned per read (geometry-pass.ts readPixelsInto)
-			this.pbo ??= gl.createBuffer();
-			if (!this.pbo) return null;
-			const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
-			const prevPack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
-			const prevAlign = gl.getParameter(gl.PACK_ALIGNMENT);
-			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo);
-			gl.readBuffer(gl.COLOR_ATTACHMENT0);
-			gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
-			gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
+			// a fresh pack buffer per read = orphaned storage (geometry-pass.ts readPixelsInto)
+			readback = readbackBuffer(this.device, bytes, "silhouette-mask-readback");
+			this.tex?.readBuffer({ width: G, height: rows }, readback);
 			this.pboBytes = bytes;
-			gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
-			gl.readPixels(0, 0, G, rows, gl.RGBA_INTEGER, gl.UNSIGNED_INT, 0);
-			gl.pixelStorei(gl.PACK_ALIGNMENT, prevAlign);
-			gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prevPack);
-			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
+			const gl = glOf(this.device);
 			const cancelled = () => this.destroyed;
 			const fence = await glFence(gl, cancelled);
 			if (!fence.ok) return null;
 			const quiet = await readbackQuiet(gl, fence.ms, cancelled);
-			if (!quiet.ok || this.destroyed || !this.pbo) return null;
-			const out = new Uint32Array(words);
-			const prev = gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
-			gl.bindBuffer(gl.COPY_READ_BUFFER, this.pbo);
-			gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, out, 0, words);
-			gl.bindBuffer(gl.COPY_READ_BUFFER, prev);
-			return out;
+			if (!quiet.ok || this.destroyed) return null;
+			const raw = await readback.readAsync(0, bytes);
+			return new Uint32Array(raw.buffer, raw.byteOffset, words);
 		} catch (e) {
 			console.warn("[silhouette-gl] mask pass failed, CPU re-rank", e);
 			return null;
 		} finally {
+			readback?.destroy();
+			for (const t of wrapped) t.destroy();
 			this.busy = false;
 		}
 	}
@@ -241,105 +261,50 @@ export class SilhouetteMaskGL {
 	}
 
 	private draw(
-		prog: Prog,
-		ranges: WebGLTexture[],
+		model: Model,
+		ranges: Texture[],
 		W: number,
 		H: number,
 		nonce: number,
-	) {
-		const gl = this.gl;
+	): boolean {
 		const G = silGroups(W);
 		const t = silhouetteThresholds();
-		// save everything the pass touches; restored in `finally`, so a throw (e.g. a lost context
-		// mid-pass) never leaves luma's state cache pointing at our program / framebuffer
-		const prev = {
-			fbo: gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING),
-			program: gl.getParameter(gl.CURRENT_PROGRAM),
-			vao: gl.getParameter(gl.VERTEX_ARRAY_BINDING),
-			viewport: gl.getParameter(gl.VIEWPORT) as Int32Array,
-			active: gl.getParameter(gl.ACTIVE_TEXTURE),
-			mask: gl.getParameter(gl.COLOR_WRITEMASK) as boolean[],
-		};
-		const caps = [
-			gl.BLEND,
-			gl.DEPTH_TEST,
-			gl.STENCIL_TEST,
-			gl.SCISSOR_TEST,
-			gl.CULL_FACE,
-			gl.RASTERIZER_DISCARD,
-			gl.SAMPLE_ALPHA_TO_COVERAGE,
-			gl.SAMPLE_COVERAGE,
-			gl.POLYGON_OFFSET_FILL,
-		];
-		const on = caps.map((c) => gl.isEnabled(c));
-		gl.activeTexture(gl.TEXTURE0);
-		const prevTex = gl.getParameter(gl.TEXTURE_BINDING_2D);
-		const prevSampler = gl.getParameter(gl.SAMPLER_BINDING);
+		const pass = this.device.beginRenderPass({
+			id: "silhouette-mask",
+			framebuffer: this.fbo ?? undefined,
+			clearColor: false,
+			clearDepth: false,
+		});
+		let ok = true;
 		try {
-			for (const c of caps) gl.disable(c);
-			gl.bindSampler(0, null);
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.fbo);
-			gl.framebufferTexture2D(
-				gl.DRAW_FRAMEBUFFER,
-				gl.COLOR_ATTACHMENT0,
-				gl.TEXTURE_2D,
-				this.tex,
-				0,
-			);
-			gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-			gl.colorMask(true, true, true, true);
-			// biome-ignore lint/correctness/useHookAtTopLevel: WebGL call, not a React hook
-			gl.useProgram(prog.program);
-			gl.bindVertexArray(prog.vao);
-			const L = prog.loc;
-			gl.uniform1i(L.uRange, 0);
-			gl.uniform1i(L.uW, W);
-			gl.uniform1i(L.uH, H);
-			gl.uniform1ui(L.uNonce, nonce);
-			gl.uniform1fv(
-				L.uT,
-				new Float32Array([t.rmax, t.khi, t.klo, t.zlo, t.zhi, t.flo, t.fhi]),
-			);
 			ranges.forEach((tex, k) => {
-				gl.bindTexture(gl.TEXTURE_2D, tex);
-				gl.uniform1i(L.uBase, k * H);
-				gl.viewport(0, k * H, G, H);
-				gl.drawArrays(gl.TRIANGLES, 0, 3);
+				model.shaderInputs.setProps({
+					sil: {
+						uW: W,
+						uH: H,
+						uBase: k * H,
+						uNonce: nonce,
+						uTa: [t.rmax, t.khi, t.klo, t.zlo],
+						uTb: [t.zhi, t.flo, t.fhi, 0],
+					},
+				});
+				model.setBindings({ uRange: tex });
+				pass.setParameters({ viewport: [0, k * H, G, H, 0, 1] });
+				ok = model.draw(pass) && ok;
 			});
 		} finally {
-			gl.bindTexture(gl.TEXTURE_2D, prevTex);
-			gl.bindSampler(0, prevSampler);
-			gl.activeTexture(prev.active);
-			gl.bindVertexArray(prev.vao);
-			// biome-ignore lint/correctness/useHookAtTopLevel: WebGL call, not a React hook
-			gl.useProgram(prev.program);
-			gl.colorMask(prev.mask[0], prev.mask[1], prev.mask[2], prev.mask[3]);
-			gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prev.fbo);
-			gl.viewport(
-				prev.viewport[0],
-				prev.viewport[1],
-				prev.viewport[2],
-				prev.viewport[3],
-			);
-			caps.forEach((c, i) => {
-				if (on[i]) gl.enable(c);
-			});
+			pass.end();
 		}
+		return ok;
 	}
 
 	destroy() {
 		this.destroyed = true;
-		const gl = this.gl;
-		if (this.prog) {
-			gl.deleteProgram(this.prog.program);
-			gl.deleteVertexArray(this.prog.vao);
-		}
-		if (this.tex) gl.deleteTexture(this.tex);
-		if (this.fbo) gl.deleteFramebuffer(this.fbo);
-		if (this.pbo) gl.deleteBuffer(this.pbo);
-		this.prog = null;
+		this.model?.destroy();
+		this.fbo?.destroy();
+		this.tex?.destroy();
+		this.model = null;
 		this.tex = null;
 		this.fbo = null;
-		this.pbo = null;
 	}
 }

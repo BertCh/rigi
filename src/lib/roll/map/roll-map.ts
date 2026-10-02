@@ -626,6 +626,10 @@ export class RollMapEngine {
 			this.rangeGpu ??= new RangeGpu(atlas.range.device);
 			const gpu = this.rangeGpu;
 			const t0 = performance.now();
+			// the programs link asynchronously: wait for them once rather than take the CPU path
+			await gpu.whenReady();
+			if (this.disposed) return "disposed";
+			if (p.rev !== rev) return "moved";
 			if (gpu.ok && src.drawOnly(p.pose)) {
 				const drawSeq = src.drawSeq;
 				let landed = false;
