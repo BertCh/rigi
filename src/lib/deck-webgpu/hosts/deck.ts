@@ -2,19 +2,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// deck.gl-on-WebGPU host (the chosen direction, README.md "Approach"). deck owns the device, the
-// canvas, the views / viewports and the frame loop; our offscreen passes run in a deck Effect's
-// preRender (before deck's canvas LayersPass, same command encoder, one submit), and screen
-// cores are drawn by a thin deck Layer (CoreLayer) in deck's canvas pass.
-//
-// Why not deck's _LayersPass for the offscreen passes (spike.ts, 2026-09-30, deck 9.4.0):
-//   - LayersPass clears depth to 1 (reversed-Z needs 0) and a View `clear` opens a render pass
-//     inside the open one (invalid command buffer on WebGPU);
-//   - WEBGPU_DEFAULT_DRAW_PARAMETERS force premultiplied blending + 'less-equal' over the model's
-//     own parameters; blending can't be turned off (only neutralised), so non-blendable targets
-//     (rgba32float) need the optional 'float32-blendable' feature;
-//   - it opens no resolve targets and ignores sample counts.
-// Our pass runner (passes.ts) avoids all of it; deck still gives lifecycle, views, controllers.
 import {
 	type Deck,
 	Layer,
@@ -34,6 +21,20 @@ import { attachFrameTimings, getFrameTimings } from "../frame-timings";
 import type { FrameState, GpuLayerCore } from "../pass";
 import { ColorTargets, GeometryTargets, geometrySize } from "../targets";
 import type { Host, HostStats } from "./direct";
+// deck.gl-on-WebGPU host (the chosen direction, README.md "Approach"). deck owns the device, the
+// canvas, the views / viewports and the frame loop; our offscreen passes run in a deck Effect's
+// preRender (before deck's canvas LayersPass, same command encoder, one submit), and screen
+// cores are drawn by a thin deck Layer (CoreLayer) in deck's canvas pass.
+//
+// Why not deck's _LayersPass for the offscreen passes (spike.ts, 2026-09-30, deck 9.4.0):
+//   - LayersPass clears depth to 1 (reversed-Z needs 0) and a View `clear` opens a render pass
+//     inside the open one (invalid command buffer on WebGPU);
+//   - WEBGPU_DEFAULT_DRAW_PARAMETERS force premultiplied blending + 'less-equal' over the model's
+//     own parameters; blending can't be turned off (only neutralised), so non-blendable targets
+//     (rgba32float) need the optional 'float32-blendable' feature;
+//   - it opens no resolve targets and ignores sample counts.
+// Our pass runner (passes.ts) avoids all of it; deck still gives lifecycle, views, controllers.
+import { createFrameCoalescer } from "./frame-coalescer";
 import {
 	type CameraPose,
 	camerasFor,
@@ -176,9 +177,16 @@ export class DeckHost implements Host {
 		} as never);
 	}
 
+	/** CR-40: one draw per animation frame however many input events / requests land before it. */
+	private readonly frames = createFrameCoalescer(() => this.drawFrame());
+
 	requestRender(scope: "all" | "screen" = "all") {
 		if (scope === "all") this.offscreenDirty = true;
-		this.requestedAt = performance.now();
+		if (!this.frames.pending) this.requestedAt = performance.now();
+		this.frames.request();
+	}
+
+	private drawFrame() {
 		const canvas = this.device.getDefaultCanvasContext()
 			.canvas as HTMLCanvasElement;
 		this.deck.setProps({
@@ -312,6 +320,7 @@ export class DeckHost implements Host {
 	}
 
 	destroy() {
+		this.frames.cancel();
 		// no frame will ever render: settle pending nextFrame() callers (they only await "a frame happened")
 		for (const r of this.waiters.splice(0)) r();
 		for (const c of this.cores) c.destroy();
