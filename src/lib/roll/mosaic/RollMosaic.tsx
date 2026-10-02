@@ -83,7 +83,7 @@ export function RollMosaic({
 				{compact && map}
 				<div className="min-w-0">
 					<div className="mb-3 flex flex-wrap items-center gap-2">
-						<div className="inline-flex rounded-lg bg-white/[0.04] p-0.5 ring-1 ring-white/8">
+						<div className="inline-flex rounded-lg bg-white/[0.04] p-0.5">
 							{(
 								[
 									["viewpoint", "Viewpoint", MapPin],

@@ -80,7 +80,7 @@ function Library() {
 
 			{empty && (
 				<section className="mx-auto max-w-6xl px-4 pb-10 sm:px-8">
-					<div className="rounded-md border border-dashed border-white/15 px-5 py-8 text-center text-sm text-white/55">
+					<div className="rounded-md bg-white/[0.03] px-5 py-8 text-center text-sm text-white/55">
 						Nothing here yet. Add a photo above, or look around the sample trip
 						first.
 					</div>

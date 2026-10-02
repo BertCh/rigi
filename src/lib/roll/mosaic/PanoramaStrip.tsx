@@ -563,10 +563,10 @@ export function PanoramaStrip({
 
 	return (
 		<section
-			className={`overflow-hidden rounded-xl bg-white/[0.03] ring-1 ring-white/8 ${className}`}
+			className={`overflow-hidden rounded-xl bg-white/[0.03] ${className}`}
 			data-testid="roll-panorama"
 		>
-			<div className="flex flex-wrap items-center gap-1.5 border-b border-white/8 px-3 py-2">
+			<div className="flex flex-wrap items-center gap-1.5 bg-white/[0.03] px-3 py-2">
 				<span className="mr-1 text-xs font-semibold text-white/70">
 					Panorama
 				</span>
@@ -685,7 +685,7 @@ export function PanoramaStrip({
 					aria-valuenow={stripHeight}
 					title="Drag to resize · double-click to reset"
 					data-testid="pano-resize"
-					className="group flex h-3 cursor-ns-resize touch-none items-center justify-center border-t border-white/8 outline-none"
+					className="group flex h-3 cursor-ns-resize touch-none items-center justify-center outline-none"
 					onPointerDown={(e) => {
 						resizeDrag.current = { y: e.clientY, h: stripHeight };
 						e.currentTarget.setPointerCapture(e.pointerId);
@@ -734,7 +734,7 @@ function ModeChip({
 			className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] ring-1 transition ${
 				active
 					? "bg-white/12 text-white ring-white/25"
-					: "text-white/55 ring-white/10 hover:text-white/85"
+					: "bg-white/[0.04] text-white/55 ring-transparent hover:text-white/85"
 			}`}
 		>
 			{color && (

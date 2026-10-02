@@ -1687,7 +1687,7 @@ export function PhotoWorkspace({
 
 			{/* panel */}
 			{/* panel: mode switch (sticky) → View → Pose → Experimental & dev → credits (always shown) */}
-			<aside className="flex max-h-[45dvh] w-full shrink-0 flex-col border-white/8 bg-[var(--rigi-slate)] md:max-h-none md:w-80 md:border-l">
+			<aside className="flex max-h-[45dvh] w-full shrink-0 flex-col bg-[var(--rigi-slate)] md:max-h-none md:w-80">
 				<div className="min-h-0 flex-1 overflow-y-auto">
 					<div className="sticky top-0 z-10 bg-[var(--rigi-slate)]/95 px-4 pt-4 pb-3 backdrop-blur">
 						<div className="flex items-center gap-2">

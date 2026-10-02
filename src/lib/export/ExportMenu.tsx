@@ -235,7 +235,7 @@ export function ExportMenu({
 				aria-haspopup="menu"
 				aria-expanded={open}
 				title={photo ? `Export ${photo.id}` : "Export"}
-				className="flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 ring-1 ring-white/10 backdrop-blur hover:text-white disabled:opacity-40"
+				className="flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 backdrop-blur hover:text-white disabled:opacity-40"
 			>
 				{busy ? (
 					<LoaderCircle className="size-3.5 animate-spin" />
@@ -251,7 +251,7 @@ export function ExportMenu({
 				<div
 					role="menu"
 					className={cn(
-						"absolute top-full z-40 mt-1.5 w-64 rounded-xl bg-[#121820]/95 p-1 shadow-2xl ring-1 ring-white/10 backdrop-blur",
+						"absolute top-full z-40 mt-1.5 w-64 rounded-xl bg-[var(--rigi-slate)]/95 p-1 shadow-2xl backdrop-blur",
 						align === "right" ? "right-0" : "left-0",
 					)}
 				>
@@ -323,7 +323,7 @@ export function ExportMenu({
 						<p
 							data-export-status={msg.error ? "error" : "ok"}
 							className={cn(
-								"border-t border-white/8 px-2.5 pt-1.5 pb-1 text-[10px] leading-snug",
+								"mt-1 rounded-lg bg-white/[0.03] px-2.5 pt-1.5 pb-1 text-[10px] leading-snug",
 								msg.error ? "text-red-300" : "text-white/45",
 							)}
 						>

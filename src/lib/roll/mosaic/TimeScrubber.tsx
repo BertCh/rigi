@@ -114,7 +114,7 @@ export function TimeScrubber({
 
 	return (
 		<div
-			className={`rounded-xl bg-white/[0.03] px-4 pt-2.5 pb-2 ring-1 ring-white/8 ${className}`}
+			className={`rounded-xl bg-white/[0.03] px-4 pt-2.5 pb-2 ${className}`}
 			data-testid="roll-time"
 		>
 			<div className="flex items-center gap-3 text-[11px] text-white/55">

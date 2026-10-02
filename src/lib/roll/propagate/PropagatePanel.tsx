@@ -133,7 +133,7 @@ export function PropagatePanel({
 
 	return (
 		<aside
-			className="fixed top-36 right-3 z-40 w-[380px] max-w-[calc(100vw-24px)] rounded-xl bg-[#15181c]/95 light:bg-[var(--rigi-slate)]/95 text-[11.5px] shadow-2xl ring-1 ring-white/12 backdrop-blur"
+			className="fixed top-36 right-3 z-40 w-[380px] max-w-[calc(100vw-24px)] rounded-xl bg-[var(--rigi-slate)]/95 text-[11.5px] shadow-2xl backdrop-blur"
 			data-testid="propagate-panel"
 		>
 			<button
@@ -159,7 +159,7 @@ export function PropagatePanel({
 				)}
 			</button>
 			{open && (
-				<div className="max-h-[calc(100dvh-220px)] space-y-3 overflow-y-auto border-t border-white/10 px-3 py-2.5">
+				<div className="max-h-[calc(100dvh-220px)] space-y-3 overflow-y-auto px-3 py-2.5">
 					{up === false && (
 						<p className="text-amber-200/90 light:text-[var(--rigi-lesson)]/90">
 							Relative-rotation service not reachable at {propagateServiceUrl()}
@@ -241,7 +241,7 @@ export function PropagatePanel({
 							{mode === "dev" ? ", or fitted (dev)" : ""}.
 						</p>
 					)}
-					<p className="border-t border-white/8 pt-2 text-[10px] leading-snug text-white/35">
+					<p className="pt-2 text-[10px] leading-snug text-white/35">
 						Gate: rot only, ≥{PROPAGATE_GATE.minInliers} inliers, rms ≤
 						{PROPAGATE_GATE.maxRmsPx} px, overlap ≥{PROPAGATE_GATE.minOverlap},
 						fwd/bwd & cycle ≤{PROPAGATE_GATE.maxCycleDeg}°, gravity ≤
@@ -278,7 +278,7 @@ function RunRows({
 				return (
 					<li
 						key={t.meta.id}
-						className="rounded-md bg-white/[0.03] px-2 py-1.5 ring-1 ring-white/6"
+						className="rounded-md bg-white/[0.03] px-2 py-1.5"
 						data-testid="propagate-row"
 						data-target={t.meta.id}
 						data-status={r.status}

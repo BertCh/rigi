@@ -31,7 +31,7 @@ export function RollCard({
 			to="/roll/$id"
 			params={{ id: roll.id }}
 			data-testid="roll-card"
-			className="group overflow-hidden rounded-xl bg-white/[0.04] ring-1 ring-white/8 transition hover:ring-[var(--rigi-glow)]/50"
+			className="group overflow-hidden rounded-xl bg-white/[0.04] transition hover:ring-1 hover:ring-[var(--rigi-glow)]/50"
 		>
 			<div
 				data-theme="dark"

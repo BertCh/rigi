@@ -70,7 +70,7 @@ export function AlignRollButton({
 		const frac = p?.total ? p.done / p.total : 0;
 		return (
 			<div
-				className={`inline-flex min-w-[240px] items-center gap-3 rounded-lg bg-white/[0.04] px-3 py-1.5 ring-1 ring-white/10 ${className}`}
+				className={`inline-flex min-w-[240px] items-center gap-3 rounded-lg bg-white/[0.04] px-3 py-1.5 ${className}`}
 				data-testid="align-roll"
 				aria-live="polite"
 			>
@@ -136,7 +136,7 @@ export function AlignRollButton({
 		return (
 			<div className={`inline-flex flex-wrap items-center gap-2 ${className}`}>
 				<div
-					className="inline-flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs ring-1 ring-white/10"
+					className="inline-flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs"
 					data-testid="align-roll-summary"
 					title={
 						review.length ? `Needs review: ${review.join(", ")}` : undefined

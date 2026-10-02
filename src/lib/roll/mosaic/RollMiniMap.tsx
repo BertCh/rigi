@@ -212,7 +212,7 @@ export function RollMiniMap({
 			aria-label="Plan view of the roll: click a wedge to select a photo"
 			data-testid="roll-minimap"
 			data-theme="dark"
-			className={`relative touch-none overflow-hidden rounded-xl bg-[var(--rigi-slate)] ring-1 ring-white/8 select-none cursor-grab ${className}`}
+			className={`relative touch-none overflow-hidden rounded-xl bg-[var(--rigi-slate)] select-none cursor-grab ${className}`}
 			style={{ height }}
 			onPointerDown={onPointerDown}
 			onPointerMove={onPointerMove}

@@ -266,10 +266,10 @@ function UploadPage() {
 						setDragOver(false);
 						onFile(e.dataTransfer.files[0]);
 					}}
-					className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-6 py-10 text-center transition ${
+					className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md px-6 py-10 text-center transition ${
 						dragOver
-							? "border-[var(--rigi-glow)] bg-[var(--rigi-glow)]/10"
-							: "border-white/15 bg-white/[0.03] hover:border-white/30"
+							? "bg-[var(--rigi-glow)]/10 ring-2 ring-[var(--rigi-glow)]"
+							: "bg-white/[0.03] hover:bg-white/[0.06]"
 					}`}
 				>
 					{stage ? (

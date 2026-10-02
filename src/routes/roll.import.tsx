@@ -24,9 +24,9 @@ import {
 	DECODE_CONCURRENCY,
 	isNameTimeDuplicate,
 	type LatLon,
+	markSavingFailed,
 	type Placement,
 	placeBatch,
-	markSavingFailed,
 	placedMeta,
 	provenanceOf,
 	readFileId,
@@ -446,10 +446,10 @@ function ImportPage() {
 							setDragOver(false);
 							addFiles(e.dataTransfer.files);
 						}}
-						className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-6 py-8 text-center transition ${
+						className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md px-6 py-8 text-center transition ${
 							dragOver
-								? "border-[var(--rigi-glow)] bg-[var(--rigi-glow)]/10"
-								: "border-white/15 bg-white/[0.03] hover:border-white/30"
+								? "bg-[var(--rigi-glow)]/10 ring-2 ring-[var(--rigi-glow)]"
+								: "bg-white/[0.03] hover:bg-white/[0.06]"
 						}`}
 					>
 						<ImagePlus className="size-6 text-[var(--rigi-glow)]" />
@@ -777,7 +777,7 @@ function ItemCard({
 						? "ring-[var(--rigi-glow)]"
 						: placement?.kind === "none"
 							? "ring-amber-300/40 light:ring-[var(--rigi-lesson)]/40"
-							: "ring-white/8"
+							: "ring-transparent"
 				} ${onPin ? "hover:ring-[var(--rigi-glow)]/60" : ""}`}
 			>
 				<div data-theme="dark" className="relative aspect-[4/3] bg-black/50">
