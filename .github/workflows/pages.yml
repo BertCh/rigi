@@ -1,6 +1,6 @@
 # Deploys the app as a static SPA to GitHub Pages (https://bertch.github.io/rigi/).
 # RIGI_PAGES=1 sets Vite's base to /rigi/ and prerenders the SPA shell (vite.config.ts);
-# scripts/pages/finalize.mjs adds the 404.html deep-link fallback. Model weights come from Git LFS,
+# scripts/pages/finalize.mjs adds the 404.html deep-link fallback and rebases the URLs in public JSON. Model weights come from Git LFS,
 # cached by object id so a deploy only downloads weights that changed (LFS bandwidth is metered).
 # Gitignored data (public/photos, public/baseline) is not part of the site.
 name: pages
@@ -46,6 +46,9 @@ jobs:
         run: npx vite build
         env:
           RIGI_PAGES: "1"
+          # Pages has no runtime env: VITE_* values are baked into the client bundle at build time, so
+          # this browser key is public on the site (restrict it to the bertch.github.io referrer)
+          VITE_GOOGLE_TILES_KEY: ${{ secrets.VITE_GOOGLE_TILES_KEY }}
       - name: Finalize (404.html fallback, .nojekyll, size check)
         run: node scripts/pages/finalize.mjs .output/public
       - uses: actions/configure-pages@v5
