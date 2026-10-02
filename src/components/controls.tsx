@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { ChevronRight } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 import { storageKey } from "#/lib/ontology/core/storage";
 import { cn } from "#/lib/utils";
 
@@ -37,9 +37,62 @@ function useSectionOpen(
 	];
 }
 
+/** Which section of an accordion is open (null: none); `all` under automation. */
+type AccordionState = {
+	openId: string | null;
+	all: boolean;
+	setOpenId: (id: string | null) => void;
+};
+const AccordionContext = createContext<AccordionState | null>(null);
+
+/**
+ * Groups the collapsible Sections below it so at most one is open at a time, keeping the sidebar
+ * about one screen tall. The open id is remembered under localStorage rigi.panel.<id>; automation
+ * (navigator.webdriver) opens every section, as a lone Section does.
+ */
+export function SectionAccordion({
+	id,
+	defaultOpen,
+	children,
+}: {
+	id: string;
+	defaultOpen: string | null;
+	children: ReactNode;
+}) {
+	const [all] = useState(() => {
+		try {
+			return navigator.webdriver === true;
+		} catch {
+			return false;
+		}
+	});
+	const [openId, setOpenIdState] = useState<string | null>(() => {
+		try {
+			const s = localStorage.getItem(OPEN_KEY(id));
+			return s == null ? defaultOpen : s || null;
+		} catch {
+			return defaultOpen;
+		}
+	});
+	const setOpenId = (next: string | null) => {
+		setOpenIdState(next);
+		try {
+			localStorage.setItem(OPEN_KEY(id), next ?? "");
+		} catch {
+			// storage unavailable: remembered for this page only
+		}
+	};
+	return (
+		<AccordionContext.Provider value={{ openId, all, setOpenId }}>
+			{children}
+		</AccordionContext.Provider>
+	);
+}
+
 /**
  * A sidebar section. With `collapse` the title becomes a disclosure whose open state is remembered
- * per id (localStorage rigi.panel.<id>); `summary` is shown beside the title while it is closed.
+ * per id (localStorage rigi.panel.<id>), or by the enclosing SectionAccordion; `summary` is shown
+ * beside the title while it is closed.
  */
 export function Section({
 	title,
@@ -56,10 +109,17 @@ export function Section({
 	summary?: ReactNode;
 	icon?: ReactNode;
 }) {
-	const [open, setOpen] = useSectionOpen(
+	const [ownOpen, setOwnOpen] = useSectionOpen(
 		collapse?.id,
 		collapse?.defaultOpen ?? true,
 	);
+	const accordion = useContext(AccordionContext);
+	const inAccordion = !!(accordion && collapse);
+	const open = inAccordion
+		? accordion.all || accordion.openId === collapse.id
+		: ownOpen;
+	const setOpen = (v: boolean) =>
+		inAccordion ? accordion.setOpenId(v ? collapse.id : null) : setOwnOpen(v);
 	const heading = (
 		<h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.14em] text-white/55 uppercase">
 			{collapse && (

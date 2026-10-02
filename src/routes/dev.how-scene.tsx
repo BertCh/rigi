@@ -33,7 +33,8 @@ function Preview() {
 					How it works
 				</p>
 				<h1 className="mb-8 max-w-3xl text-[2rem] leading-[1.08] font-semibold tracking-[-0.02em] sm:text-[2.6rem]">
-					From a compass guess to a camera that fits the mountains.
+					How the phone's compass reading is corrected until the camera matches
+					the mountains.
 				</h1>
 				<HowItWorksScene at={Number.isFinite(t) ? t : undefined} />
 			</section>

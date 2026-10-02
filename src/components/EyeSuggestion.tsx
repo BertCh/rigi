@@ -118,7 +118,7 @@ export function EyeSuggestion({
 				<Button
 					onClick={run}
 					disabled={!ready || !pose || phase.kind === "running"}
-					title="Search eyes within the GPS error for a better skyline fit (a suggestion only)"
+					title="Search positions within the GPS error for a better skyline fit (suggestion only)"
 				>
 					<Crosshair className="size-3.5" /> Check camera position
 				</Button>
@@ -209,12 +209,12 @@ function ResultCard({
 					No better position nearby:{" "}
 					{r.distanceM < 0.5
 						? "the GPS position fits the skyline best"
-						: `the best eye (${r.distanceM.toFixed(1)} m away) does not beat the GPS position by the search's 2σ margin`}{" "}
+						: `the best position found (${r.distanceM.toFixed(1)} m away) is not better than the GPS position by the required 2σ margin`}{" "}
 					(fit cost {r.before.cost.toFixed(0)} → {r.after.cost.toFixed(0)}).
 				</p>
 			)}
 			<p className="text-white/40">
-				Skyline fit only; it often cannot tell nearby eyes apart. Check the
+				Skyline fit only; it often cannot tell nearby positions apart. Check the
 				overlay before keeping it. {how}
 			</p>
 			{stale && (

@@ -31,7 +31,7 @@ const tools = [
 	{
 		to: "/roll",
 		title: "All camera rolls",
-		body: "Your rolls and the bundled ones in one list.",
+		body: "Your rolls and the bundled sample rolls in one list.",
 	},
 ] as const;
 
@@ -67,7 +67,7 @@ function Library() {
 						testId="import-roll-entry"
 						icon={ImagePlus}
 						title="Import a camera roll"
-						body="A day's worth at once. Photos are grouped by place, timed GPS fills the gaps, and the whole roll aligns in one go."
+						body="Import a day's photos at once. Photos are grouped by place, timed GPS fills in missing locations, and the whole roll is aligned together."
 						cta="Choose photos"
 					/>
 				</div>

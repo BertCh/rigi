@@ -188,7 +188,7 @@ function Home() {
 			<Story
 				id="story"
 				eyebrow="01 · Single photo"
-				title="Map data, drawn into the photo."
+				title="Map data drawn onto the photo."
 				body="Once the camera pose is solved, contours, ridgelines and peak names are projected from the terrain model into the image."
 				cta={{ to: "demo-01", label: "Open this photo" }}
 			>
@@ -198,7 +198,7 @@ function Home() {
 					photoSet={variantSet("demo-01")}
 					overlaySet={variantSet("demo-01-overlay")}
 					sizes={STORY_SIZES}
-					alt="Contours, ridgelines and peak names blooming out over Lake Thun"
+					alt="Contours, ridgelines and peak names drawn over a photo of Lake Thun"
 					aspect={4 / 3}
 					className="rounded-md"
 					surround={story as SurroundBake}
@@ -254,8 +254,8 @@ function Home() {
 			{/* step inside */}
 			<Story
 				eyebrow="05 · Step inside"
-				title="Walk into the photo."
-				body="The hiker, the hut and the lift pylon in front of the camera become 3D splats, placed on the terrain by the solved pose. Beyond the photo's frame, Google's photorealistic 3D tiles carry the view on. Drag to look around."
+				title="Explore the photo in 3D."
+				body="The hiker, the hut and the lift pylon in front of the camera become 3D splats, placed on the terrain by the solved pose. Outside the photo's frame, Google's photorealistic 3D tiles extend the view. Drag to look around."
 			>
 				<NearViewport placeholder={<div className={STEP_BOX} />} margin={400}>
 					<Suspense fallback={<div className={STEP_BOX} />}>
@@ -268,8 +268,8 @@ function Home() {
 			<Story
 				id="how"
 				eyebrow="06 · Method"
-				title="Guess, measure, correct, snap."
-				body="A phone records position, heading and tilt. The heading is often off by several degrees, which is too much to identify peaks reliably. Rigi renders the expected skyline from the elevation model and adjusts the camera until the rendered and photographed skylines match."
+				title="The skyline corrects the phone's pose."
+				body="A phone records position, heading and tilt. The heading is often off by several degrees, which is too much to identify peaks reliably. Rigi renders the expected skyline from the elevation model and adjusts the camera until it matches the skyline in the photo."
 			>
 				<NearViewport placeholder={<div className={HOW_BOX} />} margin={600}>
 					<Suspense fallback={<div className={HOW_BOX} />}>

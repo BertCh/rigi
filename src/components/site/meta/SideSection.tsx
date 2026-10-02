@@ -250,8 +250,8 @@ function Figure({
 						: `Bearing ${Math.round(sec.az)}°`}
 					:
 				</span>{" "}
-				the line of sight clears {cleared.length}{" "}
-				{cleared.length === 1 ? "ridge" : "ridges"} and meets the skyline{" "}
+				the line of sight passes over {cleared.length}{" "}
+				{cleared.length === 1 ? "ridge" : "ridges"} and reaches the skyline{" "}
 				{km(sec.skyline.d)} away. The Earth's curve lowers that point by{" "}
 				{Math.round(drop(sec.skyline.d))} m.{" "}
 				<span className="text-white/40">Drag across the photo.</span>

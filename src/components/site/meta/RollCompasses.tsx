@@ -375,14 +375,14 @@ export function RollCompasses({
 					}
 				>
 					The phone's compass was off by {signed(lo)} to {signed(hi)} on one
-					afternoon, around one summit.
+					afternoon, for photos taken around one summit.
 				</span>{" "}
 				Placed by the compass, the photos' skylines miss the terrain's; placed
-				by the skyline, each locks on and the photos facing one way stitch into
-				one view. {rejected.length === 2 ? "Two" : rejected.length} (
+				by the skyline, each photo aligns and the photos facing one way join
+				into one view. {rejected.length === 2 ? "Two" : rejected.length} (
 				{rejected.map(clock).join(" and ")}) are rejected by the solver for low
-				confidence instead of guessed; the demo still carries a saved pose for
-				them, from the app's later passes, and that is where they are drawn.
+				confidence. The demo still has a saved pose for them, from the app's
+				later passes, and they are drawn there.
 			</figcaption>
 		</figure>
 	);
@@ -1258,8 +1258,8 @@ function ErrorStrip({
 						: "mt-1 text-[11.5px] leading-snug text-white/45"
 				}
 			>
-				Median size {median.toFixed(1)}°: enough to put a name on the wrong
-				summit. The skyline brings it back.
+				Median size {median.toFixed(1)}°: enough to label the wrong summit. The
+				skyline corrects it.
 			</p>
 		</div>
 	);

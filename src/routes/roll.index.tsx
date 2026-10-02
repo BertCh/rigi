@@ -29,7 +29,7 @@ function RollList() {
 					<GalleryHorizontalEnd className="size-3.5" /> Camera rolls
 				</p>
 				<h1 className="text-3xl leading-[1.1] font-semibold tracking-[-0.02em] sm:text-[2.2rem]">
-					Every photo of a day out, at once.
+					Work with all the photos from a trip together
 				</h1>
 				<p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/55">
 					Photos of one area become a roll. See them as a mosaic, stitched into

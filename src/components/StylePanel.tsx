@@ -324,7 +324,7 @@ function ReliefGroup({ style }: { style: ViewStyle }) {
 						value: "imhof",
 						label: "Imhof",
 						title:
-							"Swiss relief with range-aware generalisation, swung light and Imhof colour",
+							"Swiss relief with simplification by viewing distance, light direction that varies with slope aspect, and Imhof colours",
 					},
 				]}
 			/>

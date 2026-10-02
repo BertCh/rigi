@@ -10,6 +10,7 @@ import {
 	ColorSwatch,
 	PanelBand,
 	Section,
+	SectionAccordion,
 	Segmented,
 	Slider,
 	Toggle,
@@ -77,6 +78,55 @@ describe("Section", () => {
 			</Section>,
 		);
 		expect(screen.getByText("body")).toBeTruthy();
+	});
+});
+
+describe("SectionAccordion", () => {
+	const panel = () => (
+		<SectionAccordion id="acc" defaultOpen="a">
+			<Section title="A" collapse={{ id: "a" }}>
+				<p>body a</p>
+			</Section>
+			<Section title="B" collapse={{ id: "b" }}>
+				<p>body b</p>
+			</Section>
+			<Section title="Fixed">
+				<p>body fixed</p>
+			</Section>
+		</SectionAccordion>
+	);
+
+	it("opens only the default section at first", () => {
+		render(panel());
+		expect(screen.getByText("body a")).toBeTruthy();
+		expect(screen.queryByText("body b")).toBeNull();
+		expect(screen.getByText("body fixed")).toBeTruthy();
+	});
+
+	it("opening one closes the other and is remembered", () => {
+		const { unmount } = render(panel());
+		fireEvent.click(screen.getByText("B"));
+		expect(screen.getByText("body b")).toBeTruthy();
+		expect(screen.queryByText("body a")).toBeNull();
+		expect(localStorage.getItem(storageKey("panel", "acc"))).toBe("b");
+		unmount();
+		render(panel());
+		expect(screen.getByText("body b")).toBeTruthy();
+		expect(screen.queryByText("body a")).toBeNull();
+	});
+
+	it("closing the open section leaves all closed", () => {
+		render(panel());
+		fireEvent.click(screen.getByText("A"));
+		expect(screen.queryByText("body a")).toBeNull();
+		expect(screen.queryByText("body b")).toBeNull();
+	});
+
+	it("opens every section under webdriver", () => {
+		vi.stubGlobal("navigator", { ...navigator, webdriver: true });
+		render(panel());
+		expect(screen.getByText("body a")).toBeTruthy();
+		expect(screen.getByText("body b")).toBeTruthy();
 	});
 });
 

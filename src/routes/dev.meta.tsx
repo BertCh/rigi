@@ -35,34 +35,34 @@ function Preview() {
 					Under the hood
 				</p>
 				<h1 className="max-w-3xl text-[2rem] leading-[1.08] font-semibold tracking-[-0.02em] sm:text-[2.6rem]">
-					Why a skyline is enough.
+					Why the skyline is enough to find the pose.
 				</h1>
 			</header>
 			<Part
 				eyebrow="01 · Fingerprint"
-				title="Where does this skyline fit?"
-				body="The elevation model gives the skyline in every direction from where you stood. Slide the photo's skyline along it: for this photo the mismatch drops to 6 px at one heading, and the next-best fit is nearly three times worse."
+				title="Matching the skyline to the terrain."
+				body="The elevation model gives the skyline in every direction from where you stood. Slide the photo's skyline along it and measure the mismatch. For this photo the mismatch is 6 px at one heading, and the next-best heading is nearly three times worse."
 			>
 				<FingerprintRing />
 			</Part>
 			<Part
 				eyebrow="02 · Depth"
-				title="The skyline is the farthest thing you can see."
-				body="Every bearing is a cross-section through the terrain. The line of sight grazes ridge after ridge; the last one it touches, often 20 to 30 km out, is the skyline the photo shows."
+				title="The skyline is the farthest visible terrain."
+				body="Every bearing is a cross-section through the terrain. The line of sight passes over one ridge after another. The last ridge it touches, often 20 to 30 km away, is the skyline in the photo."
 			>
 				<SideSection />
 			</Part>
 			<Part
 				eyebrow="03 · Place"
-				title="Every pixel is a place."
-				body="With the pose solved, each pixel is a ray from the camera. Follow it until it meets the ground and you know what you are looking at, and how far away it is."
+				title="Each pixel maps to a place."
+				body="With the pose solved, each pixel is a ray from the camera. Following the ray until it meets the ground gives the location it shows and its distance."
 			>
 				<PixelToPlace />
 			</Part>
 			<Part
 				eyebrow="04 · The roll"
-				title="Where the compass put them, and where they belong."
-				body="Each photo of the day carries its own compass error, from 19° one way to 11° the other. The skyline corrects each photo on its own, and the solver rejects two rather than guess."
+				title="Compass directions before and after correction."
+				body="Each photo of the day carries its own compass error, from 19° one way to 11° the other. The skyline corrects each photo separately, and the solver rejects two photos instead of guessing."
 			>
 				<RollCompasses />
 			</Part>

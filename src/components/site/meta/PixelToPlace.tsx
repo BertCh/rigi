@@ -363,7 +363,7 @@ function Figure({
 		probe.d === 0
 			? "Sky. This ray clears every ridge and never meets the ground."
 			: probe.d < NEAR_M
-				? `This pixel is ${fmtDist(probe.d)} away: the ground at your feet.`
+				? `This pixel is ${fmtDist(probe.d)} away: the ground near the camera.`
 				: name
 					? `This pixel is ${fmtDist(probe.d)} away, on the ${name}.`
 					: `This pixel is ${fmtDist(probe.d)} away, on ground at ${Math.round(probe.height ?? 0).toLocaleString("en")} m.`;
@@ -453,8 +453,9 @@ function Figure({
 							{claim}
 						</p>
 						<p className="mt-3 text-[13px] leading-relaxed text-white/50">
-							Point anywhere in the photo. Its ray stops at the first ground it
-							meets, and its neighbours light up on the map.
+							Point anywhere in the photo. Its ray stops where it first meets
+							the ground, and the neighbouring pixels are highlighted on the
+							map.
 						</p>
 					</div>
 					<Readout probe={probe} />
@@ -467,8 +468,8 @@ function Figure({
 						<span className="mr-1.5 font-mono text-[10px] tracking-[0.14em] text-[var(--rigi-trap)] uppercase">
 							Blind spot
 						</span>
-						Huts and people aren't in the terrain: their pixels read the slope
-						behind.
+						Huts and people are not in the terrain model, so their pixels are
+						mapped to the slope behind them.
 					</p>
 				</div>
 			</div>

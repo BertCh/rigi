@@ -98,7 +98,7 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 						disabled={!!si.disabledReason}
 						title={
 							si.disabledReason ??
-							"Walk a few metres into the photo: near objects in 3D on the true terrain"
+							"Move a few metres into the photo and see nearby objects in 3D on the terrain model"
 						}
 						data-nearfield-enter=""
 						className="flex items-center gap-1.5 rounded-lg bg-black/55 px-3 py-1.5 text-xs font-semibold text-white/90 ring-1 ring-white/15 backdrop-blur hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-45"

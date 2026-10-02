@@ -374,7 +374,7 @@ function Fingerprint({ p, children }: { p: RollPhoto; children: ReactNode }) {
 					</span>
 				</span>
 				<span className="ml-auto hidden text-white/30 sm:inline">
-					drag the photo along the horizon
+					drag the photo along the skyline
 				</span>
 				{!atSolved && (
 					<button
@@ -792,34 +792,34 @@ function Claim({
 }) {
 	const verdict = p.accepted
 		? null
-		: " The solver rejects this photo instead of guessing.";
+		: " The solver rejects this photo instead of guessing its pose.";
 	if (s.decoy)
 		return (
 			<>
 				<span className="text-[var(--rigi-paper)]">
-					For this photo, heading alone points the wrong way.
+					For this photo, the heading alone gives the wrong answer.
 				</span>{" "}
 				Turning only the heading, the lowest mismatch round the circle is at{" "}
-				{f1(s.best.yaw)}° ({f1(s.best.cost)} px), a decoy. The photo was taken
-				facing {f1(p.solved.yaw)}°, which fits better ({f1(s.solvedCost)} px)
-				once tilt, roll and lens are refined too. That is why Rigi searches only
-				about ±{SEARCH}° around the compass, and checks that no other heading
-				comes close.{verdict}
+				{f1(s.best.yaw)}° ({f1(s.best.cost)} px), a wrong heading. The photo was
+				taken facing {f1(p.solved.yaw)}°, which fits better ({f1(s.solvedCost)}{" "}
+				px) once tilt, roll and lens are refined too. For this reason Rigi
+				searches only about ±{SEARCH}° around the compass and checks that no
+				other heading fits nearly as well.{verdict}
 			</>
 		);
 	return (
 		<>
 			<span className="text-[var(--rigi-paper)]">
-				The compass said {f1(p.prior.yaw)}°; the skyline says {f1(p.solved.yaw)}
+				The compass said {f1(p.prior.yaw)}°; the skyline gives{" "}
+				{f1(p.solved.yaw)}
 				°, {f1(Math.abs(delta))}° {delta > 0 ? "clockwise" : "anticlockwise"}.
 			</span>{" "}
-			For this photo, the skyline fits best there of all 360 headings:{" "}
-			{f1(s.best.cost)} px on the 1° sweep, {f1(s.solvedCost)} px after the fine
-			solve. The next-best heading, at {f1(s.runner.yaw)}°, is{" "}
-			{f1(s.runner.cost)} px:{" "}
+			Of all 360 headings, the skyline fits best there: {f1(s.best.cost)} px on
+			the 1° sweep, {f1(s.solvedCost)} px after the fine solve. The next-best
+			heading, at {f1(s.runner.yaw)}°, is {f1(s.runner.cost)} px:{" "}
 			{ratio >= 1.6
-				? `${ratio.toFixed(1)}× worse, a clear fingerprint.`
-				: `only ${ratio.toFixed(1)}× worse, so the compass is still needed to pick the right notch.`}
+				? `${ratio.toFixed(1)}× worse, so the match is clear.`
+				: `only ${ratio.toFixed(1)}× worse, so the compass is still needed to choose between them.`}
 			{verdict}
 		</>
 	);

@@ -424,7 +424,7 @@ function ImportPage() {
 					<GalleryHorizontalEnd className="size-3.5" /> Import
 				</p>
 				<h1 className="text-3xl leading-[1.1] font-semibold tracking-[-0.02em] sm:text-[2.2rem]">
-					Bring in a whole camera roll.
+					Import a whole camera roll
 				</h1>
 				<p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/55">
 					Drop a day's photos (JPEG, HEIC, PNG, WebP or AVIF). Photos without

@@ -93,7 +93,7 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "tiles3dBlend",
 		label: "Blend",
-		help: "Fill: tiles only outside the photo frame (the photo stays the truth). Over: tiles everywhere (alignment check).",
+		help: "Fill: tiles only outside the photo frame (the photo itself is not changed). Over: tiles everywhere (alignment check).",
 		group: "tiles",
 		options: { fill: "Fill", over: "Over" },
 	},
