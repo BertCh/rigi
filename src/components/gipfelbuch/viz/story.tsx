@@ -20,7 +20,14 @@ import { useReducedMotion } from "./hooks";
 
 export type AlignmentStory = {
 	t: number;
-	setT: (t: number) => void;
+	/**
+	 * Moves the story. `instant` says the writer already animates t (a drag, a film clock writing every
+	 * frame): followers draw it as given. Without it, t jumped (a stepper, a click) and followers
+	 * settle towards it themselves (grammar MOTION.settle, EASE.out), as GeoSpill does.
+	 */
+	setT: (t: number, opts?: { instant?: boolean }) => void;
+	/** True while the last write was `instant`. */
+	instant: boolean;
 };
 
 const StoryContext = createContext<AlignmentStory | null>(null);
@@ -33,10 +40,18 @@ export function AlignmentStoryProvider({
 	initial?: number;
 	children: ReactNode;
 }) {
-	const [t, setRaw] = useState(initial);
+	const [state, setState] = useState({ t: initial, instant: false });
 	const value = useMemo(
-		() => ({ t, setT: (v: number) => setRaw(Math.min(1, Math.max(0, v))) }),
-		[t],
+		() => ({
+			t: state.t,
+			instant: state.instant,
+			setT: (v: number, opts?: { instant?: boolean }) =>
+				setState({
+					t: Math.min(1, Math.max(0, v)),
+					instant: !!opts?.instant,
+				}),
+		}),
+		[state],
 	);
 	return (
 		<StoryContext.Provider value={value}>{children}</StoryContext.Provider>
@@ -78,7 +93,10 @@ export function poseAt(d: { prior: Pose; solved: Pose }, t: number): Pose {
 	};
 }
 
-/** Eases a value towards `target` (about `ms` to settle); jumps under reduced motion. */
+/**
+ * Eases a value towards `target` (about `ms` to settle); jumps under reduced motion. Legacy: a follower
+ * of an alignment story should draw `t` as given when `story.instant`, and settle otherwise.
+ */
 export function useTween(target: number, ms = 520): number {
 	const reduce = useReducedMotion();
 	const [v, setV] = useState(target);
