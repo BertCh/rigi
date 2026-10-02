@@ -232,4 +232,100 @@ describe("viewpointTerrain live trace", () => {
 		// the later duplicate wins
 		expect(peaks.map((p) => p.lat).sort()).toEqual([46.5773, 46.9]);
 	});
+
+	describe("cancellation", () => {
+		const isAbort = (e: unknown) => (e as DOMException).name === "AbortError";
+		// holds the queue head so later traces wait their turn
+		const gate = () => {
+			let release!: () => void;
+			const held = new Promise<void>((r) => {
+				release = r;
+			});
+			FakeWorker.reply = (w) => {
+				void held.then(() =>
+					w.onmessage?.({ data: { type: "done", terrain: { id: "T" } } }),
+				);
+			};
+			return release;
+		};
+
+		it("a queued trace whose only caller aborted never fetches or spawns, and the key retraces later", async () => {
+			const release = gate();
+			const { viewpointTerrain } = await load();
+			const first = viewpointTerrain(req({ lat: 10 }));
+			const ac = new AbortController();
+			const queued = viewpointTerrain(req({ lat: 11 }), ac.signal);
+			ac.abort();
+			await expect(queued).rejects.toSatisfy(isAbort);
+			release();
+			await first;
+			expect(FakeWorker.instances).toHaveLength(1);
+			expect(m.fetched).toHaveLength(2); // only the first trace's tiles
+			FakeWorker.reply = (w) =>
+				w.onmessage?.({ data: { type: "done", terrain: { id: "again" } } });
+			await expect(viewpointTerrain(req({ lat: 11 }))).resolves.toEqual({
+				id: "again",
+			});
+			expect(FakeWorker.instances).toHaveLength(2);
+		});
+
+		it("an already-aborted signal rejects at once and starts nothing", async () => {
+			const { viewpointTerrain } = await load();
+			await expect(
+				viewpointTerrain(req(), AbortSignal.abort()),
+			).rejects.toSatisfy(isAbort);
+			await new Promise((r) => setTimeout(r, 5));
+			expect(FakeWorker.instances).toHaveLength(0);
+		});
+
+		it("with two callers, one aborting leaves the trace running for the other", async () => {
+			const release = gate();
+			const { viewpointTerrain } = await load();
+			const first = viewpointTerrain(req({ lat: 10 }));
+			const ac = new AbortController();
+			const a = viewpointTerrain(req({ lat: 12 }), ac.signal);
+			const b = viewpointTerrain(
+				req({ lat: 12 }),
+				new AbortController().signal,
+			);
+			ac.abort();
+			await expect(a).rejects.toSatisfy(isAbort);
+			release();
+			await first;
+			await expect(b).resolves.toEqual({ id: "T" });
+			expect(FakeWorker.instances).toHaveLength(2);
+		});
+
+		it("aborting after the run started rejects the caller but the result is memoised", async () => {
+			const release = gate();
+			const { viewpointTerrain } = await load();
+			const ac = new AbortController();
+			const p = viewpointTerrain(req(), ac.signal);
+			while (FakeWorker.instances.length === 0)
+				await new Promise((r) => setTimeout(r, 1));
+			ac.abort();
+			await expect(p).rejects.toSatisfy(isAbort);
+			release();
+			await new Promise((r) => setTimeout(r, 5));
+			expect(FakeWorker.instances[0].terminated).toBe(true);
+			await expect(viewpointTerrain(req())).resolves.toEqual({ id: "T" });
+			expect(FakeWorker.instances).toHaveLength(1);
+		});
+
+		it("a caller without a signal keeps the trace alive and shares the promise", async () => {
+			const release = gate();
+			const { viewpointTerrain } = await load();
+			const first = viewpointTerrain(req({ lat: 10 }));
+			const plain = viewpointTerrain(req({ lat: 13 }));
+			const ac = new AbortController();
+			const sig = viewpointTerrain(req({ lat: 13 }), ac.signal);
+			ac.abort();
+			await expect(sig).rejects.toSatisfy(isAbort);
+			expect(viewpointTerrain(req({ lat: 13 }))).toBe(plain);
+			release();
+			await first;
+			await expect(plain).resolves.toEqual({ id: "T" });
+			expect(FakeWorker.instances).toHaveLength(2);
+		});
+	});
 });

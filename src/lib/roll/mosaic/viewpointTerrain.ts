@@ -5,6 +5,8 @@
 // Main-thread client for the viewpoint ridgelines (ridgelines.ts, in ridgelines.worker.ts). Tiles go
 // through dem's fetchDemBytes (shared tile cache, missing-tile policy, 0 requests on a warm load); one
 // worker runs at a time (each holds ~100 MB of mosaics), results are memoised per eye for the session.
+// Cancellation: callers share one memo entry per eye; a queued trace whose callers all aborted is skipped
+// when it reaches the head of the queue, a started one finishes (and stays memoised). No signal = permanent.
 import { tilePriority } from "#/lib/cache";
 import { fetchDemBytes, MAPTERHORN, tileId } from "#/lib/dem";
 import { realmGpuOptions } from "#/lib/gpu/core/realm";
@@ -51,7 +53,9 @@ export function viewpointEye(roll: Roll, vp: Viewpoint): TerrainRequest {
 /** A worker's ridge kernel failed for good (not a device loss): later viewpoints trace on the CPU. */
 let gpuBroken = false;
 
-const memo = new Map<string, Promise<ViewpointTerrain>>();
+/** One memo entry per terrainKey; `interest` counts callers still waiting (a caller without a signal never leaves). */
+type MemoEntry = { promise: Promise<ViewpointTerrain>; interest: number };
+const memo = new Map<string, MemoEntry>();
 let queue: Promise<unknown> = Promise.resolve();
 
 /** Terrain baked ahead of time, by terrainKey: null (or a failure) means trace it live. */
@@ -65,25 +69,68 @@ export function setBakedTerrain(lookup: BakedTerrainLookup) {
 	baked = lookup;
 }
 
-export function viewpointTerrain(r: TerrainRequest): Promise<ViewpointTerrain> {
+const abortError = () => new DOMException("aborted", "AbortError");
+
+export function viewpointTerrain(
+	r: TerrainRequest,
+	signal?: AbortSignal,
+): Promise<ViewpointTerrain> {
+	if (signal?.aborted) return Promise.reject(abortError());
 	const key = terrainKey(r);
-	let p = memo.get(key);
-	if (!p) {
+	let entry = memo.get(key);
+	if (!entry) {
+		const created: MemoEntry = {
+			promise: undefined as unknown as Promise<ViewpointTerrain>,
+			interest: 0,
+		};
 		const lookup = baked;
-		p = lookup
+		created.promise = lookup
 			? lookup(key)
 					.catch(() => null)
-					.then((t) => t ?? traced(r))
-			: traced(r);
-		memo.set(key, p);
-		p.catch(() => memo.delete(key));
+					.then((t) => t ?? traced(r, created))
+			: traced(r, created);
+		memo.set(key, created);
+		created.promise.catch(() => {
+			if (memo.get(key) === created) memo.delete(key);
+		});
+		entry = created;
 	}
-	return p;
+	const shared = entry;
+	if (!signal) {
+		shared.interest++; // permanent
+		return shared.promise;
+	}
+	shared.interest++;
+	return new Promise<ViewpointTerrain>((resolve, reject) => {
+		const onAbort = () => {
+			shared.interest--;
+			reject(abortError());
+		};
+		signal.addEventListener("abort", onAbort, { once: true });
+		const done = () => signal.removeEventListener("abort", onAbort);
+		shared.promise.then(
+			(t) => {
+				done();
+				resolve(t);
+			},
+			(e) => {
+				done();
+				reject(e);
+			},
+		);
+	});
 }
 
 /** One live trace at a time (each worker holds ~100 MB of mosaics). */
-function traced(r: TerrainRequest): Promise<ViewpointTerrain> {
-	const p = queue.then(() => run(r));
+function traced(
+	r: TerrainRequest,
+	entry: MemoEntry,
+): Promise<ViewpointTerrain> {
+	const p = queue.then(() => {
+		// every caller left while this waited its turn: don't fetch tiles or spawn a worker
+		if (entry.interest <= 0) throw abortError();
+		return run(r);
+	});
 	queue = p.catch(() => {});
 	return p;
 }

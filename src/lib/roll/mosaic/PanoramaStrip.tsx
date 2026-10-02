@@ -174,7 +174,8 @@ export function PanoramaStrip({
 	useEffect(() => {
 		if (!eye || vpIndex == null || !terrainOn) return;
 		let live = true;
-		viewpointTerrain(eye).then(
+		const abort = new AbortController();
+		viewpointTerrain(eye, abort.signal).then(
 			(t) => {
 				// debug handle, like window.__roll
 				window.__rollPanoTerrain = t;
@@ -187,6 +188,7 @@ export function PanoramaStrip({
 			},
 			(e) =>
 				live &&
+				(e as Error).name !== "AbortError" &&
 				setTerrain({
 					vp: vpIndex,
 					prepared: null,
@@ -196,6 +198,7 @@ export function PanoramaStrip({
 		);
 		return () => {
 			live = false;
+			abort.abort();
 		};
 	}, [eye, vpIndex, terrainOn]);
 	const shownTerrain =
