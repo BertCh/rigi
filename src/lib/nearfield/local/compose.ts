@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// MoGe-2 network outputs → the NearFieldDepth the service's /depth returned (moge/model/v2.py infer()
-// with force_projection and apply_mask, then tools/nearfield/service/app.py _compute_depth): the
+// MoGe-2 network outputs → the NearFieldDepth the former near-field service's /depth returned
+// (moge/model/v2.py infer() with force_projection and apply_mask, then its _compute_depth): the
 // focal and z shift from the 64 × 64 samples (./focal-shift.ts), depth = (z + shift) · metric scale
 // on mask > 0.5 and depth > 0, normals zeroed off the mask, intrinsics normalised with the centre at
 // (0.5, 0.5). Pure CPU on arrays already read back (an O(W·H) pass).

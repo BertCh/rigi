@@ -981,7 +981,7 @@ export function PhotoWorkspace({
 		return () => ro.disconnect();
 	}, [aspect, settings.mode]);
 
-	// Step Inside (src/lib/nearfield): dormant and invisible unless the near-field service is running
+	// Step Inside (src/lib/nearfield): dormant and invisible unless in-browser depth is available (WebGPU + weights)
 	const si = useStepInside({
 		engineRef,
 		ready: !status && !error,

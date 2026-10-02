@@ -1,4 +1,4 @@
-Archived 2026-10-01: merged into [../matcher-service.md](../matcher-service.md).
+Archived 2026-10-01: merged into [matcher-service.md](matcher-service.md).
 
 # Matcher service v0.4.0: T6 stage-1 search and frozen rule behind a policy switch
 

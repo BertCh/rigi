@@ -121,10 +121,7 @@ export const SPLAT_PROVENANCE = {
 
 /** Step Inside depth for a roll viewpoint (nearfield/roll/roll-spot.ts SpotDepthSource). */
 export const SPOT_DEPTH_SOURCE = {
-	multiview: { agent: "model", method: "depth-multiview" },
-	"multiview-joint": { agent: "model", method: "depth-multiview" },
 	moge2: { agent: "model", method: "depth-model" },
-	da3: { agent: "model", method: "depth-model" },
 } as const satisfies Record<SpotDepthSource, ProvenanceClass>;
 
 export const SKY_SOURCE = {

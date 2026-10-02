@@ -28,8 +28,8 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | 6-DoF PnP / P4Pf instead of rotation-only | Worse pitch (0.22–0.42° vs 0.07°), spurious centre shifts | matcher.md (removed) |
 | RoMa v1, DISK | RoMa 25–40 s/pair, no better; DISK 10.4° miss, 19/24 at oracle | matcher.md (removed), stage1.md |
 | Fusion variants (λ sweep, per-direction residuals, adaptive σ) | Flat over λ 0.25–4; per-direction drifted tens of degrees; adaptive σ picked wrong poses | [fusion.md](fusion.md) |
-| LightGlue on Apple MPS | Nondeterministic (0/2/13 matches); moved to CPU | [matcher-service.md](matcher-service.md) |
-| SWEEP_KP 2048 | wc_0009, wc_0006 go wrong for negligible time; reverted to 4096 | matcher-service.md |
+| LightGlue on Apple MPS | Nondeterministic (0/2/13 matches); moved to CPU | [archive/matcher-service.md](archive/matcher-service.md) |
+| SWEEP_KP 2048 | wc_0009, wc_0006 go wrong for negligible time; reverted to 4096 | archive/matcher-service.md |
 | 360° drape to 120 km | 90 s cold page; capped at 40 km | [bench-ablation.md](bench-ablation.md) |
 | Render-match at hfov ≲ 10° | 0–10 inliers, always LOW | [bench-ablation.md](bench-ablation.md) |
 | T5 pose6 position refinement (test arm C) | No near-miss converted; HIGH precision 0.56 vs 0.85 target; false HIGH wc_0019 (support inflated 0.13→0.73); test recall 9 vs 11. Stays opt-in | position.md (removed), [test-results.md](test-results.md) |

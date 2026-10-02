@@ -415,7 +415,7 @@ path; "in-app A/B" means compared inside the running engine against `/photo/<id>
 | `layers/atm-sky.ts` | AtmSkyLayer, applyAtmosphere | color | ≤ 1/255 vs the GLSL compiled on WebGL2 | world view | — |
 | `layers/photo-sky.ts` | PhotoSkyLayer | color | max err 0 vs CPU model | not run (needs Step Inside scene) | — |
 | `layers/gizmo.ts` | WorldGizmoLayer | color | 10/10 checks | world view screenshots | linear-light blending differs slightly |
-| `layers/splats.ts` | DeckSplatLayer + SplatColorPass | color (+ geometry class 2, off) | 0 px > 2/255 vs CPU model | not run (needs :8767 scene) | worker sort untested on WebGPU; smear gate unmeasured |
+| `layers/splats.ts` | DeckSplatLayer + SplatColorPass | color (+ geometry class 2, off) | 0 px > 2/255 vs CPU model | not run (needs a Step Inside scene) | worker sort untested on WebGPU; smear gate unmeasured |
 | `layers/tiles3d.ts` | Tiles3DDeckLayer | color (+ geometry class 3, off) | 15/15 checks | not run (needs `?tiles3d=`) | class-3 default is a product call |
 | `layers/geometry-source.ts` | GpuGeometrySource (geometry-pass.ts) | geometry, off-frame | exact vs the frame pass; reproj 0.052 px | yes (queries, labels) | direct host only for the check |
 | `layers/multi-drape.ts` | /roll MultiDrapeLayer | color | median 1.2e-4 vs CPU copy of the GLSL | n/a (/roll stays WebGL) | only if /roll moves; clear air + exposure via `setClearAir(DrapeClear.texture)` (unmeasured on GPU) |
@@ -472,8 +472,8 @@ buffers, the MSAA colour target, the per-size geometry targets).
 
 ## Matcher hooks (`loadFullTerrain`, `loadSatellite`, `renderPoseView`; WAG3)
 
-The matcher's render worker (`tools/matcher/server/render_worker.mjs`, `MATCHER_RENDERER=webgpu`)
-and the precision gate call these on either engine (`src/lib/renderer.ts`, optional members;
+The in-browser matcher (`src/lib/matcher`, through the page's engine binding) and the precision gate
+call these on either engine (`src/lib/renderer.ts`, optional members;
 `renderer.check.ts` asserts both engines have them). Same contract as `deck/engine.ts`:
 - `loadFullTerrain()`: the streamer's wedge becomes 360° and stays so (`fullWedge`; `setPose` no
   longer narrows it), the query terrain swaps to the complete set, the horizon is re-traced over

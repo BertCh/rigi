@@ -5,8 +5,8 @@
 
 // Parity of the matcher's offscreen hooks (src/lib/renderer.ts loadFullTerrain / loadSatellite /
 // renderPoseView) between the WebGL DeckEngine (?renderer=deck, the reference) and WebGpuEngine
-// (?renderer=webgpu). Per photo and engine, one fresh page, the same calls the render worker
-// (tools/matcher/server/render_worker.mjs) makes for a full-terrain render:
+// (?renderer=webgpu). Per photo and engine, one fresh page, the same calls the in-browser
+// matcher (src/lib/matcher) makes for a full-terrain render:
 //   loadFullTerrain() → loadSatellite(--drape-m, 2) → renderPoseView(prior + yaw offset) per offset,
 // then autoAlign(true) on the 360° terrain. Reported per photo:
 //   - the full terrain: ms, query tiles, horizon directions and the max |Δ| of the two horizons

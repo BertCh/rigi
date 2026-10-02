@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Step Inside without the near-field service: the same surface as ../client.ts NearFieldClient
-// (available / depth / gaussiansWithMeta), computed in the browser.
+// Step Inside's near-field source (../client.ts NearFieldSource: available / depth / gaussiansWithMeta),
+// computed in the browser.
 //   depth     → MoGe-2 ViT-S (./depth-net.ts) on the src/lib/nn runtime (WGSL kernels on one core
 //               ComputeGraph per forward, on the app's WebGPU device), then ./compose.ts (focal / shift,
 //               metric depth, normals, intrinsics) — the service ran MoGe-2 ViT-L in PyTorch.
 //   gaussians → the depth lift (./lift-gpu.ts, a graph kernel; ./lift.ts is its CPU twin), on the cached
-//               depth of the same photo. No SHARP (research-only weights) and no /multiview.
+//               depth of the same photo. No SHARP (research-only weights) and no DA3 multiview.
 // "Available" = WebGPU compute is there and the weights are reachable (public/models or the Cache
 // Storage copy); the first build downloads them (70 MB, progress through onProgress and the
 // src/lib/models download store). The nn CPU backend runs the same forward (specs, node parity), far
 // too slowly for the page, so without WebGPU Step Inside reports "needs WebGPU".
-// Never throws: failures resolve false / null like the HTTP client.
+// Never throws: failures resolve false / null.
 import type { Device } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { describeModelDownload, modelEntry, modelUrl } from "#/lib/models";
@@ -341,11 +341,6 @@ export class LocalNearFieldClient {
 				meta: { width: depth.width, height: depth.height, intrinsicsNorm: K },
 			};
 		}
-	}
-
-	/** /multiview (DA3) has no browser port: the roll spot uses per-photo depth instead. */
-	async multiview(): Promise<null> {
-		return null;
 	}
 }
 

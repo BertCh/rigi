@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The relative-rotation estimator, in the browser. It replaces the Python service
-// (tools/nearfield/propagate/service.py, :8769) with the same pipeline and the same outputs:
+// The relative-rotation estimator, in the browser. It replaces the former Python relative-rotation
+// service (removed 2026-10-02; the study's tools/nearfield/propagate/run_propagate.py `rot`) with the same
+// pipeline and the same outputs:
 //   decode (EXIF orientation applied) → long side 1024 → ALIKED (2048 keypoints) + LightGlue
 //   (src/lib/features/client: a worker; the compute graph under WebGPU) → bearings with K from the vfov
 //   (anchor: accepted vfov; target: EXIF vfov) → pure-rotation RANSAC (src/lib/pose6dof rotationRansac:

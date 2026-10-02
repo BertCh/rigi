@@ -22,7 +22,7 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | Registration | [terrain-matching-research.md](terrain-matching-research.md) | Synthesis of the TM studies, plus the strategy carried forward from the archived tm-strategy (construction negatives, miss-rate bounds, Part A status); study records in `tools/research/tm/*/REPORT.*` |
 | | [fundamentals-plan.md](fundamentals-plan.md) | 2026-09-29 first-principles review of rendering+matching: missing common core (a-contrario accept, dense feature-metric objective, ray-cast oracle), parallax/near-field observability, data engine; experiments E0–E8; phase 0 (E0–E3) run 2026-09-29, all killed; reports in `tools/research/fund/` |
 | | [geometry-first-pose.md](geometry-first-pose.md) | 2026-09-29 geometry-first camera: unused 3D assets (lakes, ridges, near field, sun, vectors), occlusion-crossing eye cue, MAP solver + covariance (GTSAM/pycolmap/PoseLib), integrity; GEO phase GA0–GC3; phase A results §8 (2026-09-30: GA2–GA5 killed, GA1 solver built) |
-| | [matcher-service.md](matcher-service.md) | Matcher service: running it (env knobs), API and `policy`, changelog v0.1–v0.4, test records. The v0.4 ops doc is merged in (`archive/matcher-service-v040.md`) |
+| | [archive/matcher-service.md](archive/matcher-service.md) | The former Python matcher service (archived 2026-10-02: render-and-match now runs in the browser, `src/lib/matcher`): `policy`, changelog v0.1–v0.4, test records |
 | | [stage1.md](stage1.md), [fusion.md](fusion.md) | T6 two-stage search; skyline+match fusion and the a-priori HIGH rule. The vendored stage-1 render workers were re-based on the ported deck/WebGPU service worker (wave5/S1, browser-unverified; batch-verify before the v3 freeze) |
 | | [bench-wild.md](bench-wild.md), [bench-ablation.md](bench-ablation.md) | Wild benchmark and verification protocol (use the Mapterhorn update, not the headline); heading/gravity ablation, which is the unknown-pose design basis |
 | | [matching-v2.md](matching-v2.md) | Eye fallback, calibration priors, LoMa: not shipped |
@@ -61,7 +61,7 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | [test-prereg.md](test-prereg.md), [test-results.md](test-results.md), [test-addendum.md](test-addendum.md) | Preregistered held-out test on 50 frozen wild photos. test-results' reference to `test-prereg-addenda.md` means test-addendum.md |
 | [pipeline-ab.md](pipeline-ab.md) | App pipeline variants A/B; the code it runs has been removed |
 | [leaderboard.md](leaderboard.md) (+ `.json`) | All methods on the 12-photo GT (2026-09-25; regenerate with `node scripts/leaderboard.mjs`). App numbers predate pipeline-ab; not comparable with eval-app |
-| [archive/](archive/) | Superseded docs: next-gen roadmap (2026-09-29), tm-strategy and matcher-service-v040 (merged 2026-10-01), visgl-frontier sweep (carried into the WAG plan, 2026-10-01) |
+| [archive/](archive/) | Superseded docs: next-gen roadmap (2026-09-29), tm-strategy and matcher-service-v040 (merged 2026-10-01), visgl-frontier sweep (carried into the WAG plan, 2026-10-01), matcher-service (service removed 2026-10-02) |
 
 ## Module docs (next to the code)
 

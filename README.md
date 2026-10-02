@@ -17,14 +17,14 @@ export as pose JSON, XMP, COLMAP, KML/KMZ, GeoJSON footprints and annotated imag
 
 ## Quick start
 
-Requirements: Node 22 and a browser with WebGPU (recent Chrome, Edge or Safari) for the default engine; any WebGL2 browser gets the fallback engine. The Python matcher and near-field services are optional.
+Requirements: Node 22 and a browser with WebGPU (recent Chrome, Edge or Safari) for the default engine; any WebGL2 browser gets the fallback engine. There is no backend: everything the app computes runs in the browser.
 
 ```bash
 npm install
 npm run dev     # http://localhost:3100
 ```
 
-What works on a bare clone: the app builds and runs, `/upload` aligns any photo you drop in (HEIC or JPEG, processed in the browser against Mapterhorn DEM tiles fetched over the network), `/roll/import` builds a camera roll from your photos, `/gipfelbuch` and the `/lab/*` benches open, and the standalone [examples](examples/README.md) run. What needs more: the home page and `/library` list the photos in `public/photos/`, which you create with `npm run ingest` from HEIC files in `img/`. The evaluation harnesses (`scripts/eval*.ts`, `scripts/leaderboard.mjs`), the dev-only `/baseline` and some CI checks read research data under `data/`, `public/photos/` and `public/baseline/`; these are gitignored, so without them those checks report SKIP in `node scripts/ci/run.mjs`. The Niederhorn demo set in `public/demo/` is included in the repository (all rights reserved, see NOTICE.md), so the landing page demo works on a bare clone. Step Inside and the matcher need their Python services (`npm run dev:all`).
+What works on a bare clone: the app builds and runs, `/upload` aligns any photo you drop in (HEIC or JPEG, processed in the browser against Mapterhorn DEM tiles fetched over the network), `/roll/import` builds a camera roll from your photos, `/gipfelbuch` and the `/lab/*` benches open, and the standalone [examples](examples/README.md) run. What needs more: the home page and `/library` list the photos in `public/photos/`, which you create with `npm run ingest` from HEIC files in `img/`. The evaluation harnesses (`scripts/eval*.ts`, `scripts/leaderboard.mjs`), the dev-only `/baseline` and some CI checks read research data under `data/`, `public/photos/` and `public/baseline/`; these are gitignored, so without them those checks report SKIP in `node scripts/ci/run.mjs`. The Niederhorn demo set in `public/demo/` is included in the repository (all rights reserved, see NOTICE.md), so the landing page demo works on a bare clone. Step Inside, the matcher and pose propagation download their model weights from `public/models` on first use (gitignored; `node scripts/models/fetch.mjs` produces them, see `scripts/models/README.md`).
 
 ## Built with luma.gl and deck.gl
 
@@ -107,24 +107,23 @@ on its own 360° Mapterhorn scene. It serves two cases:
    through the solver options: a 360° yaw search, free tilt, and three focal seeds, with a stricter
    0.75 accept bar.
 
-**Matcher service** (`tools/matcher`; `reports/matcher-service.md`). This is
-an optional Python service on :8765 that does render-and-match (ALIKED + LightGlue against app
-renders from a headless Chromium worker), fused with the skyline cue. The app reaches it through
-`src/lib/matcher-client.ts` (`VITE_MATCHER_URL`) and degrades silently when it is down.
+**Matcher** (`src/lib/matcher`, behind `src/lib/matcher-client.ts`). Render-and-match escalation in the
+browser: ALIKED + LightGlue (`src/lib/features`, on the `src/lib/nn` runtime) between the photo and
+views the page's own engine renders, rotation RANSAC from `src/lib/pose6dof`, fused with the skyline
+cue. Solves run in a worker; one job runs at a time per page. `v034` is the default policy and
+`?matcherPolicy=t6` selects the T6 two-stage search. The Python implementation it was ported from is
+kept as offline reference code in `tools/matcher` (see `tools/matcher/reference/README.md`).
 
-- **Endpoints:** `POST /match` (a bundled photoId, an ad-hoc photo, or a multipart request) and `GET /health`.
-- **Queueing:** one job runs at a time. Otherwise the service answers `503 busy` with a queue ticket.
-- **v0.4.0 policies:** `v034` (default) is the v0.3.x search with an a-priori HIGH and a basin-gap
-  check. `t6` (opt-in, `timeoutMs` ≥ 300 s) is the T6 two-stage search with a frozen confidence rule.
 - **Product accept rule** (`matchAccepted`): a match counts only when it is HIGH and either the
   EXIF GPS is trusted or it lies within 0.5° of the skyline cascade.
 
 **Step Inside** (`src/lib/nearfield`, `reports/step-inside-results.md`). Near-field Gaussian splats anchored
 to the DEM with a per-photo depth curve and object grounding, a step-in camera that starts on the photo, a
 Truth tint, a hover readout on objects, and georeferenced `.ply`/`.splat` export (generated content is
-always stripped). It is on by default in both renderers and needs the near-field service
-(`tools/nearfield/run.sh`, :8767: depth, Gaussians, multiview, inpainting). Pose propagation between
-overlapping photos is wired into `/roll` as suggestions only, behind `?propagate=on`
+always stripped). It is on by default in both renderers when WebGPU is available: depth comes from
+MoGe-2 ViT-S on `src/lib/nn` and the depth lift is a compute-graph kernel (`src/lib/nearfield/local`,
+70 MB of weights on first use). Pose propagation between overlapping photos (ALIKED + LightGlue and
+rotation RANSAC, on the device) is wired into `/roll` as suggestions only, behind `?propagate=on`
 (`src/lib/roll/propagate/README.md`).
 
 **Other modules.**
@@ -147,16 +146,12 @@ overlapping photos is wired into `/roll` as suggestions only, behind `?propagate
 | `?reveal=off\|<preset>` | Load animation |
 | `?concord=eye,occl` | Concordance: focal-table eye prior, DSM occluder dimming |
 | `?picker=on\|always` | Top-3 picker / tap-a-peak (`src/lib/picker`) |
-| `?propagate=on` | `/roll`: pose propagation suggestions (needs its service) |
+| `?propagate=on` | `/roll`: pose propagation suggestions (on-device) |
 | `?tiles3d=buildings\|swisstopo\|google\|all` | 3D Tiles in Step Inside (`src/lib/tiles3d`) |
 
 Every flag is declared in `src/lib/flags` (typed, the only reader), carried across navigation by the root route, and settable from the photo sidebar's **Experimental & dev** section. Booleans are `on`/`off`. Harnesses override per realm with `globalThis.__RIGI_FLAGS__ = { gpu: "off", … }`.
 
-| Port | Service |
-|---|---|
-| 3100 | Dev server (`npm run dev`, or `npm run dev:all` with both backends) |
-| 8765 | Matcher (`tools/matcher/server/run.sh`) |
-| 8767 | Near-field service (`tools/nearfield/run.sh`) |
+The dev server is the only process: `npm run dev` (or `node scripts/dev.mjs`) on :3100.
 
 ## The pose pipeline today
 
@@ -204,8 +199,7 @@ harnesses, so don't compare their numbers directly.
 npm install
 npm run ingest            # img/*.HEIC → public/photos/*.jpg + photos.json + region-*.json (SKIP_OSM=1: no Overpass)
 npm run dev               # dev server on http://localhost:3100
-npm run dev:all           # dev server + matcher (:8765) + near-field (:8767); reuses anything already up,
-                          #   skips a backend without tools/matcher/.venv. Pick some: node scripts/dev.mjs --be=nearfield
+node scripts/models/fetch.mjs     # model weights into public/models (verified by sha256; --check to verify only)
 npm run build             # production build (vite build)
 node scripts/examples.mjs list   # standalone luma.gl/deck.gl examples: start <id> | check | build | smoke
 node scripts/ci/spdx.mjs  # SPDX headers on first-party files
@@ -225,13 +219,10 @@ node scripts/ci/run.mjs fast                 # tsc, biome ratchet, unit specs an
 node scripts/ci/run.mjs full                 # + 6 browser checks (style-baseline, deck smoke, eval-app, eval-app-deck, settle-submits, graph-plumbing-ab), via the render lock
 node scripts/ci/run.mjs --list               # every check, its command and inputs
 
-# matcher service (optional; needs tools/matcher/.venv and weights)
-tools/matcher/server/run.sh --port 8765      # env MATCHER_POLICY=v034|t6
-
 node scripts/shot.mjs <url> out.png --wait-for "[data-ready]"   # headless WebGL screenshot
 node scripts/gpu/with-render-lock.mjs -- <cmd>                # wrap every browser job: one GPU job at a time
 #   FIFO queue; RENDER_LOCK_PRIORITY=1 jumps it for a job someone is waiting on. Never omit the `--`
-node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs [--renderer=deck] [--dead] <ids>
+node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs [--renderer=deck] [--no-models] <ids>
 ```
 
 **Brand.** The home page panorama (the view south from Rigi Kulm, drawn as depth-layered ridgelines, with visibility-tested OSM peaks) and the logo mark (Rigi Kulm summit contours) are generated from the same DEM. To regenerate them, run `npx tsx scripts/brand/rigi.ts` (add `--preview` to also write PNGs to `.cache/brand/`). It writes `public/brand/rigi-panorama.json`, `src/brand/rigi-mark.json` and `public/favicon.svg`.

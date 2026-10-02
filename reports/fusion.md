@@ -198,7 +198,7 @@ Both are in the format documented at the top of `scripts/leaderboard.mjs`.
 
 ## Reproduce
 
-> **Update (2026-10-01):** only `fusion.py`, `match.py`, `results.json` and `results-fusion.json` of the scripts below are in the repository; `export_skyline.mjs`, `render.mjs`, `fusion_prep.sh`, `fusion_report.py`, `gtjson_check.py`, `write_leaderboard.py`, `gps_offset.mjs` and `collect_corr.py` were never committed. They also drove the three.js PhotoEngine, removed 583e2b7. The live equivalent is the matcher service's `render_worker.mjs` + `server/fuse.py` ([matcher-service.md](matcher-service.md)).
+> **Update (2026-10-01):** only `fusion.py`, `match.py`, `results.json` and `results-fusion.json` of the scripts below are in the repository; `export_skyline.mjs`, `render.mjs`, `fusion_prep.sh`, `fusion_report.py`, `gtjson_check.py`, `write_leaderboard.py`, `gps_offset.mjs` and `collect_corr.py` were never committed. They also drove the three.js PhotoEngine, removed 583e2b7. The live equivalent is the matcher service's `render_worker.mjs` + `server/fuse.py` ([archive/matcher-service.md](archive/matcher-service.md)).
 
 ```bash
 # prerequisites: tools/matcher/.venv and weights as in reports/matcher.md (removed; `git show 384df44:reports/matcher.md`); dev server on :3100; ≥ 3 GB free

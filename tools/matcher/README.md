@@ -1,43 +1,35 @@
-# tools/matcher: optional Python backend
+# tools/matcher: offline Python (reference, research, model export)
 
-The app runs without any of this. The matcher service (`:8765`, render-and-match escalation) and the
-near-field service (`:8767`, Step Inside) are optional; `node scripts/dev.mjs --be` starts them only when
-`tools/matcher/.venv/bin/python` exists and otherwise skips them with a warning. A fresh clone type-checks
-(`npx tsc --noEmit -p .`), builds (`npm run build`) and passes the fast tier without any Python (checks whose
-gitignored inputs `data/`, `public/photos/`, `.cache/` are missing report SKIP).
+The app does not use any of this: render-and-match runs in the browser (`src/lib/matcher`, behind
+`src/lib/matcher-client.ts`), and there is no matcher service any more (removed 2026-10-02; its design doc
+is `reports/archive/matcher-service.md`). What is here:
+
+- `match.py`, `common.py`, `fusion.py`, `dem.py`, `pose6.py`, `pose6_inputs.py`: the matcher algorithms the
+  TypeScript port was verified against, also imported by the research and frozen benchmark code
+  (`tools/bench/final`, `tools/research/*`, `v2/`).
+- `reference/`: the service-side modules kept as the Python reference for the browser ports and the parity
+  fixtures (see `reference/README.md`).
+- `stage1/`, `v2/`: study records (T6 stage-1 search, matching v2). `stage1/vendor*` and `worker_client.py`
+  are frozen snapshots of the old render worker for reruns of those studies.
 
 ## Python environment
 
-The weights and `.venv` are gitignored; `requirements.txt` (below) was derived from the imports in
-`tools/matcher/**` and the maintainers' venv:
+`tools/matcher/.venv` is the shared research and model-export venv: `scripts/models/*.py` (the weight
+producers behind `scripts/models/fetch.mjs`), the `*.check.ts` parity scripts and the research code use it.
+The weights and `.venv` are gitignored; `requirements.txt` was derived from the imports in `tools/matcher/**`
+and the maintainers' venv:
 
 - Python 3.10+ (developed on macOS Apple Silicon, MPS; CPU works, slowly).
 - `torch` (MPS or CPU), `numpy`, `scipy`, `opencv-python` (`cv2`), `Pillow`.
 - `lightglue` (cvg/LightGlue: ALIKED + LightGlue, weights download into `tools/matcher/weights` through
   `TORCH_HOME`), `romatch` (RoMa, only for the optional dense-match path), `poselib` (pose solver).
-- The render worker (`server/render_worker.mjs`) is Node and uses `playwright` (already an npm dependency;
-  run `npx playwright install chromium` once). It needs `vite dev` on :3100.
-- The near-field service (`tools/nearfield/service`) shares this venv and has its own weights under
-  `tools/nearfield/service/weights` (`HF_HUB_OFFLINE=1`, so models must be pre-downloaded); see
-  `tools/nearfield/` and `reports/` for the models it needs.
 
 ```
 cd tools/matcher
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-# near-field service extras (same venv): .venv/bin/pip install -r ../nearfield/requirements.txt
 ```
 
 `requirements.txt` pins the direct dependencies as run by the maintainers (Python 3.12, torch 2.14). On
 CUDA machines install the matching torch wheel from pytorch.org first (see the comment in the file).
-`tools/nearfield/requirements.txt` includes it and documents the vendored `.pylib` folders and weights.
 
-Weights licences (ALIKED, LightGlue, RoMa, DepthPro-class models) are in `reports/licences.md`; check them
-before shipping any of this as a hosted service.
-
-## T6 GPU skyline grid
-
-Policy t6's stage-1 skyline grid runs on the GPU by default: the render worker's `edges` command returns the
-certified candidate cells from `src/lib/gpu/skyglobal` (a `ComputeGraph` over luma), and `server/sky_gpu.py`
-re-scores exactly those cells in numpy, so poses match the CPU grid. When the page has no WebGPU device, the
-candidate list overflows or anything throws, the CPU grid runs instead. Set `T6_GPU_GRID=0` (also `off` or
-`false`) to force the CPU grid; `T6_GPU_IDLE_MS` is the idle time before the grid's GPU buffers are released.
+Weights licences are in `reports/licences.md`.

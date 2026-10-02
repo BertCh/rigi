@@ -73,8 +73,8 @@ export type BuildSceneInput = {
 	anchor?: AnchorOpts;
 	lift?: LiftOpts;
 	/**
-	 * Normalised intrinsics the service built `cloud` with (the /gaussians X-NearField-Meta intrinsicsNorm,
-	 * NearFieldClient.gaussiansWithMeta). The cloud is re-projected onto the photo's rays so every Gaussian
+	 * Normalised intrinsics the source built `cloud` with (meta.intrinsicsNorm of
+	 * NearFieldSource.gaussiansWithMeta). The cloud is re-projected onto the photo's rays so every Gaussian
 	 * stays on the pixel it was seen at. Default: depth.intrinsicsNorm (right for model "lift" with the same
 	 * depth model), else the photo intrinsics (no re-projection).
 	 */

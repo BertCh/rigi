@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Browser glue for roll spots: RollMapEngine (DEM range buffers, people masks, poses in the roll frame)
-// + per-photo depth (nearField: in the browser by default; /multiview DA3 only via the legacy service) → fuseSpot → a
+// + per-photo depth (nearField: MoGe-2 ViT-S in the browser) → fuseSpot → a
 // DeckSplatLayer on the roll map (the "Spot 3D" toggle in RollMap.tsx). Lazy-loaded; nothing here runs
 // unless the toggle is switched on.
 import type { Pose } from "../../camera";
@@ -11,12 +11,7 @@ import type { SplatsCore } from "../../deck-webgpu/layers/splats";
 import { type DemRaster, latToTileY, loadDemTile, lonToTileX } from "../../dem";
 import type { RollMapEngine } from "../../roll/map/roll-map";
 import type { Roll, RollPhoto } from "../../roll/types";
-import {
-	type DepthModel,
-	type NearFieldMultiView,
-	type NearFieldSource,
-	nearField,
-} from "../client";
+import { type NearFieldSource, nearField } from "../client";
 import { DeckSplatLayer } from "../deck-splat-layer";
 import type { RGBAImage } from "../lift";
 import { imageToRGBA } from "../scene";
@@ -24,9 +19,6 @@ import type { GaussianCloud, NearFieldDepth } from "../types";
 import type { EyePair, EyeSolve } from "./eyes";
 import {
 	fuseSpot,
-	type JointPlacementResult,
-	jointPlacement,
-	multiviewPoses,
 	REFINE_EYES_DEFAULT,
 	refineSpotEyes,
 	type SpotOpts,
@@ -37,27 +29,16 @@ import {
 } from "./spot";
 
 /**
- * "multiview": /multiview DA3 with the Rigi poses as known poses, then a DEM anchor per photo.
- * "multiview-joint": /multiview WITHOUT poses (DA3's own consistent relative cameras), placed in ENU as one
- *   rigid reconstruction (spot.jointPlacement: Rigi rotations, one DEM scale, mean GPS translation).
- * "moge2" / "da3": per-photo /depth, DEM anchor per photo.
+ * "moge2": per-photo depth (MoGe-2 ViT-S in the browser, nearfield/local), DEM anchor per photo. The DA3
+ * multiview modes of the former near-field service have no browser port and were removed.
  */
-export type SpotDepthSource = "multiview" | "multiview-joint" | "moge2" | "da3";
+export type SpotDepthSource = "moge2";
 
 export type RollSpotOpts = SpotOpts & {
 	client?: NearFieldSource;
-	/**
-	 * "moge2" (default): per-photo depth (in the browser: MoGe-2 ViT-S, nearfield/local). "multiview" /
-	 * "multiview-joint" / "da3" need the legacy service (serviceNearField): DA3 has no browser port.
-	 */
-	depth?: SpotDepthSource;
-	/** Send the Rigi poses as known poses to /multiview. Default true. */
-	posed?: boolean;
-	/** One /multiview per photo orientation (default true; see buildRollSpot). */
-	splitOrientations?: boolean;
 	/** Sky masks from src/lib/sky (default true). */
 	sky?: boolean;
-	/** Long side (px) of the photo pixels used for colours (and uploaded). Default 1024. */
+	/** Long side (px) of the photo pixels used for colours and depth. Default 1024. */
 	pixelsLong?: number;
 	signal?: AbortSignal;
 	onStatus?: (s: string) => void;
@@ -85,8 +66,6 @@ export type RollSpot = SpotResult & {
 	/** Per view, for exports / evaluation. */
 	inputs: SpotView[];
 	depths: (NearFieldDepth | null)[];
-	/** "multiview-joint": the placement of each jointly reconstructed group. */
-	joint: (JointPlacementResult | null)[];
 	/** The refineEyes step's solution when it ran and moved the eyes (inputs[k].eye are the refined eyes). */
 	eyes?: (EyeSolve & { pairs: EyePair[] }) | null;
 };
@@ -114,7 +93,7 @@ async function loadImage(src: string): Promise<{
 	}
 }
 
-/** Downscaled JPEG of an image (long side ≤ long) for the service upload. */
+/** Downscaled JPEG of an image (long side ≤ long), the depth model's input. */
 async function jpegOf(img: HTMLImageElement, long: number): Promise<Blob> {
 	const s = Math.min(1, long / Math.max(img.naturalWidth, img.naturalHeight));
 	const w = Math.max(1, Math.round(img.naturalWidth * s));
@@ -125,8 +104,8 @@ async function jpegOf(img: HTMLImageElement, long: number): Promise<Blob> {
 }
 
 /**
- * Build the spot of the given photos (all within one viewpoint) from the map's terrain + the service.
- * Null when the service is unavailable or fewer than one view has depth.
+ * Build the spot of the given photos (all within one viewpoint) from the map's terrain + per-photo depth.
+ * Null when the depth model is unavailable or no view has depth.
  */
 export async function buildRollSpot(
 	engine: RollMapEngine,
@@ -137,10 +116,9 @@ export async function buildRollSpot(
 	const client = opts.client ?? nearField;
 	const status = opts.onStatus ?? (() => {});
 	const long = opts.pixelsLong ?? 1024;
-	const mode = opts.depth ?? "moge2";
 	if (!ids.length) return null;
 	if (!(await client.available())) {
-		status("near-field service unavailable");
+		status("depth model unavailable (needs WebGPU)");
 		return null;
 	}
 	status("loading photos");
@@ -157,7 +135,7 @@ export async function buildRollSpot(
 	if (opts.signal?.aborted) return null;
 
 	status("depth");
-	let model: string = mode;
+	let model = "moge2";
 	// DEM range buffers need the pose first: take the placed pose with a 1×1 render
 	const cams = await Promise.all(ids.map((id) => engine.rangeMapFor(id, 1, 1)));
 	if (cams.some((c) => !c)) {
@@ -165,7 +143,7 @@ export async function buildRollSpot(
 		return null;
 	}
 	const placed = cams as NonNullable<(typeof cams)[number]>[];
-	// optional: relative eye refinement before anything uses the eyes (multiview poses, range buffers)
+	// optional: relative eye refinement before anything uses the eyes (range buffers)
 	let eyeSol: RollSpot["eyes"] = null;
 	if (opts.eyePairs && (opts.refineEyes ?? REFINE_EYES_DEFAULT)) {
 		status("refining eyes");
@@ -193,59 +171,16 @@ export async function buildRollSpot(
 	const origin = spotOrigin(placed);
 	const depths: (NearFieldDepth | null)[] = [];
 	for (const _ of ids) depths.push(null);
-	const perPhoto = async (k: number, dm: DepthModel) => {
+	for (const k of ids.keys()) {
 		const d = await client.depth(loaded[k].upload, {
-			model: dm,
+			model: "moge2",
 			signal: opts.signal,
 			timeoutMs: 300_000,
 		});
 		depths[k] = d;
 		if (d) model = d.model;
-	};
-	const joint: { idx: number[]; cameras: NearFieldMultiView["cameras"] }[] = [];
-	if (mode === "multiview" || mode === "multiview-joint") {
-		// DA3 centre-crops a batch of mixed portrait + landscape photos to squares (the near field at the
-		// bottom of a portrait photo is lost): one /multiview per orientation unless told otherwise
-		const idx = ids.map((_, k) => k);
-		const groups =
-			opts.splitOrientations === false
-				? [idx]
-				: [
-						idx.filter((k) => placed[k].aspect >= 1),
-						idx.filter((k) => placed[k].aspect < 1),
-					].filter((g) => g.length);
-		for (const g of groups) {
-			if (g.length < 2) {
-				await perPhoto(g[0], "da3");
-				continue;
-			}
-			const mv = await client.multiview(
-				g.map((k) => loaded[k].upload),
-				{
-					poses:
-						opts.posed === false || mode === "multiview-joint"
-							? undefined
-							: multiviewPoses(
-									g.map((k) => placed[k]),
-									origin,
-								),
-					signal: opts.signal,
-				},
-			);
-			if (!mv) continue;
-			g.forEach((k, n) => {
-				depths[k] = mv.depths[n];
-			});
-			if (mode === "multiview-joint")
-				joint.push({ idx: g, cameras: mv.cameras });
-			model = mv.model;
-		}
-		if (depths.every((d) => !d)) {
-			status("multiview failed");
-			return null;
-		}
-	} else for (const k of ids.keys()) await perPhoto(k, mode);
-	// sky: DA3-BASE has no sky output, and a sky pixel with depth and no DEM would be an "Object"
+	}
+	// sky: a sky pixel with depth and no DEM would be an "Object"
 	const skies =
 		opts.sky === false
 			? ids.map(() => null)
@@ -281,19 +216,6 @@ export async function buildRollSpot(
 			skyMask: skies[k],
 		});
 	}
-	const jointStats: (JointPlacementResult | null)[] = [];
-	for (const g of joint) {
-		const jp = jointPlacement(
-			g.idx.map((k) => views[k]),
-			g.idx.map((k) => depths[k] as NearFieldDepth),
-			g.cameras,
-		);
-		jointStats.push(jp);
-		if (jp)
-			g.idx.forEach((k, n) => {
-				views[k].placement = jp.placements[n];
-			});
-	}
 	status("fusing");
 	const res = fuseSpot(views, depths, opts);
 	status(`${res.cloud.count} splats`);
@@ -305,7 +227,6 @@ export async function buildRollSpot(
 		origin,
 		inputs: views,
 		depths,
-		joint: jointStats,
 		eyes: eyeSol,
 	};
 }

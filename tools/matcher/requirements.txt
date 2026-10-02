@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: MIT
 # SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 #
-# Python deps of the matcher service (tools/matcher, :8765). The near-field service (:8767) shares this venv.
+# Python deps of the offline matcher reference/research code and the model producers in scripts/models.
 # Direct third-party imports only; transitive deps (kornia, matplotlib, ...) come with them.
 # Versions are what the maintainers ran (Python 3.12.13, macOS arm64 / MPS); any Python >= 3.10 should work.
 #
 #   python3 -m venv tools/matcher/.venv
 #   tools/matcher/.venv/bin/pip install -r tools/matcher/requirements.txt
 #
-# The startup scripts (server/run.sh, ../nearfield/run.sh, scripts/dev.mjs) look for tools/matcher/.venv.
+# scripts/models/lib.mjs and the *.check.ts parity scripts look for tools/matcher/.venv.
 
 # torch: on macOS arm64 the default PyPI wheel has MPS. On Linux/Windows with CUDA, install the matching
 # wheel first from https://pytorch.org/get-started/locally/ (for example
@@ -21,7 +21,7 @@ opencv-python==5.0.0.93
 pillow==12.3.0
 poselib==2.0.5
 
-# ALIKED + LightGlue (matcher/server/core.py, match.py); not on PyPI at the version used, pinned to a commit.
+# ALIKED + LightGlue (match.py, reference/core.py, scripts/models/aliked-lightglue.py); not on PyPI at the version used, pinned to a commit.
 lightglue @ git+https://github.com/cvg/LightGlue.git@eb42fee2d71449efb0aa5c10549752b5d75384d8
 
 # Optional: dense-match path only (match.py roma_outdoor).

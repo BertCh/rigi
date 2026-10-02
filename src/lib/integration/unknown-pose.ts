@@ -270,8 +270,8 @@ export function positionSource(photo: PhotoMeta) {
 
 /**
  * Fused render-and-match, ad-hoc photo mode (src/lib/matcher pipeline.ts matchAdhoc, the port of
- * tools/matcher/server/app.py match_adhoc): unknowns are simply omitted. `seeds` are the cascade's
- * candidates (reports/matcher-service.md v0.3): only real candidates, since a wrong seed costs time.
+ * the former service's match_adhoc): unknowns are simply omitted. `seeds` are the cascade's
+ * candidates (reports/archive/matcher-service.md v0.3): only real candidates, since a wrong seed costs time.
  * The 150 s default is the service's budget (in-browser timing is unmeasured).
  */
 export async function matchUnknownPose(

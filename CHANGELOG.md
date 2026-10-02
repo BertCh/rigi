@@ -66,6 +66,27 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - Near field (S1 prep, opt-in): cliff-lip anchoring (`nearfield/cliff-lip.ts`, `AnchorOpts.cliffLip`, flag `anchorCliff`, off by default) drops DEM range discontinuities and the lip face from the anchor fit; `nearfield/anchor-parity.ts` compares the DEM grids two engines feed the anchor; segmenter licence shortlist in `research_notes/segmenter-shortlist-2026-10-02/`.
 - **`?colorTarget=rg11b10` is now downgraded to rgba16float with a console warning** (rg11b10ufloat has no destination alpha: the photo overlay turns opaque and the world sky, blended under with `one-minus-dst-alpha`, is never drawn). `?colorTarget=rg11b10-unsafe` forces the old behaviour for experiments.
 
+### Browser-only compute (2026-10-02)
+
+Everything the app computes now runs in the browser; no Python service remains. Rendering, UI and WebGPU paths below are browser-unverified until the next batch pass.
+
+- `src/lib/nn`: in-browser tensor runtime (no ONNX). Model forwards run as WGSL kernels on one luma compute graph per forward (GEMM/implicit-GEMM conv/deformable conv, flash attention, norms, sampling, topk; f16 weights). It has a CPU reference/fallback, a safetensors loader through `src/lib/models`, and a Dawn parity check `nn-parity`.
+- nn performance: activation epilogue fusion, narrow-M GEMM tiles, vec4 flash attention, and topk k=1 as argmax.
+- Model weights: `src/lib/models` (`fetchModel` with Cache Storage, sha256 verification and download progress) and `scripts/models` (manifest, `fetch.mjs`, reproducible producers).
+- People segmentation is self-hosted: MediaPipe wasm is served from the build and its two models from `public/models`, with no third-party fetch at runtime. New fast check `models`.
+- In-browser ALIKED + LightGlue (`src/lib/features`, worker client `#/lib/features/client`) on the nn runtime, with fp16 safetensors weights from `scripts/models/aliked-lightglue.py` and a PyTorch parity check (`features` row).
+- pose6dof: in-browser RANSAC solvers (`absolutePoseRansac`, `cameraRotationRansac`, `rotationRansac` + Async GPU-scored twins), ports of poselib / `match.solve_rotation` / `rot_ransac` with Python parity scripts; the `ransac` graph group is declared in the app-graph islands table.
+- Roll pose propagation: relative rotation runs in the browser (ALIKED + LightGlue + rotation RANSAC); the :8769 service client is removed.
+- Render-and-match runs in the browser on the page's engine and GPU (`src/lib/matcher`, no Python service); `?matcherPolicy=t6` selects the T6 search. `Renderer.matchEvidence` on both engines; optional GPU re-score of the skyline global-search candidates; the position-grid basin gap is ported, so untrusted positions can reach HIGH again.
+- Step Inside estimates depth in the browser: MoGe-2 ViT-S on the luma compute graph (70 MB, downloaded on first use), with the depth lift as a graph kernel; without WebGPU the panel stays hidden. `?nearfield=sharp` was removed. New fast checks `nearfield-depth-net` and `nearfield-lift-dawn`.
+- Roll map Spot 3D uses per-photo in-browser depth; the DA3 `multiview` / `multiview-joint` / `da3` spot modes, `RollSpot.joint` and the `SpotDepthSource` values other than `moge2` are removed.
+- Sky segmentation runs U²-Net-P on `src/lib/nn` (`skyseg-u2netp-nn` safetensors); onnxruntime-web is no longer on the sky path.
+- Removed the Python services and their tooling: `tools/matcher/server` (app, render worker, replay, run script), `tools/nearfield/service`, `tools/nearfield/run.sh` and `requirements.txt`, `tools/nearfield/propagate/{service.py,run_service.sh}`, the service-spawning bench harness (`tools/bench/harness/run.{ts,sh}`, `lib/worker.mjs`), `npm run dev:all` and `scripts/dev.mjs --be`. `scripts/dev.mjs` now only starts (or reuses) vite on :3100.
+- Removed the legacy HTTP near-field client (`NearFieldClient`, `serviceNearField`, `VITE_NEARFIELD_URL`, `NEARFIELD_URL_DEFAULT`, the depth wire decoders and wire types) and `multiview()` from `NearFieldSource`.
+- Removed CI rows `nearfield-service`, `stage1-worker-snapshot`, `t6-gpu-grid-default` and the spec `worker-engine-surface.spec.ts` (they kept the deleted render worker in sync).
+- The service's Python matching modules (`core.py`, `fuse.py`, `t6.py`, `sky_gpu.py`) moved to `tools/matcher/reference/` as offline reference for the browser ports and parity fixtures; `reports/matcher-service.md` moved to `reports/archive/`. The MoGe-2 checkpoint used by `scripts/models/moge2-vits.py` now lives in `tools/nearfield/weights/`.
+- Harnesses updated for in-browser paths (browser-unverified): `step-inside-e2e.mjs --no-models` replaces `--dead`, `propagate-ui.mjs` runs the estimator in the page (`--no-models` checks the unavailable path), `bake-step.mjs` builds through the in-page depth model.
+
 ### Lean pass: no back-compat (2026-10-02)
 
 Rigi is unreleased, so compatibility bridges, aliases, old-format readers and finished A/B arms are gone. Rendering changes are browser-unverified.

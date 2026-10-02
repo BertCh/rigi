@@ -809,7 +809,7 @@ export class PhotoCompositor implements Effect {
 	 * The terrain colour pass alone (no photo, no composite, no trails) through `pose`, offscreen at
 	 * width × height, multisampled like the on-screen colour pass: linear RGB + straight alpha
 	 * (0 = nothing drawn = sky), RGBA float, row 0 = top. DeckEngine.renderPoseView (the matcher's
-	 * satellite drape, tools/matcher/server/render_worker.mjs).
+	 * satellite drape, src/lib/matcher).
 	 */
 	async renderColorPixels(
 		layers: Layer[],

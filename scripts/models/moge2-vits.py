@@ -8,7 +8,7 @@
     python scripts/models/moge2-vits.py --dump-ref DIR [--safetensors FILE]   # per-layer fp32 reference for the TS port
 
 Runs with tools/matcher/.venv/bin/python (torch, safetensors) and the MoGe source in tools/research/tm/.pylib_x2.
-The pinned public checkpoint (MIT) is downloaded to tools/nearfield/service/weights/ and its sha256 is checked.
+The pinned public checkpoint (MIT) is downloaded to tools/nearfield/weights/ (gitignored) and its sha256 is checked.
 
 Tensor names are exactly the PyTorch state_dict keys; nothing is folded. Floating tensors are stored fp16, except the
 encoder's ImageNet mean/std buffers (fp32, so the normalisation is exact). Compute in the runtime is fp32.
@@ -51,7 +51,7 @@ def find_main() -> Path:
 
 MAIN = find_main()
 MOGE_LIB = MAIN / "tools/research/tm/.pylib_x2"
-WEIGHTS_DIR = MAIN / "tools/nearfield/service/weights"
+WEIGHTS_DIR = MAIN / "tools/nearfield/weights"
 WEIGHTS = WEIGHTS_DIR / f"moge-2-vits-normal.{URL_COMMIT[:8]}.pt"
 
 

@@ -624,22 +624,6 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
-		id: "nearfield-service",
-		tier: "fast",
-		group: "nearfield",
-		cmd: [
-			"tools/matcher/.venv/bin/python",
-			"-m",
-			"unittest",
-			"discover",
-			"-s",
-			"tools/nearfield/service/tests",
-		],
-		needs: ["tools/matcher/.venv/bin/python"],
-		note: "near-field service CR-05 caps and error paths, in-process (no torch, no model load); SKIPs without the matcher venv",
-		timeoutS: 120,
-	},
-	{
 		id: "nearfield-depth-net",
 		tier: "fast",
 		group: "nearfield",
@@ -1080,20 +1064,6 @@ export const CHECKS = [
 		tier: "fast",
 		group: "export",
 		cmd: tsx("src/lib/export/geoid-default.check.ts"),
-		timeoutS: 60,
-	},
-	{
-		id: "stage1-worker-snapshot",
-		tier: "fast",
-		group: "matcher",
-		cmd: tsx("tools/matcher/stage1/__tests__/worker-snapshot.check.ts"),
-		timeoutS: 60,
-	},
-	{
-		id: "t6-gpu-grid-default",
-		tier: "fast",
-		group: "matcher",
-		cmd: tsx("tools/matcher/stage1/__tests__/t6-gpu-grid-default.check.ts"),
 		timeoutS: 60,
 	},
 	{

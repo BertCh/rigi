@@ -9,8 +9,8 @@
 // precision for the app's autoAlign), whereas the cascade had 0 false accepts on the bundled set,
 // so its accept flag is the only thing that promotes a pose.
 //
-// Browser only (Web Worker + canvas). The matcher service (:8765) is never used: it may be down,
-// and a roll of dozens of photos would queue minutes of render-and-match per photo.
+// Browser only (Web Worker + canvas). Render-and-match (src/lib/matcher) is never used here: a roll of
+// dozens of photos would queue minutes of render-and-match per photo.
 //
 // One worker at a time, sequentially: the cascade loads a 360° DEM and marches a horizon, which is
 // CPU- and memory-heavy; several at once starve the page (and the machine).

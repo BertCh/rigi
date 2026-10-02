@@ -4,7 +4,7 @@
 
 // Step Inside controls on the stage (bottom-left): the 'Step inside' button (disabled with a reason),
 // the status chip ([data-nearfield-status]), the Truth toggle and, while stepping, 'Back to photo'.
-// Renders nothing while the near-field service is down, so the classic view is untouched.
+// Renders nothing while near-field depth is unavailable, so the classic view is untouched.
 import { Box, Eye, Loader2, Undo2 } from "lucide-react";
 import { SPLAT_PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
 import { cn } from "#/lib/utils";

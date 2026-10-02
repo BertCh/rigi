@@ -568,10 +568,7 @@ Each table maps every member of an app union onto the canonical axes, and tsc en
 
 | value | provenance | UI |
 |---|---|---|
-| `multiview` | agent=model · method=depth-multiview |  |
-| `multiview-joint` | agent=model · method=depth-multiview |  |
 | `moge2` | agent=model · method=depth-model |  |
-| `da3` | agent=model · method=depth-model |  |
 
 ### View mode and blend method (UI words)
 

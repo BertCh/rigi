@@ -4,7 +4,7 @@
 
 // Step Inside depth → Gaussians lift (src/lib/nearfield/local/lift-gpu.ts, one kernel on a core
 // ComputeGraph) on a real luma WebGPU device in node (Dawn), against its CPU twin
-// (local/lift.ts liftGaussiansCpu, itself equal to tools/nearfield/service/splat.py lift_gaussians)
+// (local/lift.ts liftGaussiansCpu, itself equal to the former service's splat.py lift_gaussians)
 // on synthetic depth / normal / colour grids with flying edges, invalid pixels and missing normals.
 // Same kept cells, colours exact, positions within 1e-5 of the depth, scales within 1e-4 of the largest axis, quaternions within
 // 1e-5 (up to sign).

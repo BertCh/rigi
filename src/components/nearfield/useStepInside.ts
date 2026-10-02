@@ -4,7 +4,7 @@
 
 // Step Inside state for PhotoWorkspace: one NearFieldController per engine, the accepted-pose gate, the
 // step camera enter / back, the Truth toggle and the hover sampler. Everything stays dormant (and the
-// panel invisible) while the near-field service is down or the engine has no setNearField.
+// panel invisible) while the depth model is unavailable (no WebGPU or weights) or the engine has no setNearField.
 
 import {
 	type RefObject,
@@ -144,7 +144,7 @@ export function useStepInside(opts: {
 		const off = c.onState(setState);
 		let live = true;
 		c.available().then((ok) => live && setAvailable(ok));
-		// the service may come up later: re-check now and then (the client caches health 15 s when down)
+		// availability may change (weights cached, device ready): re-check now and then
 		const t = window.setInterval(
 			() => c.available().then((ok) => live && setAvailable(ok)),
 			20_000,

@@ -5,7 +5,7 @@ Rigi is a Vite + React + TanStack Start app built on luma.gl 10 and deck.gl (Web
 ## Setup commands
 - Node 22 (`@types/node` is `^22`; CI uses Node 22).
 - Install deps: `npm install` (`npm ci` in CI). luma.gl and deck.gl come from tarballs in `vendor/`, see `vendor/luma/README.md` and `vendor/deck/README.md`.
-- Dev server on :3100: `npm run dev` (`vite dev --port 3100`), or `node scripts/dev.mjs` (same, `--strictPort`; `node scripts/dev.mjs --be` or `npm run dev:all` also starts the matcher on :8765 and the near-field service on :8767 when their venvs exist). A server already on a port is reused.
+- Dev server on :3100: `npm run dev` (`vite dev --port 3100`), or `node scripts/dev.mjs` (same, `--strictPort`, and reuses a server already on the port). The app needs no backend: matching, Step Inside depth and pose propagation run in the browser. `tools/matcher/.venv` is only for the model producers in `scripts/models` and offline Python reference/research code.
 - Regenerate routes after adding or removing a file in `src/routes`: `npm run generate-routes` (`src/routeTree.gen.ts` is generated; do not edit it).
 - Production build: `npm run build` (`vite build`), `npm run preview`.
 - Type check: `npx tsc --noEmit -p .`.

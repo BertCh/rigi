@@ -77,7 +77,7 @@ export function RollMap({
 	const [viewId, setViewId] = useState<string | null>(null);
 	const [hover, setHover] = useState<RollMapHover | null>(null);
 	const hovered = useRef(false);
-	/** Step Inside roll spot (src/lib/nearfield/roll): off by default, needs the near-field service. */
+	/** Step Inside roll spot (src/lib/nearfield/roll): off by default, needs in-browser depth (WebGPU). */
 	const [spot3d, setSpot3d] = useState(false);
 	const [spotNote, setSpotNote] = useState("");
 
@@ -427,7 +427,7 @@ export function RollMap({
 					onClick={() => setSpot3d((v) => !v)}
 					disabled={spotVp === undefined}
 					className={`flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white/10 disabled:opacity-40 ${spot3d ? "bg-white/15 text-white" : ""}`}
-					title="Spot 3D: fuse the near field of this viewpoint's photos into 3D splats (needs the near-field service)"
+					title="Spot 3D: fuse the near field of this viewpoint's photos into 3D splats (needs WebGPU; downloads the depth model on first use)"
 					data-testid="roll-spot3d"
 					data-on={spot3d ? "1" : undefined}
 				>

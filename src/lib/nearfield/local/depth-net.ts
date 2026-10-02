@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // MoGe-2 ViT-S (normal) forward pass on the src/lib/nn tensor runtime: the browser's Step Inside depth
-// model (the service ran MoGe-2 ViT-L: tools/nearfield/service/models.py). Weights:
+// model (the former near-field service ran MoGe-2 ViT-L in PyTorch). Weights:
 // public/models/moge2-vits-normal.<hash>.safetensors (scripts/models/moge2-vits.py; MIT, DINOv2-S
 // backbone Apache-2.0), PyTorch state_dict names. Reference: moge/model/v2.py MoGeModel.forward and
 // its modules (dinov2_encoder.py, dinov2 vision_transformer.py, conv_stack.py).

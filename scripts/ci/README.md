@@ -52,7 +52,6 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
 | nearfield-depth-net | fast | Step Inside's in-browser depth model (MoGe-2 ViT-S on `src/lib/nn`) vs PyTorch per layer; the CPU row stops after the encoder (`--full`, `--backend gpu` run it all); the reference is made once with `tools/matcher/.venv` | `src/lib/nearfield/local/depth-net.check.ts` |
 | nearfield-lift-dawn | fast | depth → Gaussians lift kernel (ComputeGraph) vs its CPU twin on Dawn; SKIPs without `DAWN_DIR` | `scripts/gpu/nearfield-lift-dawn.ts` |
-| nearfield-service | fast | near-field service caps and error paths (CR-05), in-process Python unittest, no model load; SKIPs without `tools/matcher/.venv` | `tools/nearfield/service/tests/test_caps.py` |
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
 | photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
 | photoprep-resident | fast | Photo prep residency: lazy CPU read, memo, pins, LRU, device mismatch (fake device) | `src/lib/gpu/photoprep/resident.check.ts` |
@@ -116,7 +115,6 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | terroir-pattern, terroir-hatch | fast | terroir pattern fills and hatch: CPU mirror coverage, splice off by default, GLSL / WGSL constants agree | `src/lib/terroir/*.check.ts` |
 | palette-cvd | fast | the roll viewpoint palette stays separable under simulated colour-vision deficiency and clear of the selection orange | `src/lib/roll/mosaic/__tests__/palette-cvd.check.ts` |
 | export-geoid-default | fast | engine exports default the geoid separation to EGM2008 at the frame origin | `src/lib/export/geoid-default.check.ts` |
-| stage1-worker-snapshot, t6-gpu-grid-default | fast | matcher stage-1: render worker snapshots match what `make_worker_snapshot.mjs` generates (no drift); the T6 GPU skyline grid is on by default and its `T6_GPU_GRID` opt-out agrees in the render worker and `t6.py` | `tools/matcher/stage1/__tests__/*.check.ts` |
 | range-webgpu | fast | WebGPU range hand-off (`RangeGpuWebGpu`): reference rule == the old CPU path (unpack, rangeMapFrom, coarsen) on sky / NaN / Inf / negative / denormal words and odd sizes; with `DAWN_DIR`, the cell copy into an r32float atlas (neighbours untouched) and the coarse grid are byte-equal to it on a Dawn device. GPU half SKIPs without `DAWN_DIR` | `src/lib/roll/map/range-webgpu.check.ts` |
 | geo-unpack | fast | GPU unpack of the geometry target: the WGSL logic as a TS reference is byte-equal to the CPU unpack on sky / NaN / Inf / denormal / -0 words; odd words fall back to the CPU | `src/lib/deck-webgpu/geo-unpack.check.ts` |
 | gipfelbuch-notebook, tafel, tafel-sheets | fast | Gipfelbuch notebook covers every node once; Tafel projector lands on solved rows; every node has sheet figures and one chapter | `src/components/gipfelbuch/{notebook,tafel}/*.check.ts` |
@@ -137,8 +135,7 @@ on that port, the runner reuses it. `--url http://localhost:3100` uses an existi
 Left out on purpose:
 - `scripts/gpu/*` benches and parity checks: they need a GPU and dumped fixtures, and they are research
   checks, not a gate.
-- `scripts/nearfield/*.mjs` browser labs: long, and they need the near-field service on :8767.
-- `tools/nearfield/service/selftest.py`: needs the Python env.
+- `scripts/nearfield/*.mjs` browser labs: long, and they need WebGPU and the Step Inside weights in `public/models`.
 - `occl.check.ts --live`: network.
 
 Any of these can be added to `checks.mjs` as another entry.

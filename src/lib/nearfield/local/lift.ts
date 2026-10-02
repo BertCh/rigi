@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The near-field service's /gaussians "lift" (tools/nearfield/service/splat.py lift_gaussians), in the
+// The former near-field service's /gaussians "lift" (its splat.py lift_gaussians, removed 2026-10-02), in the
 // browser: one Gaussian per stride × stride cell of a depth map, in the camera frame (OpenCV: x right,
 // y down, z forward). This file is the CPU twin and the reference of the graph kernel in ./lift-gpu.ts.
 //

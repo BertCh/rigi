@@ -8,16 +8,17 @@ import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 // Bakes the landing page's Step Inside demo (src/components/site/StepInsideDemo.tsx): opens the photo in
-// the real workspace with its ground-truth pose, builds the near-field scene through the live
-// near-field service (tools/nearfield, :8767) exactly as the Step Inside button does, and writes the
-// anchored scene so the landing page can show it without the service:
+// the real workspace with its ground-truth pose, builds the near-field scene in the page (MoGe-2 ViT-S
+// depth + lift, src/lib/nearfield/local) exactly as the Step Inside button does, and writes the
+// anchored scene so the landing page can show it without running the depth model:
 //   public/demo/step/photo.jpg     the photo (copied from public/photos)
 //   public/demo/step/scene.json    photo meta, pose, anchor fit, split (counts; the class grid is cls.bin), radius, pivot
 //   public/demo/step/cls.bin       the split's class grid, raw bytes (width x height)
 //   public/demo/step/splats.splat  the anchored ENU Gaussians (.splat-v1, nearfield/splat-io.ts)
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/demo/bake-step.mjs [IMG_7086] [--renderer=deck]
-// Needs the dev server (APP_URL, default http://localhost:3100) and the near-field service running.
+// Needs the dev server (APP_URL, default http://localhost:3100), WebGPU in the headless browser and the
+// depth weights in public/models (node scripts/models/fetch.mjs --only moge2).
 import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");

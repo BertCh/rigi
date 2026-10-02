@@ -4016,7 +4016,7 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	// =============================================================================================
-	// offscreen pose renders (tools/matcher/server/render_worker.mjs): deck/engine.ts contract
+	// offscreen pose renders (src/lib/matcher): deck/engine.ts contract
 
 	/**
 	 * deck/engine.ts loadFullTerrain: the terrain all around the eye. The streamer's high-detail wedge

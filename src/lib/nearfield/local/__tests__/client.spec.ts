@@ -64,8 +64,4 @@ describe("LocalNearFieldClient availability (= models loadable on WebGPU)", () =
 		);
 		expect(await new LocalNearFieldClient().available()).toBe(false);
 	});
-
-	it("has no /multiview", async () => {
-		expect(await new LocalNearFieldClient().multiview()).toBeNull();
-	});
 });

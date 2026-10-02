@@ -4,8 +4,8 @@
 
 import { createNn, type Nn, type Weights } from "#/lib/nn";
 /**
- * Browser ALIKED + LightGlue: the keypoint extractor and matcher the Python matcher service
- * (tools/matcher/server) and the relative-rotation service (tools/nearfield/propagate) use, on the
+ * Browser ALIKED + LightGlue: the keypoint extractor and matcher of the former Python matcher
+ * and relative-rotation services (removed 2026-10-02; reference: tools/matcher/match.py), on the
  * src/lib/nn runtime (WGSL kernels on the compute graph under WebGPU, a CPU reference otherwise).
  * Same configuration as the services: ALIKED-n16, detection threshold 0.01, long side 1024 (lightglue's
  * resize), up to `maxKeypoints` (matcher 4096, propagation 2048); LightGlue(aliked) with filter threshold

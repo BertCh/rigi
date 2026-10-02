@@ -24,7 +24,7 @@ import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const BASE = process.env.APP_URL;
-if (!BASE || /:(3000|3100|8765|8766|8767|8768)\b/.test(BASE)) {
+if (!BASE || /:(3000|3100)\b/.test(BASE)) {
 	console.error("set APP_URL to a private dev server (not a shared live port)");
 	process.exit(2);
 }

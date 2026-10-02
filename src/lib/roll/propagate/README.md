@@ -9,7 +9,7 @@ comes from a relative rotation between the two photos. Everything here is opt-in
   the angle between each suggestion and the photo's current pose.
   `?propagate=off` (the default) turns it off. Without the flag nothing renders, and the page is unchanged.
 - **Estimator** (`estimator.ts`, in this browser; no server): the same pipeline as the former relative-rotation service
-  (`tools/nearfield/propagate/service.py`, the study's `run_propagate.py` `rot`). Each photo is decoded with its
+  (removed 2026-10-02; the study's `tools/nearfield/propagate/run_propagate.py` `rot`). Each photo is decoded with its
   EXIF orientation and fitted to a 1024 px long side; ALIKED (2048 keypoints) + LightGlue come from `src/lib/features`
   (WGSL on the compute graph under WebGPU, its CPU backend otherwise); bearings use K from the anchor's accepted vfov
   and the target's EXIF vfov; `rotationRansacAsync` (`src/lib/pose6dof`, a port of `rot_ransac`: 4 px chord, 2000

@@ -13,7 +13,6 @@ import {
 	curveRange,
 	fitAnchor,
 } from "./anchor";
-import { decodeDepthWire, f16ToF32, halfToFloat } from "./client";
 import { intrinsicsFromPose, rayFactor } from "./geom";
 import { groundObjects, isFarComponent, promoteFarObjects } from "./ground";
 import { camToEnuMatrix, liftToGaussians, toEnu } from "./lift";
@@ -174,33 +173,6 @@ const rnd = () => {
 			g.rotations[6] === 1 &&
 			g.provenance[0] === PROVENANCE_CODE.reconstructed,
 		"3DGS ply decode (SH0 colour, sigmoid opacity, exp scale, normalised quat)",
-	);
-}
-
-// ---- float16 / depth wire ----
-{
-	ok(
-		halfToFloat(0x3c00) === 1 &&
-			halfToFloat(0xc000) === -2 &&
-			halfToFloat(0x7bff) === 65504 &&
-			Number.isNaN(halfToFloat(0x7e00)),
-		"halfToFloat",
-	);
-	const b = new Uint8Array([0x00, 0x3c, 0x00, 0x49]); // 1, 10
-	const f = f16ToF32(b);
-	ok(f[0] === 1 && f[1] === 10, "f16ToF32 little-endian");
-	const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u));
-	const d = decodeDepthWire({
-		width: 2,
-		height: 1,
-		model: "m",
-		seconds: 1,
-		depthF16: b64(b),
-		validU8: b64(new Uint8Array([1, 0])),
-	});
-	ok(
-		d.depth[1] === 10 && d.valid[1] === 0 && d.model === "m",
-		"decodeDepthWire",
 	);
 }
 

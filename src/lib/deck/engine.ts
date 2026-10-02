@@ -3385,7 +3385,7 @@ export class DeckEngine implements Renderer {
 	 * offscreen, composite.ts renderImage) with engine.ts's label drawing, as a JPEG blob.
 	 * In world mode: the current world frame as a PNG, without labels.
 	 */
-	// ---------------- offscreen pose renders (tools/matcher/server/render_worker.mjs) ----------------
+	// ---------------- offscreen pose renders (src/lib/matcher, the precision gate) ----------------
 
 	/**
 	 * The terrain all around the eye: the streamer's high-detail wedge becomes 360° (and stays so),

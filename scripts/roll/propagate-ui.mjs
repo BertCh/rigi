@@ -7,7 +7,9 @@
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 // R5 browser check: /roll pose-propagation panel on the bundled Niederhorn viewpoint (IMG_7059/7063/7068).
-// Needs the dev server (default :3100) and tools/nearfield/propagate/run_service.sh (:8769).
+// Needs the dev server (default :3100); the estimator runs in the page (ALIKED + LightGlue + rotation RANSAC,
+// src/lib/roll/propagate/estimator.ts) and loads its weights from /models on the first run.
+// --no-models blocks the feature weights: the run must end with every row in error and the panel saying so.
 // Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/roll/propagate-ui.mjs [--base http://localhost:3100] [--out out/propagate]
 // Checks: flag off = no panel; dev mode (GT anchor 7063) → 7059/7068 suggested, 7053/7086 rejected with reasons;
@@ -28,8 +30,11 @@ const ok = (c, m) => {
 	console.log(c ? "ok  " : "FAIL", m);
 };
 
+const noModels = process.argv.includes("--no-models");
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+if (noModels)
+	await page.route(/\/models\/(aliked|lightglue)/, (route) => route.abort());
 page.on("pageerror", (e) => console.log("pageerror", e.message));
 
 const rows = () =>
@@ -79,38 +84,36 @@ await page.goto(`${BASE}/roll/region-0?propagate=dev&photo=IMG_7063`, {
 await page.waitForSelector("[data-testid=propagate-anchor]", {
 	timeout: 60_000,
 });
-await page.waitForFunction(
-	() =>
-		!document
-			.querySelector("[data-testid=propagate-service]")
-			?.textContent?.includes("…"),
-);
+const t0 = Date.now();
+await page.click("[data-testid=propagate-run]");
+await page.waitForSelector("[data-testid=propagate-row]");
+await waitDone();
 const svc = await page.textContent("[data-testid=propagate-service]");
-console.log("service:", svc);
-const up = svc?.includes("up");
+console.log("estimator:", svc);
+const up = !svc?.includes("unavailable");
+ok(
+	up !== noModels,
+	noModels ? "models blocked: estimator unavailable" : "estimator ready",
+);
 if (!up) {
 	ok(
-		await page.$eval("[data-testid=propagate-run]", (b) => b.disabled),
-		"service down: run button disabled",
+		(await rows()).every((r) => r.status === "error"),
+		"models unavailable: every row is an error, nothing suggested",
 	);
 	ok(
 		(await page.textContent("[data-testid=propagate-panel]"))?.includes(
-			"not reachable",
+			"did not load",
 		),
-		"service down: panel says so, poses unchanged",
+		"models unavailable: panel says so, poses unchanged",
 	);
-	await page.screenshot({ path: `${OUT}/service-down.png` });
+	await page.screenshot({ path: `${OUT}/models-unavailable.png` });
 } else {
-	const t0 = Date.now();
-	await page.click("[data-testid=propagate-run]");
-	await page.waitForSelector("[data-testid=propagate-row]");
-	await waitDone();
 	const r1 = await rows();
 	console.log(`dev run ${(Date.now() - t0) / 1000}s`);
 	for (const r of r1) console.log("   ", r.status.padEnd(9), r.text);
 	await page.screenshot({ path: `${OUT}/dev-anchor-7063.png` });
 	const st = Object.fromEntries(r1.map((r) => [r.target, r.status]));
-	if (svc?.includes("up")) {
+	{
 		ok(
 			st.IMG_7059 === "suggested" && st.IMG_7068 === "suggested",
 			"7059 and 7068 suggested from 7063",

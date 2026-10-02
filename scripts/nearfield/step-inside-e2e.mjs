@@ -13,7 +13,8 @@ import { chromium } from "playwright";
 // Screenshots → tools/nearfield/shots/e2e-<renderer>-<id>-*.png, numbers → e2e-report-<renderer>.json.
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs --renderer=deck IMG_7018
 //   --survey: only build every GT photo (quality / Object pixels)
-//   --dead: service URL pointed at a dead port (window.__nearfieldUrl) → the panel must stay invisible
+//   --no-models: the depth weights (/models/moge2*) are blocked → Step Inside is unavailable and the panel
+//   must stay invisible. Everything runs in the page (src/lib/nearfield/local); no service is involved.
 import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -27,6 +28,7 @@ const arg = (k, d) =>
 	process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;
 const renderer = arg("renderer", "deck");
 const survey = process.argv.includes("--survey");
+const noModels = process.argv.includes("--no-models");
 let ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 if (survey && !ids.length) ids = Object.keys(gt).sort();
 if (!ids.length) ids = ["IMG_7018", "IMG_7130"];
@@ -68,8 +70,7 @@ for (const id of ids) {
 		(u) => u.origin === new URL(BASE).origin.replace(/^http/, "ws"),
 		() => {},
 	);
-	if (process.argv.includes("--dead"))
-		await ctx.route(/127\.0\.0\.1:8767/, (route) => route.abort());
+	if (noModels) await ctx.route(/\/models\/moge2/, (route) => route.abort());
 	const page = await ctx.newPage();
 	const errors = [];
 	page.on("pageerror", (e) => errors.push(e.message));
@@ -98,17 +99,17 @@ for (const id of ids) {
 		});
 		r.align = await page.getAttribute("[data-ready]", "data-align");
 		r.hasPeople = await page.evaluate(() => window.__engine.hasPeople);
-		if (process.argv.includes("--dead")) {
+		if (noModels) {
 			await sleep(4000);
 			r.panel = await page.locator("[data-nearfield-status]").count();
 			r.handle = await page.evaluate(() =>
 				window.__nearfield ? window.__nearfield.state : null,
 			);
-			await shot("dead");
+			await shot("no-models");
 			await page.getByRole("button", { name: "In map" }).click();
 			await sleep(3000);
 			r.panelWorld = await page.locator("[data-nearfield-status]").count();
-			await shot("dead-world");
+			await shot("no-models-world");
 			continue;
 		}
 		await page.waitForSelector("[data-nearfield-status]", { timeout: 30000 });
@@ -337,7 +338,7 @@ for (const id of ids) {
 await browser.close();
 const f = join(
 	OUT,
-	`e2e-report-${renderer}${survey ? "-survey" : ""}${process.argv.includes("--dead") ? "-dead" : ""}.json`,
+	`e2e-report-${renderer}${survey ? "-survey" : ""}${noModels ? "-no-models" : ""}.json`,
 );
 writeFileSync(f, JSON.stringify(report, null, 1));
 console.log("wrote", f);

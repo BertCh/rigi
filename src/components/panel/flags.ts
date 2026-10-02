@@ -23,7 +23,11 @@ export const FLAG_GROUPS: { id: FlagGroup; label: string; blurb: string }[] = [
 		label: "3D Tiles",
 		blurb: "Buildings / trees around the eye in Step Inside.",
 	},
-	{ id: "step", label: "Step Inside", blurb: "Near-field splats service." },
+	{
+		id: "step",
+		label: "Step Inside",
+		blurb: "Near-field splats (in-browser depth, WebGPU).",
+	},
 	{
 		id: "assist",
 		label: "Alignment aids",

@@ -149,7 +149,7 @@ export interface Renderer {
 	flyOut(): void;
 	exportImage(withLabels?: boolean): Promise<Blob | null>;
 
-	// ---- offscreen pose renders (tools/matcher/server/render_worker.mjs, not the workspace) ----
+	// ---- offscreen pose renders (src/lib/matcher context, the precision gate; not the workspace) ----
 	// Both engines implement them (renderer.check.ts).
 	/**
 	 * The terrain all around the eye: 360° high-detail streaming (kept), the CPU queries on the complete

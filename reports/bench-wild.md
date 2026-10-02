@@ -62,7 +62,7 @@ How to read the cells:
 
 ## Confidence calibration
 
-- **Fused HIGH:** 30 of 31 are correct. The single gross error is wc_0069: hand-placed position, far skyline, tagged near-field terrain and parallax-mismatch. It's the kind of case the basin-gap LOW trigger from T5 targets; that trigger has since shipped in matcher v0.3 ([matcher-service.md](matcher-service.md)), but wc_0069's gap (≈ 0.21) passes it (roadmap N4). On EXIF-GPS photos, on near skylines, with no heading, and when seeded from the app skyline, fused HIGH has **no errors**.
+- **Fused HIGH:** 30 of 31 are correct. The single gross error is wc_0069: hand-placed position, far skyline, tagged near-field terrain and parallax-mismatch. It's the kind of case the basin-gap LOW trigger from T5 targets; that trigger has since shipped in matcher v0.3 ([archive/matcher-service.md](archive/matcher-service.md)), but wc_0069's gap (≈ 0.21) passes it (roadmap N4). On EXIF-GPS photos, on near skylines, with no heading, and when seeded from the app skyline, fused HIGH has **no errors**.
 - **Fused LOW is conservative:** 20 LOW poses are correct. HIGH covers 30 of fused's 50 correct poses, so there's recall to gain.
 - **Independence from the app seed:** in the 61 runs seeded by the app skyline, fused HIGH is 10 / 10 correct, while the app's own accepts on the same photos are 0.55 precise with 13 gross errors. The fused rule re-checks the seed and doesn't inherit the app's verdict.
 - **Cross-method agreement:** fused and the cascade share a pose cluster on 13 photos, and all **13 / 13 are correct**.

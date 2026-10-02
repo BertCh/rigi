@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Step Inside: the shared contract between the near-field service (tools/nearfield), DEM anchoring,
+// Step Inside: the shared contract between the near-field source (./local, in the browser), DEM anchoring,
 // the splat renderers (three + deck), the camera-roll multi-view work and the generative research.
 // Design: reports/step-inside-design.md. Additive fields only once other modules depend on this.
 
@@ -136,36 +136,4 @@ export type NearFieldViewOpts = {
 	maskDrape?: boolean;
 	/** Splat opacity multiplier 0..1 (for fades). */
 	opacity?: number;
-};
-
-// ---- near-field service (tools/nearfield, default http://127.0.0.1:8767) ----
-// POST /depth       multipart: image (jpeg/png), model? ("moge2"|"da3"), maxSide? → NearFieldDepthWire
-// POST /gaussians   multipart: image, model? ("sharp"|"lift") → binary .splat-v1 (see encodeSplatV1)
-// POST /multiview   multipart: images[] (+ poses.json optional) → MultiViewWire (camera-roll, P2)
-// GET  /health      → { ok, models: string[], device }
-export const NEARFIELD_URL_DEFAULT = "http://127.0.0.1:8767";
-
-/** JSON header of /depth; the binary body follows (see nearfield client). */
-export type NearFieldDepthWire = {
-	width: number;
-	height: number;
-	model: string;
-	seconds: number;
-	intrinsicsNorm?: { fx: number; fy: number; cx: number; cy: number };
-	/** Base64 float16 little-endian arrays. */
-	depthF16: string;
-	validU8: string;
-	normalF16?: string;
-};
-
-export type MultiViewWire = {
-	model: string;
-	/** Per input image: camera-to-first-camera 4x4 row-major (OpenCV), and normalised intrinsics. */
-	cameras: {
-		c2w: number[];
-		intrinsicsNorm: { fx: number; fy: number; cx: number; cy: number };
-	}[];
-	/** Per image depth, same encoding as NearFieldDepthWire. */
-	depths: Omit<NearFieldDepthWire, "model" | "seconds">[];
-	seconds: number;
 };

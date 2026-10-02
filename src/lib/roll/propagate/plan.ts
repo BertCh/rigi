@@ -8,7 +8,7 @@
 // Rules (tools/nearfield/propagate/PREREG_DRAFT.txt §2, reports/roadmap.md "precision beats recall"):
 //  - Anchor = a photo whose pose a person or the product accepted: 'saved' (user) or 'solved' by the roll
 //    aligner. Never a propagated pose (no chaining). Ground truth only in the dev mode (?propagate=dev).
-//  - Estimator = "rot" only (ALIKED+LightGlue pure-rotation RANSAC, tools/nearfield/propagate/service.py).
+//  - Estimator = "rot" only (ALIKED+LightGlue pure-rotation RANSAC, ./estimator.ts in the browser).
 //  - Gate = PROPAGATE_GATE unchanged (src/lib/nearfield/propagate.ts). A gated result is still a
 //    suggestion: kind "suggestion", provenance "propagated-suggestion", confidence never set.
 
@@ -151,7 +151,7 @@ export function candidatesFor(
 	return out;
 }
 
-/** What the relative-rotation service returns (tools/nearfield/propagate/service.py /relrot). */
+/** What the relative-rotation estimator returns (./estimator.ts; the shape of the former service's /relrot). */
 export type RelRotResult = {
 	method: "rot";
 	relR: number[] | null;
