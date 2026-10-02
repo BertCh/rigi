@@ -89,11 +89,13 @@ const config = defineConfig({
 	},
 	server: {
 		// TM research and the test scripts write here constantly: watching it reloaded pages mid-test
-		watch: { ignored: ["**/tools/**", "**/out/**"] },
+		watch: {
+			ignored: ["**/tools/**", "**/out/**", "**/reports/**", "**/.output/**"],
+		},
 	},
 	plugins: [
 		photosJson(),
-		nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+		nitro(),
 		tailwindcss(),
 		tanstackStart(
 			gateRoutes

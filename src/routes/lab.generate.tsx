@@ -11,7 +11,7 @@
 // Gaussians with provenance `generated` → merge. Panels: cache, holes, filled, merged (Truth: generated =
 // magenta), merged (colour). Needs the near-field service (tools/nearfield/run.sh). Dev only.
 // Harness hook: window.__genLab { done, error, summary, panels } (tools/nearfield/generate/shots.mjs).
-// Engines (2026-10-01, the three.js PhotoEngine was removed): the WebGL DeckEngine on the visible canvas
+// Engines: the WebGL DeckEngine on the visible canvas
 // answers the queries (eye, readback, sampleAt for the scene build); the RGB-D cache (cache-render.ts,
 // three.js) draws its own three Terrain meshes (src/lib/nearfield/generate/three-terrain.ts, same ENU frame) on a private offscreen
 // WebGLRenderer.

@@ -64,7 +64,7 @@
  *
  * ── reports/leaderboard.json, schemaVersion 2 (v1 + ranking, ensemble, recommendation, inputs.files) ──
  * {
- *   schemaVersion: 2, generatedAt: ISO, durationMs, appUrl, renderer: 'deck'|'webgpu'|'auto'|'app-default' (older files: 'three'), argv: string[],
+ *   schemaVersion: 2, generatedAt: ISO, durationMs, appUrl, renderer: 'deck'|'webgpu'|'auto'|'app-default', argv: string[],
  *   targets: { medianYawDeg, success1Rate, meanYawSotaDeg, success1SotaRate, coldReadyMs },
  *   steps: {
  *     <step>: { status: 'ok'|'partial'|'fail'|'timeout'|'skipped'|'error', ms, note?, stale?: ISO (carried over; engine steps only from a run with the same renderer), ...step fields }
@@ -626,7 +626,6 @@ export default defineConfig({
   build: { outDir: path.join(OUT, 'client') },
   plugins: [
     nitro({
-      rollupConfig: { external: [/^@sentry\\//] },
       buildDir: path.join(OUT, '.nitro'),
       output: { dir: OUT, serverDir: path.join(OUT, 'server'), publicDir: path.join(OUT, 'public') },
     }),
@@ -681,11 +680,7 @@ async function stepBuild(scale) {
 	// stay the repo root): nitro rewrites node_modules/.nitro/last-build.json; we restore it here and record it.
 	let lastBuildAction = "untouched";
 	try {
-		// a pointer at our own build dir (left by an older version of this script) is dropped → nitro's default (.output)
-		if (
-			lastBuildBefore != null &&
-			!lastBuildBefore.includes("out/lead/leaderboard")
-		) {
+		if (lastBuildBefore != null) {
 			fs.writeFileSync(lastBuild, lastBuildBefore);
 			lastBuildAction = "rewritten by nitro, restored to its previous content";
 		} else if (
@@ -696,7 +691,7 @@ async function stepBuild(scale) {
 			lastBuildAction =
 				lastBuildBefore == null
 					? "created by nitro, deleted (did not exist before)"
-					: "pointed at our build (older run), deleted";
+					: "pointed at our build, deleted";
 		}
 	} catch (e) {
 		lastBuildAction = `restore failed: ${e.message}`;

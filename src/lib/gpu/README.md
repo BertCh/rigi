@@ -55,7 +55,7 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
   ~28 KB instead of 273 KB, and haze reads ~480 KB instead of ~3 MB).
 - **Test with headless Chromium** under the render lock, one job at a time:
   `node scripts/gpu/with-render-lock.mjs -- …`. It needs a dev server on this tree:
-  `npx vite dev --config scripts/gpu/vite.gpu.config.ts --port <free>`, then set `APP_URL`. On
+  `npx vite dev --port <free>` (each port gets its own dep cache), then set `APP_URL`. On
   this Mac, WebGPU has `timestamp-query`, `subgroups`, `shader-f16` and `float32-filterable`.
   Vite gotcha: on a cold dependency cache, the first import of `@luma.gl/gpgpu/gpu-core` makes Vite
   re-optimise its dependencies. Chunks from before and after then load in the same page, you get

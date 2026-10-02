@@ -3,8 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // CR-02: killing with-render-lock.mjs must also kill the job it wraps (and the job's own children).
-// Uses a private temp RIGI_RENDER_LOCK_DIR and a private legacy-lock path, never the shared ~/.cache/rigi
-// queue, and a harmless `sleep` as the job. Usage: npx tsx scripts/gpu/with-render-lock.check.ts
+// Uses a private temp RIGI_RENDER_LOCK_DIR, never the shared ~/.cache/rigi queue, and a harmless `sleep` as the job. Usage: npx tsx scripts/gpu/with-render-lock.check.ts
 import { spawn, spawnSync } from "node:child_process";
 import {
 	existsSync,
@@ -52,7 +51,6 @@ async function runCase(signal: NodeJS.Signals): Promise<string[]> {
 			env: {
 				...process.env,
 				RIGI_RENDER_LOCK_DIR: dir,
-				RIGI_LEGACY_RENDER_LOCK: join(dir, "no-legacy", ".render-lock"),
 				RENDER_LOCK_SLOTS: "1",
 				RENDER_LOCK_EXCLUSIVE: "0",
 			},
@@ -74,7 +72,7 @@ async function runCase(signal: NodeJS.Signals): Promise<string[]> {
 	const grandchildPid = Number(readFileSync(grandchildFile, "utf8"));
 	if (!alive(jobPid) || !alive(grandchildPid))
 		failures.push(`${signal}: job not running before the signal`);
-	if (!existsSync(join(dir, "render-lock")))
+	if (!existsSync(join(dir, "render-lock-0")))
 		failures.push(`${signal}: lock slot not held while the job runs`);
 
 	wrapperProcess.kill(signal);
@@ -86,7 +84,7 @@ async function runCase(signal: NodeJS.Signals): Promise<string[]> {
 		failures.push(
 			`${signal}: job's child (pid ${grandchildPid}) survived the wrapper`,
 		);
-	if (existsSync(join(dir, "render-lock")))
+	if (existsSync(join(dir, "render-lock-0")))
 		failures.push(`${signal}: lock slot not released`);
 	for (const pid of [jobPid, grandchildPid])
 		if (alive(pid)) process.kill(pid, "SIGKILL");
@@ -102,7 +100,7 @@ async function runOwnerlessCase(
 	expectReclaimed: boolean,
 ): Promise<string[]> {
 	const dir = mkdtempSync(join(tmpdir(), "rigi-lock-check-"));
-	const lock = join(dir, "render-lock");
+	const lock = join(dir, "render-lock-0");
 	mkdirSync(lock);
 	if (ownerText !== null) writeFileSync(join(lock, "owner"), ownerText);
 	const then = new Date(Date.now() - ageSeconds * 1000);
@@ -116,7 +114,6 @@ async function runOwnerlessCase(
 			env: {
 				...process.env,
 				RIGI_RENDER_LOCK_DIR: dir,
-				RIGI_LEGACY_RENDER_LOCK: join(dir, "no-legacy", ".render-lock"),
 				RENDER_LOCK_SLOTS: "1",
 				RENDER_LOCK_EXCLUSIVE: "0",
 				RENDER_LOCK_OWNERLESS_GRACE_MS: "5000",
@@ -137,23 +134,24 @@ async function runOwnerlessCase(
 }
 
 /** CR-52: the memory-headroom wait gives up after RENDER_LOCK_MEM_WAIT_S and starts the job. */
-function runMemoryTimeoutCase(): string[] {
+async function runMemoryTimeoutCase(): Promise<string[]> {
 	if (spawnSync("memory_pressure", { stdio: "ignore" }).error) return []; // not macOS
+	const dir = mkdtempSync(join(tmpdir(), "rigi-lock-check-"));
 	const started = Date.now();
-	const r = spawnSync(
-		"python3",
-		[resolve(import.meta.dirname, "tm_locks.py"), "sh", "-c", "exit 7"],
-		{
-			encoding: "utf8",
-			timeout: 30_000,
-			env: {
-				...process.env,
-				RENDER_LOCK_MEM_MIN_FREE: "101", // never satisfiable
-				RENDER_LOCK_MEM_WAIT_S: "1",
-				RENDER_LOCK_MEM_POLL_S: "0.2",
-			},
+	const r = spawnSync(process.execPath, [wrapper, "--", "sh", "-c", "exit 7"], {
+		encoding: "utf8",
+		timeout: 30_000,
+		env: {
+			...process.env,
+			RIGI_RENDER_LOCK_DIR: dir,
+			RENDER_LOCK_SLOTS: "1",
+			RENDER_LOCK_EXCLUSIVE: "0",
+			RENDER_LOCK_MEM_MIN_FREE: "101", // never satisfiable
+			RENDER_LOCK_MEM_WAIT_S: "1",
+			RENDER_LOCK_MEM_POLL_S: "0.2",
 		},
-	);
+	});
+	rmSync(dir, { recursive: true, force: true });
 	const failures: string[] = [];
 	if (r.status !== 7)
 		failures.push(`memory wait: job not started (status ${r.status})`);
@@ -170,7 +168,7 @@ const failures = [
 	...(await runOwnerlessCase("ownerless stale", null, 3600, true)),
 	...(await runOwnerlessCase("malformed owner stale", "garbage", 3600, true)),
 	...(await runOwnerlessCase("ownerless fresh", null, 0, false)),
-	...runMemoryTimeoutCase(),
+	...(await runMemoryTimeoutCase()),
 ];
 if (failures.length) {
 	console.error(failures.join("\n"));

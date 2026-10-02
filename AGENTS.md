@@ -68,9 +68,7 @@ The regression gate is `scripts/ci/run.mjs`; the check registry is `scripts/ci/c
 
 ## Renderer selection
 - `?renderer=auto|webgpu|deck`, default `auto`: deck.gl on WebGPU where `navigator.gpu` passes the probe (`float32-filterable`, required limits, a probe device), otherwise deck.gl on WebGL2. `?renderer=webgpu` and `?renderer=deck` pin an engine; `?webgpu=off` makes `auto` behave as if WebGPU were missing; `?gpu=off` is the compute kill switch.
-- The three.js `PhotoEngine` and `?renderer=three` were removed on 2026-10-01; that value falls back to the default with a console warning (see `src/lib/flags/index.ts`).
 - The workspace root reports the resolved engine as `data-renderer` and the reason as `data-renderer-reason`. Decision record: `reports/webgpu-default.md`.
-- `?backend=webgpu|webgl` (luma.gl's example convention) is an alias that overrides `?renderer`: `webgl` pins deck.gl on WebGL2.
 - Harnesses take `--renderer webgpu|deck|auto` and fail when the pinned engine did not run.
 
 ## Documentation

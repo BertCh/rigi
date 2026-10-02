@@ -15,8 +15,9 @@
 // "bench"; RENDER_LOCK_EXCLUSIVE=0 opts out) takes every slot.
 // The lock and queue live outside any tree (RIGI_RENDER_LOCK_DIR, default ~/.cache/rigi), so
 // sandbox clones and copies of this script all share one queue.
-// It also waits for memory headroom before starting (see tm_locks.py; bounded by
-// RENDER_LOCK_MEM_WAIT_S, default 600, after which the job starts anyway with a warning).
+// It also waits for memory headroom before starting (free memory >= RENDER_LOCK_MEM_MIN_FREE %,
+// default 25; bounded by RENDER_LOCK_MEM_WAIT_S, default 600, after which the job starts anyway
+// with a warning).
 // Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/eval-app.mjs IMG_6958
 import { spawn, spawnSync } from "node:child_process";
 import {
@@ -29,7 +30,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { isStaleOwner } from "./render-lock-lib.mjs";
 
 const DIR =
@@ -44,14 +45,10 @@ const OWNERLESS_GRACE_MS = Number(
 	process.env.RENDER_LOCK_OWNERLESS_GRACE_MS ?? 10_000,
 );
 const SETTLE_MS = Number(process.env.RENDER_LOCK_SETTLE_MS ?? 20_000);
-// slot 0 keeps the single-lock name, so a holder from the one-slot script still blocks slot 0
-const slotDir = (i) => join(DIR, i ? `render-lock-${i}` : "render-lock");
-// Transition (remove after 2026-10): scripts from before the shared dir lock <real tree>/out/.render-lock.
-// No job starts while an old-script job holds it, and exclusive jobs take it too. It must be the real
-// tree's absolute path: a sandbox copy's out/ holds a private (possibly stale, cloned) lock.
-const LEGACY =
-	process.env.RIGI_LEGACY_RENDER_LOCK ??
-	join(homedir(), "Documents/GitHub/mt-image/out/.render-lock");
+const MEM_MIN_FREE = Number(process.env.RENDER_LOCK_MEM_MIN_FREE) || 25;
+const MEM_WAIT_S = Number(process.env.RENDER_LOCK_MEM_WAIT_S ?? 600);
+const MEM_POLL_S = Number(process.env.RENDER_LOCK_MEM_POLL_S ?? 5);
+const slotDir = (i) => join(DIR, `render-lock-${i}`);
 
 const dashAt = process.argv.indexOf("--");
 const argv = dashAt < 0 ? [] : process.argv.slice(dashAt + 1);
@@ -108,8 +105,8 @@ const holder = (dir) => {
 		return null;
 	}
 	// CR-52: a recycled pid is alive but started at another time than the one that took the lock.
-	// The start time lives in a separate `start` file so older scripts still parse `owner` as before;
-	// a lock without one (older script) keeps the pid-only check.
+	// The start time lives in a separate `start` file next to `owner`; a lock without one keeps the
+	// pid-only check.
 	let recorded = "";
 	try {
 		recorded = readFileSync(`${dir}/start`, "utf8").trim();
@@ -212,16 +209,12 @@ process.on("exit", () => signalChildGroup("SIGKILL"));
 
 /** At the head of the queue: try to start. Returns a reason string while we must keep waiting. */
 const tryStart = () => {
-	const legacy = holder(LEGACY);
-	if (legacy) return `old-script job: ${legacy}`;
 	if (exclusive) {
 		// hold every slot we get (so later jobs can't refill them) until we have them all
 		for (let i = 0; i < SLOTS; i++)
 			if (!held.includes(slotDir(i)) && tryLock(slotDir(i)))
 				held.push(slotDir(i));
 		if (held.length < SLOTS) return `exclusive, ${held.length}/${SLOTS} slots`;
-		if (existsSync(dirname(LEGACY)) && tryLock(LEGACY)) held.push(LEGACY);
-		else if (existsSync(dirname(LEGACY))) return "exclusive, legacy lock";
 		return "";
 	}
 	const busy = [];
@@ -265,12 +258,27 @@ for (let waited = 0; ; waited += 1) {
 }
 writeFileSync(LAST_START, owner);
 dropTicket();
-// Then wait for memory headroom (tm_locks.py; mt-image-58 runs a long render worker + MPS model).
-child = spawn(
-	"python3",
-	[resolve(import.meta.dirname, "tm_locks.py"), ...argv],
-	{ stdio: "inherit", detached: true },
-);
+// Then wait for memory headroom. The wait is bounded because we already hold a slot: an unbounded
+// wait would stall every queued job behind a machine that never frees memory. Swap use is not
+// checked: it stays high long after pressure is gone, and gating on it deadlocked the queue.
+const memoryWaitStart = Date.now();
+let lastMemoryNotice = 0;
+while (freeMemory() < MEM_MIN_FREE) {
+	if (Date.now() - memoryWaitStart >= MEM_WAIT_S * 1000) {
+		console.error(
+			`[render-lock] memory headroom wait timed out after ${MEM_WAIT_S.toFixed(0)}s (free ${freeMemory()}%); starting anyway`,
+		);
+		break;
+	}
+	if (Date.now() - lastMemoryNotice > 60_000) {
+		console.error(
+			`[render-lock] waiting for memory headroom (free ${freeMemory()}%)`,
+		);
+		lastMemoryNotice = Date.now();
+	}
+	await sleep(MEM_POLL_S * 1000);
+}
+child = spawn(argv[0], argv.slice(1), { stdio: "inherit", detached: true });
 child.on("error", (error) => {
 	console.error(`[render-lock] cannot start the job: ${error.message}`);
 	childGone = true;

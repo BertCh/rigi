@@ -7,7 +7,7 @@
 // actually ran? One browser, photos one after another. Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/app-load.mjs --renderer auto [--query webgpu=off] [--no-gpu] [IMG_7086 …]
 // No ids = every photo in data/control-points.json (the 19 ground-truth photos).
-// --renderer auto|webgpu|deck (always explicit; ?renderer=three was removed and falls back to auto). --no-gpu hides navigator.gpu (an init script makes it
+// --renderer auto|webgpu|deck (always explicit). --no-gpu hides navigator.gpu (an init script makes it
 // undefined; Chromium's --disable-features=WebGPU does not remove it), the "browser without WebGPU" case.
 // Per photo: data-renderer / data-renderer-reason (src/lib/renderer-select.ts), __engine kind/backend,
 // whether the compute device is the render device (adoptRenderDevice), ready ms, page / console errors.

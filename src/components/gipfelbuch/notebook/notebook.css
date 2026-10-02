@@ -186,8 +186,6 @@
 	padding: 4px 4px 22px;
 }
 
-/* Tape is retired (the soft look has no paper props); the span stays for layout compatibility. */
-
 /* Native range inputs anywhere in the Gipfelbuch: a solid 4px track in the paper-deep tone, a
  * 16px ink thumb with a paper ring (regression R8: the pen hairline read as no control at all).
  * Keyboard and ARIA stay native; only the drawing changes. */

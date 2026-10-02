@@ -8,13 +8,9 @@
 // WebGL backend (SwiftShader), then compares the captures against the stored baseline so each styling
 // chunk can show that "classic" is still pixel-identical.
 //
-// RECAPTURE REQUIRED (2026-10-01): until then this harness ran the three.js PhotoEngine (?renderer=three),
-// which has been removed. Its baseline (out/lead/style-baseline) is a three.js reference and means nothing
-// for deck, so the default root moved to out/lead/style-baseline-deck, which starts empty: `check` exits 1
-// ("no baseline") and the CI row (scripts/ci/checks.mjs style-baseline) SKIPs until someone captures the
-// deck reference ONCE, deliberately, on a tree whose classic look is known good:
+// The reference is captured ONCE, deliberately, on a tree whose classic look is known good:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --url http://localhost:3100
-// Only after that is the classic pixel check (and the geometry hash) meaningful again.
+// Until it exists `check` exits 1 ("no baseline") and the CI row (scripts/ci/checks.mjs style-baseline) SKIPs.
 //
 // Usage (the vite dev server must be on :3100, because the harness needs window.__engine):
 //   node scripts/style-baseline.mjs check               capture and diff against the baseline (the normal run)
@@ -31,7 +27,7 @@
 //   --tol 0                        per-channel tolerance (0..255) when counting differing pixels
 //   --noise 0.01                   % of a capture's pixels that may differ and still count as run-to-run
 //                                  noise (status "noise", exit 0). --noise 0 demands exact identity.
-//   --out out/lead/style-baseline-deck  root directory (the three.js-era baseline is in out/lead/style-baseline)
+//   --out out/lead/style-baseline  root directory
 //
 // Disk use (the disk is often nearly full): the baseline is about 10 MB. `check` keeps no copy of
 // its captures. It compares in memory and writes only report.json, plus a <name>.diff.png (differing
@@ -127,7 +123,7 @@ if (!["capture", "check"].includes(cmd)) {
 	process.exit(1);
 }
 const BASE_URL = (opt.url ?? "http://localhost:3100").replace(/\/$/, "");
-const OUT = resolve(ROOT, opt.out ?? "out/lead/style-baseline-deck");
+const OUT = resolve(ROOT, opt.out ?? "out/lead/style-baseline");
 const BASE_DIR = join(OUT, "baseline");
 const DIFF_DIR = join(OUT, "diff");
 const META = join(OUT, "baseline.json");
@@ -518,14 +514,14 @@ if (cmd === "capture") {
 // check
 if (!existsSync(META)) {
 	console.error(
-		`no baseline at ${OUT}; capture the deck reference first (the three.js-era one does not apply):\n  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture`,
+		`no baseline at ${OUT}; capture the reference first:\n  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture`,
 	);
 	process.exit(1);
 }
 const meta = JSON.parse(readFileSync(META, "utf8"));
 if (meta.renderer !== "deck") {
 	console.error(
-		`${META} was captured on ${meta.renderer ?? "three.js"}, not the deck engine this harness now runs; recapture it on deck first:\n  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --out ${OUT}${OUT.endsWith("style-baseline") ? " --force" : ""}`,
+		`${META} was captured on ${meta.renderer ?? "an unknown renderer"}, not the deck engine this harness runs; recapture it first:\n  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --force --out ${OUT}`,
 	);
 	process.exit(1);
 }

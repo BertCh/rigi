@@ -140,8 +140,7 @@ import { markWorkspace } from "./workspace/timing";
 
 // Every backend loads on demand, so /photo downloads only the one it runs (src/lib/renderer-select.ts
 // picks it): the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts) where WebGPU passes the probe, the
-// WebGL DeckEngine (src/lib/deck/engine.ts) otherwise or with ?renderer=deck (the three.js PhotoEngine,
-// ?renderer=three, was removed on 2026-10-01). One promise per backend, started when this module evaluates
+// WebGL DeckEngine (src/lib/deck/engine.ts) otherwise or with ?renderer=deck). One promise per backend, started when this module evaluates
 // (below) so the engine chunk downloads alongside the first render instead of after the engine effect runs.
 type MakeRenderer = (c: HTMLCanvasElement, p: PhotoMeta) => Renderer;
 const rendererChunks = new Map<ResolvedRenderer, Promise<MakeRenderer>>();

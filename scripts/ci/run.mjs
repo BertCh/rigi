@@ -73,7 +73,7 @@ if (flag("list")) {
 
 const baseline = existsSync(BASELINE_FILE)
 	? JSON.parse(readFileSync(BASELINE_FILE, "utf8"))
-	: { checks: {}, biome: { errors: {} }, evalApp: {} };
+	: { checks: {}, biome: { errors: {} } };
 // A known failure is a string (always expected) or { reason, when: "ci" } (expected only under CI=1,
 // e.g. a check that needs gitignored data a fresh clone lacks).
 const isKnown = (id) => {

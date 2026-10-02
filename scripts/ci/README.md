@@ -122,15 +122,10 @@ The gate compares each run against this baseline. It does not demand zero: pre-e
 belong to other owners are recorded here, and only new ones fail. Fix the cause, then delete the entry.
 Don't add an entry just to get your own change through.
 
-Baseline as of 2026-09-29, taken while the shared tree was being edited concurrently:
-
-| check | known failure | where |
-|---|---|---|
-| style-check | `TypeError: ctx.save is not a function` at `src/lib/look/labels/canvas.ts:95` (`drawPeakLabels` is called from `scripts/style-check.ts:1126` with a stub ctx). Fails locally and in CI | look/labels + style owners |
-| tsc (CI only) | `src/lib/roll/roll.ts` imports `../../../data/ground-truth.json`, and `data/` is gitignored, so a fresh clone can't typecheck (or build) that module. Tolerated only when `CI=1` (`tsc.ciAllowed`). Locally tsc is clean | roll owner. Move the GT JSON into a tracked path, or load it at runtime |
-| biome | 79 errors in 64 files (54 of them `organizeImports`, then `noAssignInExpressions`, format…). `biome.errors` stores a per-file count, and the gate fails only when a file has **more** errors than its baseline or a new file has any | everyone. `npx biome check --write <file>` on files you own |
-| pose6dof, export | SKIP in CI: they read gitignored `data/` and `public/photos/`. They run locally | n/a |
-| style-baseline, deck-smoke, eval-app | Not run in CI: they need the photos, DEM tiles over the network, and the stored ~10 MB pixel baseline | n/a |
+The `checks`, `tsc` and `biome.errors` baselines are currently empty; the ratchet machinery stays so
+a new known failure can be recorded. pose6dof and export SKIP in CI (they read gitignored `data/` and
+`public/photos/`), and style-baseline, deck-smoke and eval-app are not run in CI (they need the photos,
+DEM tiles over the network and the stored ~10 MB pixel baseline).
 
 To update the baseline, run `node scripts/ci/run.mjs full --biome all --update-baseline`. It rewrites
 `biome.errors` (only with `--biome all`) and, for each eval-app row that ran, `evalAppWebgpu` / `evalAppDeck`:
@@ -139,7 +134,7 @@ other hand-written fields (`note`) are kept. Review the diff before keeping it: 
 minimum. To record only the deck baseline, add `evalAppDeck` by hand (observed − 1) rather than
 rerunning `--update-baseline` over everything. The `checks` and `tsc` entries are edited by hand.
 
-`eval-app-deck` (eval-app with `--renderer deck`, the default renderer) runs in the full tier and
+`eval-app-deck` (eval-app with `--renderer deck`, the WebGL2 engine) runs in the full tier and
 gates like `eval-app` against `evalAppDeck`. Without an `evalAppDeck` entry it would be advisory: every
 failure, including a crash, a timeout or an engine mismatch, reports KNOWN and does not fail the gate.
 
@@ -147,24 +142,14 @@ failure, including a crash, a timeout or an engine mismatch, reports KNOWN and d
 `minWithin1deg` is set a little below the observed count. See `evalAppDeck` in the JSON for the last
 observed value.
 
-### three.js renderer removed (2026-10-01)
+`style-baseline` runs `?renderer=deck`; its reference lives in `out/lead/style-baseline` and is captured once,
+deliberately, on a tree whose classic look is known good (the row SKIPs until it exists):
 
-The three.js PhotoEngine (`?renderer=three`) is gone, and the rows that pinned it were retargeted:
+```sh
+node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --url http://localhost:3100
+```
 
-- `eval-app` now pins `--renderer webgpu` (the app default) against a new `evalAppWebgpu` key. The old
-  `evalApp` minimum (a three.js number) was deleted, so the row is advisory until a webgpu run records
-  `evalAppWebgpu` (`--update-baseline`, or by hand: observed − 1).
-- `deck-smoke`'s reference arm is the WebGL deck instead of three.js, compared with WebGPU.
-- `style-baseline` runs `?renderer=deck`. **Its reference must be recaptured on deck before the classic
-  pixel check means anything again.** The three.js-era baseline stays in `out/lead/style-baseline`
-  (untouched); the harness now defaults to `out/lead/style-baseline-deck`, which starts empty, so the row
-  SKIPs until someone captures it once, deliberately, on a tree whose classic look is known good:
-
-  ```sh
-  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --url http://localhost:3100
-  ```
-
-  `check` refuses a `baseline.json` that does not say `"renderer": "deck"`.
+`check` refuses a `baseline.json` that does not say `"renderer": "deck"`.
 
 ## Biome scope
 
@@ -189,31 +174,3 @@ symlink `node_modules`, and run `CI=1 node scripts/ci/run.mjs fast` there.
 `node scripts/ci/run.mjs fast --biome changed`. It won't overwrite another hook unless you pass
 `--force`, `--uninstall` removes it, and `git push --no-verify` skips it once. Nothing installs the hook
 automatically.
-
-## First runs (2026-09-29)
-
-These runs were on the shared working tree while other contributors had uncommitted edits in `src/`.
-
-- **fast (local)**: 21 pass, 1 KNOWN (style-check), 1 FAIL (biome). The biome failure is new unformatted
-  or unsorted-import code in files being edited concurrently (`src/lib/licences/attribution.ts`,
-  `src/lib/dem/sources.ts`, `src/lib/deck/terrain-data.ts`, …). The gate caught it as designed, and it was
-  left alone. About 27 s.
-- **fast (fresh-checkout simulation, `CI=1`)**: tsc KNOWN (the gitignored `data/ground-truth.json`
-  import), pose6dof and export SKIP, biome FAIL on the same in-flight files, everything else PASS.
-- **full**:
-  - deck-smoke: PASS.
-  - eval-app: PASS, 12/14 within 1° yaw, median 6.5 px. This matches `reports/status.md`. The first
-    attempt crashed inside Playwright's launch, which is why eval-app now retries once.
-  - style-baseline: **FAIL**, 0/16 images identical, geometry hash identical. Diffs are 0.5–3.8% of
-    pixels, along the draped map/overlay lines. The harness warned that `src/` changed during the run.
-    At the time, the three.js engine, `terrain.ts`, `dem/sources.ts`, `deck/*` and `export/engine-export.ts`
-    had uncommitted edits from concurrent work. It is not yet known whether this is a real classic-view
-    regression from that work or remote-tile drift. Re-run `node scripts/ci/run.mjs full --only
-    style-baseline` on a quiet tree and look at `out/lead/style-baseline/diff/`. It is deliberately
-    **not** recorded as a known failure.
-- **fast, re-run about 20 min later**: 20 pass, 1 KNOWN, 2 FAIL. Both failures come from new in-flight work
-  by concurrent edits. tsc: `scripts/licences-check.ts:155-156` TS2352 (`OsmElement[]` cast to `{id:number}[]`).
-  biome: format/import order in `src/lib/tiles3d/*`, `src/lib/concord/flags.ts`,
-  `src/lib/deck/{engine,composite-shader}.ts`, `scripts/tiles3d/step-tiles-check.mjs` and
-  `scripts/licences-check.ts`. The new peer checks (`scripts/licences-check.ts`,
-  `scripts/tiles3d/step-tiles-check.mjs`) should be added to `checks.mjs` once their owners call them stable.

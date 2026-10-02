@@ -75,8 +75,7 @@ use. Both backends are deck.gl on luma.gl, picked by `src/lib/renderer-select.ts
   overlap between the two.
 
 Each draws Mapterhorn tiles with a geometry pass (ENU xyz + range, read back for `sampleAt`, labels,
-occlusion and auto-align), a layer pass and a composite pass. The three.js PhotoEngine (`?renderer=three`)
-was removed on 2026-10-01; that value now falls back to the default with a console warning. three.js is
+occlusion and auto-align), a layer pass and a composite pass. three.js is
 still used where it is the right tool: Step Inside splats (`src/lib/nearfield`), the 3D Tiles adapters
 (`src/lib/tiles3d`), `/lab/splats` and the P3 RGB-D cache (`/lab/generate`).
 
@@ -140,13 +139,12 @@ overlapping photos is wired into `/roll` as suggestions only, behind `?propagate
 
 | Flag | Effect |
 |---|---|
-| `?renderer=auto\|webgpu\|deck` | Engine: `auto` (default) = deck.gl on WebGPU where the browser passes the probe, else WebGL2; `webgpu` / `deck` pin one. `?backend=webgpu\|webgl` is luma.gl's example-style alias. `?webgpu=off` forces the WebGL fallback |
+| `?renderer=auto\|webgpu\|deck` | Engine: `auto` (default) = deck.gl on WebGPU where the browser passes the probe, else WebGL2; `webgpu` / `deck` pin one. `?webgpu=off` forces the WebGL fallback |
 | `?style=<preset>` | View style preset |
 | `?nearfield=off\|on\|sharp` | Step Inside: hide, force on (headless browsers too), or the dev-only SHARP model (research licence). Default `auto` |
 | `?gpu=off` | GPU compute kill switch (CPU twins everywhere) |
 | `?gpuHorizon=off`, `?lookgpu=off` | Turn off the GPU horizon or the GPU look passes (both on by default) |
 | `?eyesearch=on\|auto`, `?unknownGpu=on` | Opt-in GPU eye search / GPU unknown-pose horizon |
-| `?terrain=tiles` | deck: per-tile terrain instead of batched |
 | `?reveal=off\|<preset>` | Load animation |
 | `?concord=eye,occl` | Concordance: focal-table eye prior, DSM occluder dimming |
 | `?horizonPrecision=f64`, `?alignPrecision=f64` | Opt out of the certified-f32 GPU horizon / align refine (default `certified-f32`) |
@@ -161,7 +159,6 @@ Every flag is declared in `src/lib/flags` (typed, the only reader), carried acro
 | Port | Service |
 |---|---|
 | 3100 | Dev server (`npm run dev`, or `npm run dev:all` with both backends) |
-| 3110 | Private Vite server for GPU and near-field browser checks (`scripts/gpu/vite.gpu.config.ts`) |
 | 8765 | Matcher (`tools/matcher/server/run.sh`) |
 | 8767 | Near-field service (`tools/nearfield/run.sh`) |
 

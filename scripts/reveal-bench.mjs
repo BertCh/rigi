@@ -3,12 +3,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Reveal (intro animation) frame-time bench: deck (WebGL), same photo, same preset (the three.js arm was
-// dropped with the three.js renderer, 2026-10-01).
+// Reveal (intro animation) frame-time bench on the shipped deck engines, same photo, same preset.
 // For each engine: load /photo/<id>?reveal=off, wait for [data-ready], then run
 // window.__reveal.play() and record every rAF interval while it plays.
-// deck is run twice: as shipped, and "legacy" (compositor.onChange → updateLayers, i.e. every
-// reveal frame rebuilds the terrain layers and re-renders the colour pass) for the before/after.
 // Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/reveal-bench.mjs \
 //          [--url http://localhost:3100] [--photos IMG_6958] [--preset bloom] [--secs 4]
 import { chromium } from "playwright";
@@ -27,7 +24,7 @@ const browser = await chromium.launch({
 	args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 });
 
-async function run(id, renderer, legacy) {
+async function run(id, renderer) {
 	const ctx = await browser.newContext({
 		viewport: { width: 1400, height: 900 },
 		deviceScaleFactor: 2,
@@ -39,10 +36,8 @@ async function run(id, renderer, legacy) {
 	await page.waitForSelector("[data-ready]", { timeout: 240_000 });
 	await page.waitForTimeout(1500);
 	const r = await page.evaluate(
-		async ({ preset, secs, legacy }) => {
+		async ({ preset, secs }) => {
 			const e = window.__engine;
-			if (legacy && e.compositor)
-				e.compositor.onChange = () => e.updateLayers();
 			const cfg = { preset, duration: secs };
 			const dts = [];
 			let last = performance.now();
@@ -96,18 +91,16 @@ async function run(id, renderer, legacy) {
 				colorPasses: comp ? colorPasses.n : null,
 			};
 		},
-		{ preset: PRESET, secs: SECS, legacy },
+		{ preset: PRESET, secs: SECS },
 	);
 	await ctx.close();
 	return r;
 }
 
 for (const id of IDS) {
-	for (const [label, renderer, legacy] of [
-		["deck (legacy)", "deck", true],
-		["deck", "deck", false],
-	]) {
-		const r = await run(id, renderer, legacy);
+	for (const renderer of ["deck", "webgpu"]) {
+		const label = renderer;
+		const r = await run(id, renderer);
 		const f = (x) => (x == null ? "-" : x.toFixed(1));
 		console.log(
 			`${id} ${label.padEnd(14)} fps ${f(r.fps)}  mean ${f(r.meanMs)}ms  p50 ${f(r.p50)}  p95 ${f(r.p95)}  max ${f(r.max)}  >20ms ${r.over20ms}/${r.frames}  colourPasses ${r.colorPasses ?? "-"}`,

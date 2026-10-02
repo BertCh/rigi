@@ -19,7 +19,7 @@ export type DemoName = keyof typeof DEMO_IMAGES;
 
 /**
  * A demo photo or app screenshot, cover-cropped to `aspect` (CSS aspect-ratio, default 4/3). A pasted
- * print: square corners and never filtered (`rounded` is kept for old call sites and ignored).
+ * print: square corners and never filtered.
  */
 export function DemoImage({
 	name,
@@ -31,8 +31,6 @@ export function DemoImage({
 	aspect?: string;
 	alt?: string;
 	className?: string;
-	/** Ignored (hand pass: prints have square corners). */
-	rounded?: boolean;
 }) {
 	return (
 		<img

@@ -5,8 +5,7 @@
 
 // Parity smoke for the deck engines: the WebGL DeckEngine (src/lib/deck/engine.ts, ?renderer=deck, the
 // fallback and reference) against the engine under test (--renderer: webgpu = WebGpuEngine, the default; auto;
-// or deck = a run-to-run self-check). Until 2026-10-01 the reference arm was the three.js PhotoEngine,
-// which has been removed; rows now carry `ref` (WebGL deck) and `deck` (the engine under test).
+// or deck = a run-to-run self-check). Rows carry `ref` (WebGL deck) and `deck` (the engine under test).
 // For each photo:
 //   ref:   /photo/<id>?renderer=deck (fresh localStorage), wait for [data-ready] and for the background
 //          second opinion to settle ([data-verify] not "pending"), then window.__engine.autoAlign(true)
