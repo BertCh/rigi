@@ -1,48 +1,71 @@
-DEM band sensitivity (DEM-only; not an accuracy result)
+=== demo ===
+DEM band sensitivity, positions=demo (DEM-only; not an accuracy result)
 command: npx tsx scripts/dem/band-sensitivity.ts
 date: 2026-10-02
-eye: ground + 1.7 m from each arm's own DEM; computeHorizon step 0.05 deg, default options
+eye: ground + 1.6 m (EYE_ABOVE_GROUND, src/lib/geo/pipeline.ts) from each arm's own DEM; computeHorizon step 0.05 deg, default options
 base levels: z15<=1km z14<=2.5km z12<=6km z11<=15km z10<=40km z9<=150km
 fine levels: z16<=1km z15<=2.5km z13<=6km z12<=15km z11<=40km z10<=150km
 terrarium levels: z13<=4km z11<=40km z10<=150km (256 px)
 arms: fine = z+1 bands; terrarium = own DEM and own eye; terr-baseEye = Terrarium DEM with the Mapterhorn eye
 positions (demo manifest, deduped within 200 m):
-  46.71017, 7.77332  (12 photos: demo-01,demo-02,demo-03,demo-04,demo-05,demo-06,demo-07,demo-08,demo-09,demo-10,demo-11,demo-12)
+  CH   46.71017, 7.77332  (12 photos: demo-01,demo-02,demo-03,demo-04,demo-05,demo-06,demo-07,demo-08,demo-09,demo-10,demo-11,demo-12)
 
 ground at camera: mapterhorn 1934.3 m, fine 1934.2 m, terrarium 1886.1 m (terrarium - mapterhorn -48.2 m)
-viewpoint 46.71017, 7.77332: |delta elevation| over 7200 azimuths
+viewpoint CH 46.71017, 7.77332: |delta elevation| over 7200 azimuths
 arm                 band          n   median      p95      max   (deg)
-fine-base           all        7200    0.013    0.151    0.870
-fine-base           <2km       2783    0.036    0.313    0.867
-fine-base           2-15km      145    0.010    0.030    0.064
-fine-base           >15km      4272    0.006    0.038    0.870
-terrarium-base      all        7200    7.476   26.971   29.054
-terrarium-base      <2km       2783   11.051   25.028   28.628
-terrarium-base      2-15km      145    0.116    8.790    9.160
-terrarium-base      >15km      4272    0.077   28.085   29.054
-terr-baseEye-base   all        7200    0.098   12.417   12.875
-terr-baseEye-base   <2km       2783    9.217   12.709   12.875
+fine-base           all        7200    0.014    0.151    0.937
+fine-base           <2km       2791    0.036    0.318    0.937
+fine-base           2-15km      145    0.010    0.030    0.063
+fine-base           >15km      4264    0.006    0.038    0.905
+terrarium-base      all        7200    7.672   27.170   29.266
+terrarium-base      <2km       2791   11.115   25.059   28.781
+terrarium-base      2-15km      145    0.116    9.063    9.432
+terrarium-base      >15km      4264    0.077   28.283   29.266
+terr-baseEye-base   all        7200    0.098   12.507   13.057
+terr-baseEye-base   <2km       2791    9.329   12.816   13.057
 terr-baseEye-base   2-15km      145    0.129    0.217    0.248
-terr-baseEye-base   >15km      4272    0.032    0.174    0.449
+terr-baseEye-base   >15km      4264    0.032    0.174    0.449
 
-POOLED over viewpoints
+POOLED CH (1 viewpoints)
 arm                 band          n   median      p95      max   (deg)
-fine-base           all        7200    0.013    0.151    0.870
-fine-base           <2km       2783    0.036    0.313    0.867
-fine-base           2-15km      145    0.010    0.030    0.064
-fine-base           >15km      4272    0.006    0.038    0.870
-terrarium-base      all        7200    7.476   26.971   29.054
-terrarium-base      <2km       2783   11.051   25.028   28.628
-terrarium-base      2-15km      145    0.116    8.790    9.160
-terrarium-base      >15km      4272    0.077   28.085   29.054
-terr-baseEye-base   all        7200    0.098   12.417   12.875
-terr-baseEye-base   <2km       2783    9.217   12.709   12.875
+fine-base           all        7200    0.014    0.151    0.937
+fine-base           <2km       2791    0.036    0.318    0.937
+fine-base           2-15km      145    0.010    0.030    0.063
+fine-base           >15km      4264    0.006    0.038    0.905
+terrarium-base      all        7200    7.672   27.170   29.266
+terrarium-base      <2km       2791   11.115   25.059   28.781
+terrarium-base      2-15km      145    0.116    9.063    9.432
+terrarium-base      >15km      4264    0.077   28.283   29.266
+terr-baseEye-base   all        7200    0.098   12.507   13.057
+terr-baseEye-base   <2km       2791    9.329   12.816   13.057
 terr-baseEye-base   2-15km      145    0.129    0.217    0.248
-terr-baseEye-base   >15km      4272    0.032    0.174    0.449
+terr-baseEye-base   >15km      4264    0.032    0.174    0.449
 
-cache growth this run: 0 MB (first run before this: mapterhorn +4 MB, terrarium +0 MB)
+POOLED other (0 viewpoints)
+arm                 band          n   median      p95      max   (deg)
+fine-base           all           0      NaN      NaN      NaN
+fine-base           <2km          0      NaN      NaN      NaN
+fine-base           2-15km        0      NaN      NaN      NaN
+fine-base           >15km         0      NaN      NaN      NaN
+terrarium-base      all           0      NaN      NaN      NaN
+terrarium-base      <2km          0      NaN      NaN      NaN
+terrarium-base      2-15km        0      NaN      NaN      NaN
+terrarium-base      >15km         0      NaN      NaN      NaN
+terr-baseEye-base   all           0      NaN      NaN      NaN
+terr-baseEye-base   <2km          0      NaN      NaN      NaN
+terr-baseEye-base   2-15km        0      NaN      NaN      NaN
+terr-baseEye-base   >15km         0      NaN      NaN      NaN
 
-reading (DEM-only sensitivity, not an accuracy result; GT noise 0.2-0.4 deg, a photo pixel 0.02-0.05 deg):
-1. One distinct position only (all 12 demo photos are on the Niederhorn summit within 200 m), so this is n=1 viewpoint: fine vs base is median 0.013 deg, p95 0.15 deg, max 0.87 deg; the bands do not move the skyline beyond GT noise except in a few near-field azimuths (<2 km p95 0.31 deg).
-2. Terrarium differs hugely at this summit: its ground is 48 m lower (smoothed summit), which at the shared eye rule moves the near-field skyline by median 11 deg; with the Mapterhorn eye, Terrarium agrees to median 0.10 deg beyond 2 km but still 9 deg inside 2 km, so the shape error is local to the smoothed summit.
-3. Not generalisable: a summit with near-field cliffs is the worst case for both arms; other terrain needs more viewpoints (not taken here to keep the wild test half sealed).
+tiles missing (404 or no coverage; sampler falls back to coarser levels):
+  none
+
+cache growth: mapterhorn +0 MB, terrarium +0 MB
+
+reading (demo; DEM-only sensitivity, not an accuracy result; GT noise 0.2-0.4 deg, a photo pixel 0.02-0.05 deg):
+1. One distinct position (all 12 demo photos within 200 m on Niederhorn), n=1: fine vs base median 0.014 deg, p95 0.15 deg, max 0.94 deg; the bands stay under GT noise except a few near-field azimuths (<2 km p95 0.32 deg).
+2. Terrarium ground is 48 m lower (smoothed summit); with its own eye the skyline moves by a median of 7.7 deg, and with the Mapterhorn eye it agrees beyond 2 km (median 0.10 deg) but not inside 2 km (median 9 deg).
+3. A summit with near-field cliffs is a worst case; this does not generalise without more viewpoints.
+
+=== gt ===
+NOT RUN: `--positions gt` aborted by the script's disk guard (3.9 GB free < 6 GB required before downloading tiles).
+Re-run `npx tsx scripts/dem/band-sensitivity.ts --positions gt` when disk is free; the section above is replaced in place.

@@ -14,12 +14,12 @@ import path from "node:path";
 import type { DemSource, TerrainLevel } from "../../src/lib/dem/sources";
 import { MAPTERHORN, TERRARIUM_AWS } from "../../src/lib/dem/sources";
 import { computeHorizon } from "../../src/lib/geo/horizon";
+import { EYE_ABOVE_GROUND } from "../../src/lib/geo/pipeline";
 import { loadTerrain } from "../../src/lib/geo/terrain";
 import { demTileLoaderNode, ROOT } from "../lib/node-io";
 
-const EYE_ABOVE_GROUND = 1.7;
 const DEDUPE_M = 200;
-const MAX_POSITIONS = 6;
+const MIN_FREE_BYTES = 6e9;
 const CONCURRENCY = 8;
 const MAX_ZOOM = 17;
 
@@ -28,6 +28,8 @@ interface Position {
 	lat: number;
 	lon: number;
 	ids: string[];
+	/** CH = lon 5.9-10.5 and lat 45.8-47.8 (swissALTI3D-class lidar coverage nearby). */
+	region: "CH" | "other";
 }
 
 function haversineMetres(a: Position, b: Position) {
@@ -41,35 +43,85 @@ function haversineMetres(a: Position, b: Position) {
 	return 2 * r * Math.asin(Math.sqrt(h));
 }
 
+function regionOf(lat: number, lon: number): "CH" | "other" {
+	return lon >= 5.9 && lon <= 10.5 && lat >= 45.8 && lat <= 47.8
+		? "CH"
+		: "other";
+}
+
+function dedupe(
+	points: { id: string; lat: number; lon: number }[],
+	cap: number,
+): Position[] {
+	const positions: Position[] = [];
+	for (const p of points) {
+		const cand: Position = {
+			label: p.id,
+			lat: p.lat,
+			lon: p.lon,
+			ids: [p.id],
+			region: regionOf(p.lat, p.lon),
+		};
+		const near = positions.find((q) => haversineMetres(q, cand) < DEDUPE_M);
+		if (near) near.ids.push(p.id);
+		else if (positions.length < cap) positions.push(cand);
+	}
+	return positions;
+}
+
 function readDemoPositions(): Position[] {
 	const manifest = JSON.parse(
 		fs.readFileSync(path.join(ROOT, "public/demo/manifest.json"), "utf8"),
 	) as { photos: { id: string; lat?: number; lon?: number }[] };
-	const positions: Position[] = [];
-	for (const p of manifest.photos) {
-		if (p.lat === undefined || p.lon === undefined) continue;
-		const cand: Position = { label: p.id, lat: p.lat, lon: p.lon, ids: [p.id] };
-		const near = positions.find((q) => haversineMetres(q, cand) < DEDUPE_M);
-		if (near) near.ids.push(p.id);
-		else if (positions.length < MAX_POSITIONS) positions.push(cand);
-	}
-	return positions;
+	return dedupe(
+		manifest.photos.flatMap((p) =>
+			p.lat === undefined || p.lon === undefined
+				? []
+				: [{ id: p.id, lat: p.lat, lon: p.lon }],
+		),
+		6,
+	);
+}
+
+/** Positions only (lat/lon) from the gitignored ground-truth file; poses are never read. */
+function readGtPositions(): Position[] {
+	const file = path.join(ROOT, "data/ground-truth.json");
+	const gt = JSON.parse(fs.readFileSync(file, "utf8")) as Record<
+		string,
+		{ lat?: number; lon?: number }
+	>;
+	return dedupe(
+		Object.entries(gt).flatMap(([id, e]) =>
+			typeof e.lat === "number" && typeof e.lon === "number"
+				? [{ id, lat: e.lat, lon: e.lon }]
+				: [],
+		),
+		10,
+	);
 }
 
 function finer(levels: TerrainLevel[]): TerrainLevel[] {
 	return levels.map((l) => ({ ...l, z: Math.min(MAX_ZOOM, l.z + 1) }));
 }
 
+const missingTiles: Record<string, number> = {};
+
 async function horizonFor(
 	source: DemSource,
 	levels: TerrainLevel[],
 	pos: Position,
+	armKey: string,
 	eyeOverride?: number,
 ) {
+	const loadTile = demTileLoaderNode(source);
 	const terrain = await loadTerrain(
 		pos.lat,
 		pos.lon,
-		demTileLoaderNode(source),
+		async (k) => {
+			const tile = await loadTile(k);
+			if (!tile) missingTiles[armKey] = (missingTiles[armKey] ?? 0) + 1;
+			return tile;
+		},
 		levels,
 		new Map(),
 		CONCURRENCY,
@@ -166,54 +218,89 @@ function dirSize(dir: string) {
 	return total;
 }
 
+function freeBytes() {
+	const stat = fs.statfsSync(ROOT);
+	return stat.bavail * stat.bsize;
+}
+
+function levelsText(levels: TerrainLevel[]) {
+	return levels.map((l) => `z${l.z}<=${l.maxDistance / 1000}km`).join(" ");
+}
+
 async function main() {
+	const mode = process.argv.includes("--positions")
+		? process.argv[process.argv.indexOf("--positions") + 1]
+		: "demo";
+	if (mode !== "demo" && mode !== "gt") throw new Error("--positions demo|gt");
+	// The demo set is fully cached; only the gt set can download.
+	if (mode === "gt" && freeBytes() < MIN_FREE_BYTES)
+		throw new Error(
+			`only ${(freeBytes() / 1e9).toFixed(1)} GB free, need ${MIN_FREE_BYTES / 1e9} GB before downloading tiles`,
+		);
 	const cacheDirs = [
 		path.join(ROOT, ".cache/dem-mapterhorn"),
 		path.join(ROOT, ".cache/terrarium"),
 	];
 	const before = cacheDirs.map(dirSize);
-	const positions = readDemoPositions();
+	const positions = mode === "gt" ? readGtPositions() : readDemoPositions();
 	const out: string[] = [];
-	out.push("DEM band sensitivity (DEM-only; not an accuracy result)");
-	out.push("command: npx tsx scripts/dem/band-sensitivity.ts");
+	out.push(
+		`DEM band sensitivity, positions=${mode} (DEM-only; not an accuracy result)`,
+	);
+	out.push(
+		`command: npx tsx scripts/dem/band-sensitivity.ts${mode === "gt" ? " --positions gt" : ""}`,
+	);
 	out.push(`date: ${new Date().toISOString().slice(0, 10)}`);
 	out.push(
-		`eye: ground + ${EYE_ABOVE_GROUND} m from each arm's own DEM; computeHorizon step 0.05 deg, default options`,
+		`eye: ground + ${EYE_ABOVE_GROUND} m (EYE_ABOVE_GROUND, src/lib/geo/pipeline.ts) from each arm's own DEM; computeHorizon step 0.05 deg, default options`,
 	);
+	out.push(`base levels: ${levelsText(MAPTERHORN.levels)}`);
+	out.push(`fine levels: ${levelsText(finer(MAPTERHORN.levels))}`);
 	out.push(
-		`base levels: ${MAPTERHORN.levels.map((l) => `z${l.z}<=${l.maxDistance / 1000}km`).join(" ")}`,
-	);
-	out.push(
-		`fine levels: ${finer(MAPTERHORN.levels)
-			.map((l) => `z${l.z}<=${l.maxDistance / 1000}km`)
-			.join(" ")}`,
-	);
-	out.push(
-		`terrarium levels: ${TERRARIUM_AWS.levels.map((l) => `z${l.z}<=${l.maxDistance / 1000}km`).join(" ")} (${TERRARIUM_AWS.tileSize} px)`,
+		`terrarium levels: ${levelsText(TERRARIUM_AWS.levels)} (${TERRARIUM_AWS.tileSize} px)`,
 	);
 	out.push(
 		"arms: fine = z+1 bands; terrarium = own DEM and own eye; terr-baseEye = Terrarium DEM with the Mapterhorn eye",
 	);
-	out.push("positions (demo manifest, deduped within 200 m):");
+	out.push(
+		`positions (${mode === "gt" ? "ground-truth.json, positions only" : "demo manifest"}, deduped within ${DEDUPE_M} m):`,
+	);
 	for (const p of positions)
 		out.push(
-			`  ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}  (${p.ids.length} photos: ${p.ids.join(",")})`,
+			`  ${p.region.padEnd(5)}${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}  (${p.ids.length} photos: ${p.ids.join(",")})`,
 		);
 
-	const pooled = newSamples();
+	const pooled = { CH: newSamples(), other: newSamples() };
 	for (const pos of positions) {
-		const base = await horizonFor(MAPTERHORN, MAPTERHORN.levels, pos);
-		const fine = await horizonFor(MAPTERHORN, finer(MAPTERHORN.levels), pos);
-		const terr = await horizonFor(TERRARIUM_AWS, TERRARIUM_AWS.levels, pos);
+		const tag = pos.ids[0];
+		const base = await horizonFor(
+			MAPTERHORN,
+			MAPTERHORN.levels,
+			pos,
+			`base ${tag}`,
+		);
+		const fine = await horizonFor(
+			MAPTERHORN,
+			finer(MAPTERHORN.levels),
+			pos,
+			`fine ${tag}`,
+		);
+		const terr = await horizonFor(
+			TERRARIUM_AWS,
+			TERRARIUM_AWS.levels,
+			pos,
+			`terrarium ${tag}`,
+		);
 		// Terrarium DEM with the Mapterhorn eye: isolates the skyline shape from the eye offset.
 		const terrSameEye = await horizonFor(
 			TERRARIUM_AWS,
 			TERRARIUM_AWS.levels,
 			pos,
+			`terrarium-baseEye ${tag}`,
 			base.ground + EYE_ABOVE_GROUND,
 		);
 		const own = newSamples();
-		for (const target of [own, pooled]) {
+		for (const target of [own, pooled[pos.region]]) {
 			accumulate(
 				target,
 				"fine-base",
@@ -242,13 +329,24 @@ async function main() {
 		);
 		out.push(
 			formatTable(
-				`viewpoint ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}: |delta elevation| over ${base.horizon.elevation.length} azimuths`,
+				`viewpoint ${pos.region} ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}: |delta elevation| over ${base.horizon.elevation.length} azimuths`,
 				own,
 			),
 		);
 	}
+	for (const region of ["CH", "other"] as const) {
+		const n = positions.filter((p) => p.region === region).length;
+		out.push("");
+		out.push(formatTable(`POOLED ${region} (${n} viewpoints)`, pooled[region]));
+	}
 	out.push("");
-	out.push(formatTable("POOLED over viewpoints", pooled));
+	out.push(
+		"tiles missing (404 or no coverage; sampler falls back to coarser levels):",
+	);
+	const arms = Object.entries(missingTiles).filter(([, n]) => n > 0);
+	out.push(
+		arms.length ? arms.map(([k, n]) => `  ${k}: ${n}`).join("\n") : "  none",
+	);
 	const after = cacheDirs.map(dirSize);
 	const mb = (n: number) => (n / 1e6).toFixed(0);
 	out.push("");
@@ -257,9 +355,24 @@ async function main() {
 	);
 	const text = out.join("\n");
 	console.log(text);
+	// RESULT.txt holds one section per mode; this run replaces its own section.
 	const dir = path.join(ROOT, "tools/research/dem-bands");
 	fs.mkdirSync(dir, { recursive: true });
-	fs.writeFileSync(path.join(dir, "RESULT.txt"), `${text}\n`);
+	const file = path.join(dir, "RESULT.txt");
+	const sections: Record<string, string> = {};
+	if (fs.existsSync(file))
+		for (const part of fs.readFileSync(file, "utf8").split(/^=== /m).slice(1)) {
+			const name = part.slice(0, part.indexOf(" ==="));
+			sections[name] = part;
+		}
+	sections[mode] = `${mode} ===\n${text}\n`;
+	fs.writeFileSync(
+		file,
+		["demo", "gt"]
+			.filter((k) => sections[k])
+			.map((k) => `=== ${sections[k]}`)
+			.join("\n"),
+	);
 }
 
 main();
