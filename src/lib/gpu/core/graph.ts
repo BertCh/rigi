@@ -68,6 +68,8 @@ import {
 import { onLost, untilLost } from "./lifecycle";
 import {
 	type CompiledGPUCommandGraph,
+	createGPUComputeCommandNode,
+	createTransientView,
 	GPUCommandGraph,
 	type GPUCommandGraphComputeExecutable,
 	type GPUCommandGraphComputeNode,
@@ -83,6 +85,7 @@ import {
 	type GPUCommandGraphPreflightReport,
 	type GPUCommandGraphRenderNode,
 	type GPUCommandGraphTimingReport,
+	type GPUCommandNodeProducer,
 	type GPUNode,
 	type GPUScalarFormat,
 	GraphBufferHandle,
@@ -268,11 +271,138 @@ function rangeOf<P>(r: GraphRange<P>, parameters: P) {
 	return { offset: r.offset ?? 0, size };
 }
 
+/**
+ * The byte range of a GraphDataView inside `buffer` (the Buffer that backs its import handle), as a
+ * ReadRange for run({ read }) / stageReads, or a `{ buffer, offset, size }` binding for encodeDispatch:
+ * the Rigi side of the GraphDataView interop. Size is padded to 4 bytes like the graph's own ranges.
+ */
+export function viewRange(view: GraphDataView, buffer: Buffer) {
+	return { buffer, ...rangeOf(view, undefined) };
+}
+
+/**
+ * The compute node of a KernelNode (validation, resources, the encode closure, the direct-dispatch
+ * geometry), plus the handles it writes partially / atomically (for the clear lint). Shared by
+ * ComputeGraph.addKernel and KernelOp.getCommandNodes, so a Rigi kernel is the same node either way.
+ */
+function buildKernelNode<P>(label: string, node: KernelNode<P>) {
+	const { spec } = node;
+	for (const [name, kind] of spec.layout) {
+		const v = node.bindings[name];
+		if (!v) throw new Error(`${label}: no binding for "${name}"`);
+		if (isTextureKind(kind) !== isTexture(v))
+			throw new Error(
+				`${label}: "${name}" is a ${kind} binding, bound to a ${isTexture(v) ? "texture" : "buffer"}`,
+			);
+	}
+	const buffer = (name: string) =>
+		node.bindings[name] as GraphBinding | GraphRange<P>;
+	const modes: Record<string, WriteMode> = { ...node.writes };
+	for (const name of node.cleared ?? []) modes[name] ??= "partial";
+	const partial: GraphBufferHandle[] = [];
+	for (const [name, mode] of Object.entries(modes)) {
+		const kind = spec.layout.find(([n]) => n === name)?.[1];
+		if (kind !== "storage")
+			throw new Error(`${label}: "${name}" is not a storage output`);
+		if (mode !== "full") partial.push(handleOf(buffer(name)));
+	}
+	const resources: GraphResourceUse[] = spec.layout.map(([name, kind]) => {
+		const v = node.bindings[name];
+		if (isTexture(v)) return { texture: v, usage: "sampled" };
+		const b = buffer(name);
+		return {
+			buffer: b instanceof GraphDataView ? b : handleOf(b),
+			usage: USE[kind as keyof typeof USE],
+		};
+	});
+	const executable = (k: Kernel): GPUCommandGraphComputeExecutable<P> => ({
+		encode: ({ computePass, getBuffer, getTextureView, parameters }) => {
+			const b: Bindings = {};
+			for (const [name] of spec.layout) {
+				// handles: their declared byteLength; views: their exact range; explicit ranges: the
+				// run's { offset, size } (a binding narrower than a capacity-keyed buffer); textures:
+				// their (or the view's) TextureView
+				const v = node.bindings[name];
+				if (isTexture(v)) {
+					b[name] = getTextureView(v);
+					continue;
+				}
+				b[name] = {
+					buffer: getBuffer(v instanceof GraphDataView ? v : handleOf(v)),
+					...rangeOf(v, parameters),
+				};
+			}
+			const w =
+				typeof node.workgroups === "function"
+					? node.workgroups(parameters)
+					: node.workgroups;
+			encodeDispatch(computePass, k, b, w[0], w[1] ?? 1, w[2] ?? 1);
+		},
+	});
+	const computeNode: Omit<GPUCommandGraphComputeNode<P>, "type"> = {
+		id: node.id,
+		dependsOn: node.dependsOn,
+		condition: node.condition,
+		resources,
+		compile: ({ device }) => executable(kernel(device, spec)),
+		// same WGSL, module and descriptor as kernel(): identical results (core selftest)
+		compileAsync: async ({ device }) =>
+			executable(await kernelAsync(device, spec)),
+	};
+	if (node.workload) computeNode.workload = node.workload;
+	// fixed workgroups: the direct-dispatch geometry upstream program compilers read
+	// (setGPUComputeDispatchWorkgroups's field) to put the node under a GPU predicate
+	// (upstream's setter is not exported from @luma.gl/gpgpu/gpu-core, re-checked on rigi.3; this applies its validation,
+	// non-negative safe integers, but skips the annotation instead of throwing, so an existing node
+	// with other values still compiles exactly as before)
+	if (Array.isArray(node.workgroups)) {
+		const [x, y = 1, z = 1] = node.workgroups;
+		if ([x, y, z].every((v) => Number.isSafeInteger(v) && v >= 0))
+			Object.assign(computeNode, {
+				dispatchWorkgroups: Object.freeze([x, y, z]),
+			});
+	}
+	return { computeNode, partial };
+}
+
+/**
+ * A Rigi kernel as a luma contributor: `getCommandNodes(graph)` yields its compute node, so a
+ * defineKernel kernel can sit inside any luma op tree or plain GPUCommandGraph (`graph.add(op)`),
+ * next to gpgpu / gpu-raster ops, with views from the same graph. ComputeGraph.add(op) routes it
+ * through addKernel (clear audit included).
+ */
+export class KernelOp<P = void> implements GPUCommandNodeProducer<P> {
+	constructor(readonly node: KernelNode<P>) {}
+	getCommandNodes(
+		graph: GPUCommandGraph<P>,
+	): readonly GPUCommandGraphNode<P>[] {
+		void graph;
+		return [
+			createGPUComputeCommandNode(
+				buildKernelNode(`kernel-op/${this.node.id}`, this.node).computeNode,
+			),
+		];
+	}
+}
+
+/** A gpu-raster style op: it adds its nodes itself, given the graph that owns its views. */
+export type AddToGraphOp<P> = { addToGraph(graph: GPUCommandGraph<P>): void };
+
+const isAddToGraphOp = <P>(op: unknown): op is AddToGraphOp<P> =>
+	typeof (op as AddToGraphOp<P>)?.addToGraph === "function";
+
 export class ComputeGraph<P = void> {
 	readonly device: Device;
 	readonly id: string;
 	/** the underlying gpu-core graph, for ops this wrapper does not cover */
 	readonly graph: GPUCommandGraph<P>;
+	/** the graph's own mutators, which ignore the addToGraph interception of add() */
+	private readonly rawGraph: {
+		add(node: GPUNode<P>): void;
+		addComputePass(node: Omit<GPUCommandGraphComputeNode<P>, "type">): void;
+		addCopyPass(node: Omit<GPUCommandGraphCopyNode<P>, "type">): void;
+		addRenderPass(node: Omit<GPUCommandGraphRenderNode<P>, "type">): void;
+	};
 	private compiled: CompiledGPUCommandGraph<P> | null = null;
 	private compiling: Promise<CompiledGPUCommandGraph<P>> | null = null;
 	private timestamps: QuerySet | null = null;
@@ -311,6 +441,14 @@ export class ComputeGraph<P = void> {
 		if (opts.graph && opts.graph.device !== device)
 			throw new Error(`${id}: the adopted graph is on another device`);
 		this.graph = opts.graph ?? new GPUCommandGraph<P>(device, { id });
+		const proto = GPUCommandGraph.prototype as GPUCommandGraph<P>;
+		const g = this.graph;
+		this.rawGraph = {
+			add: (n) => proto.add.call(g, n),
+			addComputePass: (n) => proto.addComputePass.call(g, n),
+			addCopyPass: (n) => proto.addCopyPass.call(g, n),
+			addRenderPass: (n) => proto.addRenderPass.call(g, n),
+		};
 	}
 
 	/** A caller-owned buffer, bound per run by `id` (or once via `buffer`). */
@@ -401,87 +539,17 @@ export class ComputeGraph<P = void> {
 
 	/** Add a compute node that dispatches a core kernel. */
 	addKernel(node: KernelNode<P>): this {
-		const { spec } = node;
-		for (const [name, kind] of spec.layout) {
-			const v = node.bindings[name];
-			if (!v)
-				throw new Error(`${this.id}/${node.id}: no binding for "${name}"`);
-			if (isTextureKind(kind) !== isTexture(v))
-				throw new Error(
-					`${this.id}/${node.id}: "${name}" is a ${kind} binding, bound to a ${isTexture(v) ? "texture" : "buffer"}`,
-				);
-		}
-		const buffer = (name: string) =>
-			node.bindings[name] as GraphBinding | GraphRange<P>;
-		const modes: Record<string, WriteMode> = { ...node.writes };
-		for (const name of node.cleared ?? []) modes[name] ??= "partial";
-		const partial: GraphBufferHandle[] = [];
-		for (const [name, mode] of Object.entries(modes)) {
-			const kind = spec.layout.find(([n]) => n === name)?.[1];
-			if (kind !== "storage")
-				throw new Error(
-					`${this.id}/${node.id}: "${name}" is not a storage output`,
-				);
-			if (mode !== "full") partial.push(handleOf(buffer(name)));
-		}
-		const resources: GraphResourceUse[] = spec.layout.map(([name, kind]) => {
-			const v = node.bindings[name];
-			if (isTexture(v)) return { texture: v, usage: "sampled" };
-			const b = buffer(name);
-			return {
-				buffer: b instanceof GraphDataView ? b : handleOf(b),
-				usage: USE[kind as keyof typeof USE],
-			};
-		});
-		this.recordAudit(node.id, resources, partial, node.condition);
-		const executable = (k: Kernel): GPUCommandGraphComputeExecutable<P> => ({
-			encode: ({ computePass, getBuffer, getTextureView, parameters }) => {
-				const b: Bindings = {};
-				for (const [name] of spec.layout) {
-					// handles: their declared byteLength; views: their exact range; explicit ranges: the
-					// run's { offset, size } (a binding narrower than a capacity-keyed buffer); textures:
-					// their (or the view's) TextureView
-					const v = node.bindings[name];
-					if (isTexture(v)) {
-						b[name] = getTextureView(v);
-						continue;
-					}
-					b[name] = {
-						buffer: getBuffer(v instanceof GraphDataView ? v : handleOf(v)),
-						...rangeOf(v, parameters),
-					};
-				}
-				const w =
-					typeof node.workgroups === "function"
-						? node.workgroups(parameters)
-						: node.workgroups;
-				encodeDispatch(computePass, k, b, w[0], w[1] ?? 1, w[2] ?? 1);
-			},
-		});
-		const computeNode: Omit<GPUCommandGraphComputeNode<P>, "type"> = {
-			id: node.id,
-			dependsOn: node.dependsOn,
-			condition: node.condition,
-			resources,
-			compile: ({ device }) => executable(kernel(device, spec)),
-			// same WGSL, module and descriptor as kernel(): identical results (core selftest)
-			compileAsync: async ({ device }) =>
-				executable(await kernelAsync(device, spec)),
-		};
-		if (node.workload) computeNode.workload = node.workload;
-		// fixed workgroups: the direct-dispatch geometry upstream program compilers read
-		// (setGPUComputeDispatchWorkgroups's field) to put the node under a GPU predicate
-		// (upstream's setter is not exported from @luma.gl/gpgpu/gpu-core, re-checked on rigi.3; this applies its validation,
-		// non-negative safe integers, but skips the annotation instead of throwing, so an existing node
-		// with other values still compiles exactly as before)
-		if (Array.isArray(node.workgroups)) {
-			const [x, y = 1, z = 1] = node.workgroups;
-			if ([x, y, z].every((v) => Number.isSafeInteger(v) && v >= 0))
-				Object.assign(computeNode, {
-					dispatchWorkgroups: Object.freeze([x, y, z]),
-				});
-		}
-		this.graph.addComputePass(computeNode);
+		const { computeNode, partial } = buildKernelNode(
+			`${this.id}/${node.id}`,
+			node,
+		);
+		this.recordAudit(
+			node.id,
+			computeNode.resources ?? [],
+			partial,
+			node.condition,
+		);
+		this.rawGraph.addComputePass(computeNode);
 		return this;
 	}
 
@@ -496,7 +564,7 @@ export class ComputeGraph<P = void> {
 		opts: { dependsOn?: string[] } = {},
 	): this {
 		const h = handleOf(target);
-		this.graph.addCopyPass({
+		this.rawGraph.addCopyPass({
 			id,
 			dependsOn: opts.dependsOn,
 			resources: [{ buffer: h, usage: "copy-destination" }],
@@ -542,7 +610,7 @@ export class ComputeGraph<P = void> {
 	): this {
 		const handles = targets.map(handleOf);
 		this.audit.uses.set(id, handles);
-		this.graph.addCopyPass({
+		this.rawGraph.addCopyPass({
 			id,
 			dependsOn: opts.dependsOn,
 			resources: handles.map((buffer) => ({ buffer, usage: "copy-source" })),
@@ -582,7 +650,7 @@ export class ComputeGraph<P = void> {
 			(cleared ?? []).map(handleOf),
 			rest.condition,
 		);
-		this.graph.addComputePass(rest);
+		this.rawGraph.addComputePass(rest);
 		return this;
 	}
 
@@ -596,7 +664,7 @@ export class ComputeGraph<P = void> {
 			rest.resources ?? [],
 			(cleared ?? []).map(handleOf),
 		);
-		this.graph.addCopyPass(rest);
+		this.rawGraph.addCopyPass(rest);
 		return this;
 	}
 
@@ -613,17 +681,33 @@ export class ComputeGraph<P = void> {
 			rest.resources ?? [],
 			(cleared ?? []).map(handleOf),
 		);
-		this.graph.addRenderPass(rest);
+		this.rawGraph.addRenderPass(rest);
 		return this;
 	}
 
-	/** Add a gpu-core op (GPUReduction, GPUSort, …) built on this graph's handles. */
-	add(op: GraphOp<P>, opts: { uses?: GraphBufferHandle[] } = {}): this {
+	/**
+	 * Add a luma op built on this graph's handles, or a Rigi kernel contributor:
+	 * - a producer (`getCommandNodes(graph)`: GPUReduction, GPUSort, GPUHistogram, GPUElementwise, …),
+	 *   a group (`getNodes()`), a raw command node, or an array of those;
+	 * - a KernelOp (a defineKernel kernel as a contributor), added through addKernel;
+	 * - a gpu-raster style op (`addToGraph(graph)`: GPURasterEdges, GPURasterThreshold, …): its
+	 *   addToGraph runs against this graph with the graph's add* mutators routed through this wrapper,
+	 *   so its nodes join the clear lint like any other.
+	 * Each command node's declared resources and condition join the clear lint; `uses` adds buffers an
+	 * op reads without declaring them. The op's views must come from THIS graph (graph.view,
+	 * importView, transientView).
+	 */
+	add(
+		op: GraphOp<P> | KernelOp<P> | AddToGraphOp<P>,
+		opts: { uses?: GraphBufferHandle[] } = {},
+	): this {
 		// flattened the way GPUCommandGraph.add does (getNodes children, getCommandNodes(graph), raw
 		// nodes, arrays; same nodes, same order), so each command node's declared resources and
-		// condition join the clear lint; `uses` adds buffers an op reads without declaring them
-		const flat = (n: GraphOp<P>) => {
-			if ("getNodes" in n) for (const child of n.getNodes()) flat(child);
+		// condition join the clear lint
+		const flat = (n: GraphOp<P> | KernelOp<P> | AddToGraphOp<P>) => {
+			if (n instanceof KernelOp) this.addKernel(n.node);
+			else if (isAddToGraphOp<P>(n)) this.addViaAddToGraph(n);
+			else if ("getNodes" in n) for (const child of n.getNodes()) flat(child);
 			else if ("getCommandNodes" in n)
 				for (const c of n.getCommandNodes(this.graph)) one(c);
 			else if ("type" in n) one(n);
@@ -642,10 +726,63 @@ export class ComputeGraph<P = void> {
 				[],
 				c.condition,
 			);
-			this.graph.add(c);
+			this.rawGraph.add(c);
 		};
 		flat(op);
 		return this;
+	}
+
+	/** Run an `addToGraph(graph)` op with this graph's mutators shadowed by the audited wrappers. */
+	private addViaAddToGraph(op: AddToGraphOp<P>) {
+		const g = this.graph as unknown as Record<string, unknown>;
+		const audited = {
+			add: (n: GraphOp<P> | KernelOp<P> | AddToGraphOp<P>) => this.add(n),
+			addComputePass: (n: Omit<GPUCommandGraphComputeNode<P>, "type">) =>
+				this.addComputePass(n),
+			addCopyPass: (n: Omit<GPUCommandGraphCopyNode<P>, "type">) =>
+				this.addCopyPass(n),
+			addRenderPass: (n: Omit<GPUCommandGraphRenderNode<P>, "type">) =>
+				this.addRenderPass(n),
+		};
+		// own properties shadow the prototype methods; removed again below. The graph identity stays
+		// the real one: ops compare `view.buffer.graph !== graph`
+		Object.assign(g, audited);
+		try {
+			op.addToGraph(this.graph);
+		} finally {
+			for (const k of Object.keys(audited)) delete g[k];
+		}
+	}
+
+	/**
+	 * Import a Rigi buffer (core/pool.ts lease, storage(), any luma Buffer) as a typed GraphDataView,
+	 * without a copy. The view's `.buffer` is the import handle: pass the same id in run({ buffers })
+	 * to bind another Buffer later (a grown pooled slot). `byteOffset` must be a multiple of 4.
+	 */
+	importView<T extends GPUScalarFormat>(
+		id: string,
+		buffer: Buffer,
+		format: T,
+		length: number,
+		byteOffset = 0,
+	): GraphDataView<T> {
+		const handle = this.importBuffer(
+			id,
+			buffer.byteLength,
+			buffer,
+			buffer.usage,
+		);
+		return this.view(handle, format, length, byteOffset);
+	}
+
+	/** Graph-owned scratch as a packed typed view (luma's createTransientView over this graph). */
+	transientView<T extends GPUScalarFormat>(
+		id: string,
+		format: T,
+		length: number,
+		usage = STORAGE,
+	): GraphDataView<T> {
+		return createTransientView(this.graph, id, format, length, usage);
 	}
 
 	/**

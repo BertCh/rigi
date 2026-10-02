@@ -80,7 +80,10 @@ const notes = [];
 const files = DIRS.flatMap(walk)
 	.map((file) => ({ file, rel: path.relative(SRC, file) }))
 	.filter(
-		({ file, rel }) => !SKIP.has(rel) && calls(fs.readFileSync(file, "utf8")),
+		({ file, rel }) =>
+			!SKIP.has(rel) &&
+			!rel.includes("__tests__/") &&
+			calls(fs.readFileSync(file, "utf8")),
 	);
 // pass 1 loads every kernel module and its dependencies; pass 2 re-evaluates each module alone
 // (a fresh instance via a query), so what it registers is exactly its own module-level kernels,

@@ -1,6 +1,6 @@
 # src/lib/gpu/core: shared WebGPU compute foundation
 
-This directory is the shared layer that every kernel in `src/lib/gpu/**` builds on. It uses luma 10.0.0-alpha.2's (vendored `10.0.0-alpha.2-rigi.3`) stable `@luma.gl/core` API plus the experimental `@luma.gl/gpgpu/gpu-core`, and it is meant to move to luma/deck "next" (WebGPU everywhere) with as little churn as possible. The house rules from `../README.md` all still apply:
+This directory is the shared layer that every kernel in `src/lib/gpu/**` builds on. It uses luma 10.0.0-alpha.2's (vendored `10.0.0-alpha.2-rigi.6`) stable `@luma.gl/core` API plus the experimental `@luma.gl/gpgpu/gpu-core`, and it is meant to move to luma/deck "next" (WebGPU everywhere) with as little churn as possible. The house rules from `../README.md` all still apply:
 - Every kernel keeps a CPU twin, and the CPU twin is the reference.
 - `getComputeDevice()` resolving `null` means the caller takes the CPU path.
 - `?gpu=off` turns everything off.
@@ -16,7 +16,7 @@ Luma-native ratchet: `scripts/ci/gpu-raw-lint.mjs` (fast-tier check `gpu-raw-lin
 | `device.ts` | The per-realm device registry: `getComputeDevice`, `adoptRenderDevice`, `resetComputeDevice`, `hasFeature`. The sidecar requests the adapter's maximum limits |
 | `pool.ts` | A persistent grow-only buffer pool (per device), `withLease` for serialising async callers, and `clear` / `range` |
 | `readback.ts` | Ring readback: staged copies into reusable MAP_READ slots on the caller's encoder, one map per read |
-| `kernel.ts` | `defineKernel` / `kernel` / `kernelAsync` / `encodeDispatch`, with bindings set per pass and the binding guards. A superset of `look/kernel.ts` |
+| `kernel.ts` | `defineKernel` (layout derived from the WGSL, or hand-written and validated against it) / `kernel` / `kernelAsync` / `encodeDispatch` / `encodeDispatchIndirect`, dispatching through the engine `Kernel.dispatch(pass, {bindings, x, y, z})` with the binding guards. A superset of `look/kernel.ts` |
 | `queue.ts` | `submit(device, enc)`: finishes and submits the encoder, then runs the pool hook. Opt-in error checks (`__RIGI_GPU_CHECKS__`) |
 | `binding-guard.ts` | Pure storage-binding checks (zero size, offset alignment) called by `encodeDispatch` |
 | `profile.ts` | Opt-in GPU timestamp profiling (`globalThis.__RIGI_GPU_PROFILE__ = true`) and `getGpuProfile()`, including the GPU workers' reports |
@@ -97,7 +97,9 @@ export type KernelSpec = { id: string; source: string; layout: [string, BindKind
   constants?: Record<string, number>; group: string; label: string };
 export type Kernel = { pipeline: ComputePipeline; names: string[]; spec: KernelSpec };
 export type KernelOptions = { entryPoint?: string; constants?: Record<string, number>; group?: string; label?: string };
-export function defineKernel(id: string, source: string, layout: [string, BindKind][], opts?: KernelOptions): KernelSpec;
+export function defineKernel(id: string, source: string, opts?: KernelOptions): KernelSpec;               // layout derived from the WGSL
+export function defineKernel(id: string, source: string, layout: [string, BindKind][] | undefined, opts?: KernelOptions): KernelSpec; // dev/tests: layout must equal the derived one
+export function deriveLayout(source: string): [string, BindKind][];  // luma getShaderLayoutFromWGSL, group 0, bindings 0..n-1
 export const definedKernels: (group?: string) => KernelSpec[];
 export function kernel(device: Device, spec: KernelSpec): Kernel;                 // sync, cached per (device, spec)
 export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel>;   // Device.createComputePipelineAsync, same cache
@@ -200,6 +202,39 @@ export function observeCompiledGraph<P>(compiled: CompiledGPUCommandGraph<P>): G
 export function inspectorSnapshots(device?: Device): { device: Device; snapshot: GPUCommandGraphInspectorSnapshot }[];
 export function getGpuGraphProfile(): Promise<GpuGraphProfileEntry[]>; // per observed graph, from the snapshots
 ```
+
+## Composing with luma operators (contributors and GraphDataViews)
+
+This is the preferred way to use a luma operator: put it in the same `ComputeGraph` as the Rigi kernels, with
+no glue buffers. Proven in `scripts/gpu/core-interop-dawn.ts` (Rigi kernel, gpgpu `GPUElementwise`, gpu-raster
+`GPURasterThreshold`, gpgpu `GPUReduction`, readback; exact against a CPU reference).
+
+```ts
+const g = new ComputeGraph(device, "id");
+const a = g.importView("a", rigiBuffer, "float32", n);   // a Rigi / pooled Buffer as a GraphDataView, no copy
+const t = g.transientView("t", "float32", n);            // graph scratch as a view (luma createTransientView)
+g.addKernel({ id: "k", spec: K, bindings: { out: t }, workgroups: [n / 64] }); // views bind as their exact range
+g.add(new KernelOp({ id: "k2", spec: K2, bindings: { ... }, workgroups: [...] })); // same kernel as a contributor
+g.add(new GPUElementwise({ ... }));                      // any op with getCommandNodes(graph)
+g.add(new GPURasterThreshold({ ... }));                  // any gpu-raster op: addToGraph(graph)
+g.compile();
+const { data } = await g.run(p, { read: [viewRange(outView, outBuffer)] }); // a view back to a Rigi byte range
+```
+
+- `ComputeGraph.add(op)` takes producers (`getCommandNodes`), groups (`getNodes`), raw command nodes, arrays, `KernelOp`
+  and `addToGraph(graph)` ops. For the last, the graph's `add*` mutators are shadowed while `addToGraph` runs, so every
+  node the op adds goes through the audited path: the clear lint sees it, and a raster op's transients are covered.
+  Ops compare `view.buffer.graph !== graph`, so their views must come from THIS graph (`view`, `importView`, `transientView`).
+- `KernelOp` (`new KernelOp(kernelNode)`) is a `GPUCommandNodeProducer`: a defineKernel kernel can be added to any
+  luma op tree or a plain `GPUCommandGraph` (`graph.add(op)`) next to luma ops.
+- `importView(id, buffer, format, length, byteOffset?)` imports a Rigi buffer (pool lease, `storage()`, any luma Buffer);
+  pass `buffers: { [id]: buffer }` to `run()` to rebind it (a grown pooled slot). `viewRange(view, buffer)` is the
+  `{ buffer, offset, size }` of a view inside the Buffer behind its import handle (`run({ read })`, `stageReads`, direct
+  `encodeDispatch` bindings). `getViewBinding` / `createGPUComputeCommandNode` / `createTransientView` are re-exported
+  from `luma.ts` for hand-written contributors.
+- Writing a new Rigi contributor: a class with `getCommandNodes(graph)`, taking `GraphDataView`s, scratch from
+  `createTransientView(graph, ...)`, nodes from `createGPUComputeCommandNode({ resources, compile })` (or a `KernelOp`).
+  Declare every buffer use in `resources`, since the lint and the scheduler read only that.
 
 ## Packing uniforms: `uniform-block.ts`
 

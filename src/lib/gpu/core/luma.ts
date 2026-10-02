@@ -43,7 +43,7 @@
 
 import type { Buffer, Device, DeviceProps } from "@luma.gl/core";
 import type { WebGPUBuffer, WebGPUDevice } from "@luma.gl/webgpu";
-import { webgpuAdapter } from "@luma.gl/webgpu";
+import { getShaderLayoutFromWGSL, webgpuAdapter } from "@luma.gl/webgpu";
 
 /**
  * Wraps an app-created GPUDevice as a luma Device (WebGPUAdapter.attach, luma #3313). Call the
@@ -52,7 +52,7 @@ import { webgpuAdapter } from "@luma.gl/webgpu";
  * ourselves because #3313 dropped its `_ownsHandle` prop (b1728918): attached devices always
  * belong to the app upstream, so passing the prop would silently leak on the npm release.
  */
-export { webgpuAdapter };
+export { getShaderLayoutFromWGSL, webgpuAdapter };
 
 export const attachWebGPUDevice = async (
 	handle: GPUDevice,
@@ -81,6 +81,33 @@ export const nativeWebGPUDevice = (device: Device): GPUDevice =>
 export const nativeWebGPUBuffer = (buffer: Buffer): GPUBuffer =>
 	(buffer as WebGPUBuffer).handle;
 
+// gpu-raster (experimental, WebGPU only): ops with `addToGraph(graph)`; ComputeGraph.add accepts them
+// next to the getCommandNodes contributors above. Re-exported here under the one-importer rule.
+export type {
+	GPURasterBand,
+	GPURasterBorderMode,
+	GPURasterBufferBand,
+	GPURasterGradientMagnitudeProps,
+	GPURasterThresholdProps,
+} from "@luma.gl/experimental/gpu-raster";
+export {
+	GPURasterBandMath,
+	GPURasterBoxBlur,
+	GPURasterClosing,
+	GPURasterConnectedComponents,
+	GPURasterConvolution,
+	GPURasterDilation,
+	GPURasterErosion,
+	GPURasterGaussianBlur,
+	GPURasterGradientMagnitude,
+	GPURasterLaplacian,
+	GPURasterMorphology,
+	GPURasterOpening,
+	GPURasterOtsuThreshold,
+	GPURasterScharr,
+	GPURasterSobel,
+	GPURasterThreshold,
+} from "@luma.gl/experimental/gpu-raster";
 export type {
 	GPUBatchSortProps,
 	GPUBVHProps,
@@ -105,11 +132,14 @@ export type {
 	GPUCommandGraphRenderNode,
 	GPUCommandGraphStats,
 	GPUCommandGraphTimingReport,
+	GPUCommandNodeProducer,
+	GPUElementwiseProps,
 	GPUGridAggregationProps,
 	GPUGridBinningProps,
 	GPUGridIndexProps,
 	GPUGridIndexQueryProps,
 	GPUHistogramProps,
+	GPUMatMulProps,
 	GPUMatVecProps,
 	GPUNode,
 	GPUOperation,
@@ -125,9 +155,11 @@ export type {
 	GPUScanProps,
 	GPUSegmentedSortProps,
 	GPUSortProps,
+	GPUTransposeProps,
 	GraphBufferDescriptor,
 	GraphBufferUsage,
 	GraphBufferUse,
+	GraphDataViewBinding,
 	GraphExternalTextureBinding,
 	GraphFrameTextureBinding,
 	GraphImportedBuffer,
@@ -139,6 +171,8 @@ export type {
 } from "@luma.gl/gpgpu/gpu-core";
 export {
 	CompiledGPUCommandGraph,
+	createGPUComputeCommandNode,
+	createTransientView,
 	GPUBatchSort,
 	GPUBVH,
 	GPUBVHQuery,
@@ -148,7 +182,9 @@ export {
 	GPUCompaction,
 	GPUConditionalOperation,
 	GPUConvolution,
+	GPUElementwise,
 	GPUFFT1D,
+	GPUFFT2D,
 	GPUFiniteDifference2D,
 	GPUGather,
 	GPUGridAggregation,
@@ -157,6 +193,7 @@ export {
 	GPUGridIndexQuery,
 	GPUGroupAggregation,
 	GPUHistogram,
+	GPUMatMul,
 	GPUMatVec,
 	GPUPointSpatialFilter,
 	GPUProgram,
@@ -170,11 +207,14 @@ export {
 	GPUScan,
 	GPUSegmentedSort,
 	GPUSort,
+	GPUTranspose,
 	GraphBufferHandle,
 	GraphDataView,
 	GraphTextureHandle,
 	GraphTextureView,
 	GraphVectorView,
+	getViewBinding,
+	getViewBindingRange,
 	scalarArithmetic,
 	scalarCompare,
 } from "@luma.gl/gpgpu/gpu-core";

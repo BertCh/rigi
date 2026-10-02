@@ -1097,6 +1097,13 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "core-interop-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/core-interop-dawn.ts"),
+		timeoutS: 120,
+	},
+	{
 		id: "render-bundle-dawn",
 		tier: "fast",
 		group: "gpu",
