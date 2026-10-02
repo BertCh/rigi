@@ -101,6 +101,14 @@ describe("GeoSpill", () => {
 		expect(getByText(`${Math.round(((az % 360) + 360) % 360)}°`)).toBeTruthy();
 	});
 
+	it("reads its reveal from --gb-spill-reveal, defaulting to shown", async () => {
+		const { getByTestId } = render(<Spill layers={[]} />);
+		await act(async () => {});
+		expect(getByTestId("gb-geo-spill").style.opacity).toBe(
+			"var(--gb-spill-reveal, 1)",
+		);
+	});
+
 	it("labels a column cursor with its bearing at the spill's pose", async () => {
 		const { getByText, getByTestId } = render(
 			<Spill layers={[]} cursor={{ x: data.photo.width / 2 }} />,

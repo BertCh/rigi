@@ -38,6 +38,9 @@ import { poseAt } from "./story";
 // to the horizon when it points past the frame. All of it fades towards the outer edges. The layer reaches no further than the nearest
 // `[data-gb-bleed-bounds]` ancestor (less EDGE), or the window's edge as on the landing. A bounds
 // value of "left" or "right" clamps that side only. Phones get the ruler and no side spill, as on the landing.
+// The whole layer's opacity reads `--gb-spill-reveal` (default 1), so a figure that animates its own
+// reveal (PhotoStory's pen wipe) can bloom the margins in by setting that var on an ancestor, without
+// re-rendering the spill; the spill adds no transition of its own.
 
 /** CSS px kept above the photo for the ruler. */
 export const RULER_BAND = 30;
@@ -400,6 +403,7 @@ export function GeoSpill({
 				height: boxH,
 				maskImage: sides,
 				WebkitMaskImage: sides,
+				opacity: "var(--gb-spill-reveal, 1)",
 			}}
 		>
 			{/* ridges: terrain ink through the bake's stroke coverage */}

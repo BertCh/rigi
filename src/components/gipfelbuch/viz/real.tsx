@@ -491,6 +491,7 @@ export function RealPhoto({
 	aspect,
 	id,
 	alsoNames = true,
+	lines = true,
 	className,
 	children,
 }: {
@@ -528,6 +529,12 @@ export function RealPhoto({
 	id?: string;
 	/** Under the photo, list the summits whose names fit no row ("also: 1 Name · 2 Name"); default on. */
 	alsoNames?: boolean;
+	/**
+	 * Draw the in-photo prior / solved / skyline / weight strokes (default). false leaves them to the
+	 * caller's `children` (a story that wipes its own `CrispLine`s in), while `layers` still drive the
+	 * spill's echo and its pose; peak marks are drawn either way.
+	 */
+	lines?: boolean;
 	className?: string;
 	children?: (d: GipfelbuchPhotoData) => ReactNode;
 }) {
@@ -555,6 +562,7 @@ export function RealPhoto({
 	const [x0, y0, x1, y1] = crop ?? [0, 0, W, H];
 	const k = (x1 - x0) / W; // < 1 when zoomed: keeps strokes and text a constant on-screen size
 	const on = (l: PhotoLayer) => layers.includes(l) && !off.has(l);
+	const drawLine = (l: PhotoLayer) => lines && on(l);
 	// the pose the bleed is drawn at: the guess when only the guess is shown, else the story's or solved
 	const showsPrior = on("prior") || on("priorPeaks");
 	const showsSolved = on("solved") || on("peaks");
@@ -671,7 +679,7 @@ export function RealPhoto({
 						<g fill="none" strokeLinecap="round" strokeLinejoin="round">
 							{(["prior", "solved", "skyline"] as const).map(
 								(l) =>
-									on(l) && (
+									drawLine(l) && (
 										<PhotoLine
 											key={l}
 											d={rowsPath(
@@ -692,7 +700,7 @@ export function RealPhoto({
 										/>
 									),
 							)}
-							{on("weight") &&
+							{drawLine("weight") &&
 								data.skyline.rows.map((y, x) =>
 									y == null || x % Math.max(1, Math.round(4 * k)) ? null : (
 										<line
