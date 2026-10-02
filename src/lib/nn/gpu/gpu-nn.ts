@@ -64,6 +64,7 @@ import {
 	textureKernel,
 } from "./k-spatial";
 import { topkPlan } from "./k-topk";
+import { capsFromFeatures, getKernelCaps, setKernelCaps } from "./kernel-caps";
 import {
 	irfftKernels,
 	LUMA_REDUCE_MIN,
@@ -132,6 +133,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		super();
 		this.runtime = new Runtime(device);
 		this.backend = { kind: "gpu", f16: device.features.has("shader-f16") };
+		setKernelCaps(capsFromFeatures((f) => device.features.has(f as never)));
 	}
 
 	// ---- tensors ------------------------------------------------------------------------------
@@ -873,12 +875,13 @@ export class GpuNn extends BaseNn<GpuTensor> {
 	pTopk(x: GpuTensor, rows: number, len: number, k: number, out: number[]) {
 		if (
 			this.lumaOps.enabled &&
-			x.dtype === "f32" &&
+			(x.dtype === "f32" || !getKernelCaps().legacy) &&
 			rows === 1 &&
 			len >= this.lumaOps.topkMin
 		) {
-			// luma GPUSort (stable radix) of (key, index): 3x faster than the bitonic nodes at 786k
-			const plan = lumaTopkPlan(len, k);
+			// luma GPUSort (stable radix) of (key, index): 3x faster than the bitonic nodes at 786k (f16 inputs
+			// widen in the key transform, so they take this path too)
+			const plan = lumaTopkPlan(len, k, x.dtype);
 			const [keys, idx] = this.node(plan.init, [x], [[len], [len]]);
 			const [sk, sv] = this.lumaNode(plan.sort, [keys, idx], [[len], [len]]);
 			const [values, indices] = this.node(plan.final, [sk, sv], [out, out]);

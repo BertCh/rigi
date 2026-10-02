@@ -14,7 +14,7 @@ import {
 	GPUSort,
 	GPUTranspose,
 } from "#/lib/gpu/core/luma";
-import type { BinaryOp } from "../types";
+import type { BinaryOp, DType } from "../types";
 import { ENTRY } from "./k-elementwise";
 import type { LumaCall } from "./runtime";
 import { grid1d, nnKernel } from "./wgsl";
@@ -104,11 +104,11 @@ const ELEM_U32 = { keys: "u32", idx: "u32", sk: "u32", sv: "u32" };
  * ascending u32, -0 folded into +0), luma GPUSort (stable, ascending), decode of the first k.
  * Storages are f32-typed words holding u32 bit patterns.
  */
-export function lumaTopkPlan(len: number, k: number) {
+export function lumaTopkPlan(len: number, k: number, dtype: DType = "f32") {
 	const init = {
 		spec: nnKernel(
 			"lsort-init",
-			[{ name: "x", dtype: "f32" }],
+			[{ name: "x", dtype }],
 			["keys", "idx"],
 			`${ENTRY} {
   let i = lin(wid, nwg, lid);

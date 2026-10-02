@@ -12,6 +12,7 @@
 
 import { CpuNn } from "../../src/lib/nn/cpu";
 import { GpuNn } from "../../src/lib/nn/gpu/gpu-nn";
+import { setKernelCaps } from "../../src/lib/nn/gpu/kernel-caps";
 import { encodeSafetensors, floatToHalf } from "../../src/lib/nn/safetensors";
 import type { Nn, Tensor } from "../../src/lib/nn/types";
 import { dawnDevice } from "./dawn";
@@ -26,7 +27,7 @@ if (!device) {
 	console.log("SKIP nn-parity: DAWN_DIR not set or no adapter");
 	process.exit(0);
 }
-const gpu = new GpuNn(device);
+let gpu = new GpuNn(device);
 const cpu = new CpuNn();
 console.log(`nn-parity: f16 storage ${gpu.backend.f16 ? "yes" : "no"}`);
 
@@ -277,6 +278,85 @@ const cases: Case[] = [
 		weights: [2],
 		fn: (nn, x, off, w) =>
 			nn.deformConv2d(x, off, null, w, null, { padding: 1, offsetGroups: 2 }),
+	},
+	// RT-1 kernels: vec4 operand loads, 8 × 4 tiles, gathering conv loader, wide attention, f16 topk
+	{
+		name: "matmul-vecA-scalarB",
+		shapes: [
+			[133, 64],
+			[64, 19],
+		],
+		fn: (nn, a, b) => nn.matmul(a, b),
+	},
+	{
+		name: "matmul-scalarA-vecB",
+		shapes: [
+			[133, 71],
+			[71, 20],
+		],
+		fn: (nn, a, b) => nn.matmul(a, b),
+	},
+	{
+		name: "matmul-vec-batch-8x4",
+		shapes: [
+			[3, 150, 96],
+			[96, 132],
+		],
+		fn: (nn, a, b) => nn.matmul(a, b),
+	},
+	{
+		name: "linear-8x4-bias-act",
+		shapes: [[2, 140, 100], [196, 100], [196]],
+		weights: [1, 2],
+		fn: (nn, x, w, b) => nn.gelu(nn.linear(x, w, b)),
+	},
+	{
+		name: "conv-g4-wrap",
+		shapes: [[1, 16, 23, 37], [16, 16, 3, 3], [16]],
+		weights: [1, 2],
+		fn: (nn, x, w, b) => nn.conv2d(x, w, b, { padding: 1 }),
+	},
+	{
+		name: "conv-g4-stride-nopad",
+		shapes: [
+			[2, 5, 31, 29],
+			[12, 5, 3, 3],
+		],
+		weights: [1],
+		fn: (nn, x, w) => nn.conv2d(x, w, null, { stride: 2 }),
+	},
+	{
+		name: "conv-g4-1x1-big",
+		shapes: [
+			[1, 48, 33, 41],
+			[96, 48, 1, 1],
+		],
+		weights: [1],
+		fn: (nn, x, w) => nn.conv2d(x, w),
+	},
+	{
+		name: "attention-long",
+		shapes: [
+			[1, 2, 530, 64],
+			[1, 2, 301, 64],
+			[1, 2, 301, 64],
+		],
+		fn: (nn, q, k, v) => nn.attention(q, k, v),
+	},
+	{
+		name: "attention-d30",
+		shapes: [
+			[1, 2, 300, 30],
+			[1, 2, 77, 30],
+			[1, 2, 77, 30],
+		],
+		fn: (nn, q, k, v) => nn.attention(q, k, v),
+	},
+	{
+		name: "topk-f16-luma",
+		shapes: [[1, 70000]],
+		weights: [0],
+		fn: (nn, x) => nn.topk(x, 700),
 	},
 	// normalisation
 	{
@@ -748,6 +828,87 @@ if (gpu.runtime.stats.graphHits <= before) {
 	rows.push(`${ok ? "PASS" : "FAIL"} eager ops outside forward: ${got}`);
 }
 if (!argv.includes("--no-f16") && gpu.backend.f16) await runPass(true);
+// kernel variants (src/lib/nn/gpu/kernel-caps.ts): each tile / option against the CPU, on a fresh
+// backend so no cached graph from another variant is reused
+{
+	const variantCases = new Set([
+		"matmul-ragged",
+		"matmul-vecA-scalarB",
+		"matmul-scalarA-vecB",
+		"matmul-vec-batch-8x4",
+		"matmul-transB",
+		"linear-big",
+		"conv3x3",
+		"conv-g4-wrap",
+		"conv-1x1",
+		"attention-long",
+		"attention-mask",
+	]);
+	const variants: [string, Parameters<typeof setKernelCaps>[0]][] = [
+		["legacy", { legacy: true }],
+		["tile 4x4", { gemmTileOverride: "4x4" }],
+		["tile 8x8", { gemmTileOverride: "8x8" }],
+		["tile 4x8", { gemmTileOverride: "4x8" }],
+		["tile n4x4", { gemmTileOverride: "n4x4" }],
+		["tile m4x4", { gemmTileOverride: "m4x4" }],
+		["tile s8x4", { gemmTileOverride: "s8x4" }],
+		[
+			"attention 128x2",
+			{ attentionTileOverride: { threads: 128, queriesPerThread: 2 } },
+		],
+		[
+			"attention 64x1",
+			{ attentionTileOverride: { threads: 64, queriesPerThread: 1 } },
+		],
+	];
+	const baseCaps = {
+		legacy: false,
+		gemmTileOverride: null,
+		attentionTileOverride: null,
+		f16Math: false,
+		f16Accumulate: false,
+	};
+	const f16Variants: [string, Parameters<typeof setKernelCaps>[0], number][] = [
+		["f16 products, f32 accumulate", { f16Math: true }, 3e-3],
+		[
+			"f16 products and accumulate",
+			{ f16Math: true, f16Accumulate: true },
+			3e-2,
+		],
+	];
+	for (const [label, caps] of variants) {
+		gpu = new GpuNn(device);
+		setKernelCaps({ ...baseCaps, ...caps });
+		const first = rows.length;
+		await runPass(false, variantCases);
+		for (let i = first; i < rows.length; i++)
+			rows[i] = rows[i].replace(/^(PASS|FAIL) /, `$1 [${label}] `);
+	}
+	if (gpu.backend.f16)
+		for (const [label, caps, tol] of f16Variants) {
+			gpu = new GpuNn(device);
+			setKernelCaps({ ...baseCaps, ...caps });
+			const first = rows.length;
+			const saved = cases.map((c) => c.tol);
+			for (const c of cases) c.tol = Math.max(c.tol ?? 0, tol);
+			await runPass(
+				true,
+				new Set([
+					"linear",
+					"linear-big",
+					"matmul-transB",
+					"linear-8x4-bias-act",
+				]),
+			);
+			cases.forEach((c, i) => {
+				c.tol = saved[i];
+			});
+			for (let i = first; i < rows.length; i++)
+				rows[i] = rows[i].replace(/^(PASS|FAIL) /, `$1 [${label}] `);
+		}
+	setKernelCaps(baseCaps);
+	gpu = new GpuNn(device);
+}
 for (const r of rows) console.log(r);
 console.log(
 	`nn-parity: ${rows.length - failed}/${rows.length} pass; graphs ${gpu.runtime.stats.graphs}, nodes ${gpu.runtime.stats.nodes}`,
