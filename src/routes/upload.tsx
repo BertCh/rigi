@@ -39,6 +39,11 @@ import {
 	withPosition,
 } from "#/lib/upload";
 import {
+	type CoachInput,
+	coachLocation,
+	isIosUserAgent,
+} from "#/lib/upload/coach";
+import {
 	LGPL_TEXT,
 	LIBHEIF_FILE_URL,
 	THIRD_PARTY,
@@ -540,40 +545,11 @@ function Warnings({
 		body: React.ReactNode;
 		tone: "amber" | "sky";
 	}[] = [];
-	if (!diag.hasGps)
-		items.push({
-			tone: "amber",
-			title: "No GPS position in this file",
-			body: (
-				<>
-					{diag.hasExif
-						? "The photo has EXIF but its location was removed."
-						: "The photo has no EXIF metadata at all (screenshots, messaging apps and some exports remove it)."}{" "}
-					On iPhone, Safari strips location from photos chosen in the photo
-					picker (since iOS 16.4) unless you tap <b>Options</b> at the top of
-					the picker and turn <b>Location</b> on. Using <b>Choose File</b> from
-					the Files app, or AirDropping the original to a computer, keeps it
-					too. For now, click the map to place where you stood.
-				</>
-			),
-		});
-	if (!diag.hasHeading)
-		items.push({
-			tone: "sky",
-			title: "No compass heading",
-			body: "The camera direction is unknown, so alignment will search all 360° of the horizon (slower, and less reliable in repetitive terrain).",
-		});
 	if (diag.headingMagnetic)
 		items.push({
 			tone: "sky",
 			title: "Magnetic heading",
 			body: "The heading is relative to magnetic north (a few degrees off true north in the Alps). Alignment corrects small offsets.",
-		});
-	if (!diag.hasGravity)
-		items.push({
-			tone: "sky",
-			title: "No gravity sensor data",
-			body: "No Apple MakerNote acceleration vector was found, so the prior pitch and roll are 0°; alignment will estimate them.",
 		});
 	if (!diag.hasF35)
 		items.push({
@@ -595,9 +571,9 @@ function Warnings({
 			title: "Imprecise GPS",
 			body: `GPS accuracy was ±${Math.round(diag.gpsAccuracy)} m. Drag the pin if you know the exact spot.`,
 		});
-	if (!items.length) return null;
 	return (
 		<div className="space-y-2" data-testid="upload-warnings">
+			<LocationCoach diag={diag} />
 			{items.map((w) => (
 				<div
 					key={w.title}
@@ -609,6 +585,49 @@ function Warnings({
 					{w.body}
 				</div>
 			))}
+		</div>
+	);
+}
+
+/** R7 coaching: which of position, heading and tilt the file carried, and how to record the rest. */
+function LocationCoach({ diag }: { diag: CoachInput }) {
+	const ios =
+		typeof navigator !== "undefined" &&
+		isIosUserAgent(navigator.userAgent, navigator.maxTouchPoints);
+	const c = coachLocation(diag, { ios });
+	const quiet = c.status === "complete";
+	return (
+		<div
+			className={`rounded-md p-3 text-xs leading-relaxed ${quiet ? "bg-[color-mix(in_oklab,var(--rigi-result)_8%,transparent)]" : "bg-[color-mix(in_oklab,var(--rigi-lesson)_10%,transparent)]"}`}
+			data-testid="location-coach"
+			data-status={c.status}
+		>
+			<p className="font-semibold text-white/85">{c.headline}</p>
+			<ul className="mt-1.5 flex gap-4" aria-label="Sensor data in this photo">
+				{c.sensors.map((s) => (
+					<li
+						key={s.id}
+						className={`flex items-center gap-1.5 ${s.present ? "text-white/80" : "text-white/50"}`}
+					>
+						<span
+							aria-hidden
+							className={`inline-block size-2 rounded-full ${s.present ? "bg-[var(--rigi-result)]" : "ring-1 ring-current"}`}
+						/>
+						{s.label}
+						<span className="sr-only">
+							{s.present ? "recorded" : "missing"}
+						</span>
+					</li>
+				))}
+			</ul>
+			{c.note && <p className="mt-2 text-white/60">{c.note}</p>}
+			{c.steps.length > 0 && (
+				<ol className="mt-2 list-decimal space-y-1 pl-4 text-white/70 marker:text-white/40">
+					{c.steps.map((s) => (
+						<li key={s.id}>{s.text}</li>
+					))}
+				</ol>
+			)}
 		</div>
 	);
 }
