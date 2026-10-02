@@ -99,6 +99,14 @@ export const FLAG_SCHEMA = {
 	 */
 	skylineGpu: onOff("off"),
 	/**
+	 * unknown-pose cascade (integration/unknown-pose-core.ts isAmbiguousFocal): on = the focal `ambiguous`
+	 * test ignores a non-best focal seed that accepted only through refinePose after a solve stage under
+	 * SEED_REFINE_MIN_SOLVE_CONFIDENCE (chaotic at 1e-4 px row noise; research_notes/wave5/skyline-gpu-flip.md).
+	 * It only removes vetoes, so it can only add accepts: GT-12 CPU 60/60 decisions unchanged, wild set not
+	 * measured. Off by default until the batch unknown-pose A/B (roadmap G2).
+	 */
+	focalSeedGate: onOff("off"),
+	/**
 	 * band colour stats (LOOK_HARMONIZE, src/lib/gpu/look/color-stats-fold.ts): gpu (default since
 	 * 2026-10-01) = the per-workgroup partials are folded and finalized on the GPU (luma GPUProgramSpMV +
 	 * a finalize node, f32) and only the ColorStats (256 B) is read back; f64 = the partials (6.6 KB) come

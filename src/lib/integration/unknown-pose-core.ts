@@ -15,6 +15,7 @@ import {
 	vfovFromHfov,
 } from "#/lib/camera";
 import { type DemSource, MAPTERHORN } from "#/lib/dem";
+import { getFlag } from "#/lib/flags";
 import type { HorizonProfile } from "#/lib/geo/horizon";
 import {
 	type CascadeOptions,
@@ -246,7 +247,9 @@ export async function solveUnknownPose(
 	// one field of view (IMG_7068 with nothing known: 66° and 78° vfov both accepted, 1.6° apart). Ambiguous.
 	// And a wrong focal seed can accept at a middling confidence (IMG_7053 focal-only: 0.68 at 40° vfov,
 	// 4° off; a correct one scored 0.66): like solvePose's 360° fallback, demand ≥ 0.75 then.
-	const ambiguous = req.unknown.focal && isAmbiguousFocal(seeds, b);
+	const ambiguous =
+		req.unknown.focal &&
+		isAmbiguousFocal(seeds, b, getFlag("focalSeedGate") === "on");
 	const weak360 = req.unknown.yaw && b.confidence < YAW_UNKNOWN_MIN_CONFIDENCE;
 	// matcher seeds: the chosen focal seed's stages first, then the other focal seeds'. Each wrong seed costs
 	// a local render + match on the server, so drop near-duplicates and cap the count.

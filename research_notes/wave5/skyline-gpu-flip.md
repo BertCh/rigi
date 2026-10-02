@@ -49,7 +49,10 @@ can guarantee an identical accept set. Full 77-decision and wild A/B were not re
 Make the cascade less brittle on wrong-focal seeds, e.g. ignore non-best seeds whose solve confidence is under ~0.1 in
 the `ambiguous` test, or demand a higher refine score for them. That changes CPU behaviour and needs the wild dev A/B.
 
-## Fix (2026-10-02, pod B unit g2)
+## Fix (2026-10-02, pod B unit g2; opt-in `?focalSeedGate=on`, default off)
+
+The pod manager put the floor behind `focalSeedGate` (default off, forwarded to workers): it only removes vetoes, so it can
+only add accepts, and the wild set is unmeasured. Precision first: the batch A/B decides the default.
 
 `isAmbiguousFocal` (`src/lib/integration/unknown-pose-core.ts`) now ignores a non-best focal seed as an
 "alternative accepted fit" when its accept came only from `refinePose` and its solve stage was under
@@ -59,11 +62,11 @@ A solve-stage accept, a refine accept whose solve reached 0.25, the best seed it
 solve support), never add one; precision-wise that is the direction to check, see below.
 
 Evidence (dev, GT-12, CPU path, node):
-- `src/lib/integration/focal-seed-noise.check.ts` (row noise 0, 1e-6, 1e-5, 1e-4, 1e-3 px on IMG_6958 none+nofocal):
+- `scripts/gpu/focal-seed-noise.ts` (row noise 0, 1e-6, 1e-5, 1e-4, 1e-3 px on IMG_6958 none+nofocal):
   with 4 noise realisations per level (`... IMG_6958 4`, 17 CPU solves): the post-fix decision is accept in all 17; the
   pre-fix rule (`isAmbiguousFocal(..., false)`, computed from the same seeds) flips to reject in 3 of 17 (1e-5 #3, 1e-4 #2,
   1e-3 #2: seed 3 solve 0.063..0.064 -> refine accept 0.69..0.70 at yaw 47.5) and is accept in the other 14. The default
-  run (1 realisation per level, CI row `focal-seed-noise`, SKIPs without the gitignored inputs) does not hit a flipping
+  run (1 realisation per level, SKIPs without the gitignored inputs) does not hit a flipping
   realisation; the 4-realisation run does. Flipping is by realisation, not monotone in amplitude.
 - `scripts/gpu/unknown-gpu-node.ts --set gt12 --unknown-gpu off --skyline-gpu off`, before vs after: 60 decisions
   (12 photos x 5 conditions; the harness's GT-12 set), 0 changed (accept, pose and confidence all identical), 34 accepts

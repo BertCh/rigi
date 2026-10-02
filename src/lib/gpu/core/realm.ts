@@ -27,6 +27,7 @@ export const FORWARDED_FLAGS = [
 	"mosaicGpu",
 	"horizonPrecision",
 	"skylineGpu",
+	"focalSeedGate",
 	"unknownGpu",
 	"alignPrecision",
 	"skyGpuPrep",

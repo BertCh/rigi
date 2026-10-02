@@ -5,23 +5,28 @@
 // Noise-injection check for the unknown-pose accept decision (research_notes/wave5/skyline-gpu-flip.md):
 // GT-12 IMG_6958 none+nofocal, CPU only, seeded uniform noise of +-a px added to the skyline rows before the
 // cascade. The accept decision must be identical for a = 0, 1e-6, 1e-5, 1e-4, 1e-3 (before the
-// SEED_REFINE_MIN_SOLVE_CONFIDENCE floor the wrong-focal third seed refined into an accept between 1e-5 and
-// 1e-4). SKIPs (exit 0) without the photo, the GT-12 manifest or the DEM tile cache (all gitignored).
-//   npx tsx src/lib/integration/focal-seed-noise.check.ts [IMG_6958]
+// SEED_REFINE_MIN_SOLVE_CONFIDENCE floor (?focalSeedGate=on, default off) the wrong-focal third seed refined into an accept between 1e-5 and
+// 1e-4). Manual script, not a CI row (5+ full CPU cascades take minutes). SKIPs (exit 0) without the photo, the GT-12 manifest or the DEM tile cache (all gitignored).
+//   npx tsx scripts/gpu/focal-seed-noise.ts [IMG_6958]
 import fs from "node:fs";
 import path from "node:path";
 import { MAPTERHORN } from "#/lib/dem";
-import { demTileLoaderNode, loadRGBA } from "../../../scripts/lib/node-io";
-import type { UnknownPoseRequest } from "./unknown-pose";
+import type { UnknownPoseRequest } from "#/lib/integration/unknown-pose";
 import {
 	computeUnknownScene,
 	isAmbiguousFocal,
 	SEED_REFINE_MIN_SOLVE_CONFIDENCE,
 	solveUnknownPose,
 	type UnknownScene,
-} from "./unknown-pose-core";
+} from "#/lib/integration/unknown-pose-core";
+import { demTileLoaderNode, loadRGBA } from "../lib/node-io";
 
-const ROOT = path.resolve(import.meta.dirname, "../../..");
+// the floor is opt-in (?focalSeedGate=on, default off until the batch A/B): this check measures it switched on
+(globalThis as { __RIGI_FLAGS__?: Record<string, string> }).__RIGI_FLAGS__ = {
+	focalSeedGate: "on",
+};
+
+const ROOT = path.resolve(import.meta.dirname, "../..");
 const ID = process.argv[2] ?? "IMG_6958";
 const NOISE_PX = [0, 1e-6, 1e-5, 1e-4, 1e-3];
 // noise realisations per level (argv[3]); the old decision flips only for some realisations
