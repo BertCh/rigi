@@ -29,6 +29,19 @@ the middle of a sort; an evicted graph is rebuilt and compiled at the next sort 
 pipeline cache. With `__RIGI_GPU_PROFILE__` the GPU time is reported per node as
 `splat-sort|<key>/<node>` (it was one `splatsort` pass).
 
+## luma GPUSort variant (flag `splatSortGpgpu`, default on)
+
+With the flag on, the four tile / scan-digit / scan-totals / scatter nodes per pass are replaced by one
+luma gpgpu `GPUSort` (stable radix, `keyBits: 17`) after the same depth and keys kernels: keys are the
+sort keys, an identity buffer (the `tmp` buffer, written once at construction) is the payload, and the
+payload output is the order buffer; `rank` takes the unused sorted-key output and `hist` / `base` shrink
+to 16 bytes. The order is element for element the same as the in-house passes (both are stable, so ties
+keep ascending index; checked against `cpu.ts radixOrderTiled` by `scripts/gpu/splat-sort-gpgpu-dawn.ts`).
+If the GPUSort graph fails to build or compile, the sorter logs a warning and rebuilds with the in-house
+passes. `?splatSortGpgpu=off` selects the in-house passes. Numbers: `scripts/gpu/splat-sort-gpgpu-dawn.ts`
+(Dawn in node) and `scripts/gpu/splat-sort-bench.mjs --query "?splatSortGpgpu=off"` (Chrome).
+GPUBitonic (`algorithm: "bitonic"`) was 5 to 8 times slower at 100k to 1M splats and is not used.
+
 ## Identity with the worker's order
 
 The worker keys: `dist = -(a x + b y + c z + d)` (kept when `dist > 0`), range `[minD, maxD]` over the

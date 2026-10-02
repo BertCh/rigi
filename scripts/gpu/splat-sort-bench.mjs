@@ -55,7 +55,7 @@ page.on("console", (m) => {
 	if (m.type() === "error" || m.type() === "warning")
 		console.log(`[page ${m.type()}]`, m.text().slice(0, 600));
 });
-await page.goto(`${BASE}/photos/IMG_7086.jpg`);
+await page.goto(`${BASE}/photos/IMG_7086.jpg${arg("query", "")}`);
 const result = await page.evaluate(
 	async ({ sizes, reps }) => {
 		const dev = await import("/src/lib/gpu/device.ts");

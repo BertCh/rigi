@@ -107,6 +107,12 @@ export const FLAG_SCHEMA = {
 	 */
 	terrainGpuCull: onOff("on"),
 	/**
+	 * WebGPU splat sort: luma's gpgpu GPUSort (stable radix, 17 key bits) replaces the in-house
+	 * tile/scan/scatter passes after the depth and key kernels (LF5; identical order, measured in
+	 * scripts/gpu/splat-sort-gpgpu-dawn.ts). off = the in-house radix passes.
+	 */
+	splatSortGpgpu: onOff("on"),
+	/**
 	 * WebGPU terrain stream: Terrarium tiles decode on the GPU straight into the height atlas (WAG W2.3,
 	 * deck-webgpu/terrain-gpu-decode.ts) and CPU heights are produced only when a CPU consumer asks
 	 * (W2.4 getCpuHeights). Same heights bit for bit (texel bytes == canvas bytes, measured); off = the
