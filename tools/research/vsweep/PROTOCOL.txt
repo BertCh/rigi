@@ -1,0 +1,40 @@
+VSWEEP (VS): a vertical pass after the horizontal sweep, using skyline peak detection   written 2026-10-01, BEFORE any VS number
+=====================================================================================================================================
+Question (user, 2026-10-01): "we do a horizontal sweep to optimise placement; can we subsequently do a vertical one using peak
+detection?" The horizontal stages (geo solvePose's coarse yaw x pitch grid + LM; the app's autoAlign coarse yaw x pitch grid +
+coordinate descent on its edge map) already fit pitch jointly. VS asks whether a SECOND, pitch-only pass with yaw (and roll, focal)
+held fixed, anchored on matched skyline peaks, brings pitch closer to ground truth than the horizontal stage leaves it.
+
+Prior art (lit search 2026-10-01): no published pipeline refines pitch from peak points after azimuth; dense contour matching
+dominates. Known pitfall: DEMs blunt summit tips (always lower), so tip-to-tip residuals are biased; saddles are not blunted.
+
+Data: the GT photos with quality good|approx in data/ground-truth.json that have img/*.HEIC (14). No wild/data_v3/test photos.
+DEM/eye: scripts/lib/pipeline-node.ts photoContext (Terrarium default, EYE=max) - the same horizon both the horizontal stage and
+the vertical pass read. GT noise: approx entries 0.2-0.4 deg; differences below ~0.05 deg pitch are reported as ties.
+
+Horizontal stages (H), unchanged code:
+  H_geo  solvePose(prior, horizon, detectSkyline(800 px))          (the /baseline + upload-worker core)
+  H_app  autoAlign(prior, 512 px edge map, horizon dirs @0.2 deg)  (the live /photo path, CPU reference)
+Vertical arms, each run on every H output (yaw, roll, focal held fixed; pitch swept over +-1.5 deg in 0.01 deg steps around H):
+  V0     none (H as is)
+  VD     DENSE: cost = sum_x w_x * min(|y_photo(x) - y_dem(x; pitch)|, 6 px) over confident photo skyline columns
+  VP     PEAKS: one detector both sides (peakfix profilePeaks on -y, prominence >= 6 px, window 40 px, @1600 px basis);
+         DEM peaks from the DEM skyline rows at the H pose; mutual nearest association within 25 px; residual = photo apex y
+         minus DEM apex y (both parabola-refined; the DEM apex is a fixed world direction re-projected per pitch). Apex-to-apex
+         is invariant to a small residual yaw error, which a same-x comparison is not (error = yaw error x local slope).
+         Cost = sum min(|r|, 6 px). Needs >= 3 matches, else falls back to V0.
+  VS     SADDLES: as VP with local MAXIMA of y (cols, saddles) instead of peaks.
+  VPS    VP and VS matches pooled.
+Pixel basis: 1600 px long side. Photo skyline for VD/VP/VS: detectSkyline on the 1600 px JPEG (weight >= 0.3).
+
+Metrics vs GT: |pitch error| (deg); vertical skyline error = mean |row(est) - row(GT)| of the DEM skyline at 1600 px.
+Robustness: each arm is also run with the H pitch perturbed by -1.0, -0.5, +0.5, +1.0 deg (capture range).
+Diagnostic (no decision): signed photo-minus-DEM residual at the GT pose on peaks, saddles and all columns (DEM tip blunting).
+
+Decision rule (fixed now). VP is WORTH WIRING INTO THE APP only if ALL hold on BOTH H_geo and H_app:
+  1. median |pitch err| of VP <= median of V0 - 0.05 deg;
+  2. no photo's |pitch err| gets worse by more than 0.15 deg vs V0;
+  3. VP median <= VD median (peaks must beat the dense vertical sweep, otherwise the dense sweep is the better design).
+If 1-2 hold for VD but not VP, the recommendation is a DENSE vertical pass. Otherwise: negative result, recorded in
+reports/negative-results.md. Any change after the first number is a labelled amendment; the frozen run is kept.
+Code: scripts/vsweep/** (eval + algorithm). Output: out/vsweep/. Report: tools/research/vsweep/REPORT.md.
