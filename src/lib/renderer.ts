@@ -21,6 +21,7 @@ import type { Pose } from "./camera";
 import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
 import type { LiveRendererApi } from "./live/contract";
+import type { LiveSplatSource } from "./nearfield/live/types";
 import type { NearFieldScene, NearFieldViewOpts } from "./nearfield/types";
 import type { ByteMask } from "./ontology/core/geometry";
 import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
@@ -113,6 +114,14 @@ export interface Renderer extends LiveRendererApi {
 	 * view / step-inside camera (deck: also the photo view); the world drape skips the scene's Object pixels.
 	 */
 	setNearField(scene: NearFieldScene | null, opts?: NearFieldViewOpts): void;
+	/**
+	 * Live Step Inside, WebGPU engine only: draw a GPU-resident splat source (nearfield/live) directly. The
+	 * WebGL2 engine does not have it; nearfield/live/bridge.ts reads back at a low rate into setNearField.
+	 */
+	setNearFieldLive?(
+		source: LiveSplatSource | null,
+		opts?: NearFieldViewOpts,
+	): void;
 
 	// ---- queries ----
 	/** Resolves true once sampleAt / peakLabels describe the current pose (false if disposed first). */

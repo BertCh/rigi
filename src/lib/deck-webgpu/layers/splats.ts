@@ -77,6 +77,7 @@ import { getFlag } from "#/lib/flags";
 import { onLost } from "#/lib/gpu/core/lifecycle";
 import { GpuSplatSorter, gpuSplatSortSupported } from "#/lib/gpu/splat-sort";
 import { SortBackendState } from "#/lib/gpu/splat-sort/fallback";
+import type { LiveSplatSource } from "#/lib/nearfield/live/types";
 import {
 	PROVENANCE_COLORS_BY_CODE,
 	PROVENANCE_TINT_MIX,
@@ -489,6 +490,9 @@ export type SplatsStats = {
 
 type Gpu = {
 	cloud: GaussianCloud;
+	/** A live GPU splat source (setLiveSource): `data` is the source's buffer, not ours; no CPU cloud, no worker. */
+	live?: LiveSplatSource;
+	liveVersion?: number;
 	data: Buffer;
 	order: Buffer;
 	/** identity order for the geometry pass (created on first use) */
@@ -694,6 +698,81 @@ export class SplatsCore implements GpuLayerCore {
 		}
 	}
 
+	/**
+	 * Draw a live GPU splat source (nearfield/live): its storage buffer is the splat data (the layout above),
+	 * dead slots carry a NaN position and alpha 0. The Rigi shader and the GPU sort run on it; the luma
+	 * renderer and the worker sort need a CPU cloud and are not used, so a failed GPU sort leaves the
+	 * identity order. A new `getVersion()` re-sorts. setCloud(null) keeps the live source (the engine's sync
+	 * calls it every frame); a non-null cloud or setLiveSource(null) replaces it.
+	 */
+	setLiveSource(source: LiveSplatSource | null) {
+		if (source && this.gpu?.live === source) return;
+		this.releaseGpu();
+		this.cloud = null;
+		this.lumaFailed = false;
+		if (!source) {
+			this.stats.count = 0;
+			return;
+		}
+		const n = source.capacity;
+		const d = this.device;
+		const initial = new Uint32Array(n);
+		for (let i = 0; i < n; i++) initial[i] = i;
+		const order = d.createBuffer({
+			id: `${this.id}-order`,
+			data: initial,
+			usage: STORAGE | COPY_DST,
+		});
+		this.stats.renderer = "rigi";
+		this.stats.lod = null;
+		this.stats.count = n;
+		this.stats.sortFallbackReason = null;
+		const wantGpu =
+			this.options.sortBackend === "gpu" && gpuSplatSortSupported(d);
+		const g: Gpu = {
+			cloud: {
+				count: n,
+				frame: "enu",
+				positions: new Float32Array(0),
+				scales: new Float32Array(0),
+				rotations: new Float32Array(0),
+				colors: new Uint8Array(0),
+				provenance: new Uint8Array(0),
+			},
+			live: source,
+			liveVersion: -1,
+			data: source.buffer,
+			order,
+			sorter: null,
+			state: new SortBackendState(wantGpu ? "gpu" : "worker", (reason) =>
+				this.switchToWorker(g, reason),
+			),
+			validSorts: 0,
+			drawCount: n,
+			dirty: true,
+		};
+		this.gpu = g;
+		this.stats.worker = false;
+		this.stats.sortBackend = wantGpu ? "gpu" : "worker";
+		if (!wantGpu) return;
+		try {
+			const gs = new GpuSplatSorter(d, source.buffer, order, n);
+			g.gpuSort = gs;
+			g.state.watch(gs.ready, "pipeline");
+			gs.ready.then(
+				() => {
+					if (this.gpu === g && g.state.backend === "gpu") {
+						g.dirty = true;
+						this.onChange?.();
+					}
+				},
+				() => {},
+			);
+		} catch (e) {
+			g.state.fail(`init: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
 	/** Abandon the luma renderer for this cloud: one warning, then the Rigi path. */
 	private failLuma(reason: string) {
 		console.warn(`[deck-webgpu splats] luma splat renderer off: ${reason}`);
@@ -744,6 +823,14 @@ export class SplatsCore implements GpuLayerCore {
 		if (this.gpu !== g) return;
 		this.stats.sortFallbackReason = reason;
 		const n = g.cloud.count;
+		if (g.live) {
+			// no CPU positions to sort: keep the identity order (or the last valid GPU order)
+			g.gpuSort?.destroy();
+			g.gpuSort = undefined;
+			this.stats.sortBackend = "worker";
+			this.onChange?.();
+			return;
+		}
 		if (g.validSorts === 0) {
 			const id = new Uint32Array(n);
 			for (let i = 0; i < n; i++) id[i] = i;
@@ -795,6 +882,13 @@ export class SplatsCore implements GpuLayerCore {
 	/** Request a back-to-front sort when the view camera has moved / turned enough since the last one. */
 	private maybeSort(g: Gpu, cam: CameraUniforms) {
 		const { sorter, spare, gpuSort } = g;
+		if (g.live) {
+			const version = g.live.getVersion();
+			if (version !== g.liveVersion) {
+				g.liveVersion = version;
+				g.dirty = true;
+			}
+		}
 		// a sort is in flight: its landing calls onChange → a redraw, which re-checks the camera
 		if (!gpuSort && !spare) return;
 		const row = splatDepthRow(cam);
@@ -872,7 +966,7 @@ export class SplatsCore implements GpuLayerCore {
 		}
 		const g = this.gpu;
 		if (!g || ctx.kind === "screen") return;
-		if (ctx.kind === "geometry" && !this.options.geometry) return;
+		if (ctx.kind === "geometry" && (!this.options.geometry || g.live)) return;
 		const model = this.model(ctx.kind);
 		let order = g.order;
 		let count = g.drawCount;
@@ -918,7 +1012,7 @@ export class SplatsCore implements GpuLayerCore {
 		if (this.lostTarget === g) this.lostTarget = null;
 		g.sorter?.dispose();
 		g.gpuSort?.destroy();
-		g.data.destroy();
+		if (!g.live) g.data.destroy();
 		g.order.destroy();
 		g.identity?.destroy();
 		this.gpu = null;

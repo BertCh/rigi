@@ -165,6 +165,7 @@ import { ReliefController } from "#/lib/look/relief/field";
 import { waterWavesAnimate } from "#/lib/look/water/waves";
 import { DeckMapCamera, MAP_VIEW_ID } from "#/lib/nearfield/deck-map-camera";
 import { type ByteMask, stepMasks } from "#/lib/nearfield/deck-step";
+import type { LiveSplatSource } from "#/lib/nearfield/live/types";
 import {
 	loadNearDem,
 	type NearDem,
@@ -674,6 +675,11 @@ export class WebGpuEngine implements Renderer {
 	/** Temporarily forces the frame view (band stats render through the photo camera classically). */
 	private viewOverride: View | null = null;
 	private loadAbort = new AbortController();
+	/** A live GPU splat source (setNearFieldLive): drawn instead of a scene's cloud. */
+	private nearFieldLive: {
+		source: LiveSplatSource;
+		opts: NearFieldViewOpts;
+	} | null = null;
 	private nearField: {
 		scene: NearFieldScene;
 		opts: NearFieldViewOpts;
@@ -1018,7 +1024,8 @@ export class WebGpuEngine implements Renderer {
 		if (this.renderSet) g.terrain.setTiles(this.renderSet.tiles);
 		this.pushImagery();
 		g.trails.setSegments(this.trails);
-		if (this.nearField) g.splats.setCloud(this.nearField.scene.splats);
+		if (this.nearFieldLive) g.splats.setLiveSource(this.nearFieldLive.source);
+		else if (this.nearField) g.splats.setCloud(this.nearField.scene.splats);
 		this.updateLook();
 		this.sync();
 	}
@@ -2681,10 +2688,12 @@ export class WebGpuEngine implements Renderer {
 		}
 		// near-field splats (the world / step view only, as deck/engine.ts)
 		const nf = this.nearField;
-		const opacity = nf?.opts.opacity ?? 1;
-		g.splats.setCloud(nf?.scene.splats.count ? nf.scene.splats : null);
-		g.splats.setOptions({ opacity, truth: !!nf?.opts.truth });
-		g.splats.setEnabled(!!nf?.scene.splats.count && opacity > 0);
+		const live = this.nearFieldLive;
+		const opacity = (live?.opts ?? nf?.opts)?.opacity ?? 1;
+		if (live) g.splats.setLiveSource(live.source);
+		else g.splats.setCloud(nf?.scene.splats.count ? nf.scene.splats : null);
+		g.splats.setOptions({ opacity, truth: !!(live?.opts ?? nf?.opts)?.truth });
+		g.splats.setEnabled(!!(live || nf?.scene.splats.count) && opacity > 0);
 	}
 
 	private harmonize(amount: number) {
@@ -3882,8 +3891,24 @@ export class WebGpuEngine implements Renderer {
 		if (this.disposed || (!scene && !this.nearField)) return;
 		if (this.step && this.nearField?.scene !== scene) this.step.masks = null;
 		this.nearField = scene ? { scene, opts: { ...opts } } : null;
+		if (scene) this.nearFieldLive = null;
 		// the photo view shows the photo (splats only in the world / step view): cores are gated
 		this.gpu?.splats.setCloud(scene?.splats.count ? scene.splats : null);
+		if (this.world?.controls) this.sync();
+	}
+
+	/**
+	 * Live Step Inside (nearfield/live): draw a GPU-resident splat source directly (no cloud, no upload);
+	 * null removes it. Replaces a scene's cloud until the next setNearField(scene). WebGL2 has no such
+	 * method: nearfield/live/bridge.ts falls back to a low-rate readback into setNearField there.
+	 */
+	setNearFieldLive(
+		source: LiveSplatSource | null,
+		opts: NearFieldViewOpts = {},
+	) {
+		if (this.disposed) return;
+		this.nearFieldLive = source ? { source, opts: { ...opts } } : null;
+		this.gpu?.splats.setLiveSource(source);
 		if (this.world?.controls) this.sync();
 	}
 
