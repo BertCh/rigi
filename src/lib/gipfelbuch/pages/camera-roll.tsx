@@ -1981,7 +1981,7 @@ function MiniPlan() {
 function MiniAim() {
 	const [photo] = useNotebookPhoto();
 	const d = useGipfelbuchPhoto(photo);
-	return <StoryMap data={d} search readout={false} />;
+	return <StoryMap data={d} search readout={false} fit="cone" aspect={4 / 3} />;
 }
 
 function RollNumbers() {

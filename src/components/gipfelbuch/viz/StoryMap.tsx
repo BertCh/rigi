@@ -5,86 +5,420 @@
 import {
 	type CSSProperties,
 	type KeyboardEvent,
+	memo,
 	type PointerEvent,
+	type ReactNode,
+	type RefObject,
 	useEffect,
+	useId,
+	useMemo,
+	useRef,
 	useState,
 } from "react";
 import { cn } from "#/lib/utils";
-import { SketchPath } from "../notebook/Ink";
-import { SWISS } from "../swiss/inks";
+import { HandScaleBar, NorthArrow } from "../notebook/carto";
+import { PenLine, SketchPath, SketchPolyline } from "../notebook/Ink";
 import { useInView, useReducedMotion } from "./hooks";
 import { inkFor, LAYER_INKS } from "./inks";
+import { HandLabel } from "./labels";
 import {
 	CrispLine,
 	coneWedge,
 	DemPatch,
 	type GipfelbuchPhotoData,
 } from "./real";
-import { poseAt, useAlignmentStory, useTween } from "./story";
+import { poseAt, useAlignmentStory } from "./story";
+import {
+	coneFitBox,
+	easeOut,
+	type FootprintRun,
+	followMode,
+	footprintRuns,
+	mapPeakSet,
+	mixHex,
+	peakInk,
+	QUICK_MS,
+	rayDraw,
+	SEARCH_LOOP_MS,
+	SETTLE_MS,
+	searchT,
+	wrap180,
+} from "./story-map";
 
 // The side map of an alignment story: the DEM patch around the camera with the view cone at the
-// story's position between the phone's guess and the solved pose. The guess (dashed) and the solved
-// cone (hairline) stay as ghosts, an arc measures the compass correction, and summits light up as the
-// cone sweeps over them. Inside an AlignmentStoryProvider the map follows the wipe or stage, and
-// dragging round the camera (or the arrow keys) drives the story from the map.
+// story's position between the phone's guess and the solved pose. It follows its photo: it names the
+// photo's own peaks in the photo's inks, draws the ground that forms the photo's skyline, and draws
+// rays to the named summits as the cone arrives. The guess (dashed) and the solved cone (hairline)
+// stay as ghosts, an arc measures the compass correction. Inside an AlignmentStoryProvider the map
+// follows the wipe or stage (settling with the geo spill, a drag at once), and dragging round the
+// camera (or the arrow keys) drives the story from the map. Spec: reports/gipfelbuch-explainers-2026-10-02/M-maps.md.
+//
+// Two layers: a memoised BASE (relief, footprint, context ticks, solved ghost, furniture) and a LIVE
+// svg on top that re-renders as t moves.
 
-/** Cone inks on paper, from the one layer table (the same as DemPatch's cones). Hex, so they can be mixed. */
 const PRIOR_INK = LAYER_INKS.prior.paperHex;
 const SOLVED_INK = LAYER_INKS.solved.paperHex;
-/** Hand block capitals for summit names (hand pass). */
-const CAPS = "var(--gb-font-caps), var(--gb-font-hand), cursive";
 /** DemPatch's square viewBox side. */
 const S = 400;
 const RAD = Math.PI / 180;
-const wrap180 = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
+const TERRAIN_INK = "var(--fig-terrain-ink, var(--gb-contour))";
 const sgn = (v: number) =>
 	`${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}`;
 
-function mixHex(a: string, b: string, t: number): string {
-	const c = (h: string, i: number) => Number.parseInt(h.slice(i, i + 2), 16);
-	const u = Math.min(1, Math.max(0, t));
-	return `#${[1, 3, 5]
-		.map((i) =>
-			Math.round(c(a, i) + (c(b, i) - c(a, i)) * u)
-				.toString(16)
-				.padStart(2, "0"),
-		)
-		.join("")}`;
+/** Motion is allowed: not reduced motion, not automation, not print. */
+function useMotionOk(): boolean {
+	const reduce = useReducedMotion();
+	const [printing, setPrinting] = useState(false);
+	useEffect(() => {
+		const m = window.matchMedia("print");
+		const f = () => setPrinting(m.matches);
+		f();
+		m.addEventListener("change", f);
+		return () => m.removeEventListener("change", f);
+	}, []);
+	return !reduce && !printing && !navigator.webdriver;
 }
 
-/**
- * "Try small turns": with no story around it, the map can play the search itself, a damped sweep
- * either side of the guess that settles on the solved pose. Static at the solved pose under reduced
- * motion and automation.
- */
-function useSearchSweep(
+/** The search loop clock; re-renders only the component that holds it, and only while on screen. */
+function useSearchClock(
 	on: boolean,
-): [ReturnType<typeof useInView<HTMLDivElement>>[0], number] {
+): [
+	RefObject<HTMLDivElement | null>,
+	{ t: number; fade: number; rays: number },
+] {
 	const [ref, inView] = useInView<HTMLDivElement>({ once: false });
-	const reduce = useReducedMotion();
-	const [t, setT] = useState(1);
+	const motion = useMotionOk();
+	const [state, setState] = useState({ t: 1, fade: 0, rays: 1 });
 	useEffect(() => {
-		if (!on || !inView || reduce || navigator.webdriver) {
-			setT(1);
+		if (!on || !inView || !motion) {
+			setState({ t: 1, fade: 0, rays: 1 });
 			return;
 		}
-		const period = 5200;
 		const t0 = performance.now();
 		let raf = 0;
 		let lastFrame = Number.NEGATIVE_INFINITY;
 		const tick = (now: number) => {
 			raf = requestAnimationFrame(tick);
-			// 30 fps cap: a state update per display frame (120 Hz) re-renders the map for no visible gain
+			// 30 fps cap (landing perf): a state update per display frame buys nothing visible
 			if (now - lastFrame < 1000 / 30 - 2) return;
 			lastFrame = now;
-			const u = ((now - t0) % period) / (period * 0.72);
-			// from the guess, overshoot both ways, settle; then hold on the solution
-			setT(u >= 1 ? 1 : 1 - Math.cos(3 * Math.PI * u) * (1 - u) ** 1.4);
+			const { t, fade, rays } = searchT((now - t0) % SEARCH_LOOP_MS);
+			setState((s) =>
+				s.t === t && s.fade === fade && s.rays === rays ? s : { t, fade, rays },
+			);
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
-	}, [on, inView, reduce]);
-	return [ref, t];
+	}, [on, inView, motion]);
+	return [ref, state];
+}
+
+/**
+ * Follows the story's t: settles to it over SETTLE_MS (ease.out, like the geo spill's slide), but
+ * at once for a drag (this map's own pointer, the story's `instant` flag, or a run of small fast steps).
+ */
+function useFollowT(
+	target: number,
+	enabled: boolean,
+	dragging: RefObject<boolean>,
+	storyInstant: boolean | undefined,
+): number {
+	const motion = useMotionOk();
+	const [v, setV] = useState(target);
+	const cur = useRef(target);
+	const prev = useRef({ target, at: performance.now() });
+	useEffect(() => {
+		if (!enabled) return;
+		const next = { target, at: performance.now() };
+		const mode = followMode(prev.current, next);
+		prev.current = next;
+		const from = cur.current;
+		if (
+			!motion ||
+			storyInstant ||
+			dragging.current ||
+			mode === "instant" ||
+			Math.abs(from - target) < 1e-4
+		) {
+			cur.current = target;
+			setV(target);
+			return;
+		}
+		const t0 = performance.now();
+		let raf = 0;
+		const tick = (now: number) => {
+			const u = Math.min(1, (now - t0) / SETTLE_MS);
+			cur.current = from + (target - from) * easeOut(u);
+			setV(cur.current);
+			if (u < 1) raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	}, [target, enabled, motion, dragging, storyInstant]);
+	return enabled ? v : target;
+}
+
+/** Rendered width of an element, px (0 until measured). */
+function useWidth(ref: RefObject<HTMLElement | null>): number {
+	const [w, setW] = useState(0);
+	useEffect(() => {
+		const el = ref.current;
+		if (!el || typeof ResizeObserver === "undefined") return;
+		const ro = new ResizeObserver(([e]) => setW(e.contentRect.width));
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [ref]);
+	return w;
+}
+
+const BaseMap = memo(function BaseMap({
+	d,
+	runs,
+	context,
+	furniture,
+}: {
+	d: GipfelbuchPhotoData;
+	runs: FootprintRun[];
+	context: { az: number; distance: number }[];
+	furniture: boolean;
+}) {
+	const half = d.demPatch.halfKm * 1000;
+	const reach = half * 1.6;
+	return (
+		<DemPatch
+			data={d}
+			cone={[]}
+			peaks={false}
+			imprint={false}
+			furniture={false}
+		>
+			{(_, toPx) => (
+				<g>
+					{runs.map((r) => (
+						<SketchPolyline
+							key={`${r.az0}-${r.az1}`}
+							points={r.pts}
+							seed={`${d.id}-sm-fp-${r.az0}`}
+							data
+							passes={1}
+							color={TERRAIN_INK}
+							width={0.9}
+							opacity={0.35}
+						/>
+					))}
+					{context.map((p) => {
+						const [x, y] = toPx(p.az, p.distance);
+						if (x < 4 || y < 4 || x > S - 4 || y > S - 4) return null;
+						return (
+							<path
+								key={`${p.az}-${p.distance}`}
+								d={`M${x} ${y - 3}l-2.6 4.5h5.2z`}
+								fill="none"
+								stroke="var(--gb-pencil)"
+								strokeWidth={0.8}
+								opacity={0.5}
+							/>
+						);
+					})}
+					<SketchPath
+						d={coneWedge(d, d.solved.yaw, d.solved.hfov, reach, S)}
+						seed={`${d.id}-sm-solved-ghost`}
+						color={SOLVED_INK}
+						width={0.9}
+						opacity={0.6}
+						passes={1}
+						tolerance={0.5}
+					/>
+					{furniture && (
+						<>
+							<HandScaleBar
+								x={14}
+								y={386}
+								metersPerPixel={(2 * half) / S}
+								maxWidth={110}
+								seed={`${d.id}-sm-scale`}
+							/>
+							<NorthArrow x={24} y={72} length={22} seed={`${d.id}-sm-north`} />
+						</>
+					)}
+				</g>
+			)}
+		</DemPatch>
+	);
+});
+
+function LiveLayer({
+	d,
+	t,
+	runs,
+	named,
+	maxNamed,
+	opacity,
+	rayT,
+}: {
+	d: GipfelbuchPhotoData;
+	t: number;
+	runs: FootprintRun[];
+	named: ReturnType<typeof mapPeakSet>["named"];
+	maxNamed: number;
+	opacity: number;
+	/** Position on the t axis the rays draw at (search mode); defaults to t. */
+	rayT?: number;
+}) {
+	const clipId = `sm-clip-${useId().replace(/:/g, "")}`;
+	const live = poseAt(d, t);
+	const half = d.demPatch.halfKm * 1000;
+	const reach = half * 1.6;
+	const ink = mixHex(PRIOR_INK, SOLVED_INK, t);
+	const tc = Math.min(1, Math.max(0, t));
+	const toPx = (az: number, dist: number): [number, number] => [
+		S / 2 + (Math.sin(az * RAD) * dist * S) / (2 * half),
+		S / 2 - (Math.cos(az * RAD) * dist * S) / (2 * half),
+	];
+	const wedge = coneWedge(d, live.yaw, live.hfov, reach, S);
+	// the correction arc, from the guess's heading to the live heading
+	const arcR = S * 0.17;
+	const arcDist = (arcR * 2 * half) / S;
+	const p0 = toPx(d.prior.yaw, arcDist);
+	const p1 = toPx(live.yaw, arcDist);
+	const sweep = wrap180(live.yaw - d.prior.yaw);
+	const mid = toPx(d.prior.yaw + sweep / 2, arcDist + (26 * 2 * half) / S);
+	const shown = named
+		.map((p) => {
+			const [x, y] = toPx(p.az, p.distance);
+			return { p, x, y };
+		})
+		.filter(({ x, y }) => x > 4 && y > 4 && x < S - 4 && y < S - 4)
+		.slice(0, maxNamed);
+	return (
+		<svg
+			viewBox={`0 0 ${S} ${S}`}
+			className="pointer-events-none absolute inset-0 h-full w-full"
+			aria-hidden="true"
+			role="presentation"
+			style={{ opacity }}
+		>
+			<defs>
+				<clipPath id={clipId}>
+					<path d={wedge} />
+				</clipPath>
+			</defs>
+			<path d={wedge} fill={ink} fillOpacity={0.12} />
+			<CrispLine
+				d={coneWedge(d, d.prior.yaw, d.prior.hfov, reach, S)}
+				color={PRIOR_INK}
+				width={1.3}
+				dash="5 4"
+				opacity={0.45 + 0.4 * (1 - tc)}
+				seed="story-prior"
+			/>
+			{/* the skyline footprint: the part of the ground the live cone sees */}
+			<g clipPath={`url(#${clipId})`}>
+				{runs.map((r) => (
+					<SketchPolyline
+						key={`${r.az0}-${r.az1}`}
+						points={r.pts}
+						seed={`${d.id}-sm-fp-${r.az0}`}
+						data
+						passes={1}
+						color={TERRAIN_INK}
+						width={1.6}
+						opacity={0.95}
+					/>
+				))}
+			</g>
+			<CrispLine d={wedge} color={ink} width={2} seed="story-live" />
+			{shown.map(({ p, x, y }, rank) => {
+				const k = rayDraw(rayT ?? t, rank, shown.length);
+				if (k <= 0.01) return null;
+				return (
+					<PenLine
+						key={p.name}
+						from={[S / 2, S / 2]}
+						to={[S / 2 + k * (x - S / 2), S / 2 + k * (y - S / 2)]}
+						seed={`${d.id}-sm-ray-${p.name}`}
+						color={LAYER_INKS.solved.paper}
+						width={1.2}
+					/>
+				);
+			})}
+			{Math.abs(sweep) > 0.15 && (
+				<g>
+					<SketchPath
+						d={`M${p0[0]} ${p0[1]}A${arcR} ${arcR} 0 0 ${sweep > 0 ? 1 : 0} ${p1[0]} ${p1[1]}`}
+						seed="story-arc"
+						color="var(--gb-red)"
+						width={1.8}
+						passes={1}
+						tolerance={0.5}
+					/>
+					<HandLabel
+						x={mid[0]}
+						y={mid[1] + 4}
+						anchor="middle"
+						size={13}
+						color="var(--gb-red)"
+					>
+						{`${sgn(sweep)}°`}
+					</HandLabel>
+				</g>
+			)}
+			{shown.map(({ p, x, y }) => {
+				const inside = Math.abs(wrap180(p.az - live.yaw)) <= live.hfov / 2;
+				const color = (inside && peakInk(t, true)) || "var(--gb-pencil)";
+				const flip = x > S - 90;
+				return (
+					<g
+						key={p.name}
+						opacity={inside ? 1 : 0.32}
+						style={{ transition: `opacity ${QUICK_MS}ms ease-out` }}
+					>
+						<path d={`M${x} ${y - 4}l-3.6 6.2h7.2z`} style={{ fill: color }} />
+						<HandLabel
+							x={flip ? x - 6 : x + 6}
+							y={y + 2}
+							anchor={flip ? "end" : "start"}
+							size={10.5}
+							halo={2.8}
+							color={color}
+							caps
+						>
+							{p.name}
+						</HandLabel>
+					</g>
+				);
+			})}
+		</svg>
+	);
+}
+
+/** Crops the map's square to the cone's box at `aspect` (spec M §4, "fit"). */
+function FitFrame({
+	box,
+	aspect,
+	children,
+}: {
+	box: { x: number; y: number; w: number; h: number };
+	aspect: number;
+	children: ReactNode;
+}) {
+	return (
+		<div
+			className="relative w-full overflow-hidden"
+			style={{ aspectRatio: aspect }}
+		>
+			<div
+				className="absolute"
+				style={{
+					left: `${(-box.x / box.w) * 100}%`,
+					top: `${(-box.y / box.h) * 100}%`,
+					width: `${(S / box.w) * 100}%`,
+				}}
+			>
+				{children}
+			</div>
+		</div>
+	);
 }
 
 export function StoryMap({
@@ -92,6 +426,10 @@ export function StoryMap({
 	search = false,
 	readout = true,
 	className,
+	crop,
+	maxLabels,
+	fit,
+	aspect = 4 / 3,
 }: {
 	data: GipfelbuchPhotoData | null;
 	/** Play the yaw search on its own when no story drives the map. */
@@ -99,19 +437,42 @@ export function StoryMap({
 	/** The yaw line under the map (guess → solved, correction). */
 	readout?: boolean;
 	className?: string;
+	/** The photo's crop in working px: the map names the peaks the photo names there. */
+	crop?: [number, number, number, number];
+	/** The photo's label cap (default 10, as RealPhoto). */
+	maxLabels?: number;
+	/** `cone`: crop the square to the camera and both cones, at `aspect` (w / h). */
+	fit?: "cone";
+	aspect?: number;
 }) {
 	const story = useAlignmentStory();
-	const [ref, swept] = useSearchSweep(search && !story);
-	const tStory = useTween(story ? story.t : 1);
-	const t = story ? tStory : search ? swept : 1;
-	if (!d) return <DemPatch data={null} className={className} />;
+	const [ref, searched] = useSearchClock(search && !story);
+	const dragging = useRef(false);
+	const bodyRef = useRef<HTMLDivElement>(null);
+	const width = useWidth(bodyRef);
+	const t = useFollowT(
+		story ? story.t : 1,
+		!!story,
+		dragging,
+		(story as { instant?: boolean } | null)?.instant,
+	);
+	const tNow = story ? t : search ? searched.t : 1;
+	const cropKey = crop?.join(",");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: crop is keyed by value
+	const set = useMemo(
+		() => (d ? mapPeakSet(d, { crop, maxLabels }) : null),
+		[d, cropKey, maxLabels],
+	);
+	const runs = useMemo(() => (d ? footprintRuns(d, S) : []), [d]);
+	const box = useMemo(
+		() => (d && fit === "cone" ? coneFitBox(d, aspect) : null),
+		[d, fit, aspect],
+	);
+	if (!d || !set) return <DemPatch data={null} className={className} />;
 	const dyaw = wrap180(d.solved.yaw - d.prior.yaw);
-	const live = poseAt(d, t);
-	const half = d.demPatch.halfKm * 1000;
-	const reach = half * 1.6;
-	const settled = story ? Math.abs(story.t - tStory) < 0.01 : true;
+	const settled = story ? Math.abs(story.t - t) < 0.01 : true;
 	const stateWord =
-		t <= 0.02 ? "phone's guess" : t >= 0.98 ? "solved" : "correcting";
+		tNow <= 0.02 ? "phone's guess" : tNow >= 0.98 ? "solved" : "correcting";
 	const fromMap = (e: PointerEvent<HTMLDivElement>) => {
 		if (!story || Math.abs(dyaw) < 0.2) return;
 		const svg = e.currentTarget.querySelector("svg");
@@ -134,9 +495,30 @@ export function StoryMap({
 		e.preventDefault();
 		story.setT(story.t + step);
 	};
+	const release = () => {
+		dragging.current = false;
+	};
+	const stack = (
+		<div className="relative">
+			<BaseMap d={d} runs={runs} context={set.context} furniture={!box} />
+			<LiveLayer
+				d={d}
+				t={tNow}
+				runs={runs}
+				named={set.named}
+				maxNamed={width > 0 && width < 400 ? 4 : set.named.length}
+				opacity={search && !story ? 1 - searched.fade : 1}
+				rayT={search && !story ? 0.82 + 0.18 * searched.rays : undefined}
+			/>
+		</div>
+	);
 	return (
-		<div ref={ref} className={className}>
+		<div
+			ref={ref}
+			className={cn(!fit && "mx-auto w-full max-w-[22rem]", className)}
+		>
 			<div
+				ref={bodyRef}
 				className={cn(
 					"relative select-none",
 					story && "cursor-grab touch-pan-y active:cursor-grabbing",
@@ -150,134 +532,29 @@ export function StoryMap({
 					"aria-valuemax": 100,
 					"aria-valuenow": Math.round(story.t * 100),
 					onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+						dragging.current = true;
 						e.currentTarget.setPointerCapture?.(e.pointerId);
 						fromMap(e);
 					},
 					onPointerMove: (e: PointerEvent<HTMLDivElement>) =>
 						e.buttons && fromMap(e),
+					onPointerUp: release,
+					onPointerCancel: release,
+					onLostPointerCapture: release,
 					onKeyDown: key,
 				})}
 			>
-				<DemPatch data={d} cone={[]} peaks={false} imprint={false}>
-					{(_, toPx) => {
-						const wedge = (yaw: number, hfov: number, dist: number) =>
-							coneWedge(d, yaw, hfov, dist, S);
-						const ink = mixHex(PRIOR_INK, SOLVED_INK, t);
-						// the correction arc, from the guess's heading to the live heading
-						const arcR = S * 0.17;
-						const arcDist = (arcR * 2 * half) / S;
-						const p0 = toPx(d.prior.yaw, arcDist);
-						const p1 = toPx(live.yaw, arcDist);
-						const sweep = wrap180(live.yaw - d.prior.yaw);
-						const mid = toPx(
-							d.prior.yaw + sweep / 2,
-							arcDist + (26 * 2 * half) / S,
-						);
-						const peaks = d.peaks
-							.filter((p) => p.labelled && p.distance < half * 1.35)
-							.map((p) => {
-								const [x, y] = toPx(p.az, p.distance);
-								const inside =
-									Math.abs(wrap180(p.az - live.yaw)) <= live.hfov / 2;
-								return { p, x, y, inside };
-							})
-							.filter(({ x, y }) => x > 4 && y > 4 && x < S - 4 && y < S - 4);
-						return (
-							<g>
-								<path
-									d={wedge(live.yaw, live.hfov, reach)}
-									fill={ink}
-									fillOpacity={0.12}
-								/>
-								<CrispLine
-									d={wedge(d.prior.yaw, d.prior.hfov, reach)}
-									color={PRIOR_INK}
-									width={1.3}
-									dash="5 4"
-									opacity={0.45 + 0.4 * (1 - Math.min(1, Math.max(0, t)))}
-									seed="story-prior"
-								/>
-								<SketchPath
-									d={wedge(d.solved.yaw, d.solved.hfov, reach)}
-									seed="story-solved-ghost"
-									color={SOLVED_INK}
-									width={0.9}
-									opacity={0.6}
-									passes={1}
-									tolerance={0.5}
-								/>
-								<CrispLine
-									d={wedge(live.yaw, live.hfov, reach)}
-									color={ink}
-									width={2}
-									seed="story-live"
-								/>
-								{Math.abs(sweep) > 0.15 && (
-									<g>
-										<SketchPath
-											d={`M${p0[0]} ${p0[1]}A${arcR} ${arcR} 0 0 ${sweep > 0 ? 1 : 0} ${p1[0]} ${p1[1]}`}
-											seed="story-arc"
-											color={SWISS.red}
-											width={1.8}
-											passes={1}
-											tolerance={0.5}
-										/>
-										<text
-											x={mid[0]}
-											y={mid[1] + 4}
-											textAnchor="middle"
-											fontSize={13}
-											stroke={SWISS.paper}
-											strokeWidth={3}
-											paintOrder="stroke"
-											strokeLinejoin="round"
-											className="nb-num"
-											style={{ fill: SWISS.red }}
-										>
-											{sgn(sweep)}°
-										</text>
-									</g>
-								)}
-								{peaks.map(({ p, x, y, inside }) => {
-									const flip = x > S - 90;
-									return (
-										<g
-											key={p.name}
-											opacity={inside ? 1 : 0.32}
-											style={{ transition: "opacity 220ms ease-out" }}
-										>
-											<path
-												d={`M${x} ${y - 4}l-3.6 6.2h7.2z`}
-												fill={inside ? SWISS.navy : SWISS.secondary}
-											/>
-											<text
-												x={flip ? x - 6 : x + 6}
-												y={y + 2}
-												textAnchor={flip ? "end" : "start"}
-												fontSize={11.5}
-												stroke={SWISS.paper}
-												strokeWidth={2.8}
-												strokeLinejoin="round"
-												paintOrder="stroke"
-												className="nb-label"
-												style={{
-													fill: inside ? SWISS.navy : SWISS.secondary,
-													fontFamily: CAPS,
-												}}
-											>
-												{p.name}
-											</text>
-										</g>
-									);
-								})}
-							</g>
-						);
-					}}
-				</DemPatch>
+				{box ? (
+					<FitFrame box={box} aspect={aspect}>
+						{stack}
+					</FitFrame>
+				) : (
+					stack
+				)}
 				<span
 					className={cn(
 						"nb-hand pointer-events-none absolute top-1.5 left-2.5 text-[20px] leading-[22px] font-bold transition-colors motion-reduce:transition-none [text-shadow:0_0_2px_var(--gb-paper,#ece6da),0_0_4px_var(--gb-paper,#ece6da),0_0_6px_var(--gb-paper,#ece6da)]",
-						settled && t >= 0.98
+						settled && tNow >= 0.98
 							? "text-[var(--sm-solved)]"
 							: "text-[var(--sm-prior)]",
 					)}
@@ -294,15 +571,17 @@ export function StoryMap({
 			{readout && (
 				<p className="nb-num gb-secondary mt-1.5 text-[12px] leading-[16px]">
 					yaw{" "}
-					<span className={t < 0.5 ? "text-[var(--gb-ink)]" : undefined}>
+					<span className={tNow < 0.5 ? "text-[var(--gb-ink)]" : undefined}>
 						{d.prior.yaw.toFixed(1)}°
 					</span>{" "}
 					→{" "}
-					<span className={t >= 0.5 ? "text-[var(--gb-ink)]" : undefined}>
+					<span className={tNow >= 0.5 ? "text-[var(--gb-ink)]" : undefined}>
 						{d.solved.yaw.toFixed(1)}°
 					</span>{" "}
-					· {d.peaks.filter((p) => p.labelled).length} peaks named
-					{story ? " · drag the cone" : ""}
+					· {set.named.length} peaks named
+					{story ? (
+						<span className="print:hidden"> · drag the cone</span>
+					) : null}
 				</p>
 			)}
 		</div>

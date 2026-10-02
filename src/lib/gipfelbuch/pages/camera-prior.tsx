@@ -183,7 +183,7 @@ function RealPrior({
 							maxLabels={4}
 						/>
 					</div>
-					<StoryMap data={d} />
+					<StoryMap data={d} crop={d ? skyBand(d) : undefined} maxLabels={4} />
 				</div>
 			</AlignmentStoryProvider>
 			{d && (

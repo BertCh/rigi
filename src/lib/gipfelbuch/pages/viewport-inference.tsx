@@ -2099,7 +2099,7 @@ function HeroCompare() {
 						afterLabel="solved"
 						start={0.5}
 					/>
-					<StoryMap data={d} />
+					<StoryMap data={d} crop={crop} />
 				</div>
 			</AlignmentStoryProvider>
 			{d && (
@@ -2205,13 +2205,7 @@ function MiniPhoto({
 
 function MiniMap({ id }: { id: GipfelbuchPhotoId }) {
 	const d = useGipfelbuchPhoto(id);
-	return (
-		<div className="relative aspect-[4/3] overflow-hidden">
-			<div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
-				<StoryMap data={d} search readout={false} />
-			</div>
-		</div>
-	);
+	return <StoryMap data={d} search readout={false} fit="cone" aspect={4 / 3} />;
 }
 
 function Verdicts() {
