@@ -8,6 +8,7 @@ import {
 	useContext,
 	useEffect,
 	useId,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -25,6 +26,18 @@ import { GeoSpill, RULER_BAND, type SpillCursor } from "./GeoSpill";
 import { HandStrike } from "./hand";
 import { dashFor, inkFor, LAYER_STYLE, type PhotoLayer } from "./inks";
 import { HandLabel } from "./labels";
+import { EASE, MOTION } from "./motion";
+import { type LayerState, OverlayLayer } from "./overlay";
+import {
+	DRAW_ON_KEYFRAMES,
+	drawOnTiming,
+	LAYER_ORDER,
+	LAYER_ROLE,
+	layerEnterDelay,
+	layerState,
+	shouldDrawOn,
+	useHeroBloom,
+} from "./real-reveal";
 import { SpillSideContext, useAlignmentStory } from "./story";
 
 // Measured data for gipfelbuch pages: the real CPU pipeline run on the bundled Niederhorn demo photos by
@@ -305,9 +318,6 @@ export function rowsPath(rows: Rows, maxJump = 12, sx = 1, sy = 1) {
 
 export { LAYER_STYLE, type PhotoLayer };
 
-/** Hand block capitals (peak and place names) and hand figures (values), per the hand pass. */
-const CAPS_STACK = "var(--gb-font-caps), var(--gb-font-hand), cursive";
-const FIGURE_STACK = "var(--gb-font-figure), var(--gb-font-hand), cursive";
 /** A measured line on a photo: one pen pass whose sideways jitter stays within this many px (Ink DATA_TOLERANCE). */
 const PHOTO_PEN_TOLERANCE = 0.5;
 /** Halo behind labels and strokes drawn on photos (Heim/Imfeld panorama style: dark name, paper halo). */
@@ -365,6 +375,7 @@ function PhotoLine({
 	dash,
 	opacity,
 	crisp = false,
+	draw,
 }: {
 	d: string;
 	seed: string;
@@ -375,7 +386,36 @@ function PhotoLine({
 	opacity?: number;
 	/** On a photograph: a paper halo and a thin dark under-stroke on the exact path, the pen pass on top. */
 	crisp?: boolean;
+	/**
+	 * A measured stroke's layer state: going from hidden to shown (with motion allowed) the pen draws
+	 * it on, after `delay` ms, as one even trace (grammar: measured layers draw on).
+	 */
+	draw?: { state: LayerState; delay: number; allowed: boolean };
 }) {
+	const group = useRef<SVGGElement>(null);
+	const drawState = draw?.state;
+	// the state this stroke last showed; a stroke mounted while motion is allowed starts undrawn
+	const drawn = useRef<LayerState | undefined>(
+		draw?.allowed ? "hidden" : drawState,
+	);
+	// before paint, so a stroke that mounts or turns on never shows drawn for a frame first
+	// biome-ignore lint/correctness/useExhaustiveDependencies: replays only when the state changes
+	useLayoutEffect(() => {
+		if (!draw) return;
+		const previous = drawn.current ?? "hidden";
+		drawn.current = draw.state;
+		const paths = group.current?.querySelectorAll("path");
+		if (!paths || !shouldDrawOn(draw.allowed, previous, draw.state)) return;
+		const runs = [...paths].map((p) =>
+			p.animate?.(DRAW_ON_KEYFRAMES, drawOnTiming(draw.delay)),
+		);
+		return () => {
+			// cut short (a state change mid-draw, StrictMode's re-run): the next run may draw again
+			if (runs.some((run) => run && run.playState !== "finished"))
+				drawn.current = previous;
+			for (const run of runs) run?.cancel();
+		};
+	}, [drawState]);
 	// The colour stroke is a single hand pen pass within PHOTO_PEN_TOLERANCE (memoised: a story only
 	// changes the opacity, so a long skyline is not redrawn per frame).
 	const pen = useMemo(
@@ -390,23 +430,27 @@ function PhotoLine({
 				: d,
 		[crisp, d, seed],
 	);
+	const pathLength = draw ? 1 : undefined;
 	if (crisp)
 		return (
-			<g fill="none" strokeLinecap="round" strokeLinejoin="round">
+			<g ref={group} fill="none" strokeLinecap="round" strokeLinejoin="round">
 				<path
 					d={d}
-					style={{ stroke: HALO }}
+					pathLength={pathLength}
+					style={{ stroke: `var(--fig-halo, ${HALO})` }}
 					strokeOpacity={0.55}
 					strokeWidth={Math.max(halo, width + 4)}
 				/>
 				<path
 					d={d}
+					pathLength={pathLength}
 					style={{ stroke: PHOTO_DARK }}
 					strokeWidth={width + 1.4}
 					strokeDasharray={dash}
 				/>
 				<path
 					d={pen}
+					pathLength={pathLength}
 					style={{ stroke: color }}
 					strokeWidth={width}
 					strokeDasharray={dash}
@@ -477,6 +521,26 @@ export function NoImprint({ children }: { children: ReactNode }) {
 	);
 }
 
+const NO_LAYERS: readonly PhotoLayer[] = [];
+
+/**
+ * The summits RealPhoto names inside `crop` ([x0, y0, x1, y1], working px), in the data's rank order
+ * and capped at `maxLabels`, at the solved pose and at the phone's guess. Shared with the side map,
+ * so the photo and the map always name the same summits.
+ */
+export function labelledPeaksIn(
+	data: Pick<GipfelbuchPhotoData, "peaks">,
+	crop: readonly [number, number, number, number],
+	maxLabels = 10,
+): { solved: GipfelbuchPeak[]; prior: GipfelbuchPeak[] } {
+	const [x0, y0, x1, y1] = crop;
+	const inCrop = (q: [number, number] | null) =>
+		!!q && q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1;
+	const pick = (at: (p: GipfelbuchPeak) => [number, number] | null) =>
+		data.peaks.filter((p) => p.labelled && inCrop(at(p))).slice(0, maxLabels);
+	return { solved: pick((p) => p.solved), prior: pick((p) => p.prior) };
+}
+
 export function RealPhoto({
 	data,
 	layers,
@@ -492,11 +556,24 @@ export function RealPhoto({
 	id,
 	alsoNames = true,
 	lines = true,
+	ghosts = NO_LAYERS,
+	reveal,
 	className,
 	children,
 }: {
 	data: GipfelbuchPhotoData | null;
 	layers: PhotoLayer[];
+	/**
+	 * Layers kept faint (grammar ghost, 0.35) when they are not in `layers`: a superseded guess that
+	 * stays on the final frame, so a reader sees what was replaced.
+	 */
+	ghosts?: readonly PhotoLayer[];
+	/**
+	 * The hero bloom (pod P spec §4.1): photo, then the horizons at a pose fade in, the eye's skyline
+	 * draws on and the names follow, once the figure is in view; the spill keeps step. Default "bloom"
+	 * for a spilled photo that runs its own clock (no Compare side, no alignment story, `lines` on).
+	 */
+	reveal?: "bloom" | "none";
 	toggles?: PhotoLayer[];
 	crop?: [number, number, number, number];
 	maxLabels?: number;
@@ -550,6 +627,21 @@ export function RealPhoto({
 		bleedFraction > 0 && data && !side?.off ? data.id : null,
 	);
 	const failedId = useLoadFailure(id);
+	const rootRef = useRef<HTMLDivElement>(null);
+	const bloom =
+		(reveal ??
+			(bleedFraction > 0 && !side && !story && lines ? "bloom" : "none")) ===
+		"bloom";
+	const { phase, allowed } = useHeroBloom(rootRef, {
+		enabled: bloom,
+		ready: !!data,
+		key: data?.id ?? "",
+		labels: maxLabels,
+		replay: !toggles?.length,
+	});
+	// a layer group, once mounted, stays (hidden when off), so a change of `layers` fades or draws
+	// instead of popping, and the photo itself never remounts
+	const mounted = useRef(new Set<PhotoLayer>()).current;
 	if (!data)
 		return (
 			<FigureSkeleton
@@ -562,7 +654,14 @@ export function RealPhoto({
 	const [x0, y0, x1, y1] = crop ?? [0, 0, W, H];
 	const k = (x1 - x0) / W; // < 1 when zoomed: keeps strokes and text a constant on-screen size
 	const on = (l: PhotoLayer) => layers.includes(l) && !off.has(l);
-	const drawLine = (l: PhotoLayer) => lines && on(l);
+	const state = (l: PhotoLayer) => layerState(l, on, ghosts, phase);
+	const delay = (l: PhotoLayer) => layerEnterDelay(l, phase);
+	// a spilled photo (one per figure, the one that blooms and steps through stages) mounts every
+	// layer up front, so even a layer's first entrance fades or draws; others mount on first show
+	for (const l of LAYER_ORDER)
+		if (bleedFraction > 0 || on(l) || ghosts.includes(l)) mounted.add(l);
+	const shows = (l: PhotoLayer) => mounted.has(l);
+	const drawLine = (l: PhotoLayer) => lines && shows(l);
 	// the pose the bleed is drawn at: the guess when only the guess is shown, else the story's or solved
 	const showsPrior = on("prior") || on("priorPeaks");
 	const showsSolved = on("solved") || on("peaks");
@@ -579,14 +678,11 @@ export function RealPhoto({
 		!story || l === "skyline" || !(on("prior") && on("solved"))
 			? undefined
 			: 0.3 + 0.7 * (l === "solved" ? story.t : 1 - story.t);
-	const inCrop = (q: [number, number] | null) =>
-		!!q && q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1;
-	const solvedLabels = data.peaks
-		.filter((p) => p.labelled && inCrop(p.solved))
-		.slice(0, maxLabels);
-	const priorLabels = data.peaks
-		.filter((p) => p.labelled && inCrop(p.prior))
-		.slice(0, maxLabels);
+	const { solved: solvedLabels, prior: priorLabels } = labelledPeaksIn(
+		data,
+		[x0, y0, x1, y1],
+		maxLabels,
+	);
 	const ws = data.skyline.weight;
 	const view = [x0, y0, x1 - x0, y1 - y0];
 	const stale = isStaleData(data);
@@ -617,12 +713,14 @@ export function RealPhoto({
 	].filter((l) => l.note != null);
 	return (
 		<div
+			ref={rootRef}
 			className={cn(
 				"transition-opacity duration-300 motion-reduce:transition-none",
 				stale && "opacity-[0.55]",
 				className,
 			)}
 			aria-busy={stale || undefined}
+			data-reveal={bloom ? phase : undefined}
 		>
 			<div
 				ref={hostRef}
@@ -639,12 +737,19 @@ export function RealPhoto({
 						t={bleedT}
 						immediate={side?.t != null}
 						echo={{
-							layers: layers.filter((l) => !off.has(l)),
+							layers: LAYER_ORDER.filter(shows),
 							opacity: {
 								prior: lineOpacity("prior"),
 								solved: lineOpacity("solved"),
 							},
+							states: Object.fromEntries(
+								LAYER_ORDER.filter(shows).map((l) => [
+									l,
+									{ state: state(l), delay: delay(l) },
+								]),
+							),
 						}}
+						shown={bloom ? phase !== "pending" : undefined}
 						cursor={spillCursor}
 					/>
 				)}
@@ -666,72 +771,103 @@ export function RealPhoto({
 							height={H}
 							preserveAspectRatio="none"
 						/>
-						{on("sky") && data.skyImage && (
-							<image
-								href={data.skyImage}
-								width={W}
-								height={H}
-								preserveAspectRatio="none"
-								opacity={0.7}
-								style={{ mixBlendMode: "screen" }}
-							/>
+						{shows("sky") && data.skyImage && (
+							<OverlayLayer
+								layer="raster"
+								state={state("sky")}
+								delay={delay("sky")}
+							>
+								<image
+									href={data.skyImage}
+									width={W}
+									height={H}
+									preserveAspectRatio="none"
+									opacity={0.7}
+									style={{ mixBlendMode: "screen" }}
+								/>
+							</OverlayLayer>
 						)}
 						<g fill="none" strokeLinecap="round" strokeLinejoin="round">
 							{(["prior", "solved", "skyline"] as const).map(
 								(l) =>
 									drawLine(l) && (
-										<PhotoLine
+										<OverlayLayer
 											key={l}
-											d={rowsPath(
-												l === "skyline"
-													? data.skyline.rows
-													: l === "prior"
-														? data.priorRows
-														: data.solvedRows,
-												l === "skyline" ? 8 : 12,
-											)}
-											seed={`${data.id}-${l}`}
-											color={inkFor(l, "photo")}
-											width={(l === "skyline" ? 1.7 : 2.2) * k}
-											halo={(l === "skyline" ? 4 : 4.6) * k}
-											dash={dashFor(l, k)}
-											opacity={lineOpacity(l)}
-											crisp
-										/>
+											layer={LAYER_ROLE[l]}
+											state={state(l)}
+											delay={delay(l)}
+										>
+											<PhotoLine
+												d={rowsPath(
+													l === "skyline"
+														? data.skyline.rows
+														: l === "prior"
+															? data.priorRows
+															: data.solvedRows,
+													l === "skyline" ? 8 : 12,
+												)}
+												seed={`${data.id}-${l}`}
+												color={inkFor(l, "photo")}
+												width={(l === "skyline" ? 1.7 : 2.2) * k}
+												halo={(l === "skyline" ? 4 : 4.6) * k}
+												dash={dashFor(l, k)}
+												opacity={lineOpacity(l)}
+												crisp
+												draw={
+													LAYER_ROLE[l] === "measured"
+														? {
+																state: state(l),
+																delay: delay(l),
+																allowed,
+															}
+														: undefined
+												}
+											/>
+										</OverlayLayer>
 									),
 							)}
-							{drawLine("weight") &&
-								data.skyline.rows.map((y, x) =>
-									y == null || x % Math.max(1, Math.round(4 * k)) ? null : (
-										<line
-											// biome-ignore lint/suspicious/noArrayIndexKey: the index is the image column
-											key={x}
-											x1={x + 0.5}
-											x2={x + 0.5}
-											y1={y}
-											y2={y - (4 + 26 * ws[x]) * k}
-											stroke={LAYER_STYLE.weight.color}
-											strokeWidth={2.4 * k}
-											opacity={0.25 + 0.75 * ws[x]}
-										/>
-									),
-								)}
+							{drawLine("weight") && (
+								<OverlayLayer
+									layer="measured"
+									state={state("weight")}
+									delay={delay("weight")}
+								>
+									{data.skyline.rows.map((y, x) =>
+										y == null || x % Math.max(1, Math.round(4 * k)) ? null : (
+											<line
+												// biome-ignore lint/suspicious/noArrayIndexKey: the index is the image column
+												key={x}
+												x1={x + 0.5}
+												x2={x + 0.5}
+												y1={y}
+												y2={y - (4 + 26 * ws[x]) * k}
+												stroke={LAYER_STYLE.weight.color}
+												strokeWidth={2.4 * k}
+												opacity={0.25 + 0.75 * ws[x]}
+											/>
+										),
+									)}
+								</OverlayLayer>
+							)}
 						</g>
-						{on("priorPeaks") && (
-							<PeakLabels
-								placed={priorLayout}
-								color={inkFor("priorPeaks", "photo")}
-								k={k}
-								top={y0}
-							/>
-						)}
-						{on("peaks") && (
-							<PeakLabels
-								placed={solvedLayout}
-								color={inkFor("peaks", "photo")}
-								k={k}
-								top={y0}
-							/>
+						{(["priorPeaks", "peaks"] as const).map(
+							(l) =>
+								shows(l) && (
+									<OverlayLayer
+										key={l}
+										layer="notes"
+										state={state(l)}
+										delay={delay(l)}
+									>
+										<PeakLabels
+											placed={l === "peaks" ? solvedLayout : priorLayout}
+											color={inkFor(l, "photo")}
+											k={k}
+											top={y0}
+											shown={state(l) !== "hidden"}
+										/>
+									</OverlayLayer>
+								),
 						)}
 						{children?.(data)}
 					</g>
@@ -862,20 +998,34 @@ function PeakLabels({
 	color,
 	k,
 	top,
+	shown = true,
 }: {
 	placed: PlacedPeakLabel[];
 	color: string;
 	k: number;
 	top: number;
+	/** False while the layer is hidden: each summit then fades in `staggerLabel` after the one before. */
+	shown?: boolean;
 }) {
 	const fs = 14 * k;
 	const rowH = (placed.some((p) => p.item.sub) ? 26 : 15) * k;
+	// names arrive in rank order, a pen beat apart (they leave together, with their layer)
+	const arrive = (i: number) => ({
+		opacity: shown ? 1 : 0,
+		transition: shown
+			? `opacity ${MOTION.fade}ms ${EASE.out} ${i * MOTION.staggerLabel}ms`
+			: undefined,
+	});
 	return (
 		<g>
-			{placed.map(({ item: it, anchor, row, note }) => {
+			{placed.map(({ item: it, anchor, row, note }, i) => {
 				if (row < 0)
 					return (
-						<g key={it.name}>
+						<g
+							key={it.name}
+							style={arrive(i)}
+							className="motion-reduce:transition-none"
+						>
 							<title>{it.name}</title>
 							<HandDot
 								x={it.at[0]}
@@ -914,7 +1064,11 @@ function PeakLabels({
 					it.at[1] - (24 + row * 1) * k - row * rowH,
 				);
 				return (
-					<g key={it.name}>
+					<g
+						key={it.name}
+						style={arrive(i)}
+						className="motion-reduce:transition-none"
+					>
 						<title>{it.sub ? `${it.name}, ${it.sub}` : it.name}</title>
 						{/* hairline leader from the summit up to the name: paper under, pen over */}
 						<PhotoLine
@@ -943,41 +1097,33 @@ function PeakLabels({
 							opacity={1}
 							data
 						/>
-						{/* Heim/Imfeld panorama lettering: a dark hand name on a paper halo */}
-						<text
+						{/* Heim/Imfeld panorama lettering: a dark hand name on a paper halo (HandLabel caps
+						    run 1.08 x their size, so the size is given back to keep KR8's layout widths) */}
+						<HandLabel
 							x={it.at[0]}
 							y={ty}
-							textAnchor={anchor}
-							fontSize={fs}
-							className="nb-label"
-							stroke={HALO}
-							strokeWidth={3.6 * k}
-							strokeLinejoin="round"
-							paintOrder="stroke"
-							style={{ fill: PHOTO_INK, fontFamily: CAPS_STACK }}
+							anchor={anchor}
+							size={fs / 1.08}
+							caps
+							color={PHOTO_INK}
+							halo={3.6 * k}
+							haloColor={HALO}
 						>
 							{it.name}
-						</text>
+						</HandLabel>
 						{it.sub && (
-							<text
+							<HandLabel
 								x={it.at[0]}
 								y={ty - 14 * k}
-								textAnchor={anchor}
-								fontSize={10.5 * k}
-								className="nb-num"
-								stroke={HALO}
-								strokeWidth={3 * k}
-								strokeLinejoin="round"
-								paintOrder="stroke"
-								style={{
-									fill: PHOTO_INK,
-									fontFamily: FIGURE_STACK,
-									fontStyle: "italic",
-									fontVariantNumeric: "tabular-nums",
-								}}
+								anchor={anchor}
+								size={10.5 * k}
+								italic
+								color={PHOTO_INK}
+								halo={3 * k}
+								haloColor={HALO}
 							>
 								{it.sub}
-							</text>
+							</HandLabel>
 						)}
 					</g>
 				);

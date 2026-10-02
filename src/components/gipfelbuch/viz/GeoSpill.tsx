@@ -17,6 +17,8 @@ import { projectAzEl } from "../tafel/project";
 import type { TafelBake } from "../tafel/useTafelBake";
 import { useReducedMotion } from "./hooks";
 import { LAYER_INKS, type PhotoLayer } from "./inks";
+import { MOTION } from "./motion";
+import { type LayerState, OverlayLayer } from "./overlay";
 import type { GipfelbuchPhotoData } from "./real";
 import { poseAt } from "./story";
 
@@ -40,7 +42,7 @@ import { poseAt } from "./story";
 // value of "left" or "right" clamps that side only. Phones get the ruler and no side spill, as on the landing.
 // The whole layer's opacity reads `--gb-spill-reveal` (default 1), so a figure that animates its own
 // reveal (PhotoStory's pen wipe) can bloom the margins in by setting that var on an ancestor, without
-// re-rendering the spill; the spill adds no transition of its own.
+// re-rendering the spill; the spill adds no transition of its own unless its figure blooms (`shown`).
 
 /** CSS px kept above the photo for the ruler. */
 export const RULER_BAND = 30;
@@ -73,7 +75,17 @@ export type SpillEcho = {
 	layers: readonly PhotoLayer[];
 	/** Stroke opacity of the prior and solved lines (the story's fade in the photo); default 1. */
 	opacity?: Partial<Record<"prior" | "solved", number>>;
+	/**
+	 * Each layer's overlay state and entrance delay in the photo (RealPhoto's bloom and layer changes),
+	 * so a margin line enters, leaves or turns ghost with its line in the frame, never before it.
+	 * A layer without an entry is on.
+	 */
+	states?: Partial<Record<PhotoLayer, { state: LayerState; delay?: number }>>;
 };
+
+/** The echo's state of `layer` (on unless the photo says otherwise). */
+const echoState = (echo: SpillEcho | undefined, layer: PhotoLayer) =>
+	echo?.states?.[layer] ?? { state: "on" as LayerState, delay: 0 };
 
 /** Where the figure points: a column of the photo (working px) or an azimuth (deg). */
 export type SpillCursor = {
@@ -237,6 +249,7 @@ export function GeoSpill({
 	immediate = false,
 	echo,
 	cursor,
+	shown,
 }: {
 	/** The photo's box (the svg's wrapper, under the ruler band). */
 	hostRef: RefObject<HTMLElement | null>;
@@ -254,11 +267,19 @@ export function GeoSpill({
 	echo?: SpillEcho;
 	/** Where the figure points, marked on the ruler. */
 	cursor?: SpillCursor | null;
+	/**
+	 * Set by a figure that blooms: false hides the whole spill (waiting for the figure to come into
+	 * view), true fades it in with the photo. Multiplies `--gb-spill-reveal`; unset, no transition.
+	 */
+	shown?: boolean;
 }) {
 	const room = useRoom(hostRef, !!bake);
 	const t = useSlide(data.id, target, immediate);
 	const layers = echo?.layers;
-	const on = (l: PhotoLayer) => !!layers?.includes(l);
+	// a layer counts while it is on or a ghost; a hidden one keeps its line mounted, faded out
+	const on = (l: PhotoLayer) =>
+		!!layers?.includes(l) && echoState(echo, l).state !== "hidden";
+	const mountedEcho = (l: PhotoLayer) => !!layers?.includes(l);
 	// the prior and solved horizons sit at fixed poses: project once per bake
 	const fixed = useMemo(
 		() =>
@@ -313,10 +334,10 @@ export function GeoSpill({
 	const inBox = (q: Point) => q[0] >= -24 && q[0] <= boxW + 24;
 	const boxLine = (pts: Point[] | null | undefined) =>
 		pts ? pts.map(toBoxPt).filter(inBox) : null;
-	const showSky = on("sky");
-	const showSkyline = on("skyline");
-	const showPrior = on("prior");
-	const showSolved = on("solved");
+	const showSky = mountedEcho("sky");
+	const showSkyline = mountedEcho("skyline");
+	const showPrior = mountedEcho("prior");
+	const showSolved = mountedEcho("solved");
 	const here =
 		showSky || showSkyline ? boxLine(horizonPoints(bake, data, pose)) : null;
 	const priorLine = showPrior ? boxLine(fixed?.prior) : null;
@@ -403,7 +424,16 @@ export function GeoSpill({
 				height: boxH,
 				maskImage: sides,
 				WebkitMaskImage: sides,
-				opacity: "var(--gb-spill-reveal, 1)",
+				opacity:
+					shown !== false
+						? "var(--gb-spill-reveal, 1)"
+						: "calc(var(--gb-spill-reveal, 1) * 0)",
+				// only a spill whose figure blooms eases its reveal; a figure that drives
+				// --gb-spill-reveal itself (PhotoStory, per frame) gets no lag from a transition
+				transition:
+					shown == null
+						? undefined
+						: `opacity ${shown ? MOTION.crossfade : Math.round(MOTION.fade * 0.6)}ms`,
 			}}
 		>
 			{/* ridges: terrain ink through the bake's stroke coverage */}
@@ -414,6 +444,7 @@ export function GeoSpill({
 				<div
 					className="tafel-spill opacity-90"
 					style={{
+						background: "var(--fig-terrain-ink, var(--gb-terrain))",
 						left: canvasX + L,
 						top: canvasY + RULER_BAND,
 						width: cw * s,
@@ -432,48 +463,57 @@ export function GeoSpill({
 						data-testid="gb-geo-spill-echo"
 					>
 						{skyD && (
-							<Hachure
-								d={skyD}
-								seed={`${data.id}-spill-sky`}
-								color={LAYER_INKS.sky.paper}
-								width={0.7}
-								opacity={0.4}
-								angle={-60}
-								gap={5}
-								inset={26}
-							/>
+							<OverlayLayer layer="raster" {...echoState(echo, "sky")}>
+								<Hachure
+									d={skyD}
+									seed={`${data.id}-spill-sky`}
+									color={`var(--fig-sky-ink, ${LAYER_INKS.sky.paper})`}
+									width={0.7}
+									opacity={0.4}
+									angle={-60}
+									gap={5}
+									inset={26}
+								/>
+							</OverlayLayer>
 						)}
-						{showSkyline && here && here.length > 1 && (
-							<SketchPolyline
-								points={here}
-								seed={`${data.id}-spill-skyline`}
-								color={LAYER_INKS.skyline.paper}
-								width={1.6}
-								dash="5 4"
-								opacity={0.9}
-								data
-							/>
-						)}
+						{/* the stack's order: derived (the horizons at a pose) under measured */}
 						{priorLine && priorLine.length > 1 && (
-							<SketchPolyline
-								points={priorLine}
-								seed={`${data.id}-spill-prior`}
-								color={LAYER_INKS.prior.paper}
-								width={1.6}
-								dash="6 5"
-								opacity={echo?.opacity?.prior ?? 1}
-								data
-							/>
+							<OverlayLayer layer="derived" {...echoState(echo, "prior")}>
+								<SketchPolyline
+									points={priorLine}
+									seed={`${data.id}-spill-prior`}
+									color={LAYER_INKS.prior.paper}
+									width={1.6}
+									dash="6 5"
+									opacity={echo?.opacity?.prior ?? 1}
+									data
+								/>
+							</OverlayLayer>
 						)}
 						{solvedLine && solvedLine.length > 1 && (
-							<SketchPolyline
-								points={solvedLine}
-								seed={`${data.id}-spill-solved`}
-								color={LAYER_INKS.solved.paper}
-								width={1.8}
-								opacity={echo?.opacity?.solved ?? 1}
-								data
-							/>
+							<OverlayLayer layer="derived" {...echoState(echo, "solved")}>
+								<SketchPolyline
+									points={solvedLine}
+									seed={`${data.id}-spill-solved`}
+									color={LAYER_INKS.solved.paper}
+									width={1.8}
+									opacity={echo?.opacity?.solved ?? 1}
+									data
+								/>
+							</OverlayLayer>
+						)}
+						{showSkyline && here && here.length > 1 && (
+							<OverlayLayer layer="measured" {...echoState(echo, "skyline")}>
+								<SketchPolyline
+									points={here}
+									seed={`${data.id}-spill-skyline`}
+									color={LAYER_INKS.skyline.paper}
+									width={1.6}
+									dash="5 4"
+									opacity={0.9}
+									data
+								/>
+							</OverlayLayer>
 						)}
 					</svg>
 				)}
@@ -489,7 +529,7 @@ export function GeoSpill({
 				<SketchPath
 					d={`M0 ${rulerY}L${boxW.toFixed(1)} ${rulerY}`}
 					seed={`${data.id}-spill-ruler`}
-					color={SWISS.ink}
+					color={`var(--fig-horizon-ink, ${SWISS.ink})`}
 					width={0.9}
 					opacity={0.55}
 					passes={2}
@@ -503,7 +543,7 @@ export function GeoSpill({
 						)
 						.join("")}
 					seed={`${data.id}-spill-ticks`}
-					color={SWISS.ink}
+					color={`var(--fig-horizon-ink, ${SWISS.ink})`}
 					width={0.9}
 					opacity={0.65}
 					passes={1}

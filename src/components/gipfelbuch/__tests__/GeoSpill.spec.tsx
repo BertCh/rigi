@@ -8,7 +8,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TafelBake } from "../tafel/useTafelBake";
-import { GeoSpill, type SpillCursor } from "../viz/GeoSpill";
+import { GeoSpill, type SpillCursor, type SpillEcho } from "../viz/GeoSpill";
 import type { PhotoLayer } from "../viz/inks";
 import type { GipfelbuchPhotoData } from "../viz/real";
 
@@ -48,10 +48,14 @@ function Spill({
 	layers,
 	cursor,
 	t = 1,
+	states,
+	shown,
 }: {
 	layers: PhotoLayer[];
 	cursor?: SpillCursor;
 	t?: number;
+	states?: SpillEcho["states"];
+	shown?: boolean;
 }) {
 	const ref = useRef<HTMLDivElement>(null);
 	return (
@@ -64,8 +68,9 @@ function Spill({
 				maxSpill={0.5}
 				t={t}
 				immediate
-				echo={{ layers }}
+				echo={{ layers, states }}
 				cursor={cursor}
+				shown={shown}
 			/>
 		</div>
 	);
@@ -107,6 +112,44 @@ describe("GeoSpill", () => {
 		expect(getByTestId("gb-geo-spill").style.opacity).toBe(
 			"var(--gb-spill-reveal, 1)",
 		);
+	});
+
+	it("puts no transition on a reveal its figure drives itself", async () => {
+		const { getByTestId } = render(<Spill layers={[]} />);
+		await act(async () => {});
+		// PhotoStory writes --gb-spill-reveal per frame: an eased opacity would lag its wipe
+		expect(getByTestId("gb-geo-spill").style.transition).toBe("");
+	});
+
+	it("hides itself while its figure's bloom is pending", async () => {
+		const { getByTestId } = render(<Spill layers={[]} shown={false} />);
+		await act(async () => {});
+		expect(getByTestId("gb-geo-spill").style.opacity).toBe(
+			"calc(var(--gb-spill-reveal, 1) * 0)",
+		);
+	});
+
+	it("keeps each echo line in step with its layer in the photo", async () => {
+		const { getByTestId, queryByText } = render(
+			<Spill
+				layers={["prior", "solved", "skyline"]}
+				states={{
+					prior: { state: "ghost" },
+					solved: { state: "on", delay: 80 },
+					skyline: { state: "hidden" },
+				}}
+			/>,
+		);
+		await act(async () => {});
+		const layers = [
+			...getByTestId("gb-geo-spill-echo").querySelectorAll("[data-layer]"),
+		].map(
+			(g) => `${g.getAttribute("data-layer")}:${g.getAttribute("data-state")}`,
+		);
+		// stack order: the two derived horizons under the measured skyline
+		expect(layers).toEqual(["derived:ghost", "derived:on", "measured:hidden"]);
+		// the note names what is on, not the hidden skyline: both poses count (ghost included)
+		expect(queryByText(/same turn/)).toBeTruthy();
 	});
 
 	it("labels a column cursor with its bearing at the spill's pose", async () => {
