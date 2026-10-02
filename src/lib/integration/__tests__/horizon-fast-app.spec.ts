@@ -246,4 +246,57 @@ describe("startFastHorizon", () => {
 		expect(worker().types()).not.toContain("build");
 		h.dispose();
 	});
+
+	it("fail() terminates the worker and rejects every waiter", async () => {
+		const h = startFastHorizon({ lat: 1, lon: 2 });
+		const p = h.dirs(7);
+		const q = h.dirs(8);
+		await flush();
+		worker().emit({ type: "error", error: "boom" });
+		await expect(p).rejects.toThrow("boom");
+		await expect(q).rejects.toThrow("boom");
+		expect(worker().terminated).toBe(true);
+	});
+
+	it("a tile-fetch failure terminates the worker", async () => {
+		mocks.fetchDemBytes.mockRejectedValue(new Error("tiles down"));
+		const h = startFastHorizon({ lat: 1, lon: 2 });
+		await expect(h.dirs(1)).rejects.toThrow("tiles down");
+		expect(worker().terminated).toBe(true);
+	});
+
+	it("an already aborted signal terminates the worker and dirs() rejects", async () => {
+		const ac = new AbortController();
+		ac.abort();
+		const h = startFastHorizon({ lat: 1, lon: 2, signal: ac.signal });
+		expect(worker().terminated).toBe(true);
+		await expect(h.dirs(1)).rejects.toMatchObject({ name: "AbortError" });
+		expect(h.take(1)).toBeNull();
+		await flush();
+		expect(worker().types()).not.toContain("build");
+	});
+
+	it("duplicate dirs() for one eye all resolve", async () => {
+		const h = startFastHorizon({ lat: 1, lon: 2 });
+		const p = h.dirs(9);
+		const q = h.dirs(9);
+		await flush();
+		worker().emit(dirsMsg(9));
+		await expect(p).resolves.toMatchObject({ stats: { tiles: 2 } });
+		await expect(q).resolves.toMatchObject({ stats: { tiles: 2 } });
+	});
+
+	it("dirs() for another eye after the worker finished rejects instead of hanging", async () => {
+		const h = startFastHorizon({ lat: 1, lon: 2 });
+		h.setEye(5);
+		await flush();
+		worker().emit(dirsMsg(5));
+		expect(h.take(5)).not.toBeNull();
+		await expect(h.dirs(6)).rejects.toThrow(/terminated/);
+		expect(
+			worker()
+				.types()
+				.filter((t) => t === "march"),
+		).toHaveLength(1);
+	});
 });

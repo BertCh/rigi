@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// CPU skyline for the renderer via d1's src/lib/horizon-fast. It replaces the 8 float geometry renders
-// of the old GPU horizon (1024×1536 RGBA32F each, read back synchronously). That GPU path is still the
-// fallback.
+// Skyline for the renderer via d1's src/lib/horizon-fast, run in a worker. It replaces the 8 float geometry
+// renders of the old GPU horizon (1024×1536 RGBA32F each, read back synchronously). The worker marches the
+// profile on the GPU by default (?gpuHorizon, gpu/horizon/opt-in.ts) and on the CPU otherwise.
 //
 //   const h = startFastHorizon({ lat, lon, az0, az1, signal })   // at init start: tiles stream in parallel
 //   h.setEye(eyeH)                                                // as soon as the eye height is known
@@ -17,8 +17,12 @@
 // Rings are horizon-fast's LITE_RINGS (one zoom coarser than its desktop default). That is still at least
 // as fine as the terrain meshes the GPU horizon rendered (96–256 segments per 512 px tile), and it needs
 // about a third of the default's mosaic memory (~60 MB for the wedge, ~116 MB for the full circle, all
-// in the worker and freed when it terminates). Any failure rejects `dirs()`; the engine then falls back
-// to the GPU horizon.
+// in the worker and freed when it terminates). Any failure terminates the worker and rejects `dirs()`; the
+// engines then fall back to the CPU profile horizon (deck/engine.ts traceHorizon).
+//
+// Lifecycle: the worker is terminated after the first delivered eye, on failure, and on dispose or abort
+// (including a signal that is already aborted at start). `dirs()` for an eye with no result after that
+// rejects; several `dirs()` calls for one eye all resolve.
 import { tilePriority } from "#/lib/cache";
 import { fetchDemBytes, MAPTERHORN, type TileKey, tileId } from "#/lib/dem";
 import { getFlag } from "#/lib/flags";
@@ -184,12 +188,19 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 	const results = new Map<number, Dirs>();
 	const waiters = new Map<
 		number,
-		{ resolve: (r: Dirs) => void; reject: (e: Error) => void }
+		{ resolve: (r: Dirs) => void; reject: (e: Error) => void }[]
 	>();
 	let failed: Error | null = null;
+	let terminated = false;
+	const terminate = () => {
+		if (terminated) return;
+		terminated = true;
+		worker.terminate();
+	};
 	const fail = (e: unknown) => {
 		failed ??= e instanceof Error ? e : new Error(String(e));
-		for (const w of waiters.values()) w.reject(failed);
+		terminate();
+		for (const list of waiters.values()) for (const w of list) w.reject(failed);
 		waiters.clear();
 	};
 	worker.onmessage = (e: MessageEvent<HorizonWorkerOut>) => {
@@ -199,12 +210,14 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 		mergeSpotLedger(m.stats.precision?.spotLedger);
 		lastFastHorizonStats = m.stats;
 		results.set(m.eyeH, m);
-		waiters.get(m.eyeH)?.resolve(m);
+		for (const w of waiters.get(m.eyeH) ?? []) w.resolve(m);
 		waiters.delete(m.eyeH);
 	};
 	worker.onerror = (e) => fail(new Error(`horizon worker: ${e.message}`));
 
 	const fetched = (async () => {
+		if (o.signal?.aborted)
+			throw new DOMException("Horizon disposed", "AbortError");
 		const rings = await resolveRings(
 			o.rings ?? LITE_RINGS,
 			o.lat,
@@ -266,22 +279,22 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 
 	const requested = new Set<number>();
 	const setEye = (eyeH: number) => {
-		if (failed || requested.has(eyeH)) return;
+		if (failed || terminated || requested.has(eyeH)) return;
 		requested.add(eyeH);
 		fetched.then(() => post({ type: "march", eyeH })).catch(fail);
 	};
 	const finish = (r: Dirs): FastHorizonResult => {
-		worker.terminate();
+		terminate();
 		return {
 			dirs: r.dirs,
 			stats: { ...r.stats, totalMs: performance.now() - t0 },
 		};
 	};
 	const dispose = () => {
-		worker.terminate();
 		fail(new DOMException("Horizon disposed", "AbortError"));
 	};
-	o.signal?.addEventListener("abort", dispose, { once: true });
+	if (o.signal?.aborted) dispose();
+	else o.signal?.addEventListener("abort", dispose, { once: true });
 
 	return {
 		setEye,
@@ -290,18 +303,23 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 			return r ? finish(r) : null;
 		},
 		async dirs(eyeH) {
-			try {
-				const r =
-					results.get(eyeH) ??
-					(await new Promise<Dirs>((resolve, reject) => {
-						if (failed) return reject(failed);
-						waiters.set(eyeH, { resolve, reject });
-						setEye(eyeH);
-					}));
-				return finish(r);
-			} finally {
-				worker.terminate();
-			}
+			const r =
+				results.get(eyeH) ??
+				(await new Promise<Dirs>((resolve, reject) => {
+					if (failed) return reject(failed);
+					// the worker is gone after the first delivered eye: no later march can answer
+					if (terminated)
+						return reject(
+							new Error(
+								"horizon worker already terminated; no result for this eye",
+							),
+						);
+					const list = waiters.get(eyeH) ?? [];
+					list.push({ resolve, reject });
+					waiters.set(eyeH, list);
+					setEye(eyeH);
+				}));
+			return finish(r);
 		},
 		dispose,
 	};
