@@ -26,6 +26,7 @@ import {
 } from "#/lib/nearfield/types";
 import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
 import type { Renderer as PhotoEngine } from "#/lib/renderer";
+import { resolveGeoidUndulation } from "./engine-export";
 
 export type SplatExportKind = "splat-ply" | "splat-v1";
 
@@ -430,7 +431,7 @@ export function exportSplatsFromEngine(
 		pose: { ...engine.pose },
 		eye: [engine.eye.x, engine.eye.y, engine.eye.z],
 		model: opts.model,
-		geoidUndulation: opts.geoidUndulation,
+		geoidUndulation: resolveGeoidUndulation(engine, opts.geoidUndulation),
 		toLv95: opts.toLv95,
 	});
 	return {

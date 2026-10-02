@@ -14,6 +14,7 @@ import { attributionLine, fullAttribution } from "#/lib/licences/attribution";
 import type { PhotoMeta } from "#/lib/photos";
 import { unprojectDir } from "#/lib/pose";
 import type { Renderer as PhotoEngine } from "#/lib/renderer";
+import { geoidUndulation } from "#/lib/tiles3d/geoid";
 import { composeAnnotatedPng } from "./annotate";
 import { buildCameraModel, type CameraModel } from "./camera";
 import { buildColmapZip } from "./colmap";
@@ -75,7 +76,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
 export type EngineExportOptions = {
 	/** Draw peak labels into the annotated image (mirror the workspace's "Peak labels" toggle). Default true. */
 	withLabels?: boolean;
-	/** Geoid undulation N (m) for true ellipsoidal ECEF / GeoJSON z. Default: none (MSL heights). */
+	/** Geoid undulation N (m) for true ellipsoidal ECEF / GeoJSON z. Default: the EGM2008 grid at the frame origin (CR-04). */
 	geoidUndulation?: number;
 	/** GeoJSON view-ray / wedge length (m). Default 30 000. */
 	maxRange?: number;
@@ -101,6 +102,14 @@ export function exportFilename(photo: Pick<PhotoMeta, "id">, kind: ExportKind) {
 	return `${photo.id}${f?.ext ?? `.${kind}`}`;
 }
 
+/** N for the engine's frame: the caller's value, else EGM2008 at the frame origin (CR-04: the DEM heights are MSL). */
+export function resolveGeoidUndulation(
+	engine: Pick<PhotoEngine, "frame">,
+	explicit?: number,
+): number {
+	return explicit ?? geoidUndulation(engine.frame.lat, engine.frame.lon);
+}
+
 export function engineCameraModel(
 	engine: PhotoEngine,
 	opts: EngineExportOptions = {},
@@ -116,7 +125,7 @@ export function engineCameraModel(
 		eye: [engine.eye.x, engine.eye.y, engine.eye.z],
 		demAtCamera: engine.demAtCamera,
 		takenAt: p.takenAtUtc ?? p.takenAt,
-		geoidUndulation: opts.geoidUndulation,
+		geoidUndulation: resolveGeoidUndulation(engine, opts.geoidUndulation),
 	});
 }
 

@@ -66,6 +66,30 @@ MAX_BODY = 200 * 1024 * 1024
 ALLOWED_ORIGINS = {o.strip() for o in os.environ.get(
     "MATCHER_CORS", "http://localhost:3100,http://127.0.0.1:3100").split(",") if o.strip()}
 
+# CR-06: DNS-rebinding guard. Host must name a loopback host (any port) or one listed in MATCHER_HOSTS.
+ALLOWED_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"} | {
+    h.strip().lower() for h in os.environ.get("MATCHER_HOSTS", "").split(",") if h.strip()}
+# CR-06: photoPath / file:// photoUrl may only read below these roots (repo root + MATCHER_PHOTO_ROOTS, ':'-separated).
+PHOTO_ROOTS = [ROOT] + [Path(r).expanduser() for r in os.environ.get("MATCHER_PHOTO_ROOTS", "").split(":") if r.strip()]
+
+
+def host_allowed(host_header: str | None) -> bool:
+    """True when the Host header's name (port stripped) is a loopback or MATCHER_HOSTS name."""
+    h = (host_header or "").strip().lower()
+    name = h[: h.index("]") + 1] if h.startswith("[") and "]" in h else h.rsplit(":", 1)[0] if h.count(":") == 1 else h
+    return name in ALLOWED_HOSTS
+
+
+def photo_path_allowed(pth: Path) -> bool:
+    """True when `pth` lies below an allowed root, by lexical path or after resolving symlinks."""
+    for cand in (Path(os.path.abspath(pth)), pth.resolve()):
+        for root in PHOTO_ROOTS:
+            for r in (Path(os.path.abspath(root)), root.resolve()):
+                if cand == r or r in cand.parents:
+                    return True
+    return False
+
+
 JOB_LOCK = threading.Lock()
 STATE: dict = {"device": None, "warmupMs": None, "started": time.time(), "requests": 0}
 
@@ -841,6 +865,8 @@ def _load_photo_bytes(body: dict, data: bytes | None) -> bytes:
         return data
     if isinstance(body.get("photoPath"), str):
         pth = Path(body["photoPath"]).expanduser()
+        if not photo_path_allowed(pth):
+            raise ApiError(403, "forbidden", "photoPath is outside the allowed photo roots (set MATCHER_PHOTO_ROOTS)")
         if not pth.is_file():
             raise ApiError(404, "not_found", f"photoPath {pth} not found")
         return pth.read_bytes()
@@ -1259,6 +1285,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         if self.path.split("?")[0] != "/match":
             return self._err(ApiError(404, "not_found", "GET /health or POST /match"))
+        # CR-06: reject rebinding (bad Host), foreign browser origins, and non-JSON bodies. A text/plain POST
+        # is a no-preflight "simple" request from any site, so JSON must be declared as application/json.
+        origin = self.headers.get("Origin")
+        if not host_allowed(self.headers.get("Host")):
+            return self._err(ApiError(403, "forbidden", "Host not allowed (set MATCHER_HOSTS)"))
+        if origin and origin not in ALLOWED_ORIGINS and "*" not in ALLOWED_ORIGINS:
+            return self._err(ApiError(403, "forbidden", "Origin not allowed (set MATCHER_CORS)"))
+        _ctype = self.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        if _ctype not in ("application/json", "multipart/form-data"):
+            return self._err(ApiError(415, "unsupported_media_type", "Content-Type must be application/json or multipart/form-data"))
         STATE["requests"] += 1
         _TL.client_gone = self.client_gone
         _TL.ticket = self.headers.get("X-Queue-Ticket")

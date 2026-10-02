@@ -124,15 +124,47 @@ const release = () => {
 	for (const dir of held.splice(0).reverse())
 		rmSync(dir, { recursive: true, force: true });
 };
+// CR-02: the job runs in its own process group (spawned detached below). A signal to this wrapper is
+// forwarded to that whole group and the lock is released only once the child has exited, so a killed
+// wrapper never leaves a job running outside the lock. A second signal, or KILL_GRACE_MS of ignoring
+// the first, escalates to SIGKILL. (SIGKILL of the wrapper itself cannot be caught.)
+let child = null;
+let childGone = false;
+let exitCodeFromSignal = null;
+const KILL_GRACE_MS = Number(process.env.RENDER_LOCK_KILL_GRACE_MS ?? 10_000);
+/** Signal the job's process group (the child is its leader, so its pid is the group id). */
+const signalChildGroup = (sig) => {
+	if (!child?.pid || childGone) return;
+	try {
+		process.kill(-child.pid, sig);
+	} catch {
+		try {
+			child.kill(sig);
+		} catch {}
+	}
+};
 for (const [sig, code] of [
 	["SIGINT", 130],
 	["SIGTERM", 143],
-])
+	["SIGHUP", 129],
+]) {
 	process.on(sig, () => {
 		dropTicket();
-		release();
-		process.exit(code);
+		if (!child || childGone) {
+			release();
+			process.exit(code);
+		}
+		if (exitCodeFromSignal !== null) {
+			signalChildGroup("SIGKILL");
+			return;
+		}
+		exitCodeFromSignal = code;
+		signalChildGroup(sig);
+		setTimeout(() => signalChildGroup("SIGKILL"), KILL_GRACE_MS).unref();
 	});
+}
+// last resort (uncaught error): do not leave the job running unlocked
+process.on("exit", () => signalChildGroup("SIGKILL"));
 
 /** At the head of the queue: try to start. Returns a reason string while we must keep waiting. */
 const tryStart = () => {
@@ -190,12 +222,23 @@ for (let waited = 0; ; waited += 1) {
 writeFileSync(LAST_START, owner);
 dropTicket();
 // Then wait for memory headroom (tm_locks.py; mt-image-58 runs a long render worker + MPS model).
-const child = spawn(
+child = spawn(
 	"python3",
 	[resolve(import.meta.dirname, "tm_locks.py"), ...argv],
-	{ stdio: "inherit" },
+	{ stdio: "inherit", detached: true },
 );
-child.on("exit", (code) => {
+child.on("error", (error) => {
+	console.error(`[render-lock] cannot start the job: ${error.message}`);
+	childGone = true;
 	release();
-	process.exit(code ?? 1);
+	process.exit(1);
+});
+child.on("exit", (code) => {
+	// a grandchild that outlived the group leader is stopped before the lock goes
+	try {
+		process.kill(-child.pid, "SIGKILL");
+	} catch {}
+	childGone = true;
+	release();
+	process.exit(exitCodeFromSignal ?? code ?? 1);
 });
