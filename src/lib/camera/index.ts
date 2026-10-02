@@ -37,6 +37,30 @@ export function poseBasis(p: Pose): { forward: Vec3; right: Vec3; up: Vec3 } {
 	};
 }
 
+/**
+ * projectPoint with the pose basis and tan(vfov/2) hoisted: bind once per pose, then project many
+ * points. Same float operations in the same order as the one-shot projectPoint (which uses it).
+ */
+export function makeProjector(
+	p: Pose,
+	aspect: number,
+	eye: ArrayLike<number>,
+): (pt: ArrayLike<number>) => { u: number; v: number; depth: number } | null {
+	const { forward, right, up } = poseBasis(p);
+	const t = Math.tan((p.vfov * D) / 2);
+	const ex = eye[0];
+	const ey = eye[1];
+	const ez = eye[2];
+	return (pt) => {
+		const v = [pt[0] - ex, pt[1] - ey, pt[2] - ez];
+		const z = dot3(v, forward);
+		if (z <= 0) return null;
+		const x = dot3(v, right) / z / (t * aspect);
+		const y = dot3(v, up) / z / t;
+		return { u: 0.5 + x / 2, v: 0.5 - y / 2, depth: z };
+	};
+}
+
 /** Project an ENU point into normalised image coords (0..1, y down). null if behind (depth ≤ 0). */
 export function projectPoint(
 	p: Pose,
@@ -44,14 +68,7 @@ export function projectPoint(
 	eye: ArrayLike<number>,
 	pt: ArrayLike<number>,
 ) {
-	const { forward, right, up } = poseBasis(p);
-	const v = [pt[0] - eye[0], pt[1] - eye[1], pt[2] - eye[2]];
-	const z = dot3(v, forward);
-	if (z <= 0) return null;
-	const t = Math.tan((p.vfov * D) / 2);
-	const x = dot3(v, right) / z / (t * aspect);
-	const y = dot3(v, up) / z / t;
-	return { u: 0.5 + x / 2, v: 0.5 - y / 2, depth: z };
+	return makeProjector(p, aspect, eye)(pt);
 }
 
 /** Unit ENU direction through normalised image coords. */

@@ -5,7 +5,7 @@
 // Photo-camera queries on a TerrainSet: eye altitude, peak snapping and occlusion-tested peak labels.
 
 import * as THREE from "three";
-import type { Pose } from "../camera";
+import { makeProjector, type Pose } from "../camera";
 import { getCpuHeights } from "../dem/cpu-heights";
 import { distanceM } from "../geodesy";
 import { declutterClassic, peakRank, rankPeaks } from "../look/labels/rank";
@@ -98,6 +98,49 @@ export type SnappedPeak = {
 	position: [number, number, number];
 };
 
+/** Pose-independent per-peak values (distance from the photo, raw ENU), valid for one frame/photo/eye height. */
+type PeakPrecompute = {
+	peaks: Peak[];
+	frame: TerrainSet["frame"];
+	lat: number;
+	lon: number;
+	eyeZ: number;
+	dist: Float64Array; // NaN = not computed yet
+	enu: Float64Array;
+};
+const peakPrecompute_ = new WeakMap<object, PeakPrecompute>();
+
+function peakPrecompute(
+	cache: object,
+	terrain: TerrainSet,
+	peaks: Peak[],
+	at: { lat: number; lon: number },
+	eyeZ: number,
+): PeakPrecompute {
+	let c = peakPrecompute_.get(cache);
+	if (
+		!c ||
+		c.peaks !== peaks ||
+		c.frame !== terrain.frame ||
+		c.lat !== at.lat ||
+		c.lon !== at.lon ||
+		c.eyeZ !== eyeZ ||
+		c.dist.length !== peaks.length
+	) {
+		c = {
+			peaks,
+			frame: terrain.frame,
+			lat: at.lat,
+			lon: at.lon,
+			eyeZ,
+			dist: new Float64Array(peaks.length).fill(Number.NaN),
+			enu: new Float64Array(peaks.length * 3),
+		};
+		peakPrecompute_.set(cache, c);
+	}
+	return c;
+}
+
 /**
  * engine.ts buildPeaks: peaks 150 m – 110 km away, snapped to the DEM summit within
  * min(250, 60 + dist·0.004) m. Lazily: three snaps every peak up front, but on deck's z17 set
@@ -120,17 +163,28 @@ export function snapPeaksNear(
 		radiusM: number,
 	) => { lat: number; lon: number; h: number } | undefined,
 ): SnappedPeak[] {
-	const eyeV = new THREE.Vector3(...eye);
 	const m = 0.15;
-	for (const p of peaks) {
+	const pre = peakPrecompute(cache, terrain, peaks, at, eye[2]);
+	let project: ReturnType<typeof makeProjector> | undefined;
+	for (let i = 0; i < peaks.length; i++) {
+		const p = peaks[i];
 		if (cache.has(p)) continue;
-		const dist = distanceM(at, p);
+		let dist = pre.dist[i];
+		if (Number.isNaN(dist)) {
+			dist = pre.dist[i] = distanceM(at, p);
+			if (!(dist > 110000 || dist < 150)) {
+				const w = terrain.frame.fromGeo(p.lat, p.lon, p.ele ?? eye[2]);
+				pre.enu[i * 3] = w[0];
+				pre.enu[i * 3 + 1] = w[1];
+				pre.enu[i * 3 + 2] = w[2];
+			}
+		}
 		if (dist > 110000 || dist < 150) {
 			cache.set(p, null);
 			continue;
 		}
-		const raw = terrain.frame.fromGeo(p.lat, p.lon, p.ele ?? eye[2]);
-		const pr = projectPoint(pose, aspect, eyeV, raw);
+		project ??= makeProjector(pose, aspect, eye);
+		const pr = project(pre.enu.subarray(i * 3, i * 3 + 3));
 		if (!pr || pr.u < -m || pr.u > 1 + m || pr.v < -m - 0.3 || pr.v > 1 + m)
 			continue; // not now; maybe once the view turns
 		const radiusM = Math.min(250, 60 + dist * 0.004);
