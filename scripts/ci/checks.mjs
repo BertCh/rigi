@@ -656,16 +656,6 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
-		id: "cog-reader",
-		tier: "fast",
-		group: "concord",
-		cmd: tsx("src/lib/concord/occl/cog-reader.check.ts"),
-		note: "loaders.gl vs own COG reader on real swisstopo COGs; bytes cached in .cache/swiss-cog by a networked run",
-		// SKIPs until one run with network filled the range cache (then offline)
-		needs: [".cache/swiss-cog", "public/photos/photos.json"],
-		timeoutS: 600,
-	},
-	{
 		id: "cache-range",
 		tier: "fast",
 		group: "concord",

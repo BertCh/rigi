@@ -14,8 +14,6 @@
 import { DEG, EnuFrame, wrap180 } from "../../geodesy";
 import {
 	type CogHeader,
-	type CogReader,
-	cogReaderDefault,
 	DSM_COLLECTION,
 	DTM_COLLECTION,
 	type FetchStats,
@@ -60,10 +58,8 @@ export type NearDsm = {
 };
 
 export type NearDsmOpts = {
-	/** Byte-range transport (default: the reader's, see swiss-cog.ts openCog). */
+	/** Byte-range transport (default: swiss-cog.ts openCog's plain fetch). */
 	fetcher?: RangeFetcher;
-	/** COG reader (default: the `cogReader` flag). */
-	reader?: CogReader;
 	json?: JsonFetcher;
 	signal?: AbortSignal;
 	/** Only tiles intersecting this view wedge (azimuth, degrees clockwise from north) are fetched. */
@@ -164,14 +160,11 @@ async function planTile(
 	fetcher: RangeFetcher | undefined,
 	stats: FetchStats,
 	signal: AbortSignal | undefined,
-	reader: CogReader,
 ): Promise<Plan | null> {
 	// GDAL COGs keep every IFD in the first ~1–2 KiB; HeadBuf grows on demand. (A prefix that also covers the
 	// coarsest overview would save a round trip but over-fetches on small, e.g. lake-only, tiles: +2.7 MB
 	// measured on IMG_7018.)
-	const hdr = await openCog(t.href, fetcher, stats, signal, 4096, {
-		reader,
-	});
+	const hdr = await openCog(t.href, fetcher, stats, signal, 4096);
 	const li = pickLevel(hdr, resM);
 	const lv = hdr.levels[li];
 	const px = lv.resX;
@@ -276,7 +269,6 @@ export function loadNearDsm(
 		opts.dtmRes ?? 4,
 		opts.maxTiles ?? null,
 		opts.maxBytes ?? null,
-		opts.reader ?? cogReaderDefault(),
 	]);
 	let p = CACHE.get(key);
 	if (!p) {
@@ -297,7 +289,6 @@ async function loadNearDsmUncached(
 	const t0 = performance.now();
 	if (!inSwissExtent(lat, lon)) return null;
 	const fetcher = opts.fetcher;
-	const reader = opts.reader ?? cogReaderDefault();
 	const json = opts.json ?? httpJsonFetcher;
 	const dtmRes = opts.dtmRes ?? 4;
 	const stats = newStats();
@@ -363,13 +354,11 @@ async function loadNearDsmUncached(
 	dsT.sort(byDist);
 	const [dsP, dtP] = await Promise.all([
 		Promise.all(
-			dsT.map((t) =>
-				planTile(t, resM, winOf(t), fetcher, stats, opts.signal, reader),
-			),
+			dsT.map((t) => planTile(t, resM, winOf(t), fetcher, stats, opts.signal)),
 		),
 		Promise.all(
 			dtT.map((t) =>
-				planTile(t, dtmRes, winOf(t), fetcher, stats, opts.signal, reader),
+				planTile(t, dtmRes, winOf(t), fetcher, stats, opts.signal),
 			),
 		),
 	]);

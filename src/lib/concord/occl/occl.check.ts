@@ -4,8 +4,7 @@
 
 // WP-F self-check (CPU, offline): npx tsx src/lib/concord/occl/occl.check.ts [--live]
 //  1. LZW decoder vs a reference TIFF-LZW encoder (random, repetitive, KwKwK, width switches, clear codes)
-//  2. synthetic tiled COGs (LZW / Deflate / none, predictor 1 / 2 / 3, 2 levels, BigTIFF) → readWindow exact,
-//     and the loaders.gl reader (cogReader "loaders") bit-identical to the own one on the same bytes
+//  2. synthetic tiled COGs (LZW / Deflate / none, predictor 1 / 2 / 3, 2 levels, BigTIFF) → readWindow exact
 //  3. LV95 formulas vs the swisstopo worked example; inverse round trip; ENU→LV95 affine vs exact
 //  4. occluder: synthetic DSM box — hit range, near skip, under-terrain stop, parity when off
 //  --live: one real swissSURFACE3D/swissALTI3D load (IMG_7018 GT position, 700 m).
@@ -324,41 +323,6 @@ function buildTiff(
 				hdr.originX === 2600000 &&
 				hdr.originY === 1200000,
 			`COG comp=${enc.comp} pred=${enc.pred}${enc.big ? " BigTIFF" : ""}: window ${bad}, overview ${bad1} mismatches, ${reqs} requests, res ${hdr.levels.map((l) => l.resX).join("/")}`,
-		);
-		// WAG W2.5: the loaders.gl reader (GeoTIFFSourceLoader) on the same bytes: same header, same bits
-		let lreqs = 0;
-		const memL: RangeFetcher = async (_u, a, b) => {
-			lreqs++;
-			return file.slice(a, Math.min(b + 1, file.length));
-		};
-		const lh = await openCog("mem://t.tif", memL, undefined, undefined, 0, {
-			reader: "loaders",
-		});
-		const sameHdr =
-			!!lh.loaders &&
-			JSON.stringify(lh.levels) === JSON.stringify(hdr.levels) &&
-			lh.originX === hdr.originX &&
-			lh.originY === hdr.originY &&
-			lh.nodata === hdr.nodata;
-		const lwin = await readWindow(lh, 0, 17, 9, 60, 50, memL);
-		const lw1 = await readWindow(lh, 1, 0, 0, 50, 35, memL);
-		// flush with the image's bottom-right corner, inside partial edge tiles (ndsm windows never leave
-		// the image; past it the own reader copies the edge tiles' padding, the loaders one gives NaN)
-		const edge = await readWindow(hdr, 0, 80, 50, 20, 20, mem);
-		const ledge = await readWindow(lh, 0, 80, 50, 20, 20, memL);
-		const diff = (a: Float32Array, b: Float32Array) => {
-			if (a.length !== b.length) return Number.POSITIVE_INFINITY;
-			const ua = new Uint32Array(a.buffer, a.byteOffset, a.length);
-			const ub = new Uint32Array(b.buffer, b.byteOffset, b.length);
-			let n = 0;
-			for (let k = 0; k < a.length; k++)
-				if (ua[k] !== ub[k] && !(Number.isNaN(a[k]) && Number.isNaN(b[k]))) n++;
-			return n;
-		};
-		const dl = diff(win, lwin) + diff(w1, lw1) + diff(edge, ledge);
-		ok(
-			sameHdr && dl === 0,
-			`COG comp=${enc.comp} pred=${enc.pred}${enc.big ? " BigTIFF" : ""}: loaders reader ${sameHdr ? "same header" : "HEADER DIFFERS"}, ${dl} bit mismatches vs own (window, whole overview, corner), ${lreqs} requests`,
 		);
 	}
 }

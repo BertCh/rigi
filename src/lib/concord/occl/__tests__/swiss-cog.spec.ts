@@ -125,9 +125,7 @@ describe("openCog header parsing", () => {
 	it("reads levels, tile tables, origin, pixel size and nodata", async () => {
 		const { fetcher } = memoryFetcher(files);
 		const stats = newStats();
-		const hdr = await openCog(URL0, fetcher, stats, undefined, 4096, {
-			reader: "own",
-		});
+		const hdr = await openCog(URL0, fetcher, stats, undefined, 4096);
 		expect(hdr.littleEndian).toBe(true);
 		expect(hdr.levels).toHaveLength(2);
 		expect(hdr.levels[0]).toMatchObject({
@@ -153,22 +151,20 @@ describe("openCog header parsing", () => {
 	it("rejects a non-TIFF", async () => {
 		const { fetcher } = memoryFetcher({ [URL0]: new Uint8Array(5000).fill(7) });
 		await expect(
-			openCog(URL0, fetcher, undefined, undefined, 4096, { reader: "own" }),
+			openCog(URL0, fetcher, undefined, undefined, 4096),
 		).rejects.toThrow(/not a TIFF/);
 	});
 
 	it("propagates a fetch failure", async () => {
 		const { fetcher } = memoryFetcher({});
 		await expect(
-			openCog(URL0, fetcher, undefined, undefined, 4096, { reader: "own" }),
+			openCog(URL0, fetcher, undefined, undefined, 4096),
 		).rejects.toThrow(/404/);
 	});
 
 	it("pickLevel chooses the level nearest the requested resolution", async () => {
 		const { fetcher } = memoryFetcher(files);
-		const hdr = await openCog(URL0, fetcher, undefined, undefined, 4096, {
-			reader: "own",
-		});
+		const hdr = await openCog(URL0, fetcher, undefined, undefined, 4096);
 		expect(pickLevel(hdr, 2)).toBe(0);
 		expect(pickLevel(hdr, 4)).toBe(1);
 		expect(pickLevel(hdr, 0.5)).toBe(0);
@@ -195,9 +191,7 @@ describe("readWindow", () => {
 			pad: 4200,
 		});
 		const m = memoryFetcher({ [URL0]: bytes });
-		const hdr = await openCog(URL0, m.fetcher, undefined, undefined, 4096, {
-			reader: "own",
-		});
+		const hdr = await openCog(URL0, m.fetcher, undefined, undefined, 4096);
 		return { hdr, ...m };
 	};
 
@@ -252,9 +246,7 @@ describe("readWindow", () => {
 			originY: 8,
 		});
 		const m = memoryFetcher({ [URL0]: bytes });
-		const hdr = await openCog(URL0, m.fetcher, undefined, undefined, 4096, {
-			reader: "own",
-		});
+		const hdr = await openCog(URL0, m.fetcher, undefined, undefined, 4096);
 		m.calls.length = 0;
 		const out = await readWindow(hdr, 0, 0, 0, 8, 8, m.fetcher);
 		expect(m.calls).toHaveLength(0);
@@ -314,25 +306,6 @@ describe("readWindow", () => {
 		await expect(readWindow(hdr, 0, 0, 0, 4, 4, fetcher)).rejects.toThrow(
 			/unsupported/,
 		);
-	});
-
-	it("honours an aborted signal on a loaders-backed header", async () => {
-		const ac = new AbortController();
-		ac.abort(new Error("stop"));
-		const hdr = {
-			url: "x",
-			littleEndian: true,
-			levels: [],
-			originX: 0,
-			originY: 0,
-			nodata: null,
-			prefix: new Uint8Array(),
-			loaders: { read: vi.fn() },
-		};
-		await expect(
-			readWindow(hdr, 0, 0, 0, 1, 1, undefined, undefined, ac.signal),
-		).rejects.toThrow("stop");
-		expect(hdr.loaders.read).not.toHaveBeenCalled();
 	});
 });
 

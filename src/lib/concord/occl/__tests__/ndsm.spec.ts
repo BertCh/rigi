@@ -137,7 +137,6 @@ describe("loadNearDsm (synthetic swisstopo COGs)", () => {
 		const g = await loadNearDsm(48.85, 2.35, 250, 2, {
 			json: f.json,
 			fetcher: f.fetcher,
-			reader: "own",
 		});
 		expect(g).toBeNull();
 		expect(f.jsonUrls).toHaveLength(0);
@@ -148,7 +147,6 @@ describe("loadNearDsm (synthetic swisstopo COGs)", () => {
 		const g = await loadNearDsm(BERN.lat, BERN.lon, 210, 2, {
 			json: f.json,
 			fetcher: f.fetcher,
-			reader: "own",
 		});
 		expect(g).toBeNull();
 	});
@@ -158,7 +156,6 @@ describe("loadNearDsm (synthetic swisstopo COGs)", () => {
 		const g = (await loadNearDsm(BERN.lat, BERN.lon, 300, 2, {
 			json: f.json,
 			fetcher: f.fetcher,
-			reader: "own",
 		})) as NearDsm;
 		expect(g).not.toBeNull();
 		expect(g.res).toBe(2);
@@ -197,7 +194,7 @@ describe("loadNearDsm (synthetic swisstopo COGs)", () => {
 			BERN.lon,
 			220,
 			2,
-			{ json: f.json, fetcher: f.fetcher, reader: "own" as const },
+			{ json: f.json, fetcher: f.fetcher },
 		] as const;
 		const a = loadNearDsm(...args);
 		const b = loadNearDsm(...args);
@@ -211,13 +208,12 @@ describe("loadNearDsm (synthetic swisstopo COGs)", () => {
 			BERN.lon,
 			230,
 			2,
-			{ json: bad, fetcher: f.fetcher, reader: "own" as const },
+			{ json: bad, fetcher: f.fetcher },
 		] as const;
 		await expect(loadNearDsm(...bargs)).rejects.toThrow("offline");
 		const again = loadNearDsm(BERN.lat, BERN.lon, 230, 2, {
 			json: f.json,
 			fetcher: f.fetcher,
-			reader: "own",
 		});
 		await expect(again).resolves.not.toBeNull();
 	});
@@ -228,7 +224,6 @@ describe("loadNearDsm (synthetic swisstopo COGs)", () => {
 		const g = (await loadNearDsm(lat, lon, 240, 2, {
 			json: f.json,
 			fetcher: f.fetcher,
-			reader: "own",
 			maxTiles: 1,
 			wedge: { yawDeg: 90, halfDeg: 20 },
 		})) as NearDsm;
@@ -243,7 +238,6 @@ describe("loadNearDsm (synthetic swisstopo COGs)", () => {
 		const g = (await loadNearDsm(BERN.lat, BERN.lon, 250, 2, {
 			json: f.json,
 			fetcher: f.fetcher,
-			reader: "own",
 			maxBytes: 1,
 		})) as NearDsm;
 		expect(g.stats.tiles).toBe(1);
@@ -276,7 +270,6 @@ describe("objectHitRange / occluderRange", async () => {
 	const dsm = (await loadNearDsm(BERN.lat, BERN.lon, 400, 2, {
 		json: f.json,
 		fetcher: f.fetcher,
-		reader: "own",
 	})) as NearDsm;
 	const eye: [number, number, number] = [0, 10, 501.7];
 	const east: [number, number, number] = [1, 0, 0];

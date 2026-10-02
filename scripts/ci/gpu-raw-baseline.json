@@ -1,8 +1,4 @@
 {
-	"src/lib/concord/occl/cog-loaders.ts": {
-		"privateMember": 1,
-		"why": "loaders.gl GeoTIFF source private _getInitPromise (not luma); stays"
-	},
 	"src/lib/deck-webgpu/device.ts": {
 		"rawWebGpu": 3,
 		"why": "createRenderDevice: adapter probe for features and limits before luma create"

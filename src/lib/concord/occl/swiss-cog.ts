@@ -4,25 +4,17 @@
 
 // WP-F: swisstopo surface/terrain model streaming — STAC resolve + minimal Cloud-Optimised GeoTIFF range reader.
 //
-// Two readers behind one API (openCog → CogHeader → readWindow / pickLevel), chosen per call (`openCog(…,
-// { reader })`) or by the `cogReader` flag (src/lib/flags):
-//   - "loaders": @loaders.gl/geotiff GeoTIFFSourceLoader (geotiff.js underneath), in ./cog-loaders.ts,
-//     imported on first use; ranges go through the persistent tile cache (cachedFetchRange) by default.
-//     Falls back to the own reader when it cannot open a file.
-//   - "own" (WP-F): a small TIFF/BigTIFF IFD parser, tiled/stripped layouts,
+// One API (openCog → CogHeader → readWindow / pickLevel) over a small TIFF/BigTIFF IFD parser, tiled/stripped layouts,
 // compression none / LZW (5) / Deflate (8, 32946), predictor 1 / 2 / 3, float32/int16/uint16/… samples.
 // That is exactly what swisstopo's COGs use (measured 2026-09-29: swissSURFACE3D Raster and swissALTI3D are
 // float32, LZW, predictor 1, 512² resp. 128² internal tiles, nodata -9999, CRS LV95 / EPSG:2056). Plain
 //     `fetch` with Range by default.
-// Both return the same Float32 window bits (scripts gate: cog-reader.check.ts).
 //
 // Transport: data.geo.admin.ch sends `Access-Control-Allow-Origin: *`, answers the `Range` preflight
 // (`access-control-allow-headers: range`) and returns 206 partial content, so this runs unchanged in the
 // browser. Node (probe/eval scripts) injects a caching RangeFetcher.
 //
 // Data: swisstopo OGD (free incl. commercial use; attribution "© swisstopo").
-import { cachedFetchRange } from "../../cache";
-import { getFlag } from "../../flags";
 
 // ---------------------------------------------------------------- LV95
 
@@ -229,35 +221,9 @@ export type CogHeader = {
 	originX: number;
 	originY: number;
 	nodata: number | null;
-	/** The file prefix already fetched (header, IFDs, and whatever `headBytes` pulled in). Empty for "loaders". */
+	/** The file prefix already fetched (header, IFDs, and whatever `headBytes` pulled in). */
 	prefix: Uint8Array;
-	/** Set when the "loaders" reader opened the file: readWindow reads through it. */
-	loaders?: CogLoadersHandle;
 };
-
-/** Which COG reader openCog uses (see the header comment). */
-export type CogReader = "loaders" | "own";
-
-/** A window reader bound to an opened loaders.gl source (./cog-loaders.ts). */
-export type CogLoadersHandle = {
-	read(
-		level: number,
-		x0: number,
-		y0: number,
-		w: number,
-		h: number,
-		stats?: FetchStats,
-	): Promise<Float32Array>;
-};
-
-/** RangeFetcher over the persistent tile cache (each range its own entry, keyed by url + range). */
-export const cachedRangeFetcher: RangeFetcher = (url, start, end, signal) =>
-	cachedFetchRange(url, start, end, { signal });
-
-/** The reader openCog uses when the call does not name one (the `cogReader` flag). */
-export const cogReaderDefault = (): CogReader => getFlag("cogReader");
-
-let warnedFallback = false;
 
 const TYPE_SIZE: Record<number, number> = {
 	1: 1,
@@ -309,9 +275,7 @@ class HeadBuf {
 }
 
 /**
- * Parse the IFD chain (all overview levels) of a COG. Reads only the header prefix. `opts.reader` picks the
- * reader (default: the `cogReader` flag); the default fetcher is plain fetch for "own" and the tile cache
- * for "loaders".
+ * Parse the IFD chain (all overview levels) of a COG. Reads only the header prefix; the default fetcher is plain fetch.
  */
 export async function openCog(
 	url: string,
@@ -319,32 +283,12 @@ export async function openCog(
 	stats?: FetchStats,
 	signal?: AbortSignal,
 	/**
-	 * First read size ("own" only; geotiff.js reads 64 KiB blocks). GDAL COGs store the smallest overview
+	 * First read size. GDAL COGs store the smallest overview
 	 * right after the header, so a prefix that covers it saves a round trip (readWindow reuses the prefix).
 	 * Default 16 KiB.
 	 */
 	headBytes = 16384,
-	opts: { reader?: CogReader } = {},
 ): Promise<CogHeader> {
-	if ((opts.reader ?? cogReaderDefault()) === "loaders") {
-		try {
-			const { openCogLoaders } = await import("./cog-loaders");
-			return await openCogLoaders(
-				url,
-				fetcher ?? cachedRangeFetcher,
-				stats,
-				signal,
-			);
-		} catch (e) {
-			if (signal?.aborted) throw e;
-			if (!warnedFallback) {
-				warnedFallback = true;
-				console.warn(
-					`[swiss-cog] loaders.gl reader failed on ${url} (${(e as Error)?.message ?? e}); using the own reader`,
-				);
-			}
-		}
-	}
 	return openCogOwn(url, fetcher ?? httpRangeFetcher, stats, signal, headBytes);
 }
 
@@ -610,8 +554,7 @@ async function decodeTile(
 
 /**
  * Read a pixel window [x0, x0+w) × [y0, y0+h) of `level` (band 0) into a Float32Array (row-major, nodata ⇒
- * NaN). Only the internal tiles that intersect the window are fetched, one request per tile run ("own"; a
- * header opened by "loaders" reads through its source, which keeps the fetcher it was opened with).
+ * NaN). Only the internal tiles that intersect the window are fetched, one request per tile run.
  */
 export async function readWindow(
 	hdr: CogHeader,
@@ -624,10 +567,6 @@ export async function readWindow(
 	stats?: FetchStats,
 	signal?: AbortSignal,
 ): Promise<Float32Array> {
-	if (hdr.loaders) {
-		if (signal?.aborted) throw signal.reason;
-		return hdr.loaders.read(level, x0, y0, w, h, stats);
-	}
 	const lv = hdr.levels[level];
 	const out = new Float32Array(w * h).fill(Number.NaN);
 	const tx0 = Math.max(0, Math.floor(x0 / lv.tileW));
