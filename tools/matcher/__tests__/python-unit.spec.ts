@@ -29,6 +29,6 @@ describe.skipIf(!python)("v3 tooling python unit tests", () => {
 			);
 			expect(result.stderr + result.stdout).toMatch(/\nOK\b/);
 			expect(result.status).toBe(0);
-		});
+		}, 60_000); // python3 start-up under a loaded shared machine can exceed the 5 s default
 	}
 });
