@@ -187,7 +187,7 @@ const isAbort = (e: unknown) => (e as Error)?.name === "AbortError";
  *
  * Order: capture time. With the viewpoint bias, a photo starts from its compass shifted by the
  * median offset of the anchored photos at its spot (saved / ground truth / solved / accepted
- * earlier in this run, within BIAS_WINDOW_S). Photos rejected before their spot had an anchor get
+ * earlier in this run, within the bias window: biasWindowS). Photos rejected before their spot had an anchor get
  * one retry in a second pass if the bias they would now get differs by ≥ RETRY_DELTA_DEG.
  */
 export async function alignRoll(

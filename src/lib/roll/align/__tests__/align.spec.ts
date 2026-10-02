@@ -241,6 +241,22 @@ describe("alignRoll", () => {
 		expect(check?.outlier).toBe(true);
 	});
 
+	it("runs the leave-one-out check with the same window", async () => {
+		cascade.solve.mockImplementation(async (_img, prior: Pose) =>
+			accepted(prior.yaw + 60),
+		);
+		const roll = rollOf([
+			{ ...photo("anchor", "saved", 100), pose: pose(110) },
+			photo("t", "prior", 200, { t: 120 }),
+		]);
+		const out = await alignRoll(roll, { persist: false, biasWindowS: 60 });
+		// the anchor is 120 s away: outside the window, so no bias and no check
+		expect(out.results[0]).toMatchObject({
+			biasDeg: null,
+			viewpointCheck: null,
+		});
+	});
+
 	it("reports a cascade exception as failed with the message, keeping the existing pose", async () => {
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 		cascade.solve.mockRejectedValue(new Error("no DEM"));
