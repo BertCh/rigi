@@ -3,9 +3,13 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { Link } from "@tanstack/react-router";
+import { Github } from "lucide-react";
 import { RigiMark } from "#/brand/RigiMark";
 import { cn } from "#/lib/utils";
 import { ThemeToggle } from "./ThemeToggle";
+
+/** Source repository, linked from the top bar. */
+export const REPO_URL = "https://github.com/BertCh/rigi";
 
 /** Page chrome shared by the marketing pages: theme tokens on <main> plus the top bar. */
 export const SITE_THEME =
@@ -56,13 +60,28 @@ export function SiteNav({
 				{/* phones: the three links and the toggle do not fit beside the mark */}
 				<Link to="/" hash="how" className={cn(item(false), "max-sm:hidden")}>
 					How it works
-				</a>
+				</Link>
 				<Link to="/library" className={item(active === "library")}>
 					My library
 				</Link>
 				<Link to="/gipfelbuch" className={item(active === "gipfelbuch")}>
 					Gipfelbuch
 				</Link>
+				<a
+					href={REPO_URL}
+					target="_blank"
+					rel="noreferrer"
+					aria-label="Rigi on GitHub"
+					title="Rigi on GitHub"
+					className={cn(
+						"rounded-lg px-2 py-1.5 transition",
+						paper
+							? "text-[var(--khipu-lk)]/60 hover:text-[var(--khipu-lk)]"
+							: "text-white/55 hover:text-[var(--rigi-paper)]",
+					)}
+				>
+					<Github className="size-4" aria-hidden />
+				</a>
 				<ThemeToggle
 					className={
 						paper
