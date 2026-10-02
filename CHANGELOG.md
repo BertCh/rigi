@@ -4,6 +4,14 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Consolidation pass (2026-10-02)
+
+- Docs: `reports/status.md` and `reports/roadmap.md` rewritten short and current (open work only; retired row ids point at `bab0f28`); every report indexed in `reports/README.md`; code-review backlog now 53 fixed, 3 partial, 3 obsolete, 16 open.
+- Fixes from the code-review backlog: roll import saves/resets safely and decodes with bounded concurrency (CR-03/19/20/53); no pose save on a session-only eye move (CR-08); IndexedDB late-open close (CR-32); near-field inpaint goes through the near-field client (CR-47); render lock records the holder's start time and `run.mjs --update-baseline` refuses after a FAIL (CR-52); unobservable parameters get infinite variance and integrity fails closed (CR-49); masked rows no longer leak through the cluster whitener (CR-17); robust covariance uses the accepted pose's weights (CR-36); the eye refine carries the above-ground prior (CR-15); per-kind RANSAC stop ratio (CR-50); dev export guard (CR-W5).
+- `tools/matcher/requirements.txt` and `tools/nearfield/requirements.txt` (CR-26).
+- Concordance C2: under `?concord=eye` the per-lens focal table now reaches the app prior (`getPhoto`); photo metadata keeps EXIF `model`/`lensModel` (uploads now, bundled photos after the next ingest).
+- Cleanup: one source for `DEG`, `wrap180`, `clamp`/`smoothstep`/`fract`/`mix`, Web-Mercator (`src/lib/mercator.ts`), `srgbToLinear` and 3×3 helpers; dead exports, the `PhotoEngine` alias, the dead three.js picker branch and stale three.js comments removed.
+
 ### luma compute follow-ups (2026-10-01, WAG-next)
 
 - **Sky worker graph lifetime.** The GPU prep and refine graphs are released after 30 s without a request, and a prep that disables itself frees its graphs at once (the device stays; later requests rebuild the same graphs).
