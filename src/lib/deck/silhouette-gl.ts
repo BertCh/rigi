@@ -11,8 +11,8 @@
 //
 // A luma Model on the deck device (no hand-written GL): the GLSL is the former program verbatim
 // except that its uniforms are one std140 block (luma 10 has no plain-uniform path; identical
-// values, identical math). The range targets come in as luma Textures or as borrowed WebGLTexture
-// handles (what DeckEngine passes). The readback is texture.readBuffer into a fresh luma Buffer
+// values, identical math). The range targets come in as luma Textures (GpuGeometrySource.texture,
+// what DeckEngine passes). The readback is texture.readBuffer into a fresh luma Buffer
 // (orphaned per read), behind the same glFence / readbackQuiet queue probes.
 import {
 	type Buffer,
@@ -200,7 +200,7 @@ export class SilhouetteMaskGL {
 	 * lost / superseded): the caller scores on the CPU.
 	 */
 	async run(
-		ranges: (Texture | WebGLTexture)[],
+		ranges: Texture[],
 		W: number,
 		H: number,
 		nonce: number,
@@ -210,27 +210,11 @@ export class SilhouetteMaskGL {
 		const G = silGroups(W);
 		const rows = H * ranges.length;
 		this.busy = true;
-		// borrowed handles are wrapped for the run only (luma never deletes them)
-		const wrapped: Texture[] = [];
 		let readback: Buffer | null = null;
 		try {
 			const model = await this.compile();
 			if (!model || this.destroyed || !this.target(G, rows)) return null;
-			const sources = ranges.map((r) => {
-				if (r instanceof Texture) return r;
-				const t = this.device.createTexture({
-					id: "silhouette-range-borrowed",
-					handle: r,
-					_isHandleBorrowed: true,
-					format: "r32float",
-					width: W,
-					height: H,
-					sampler: NEAREST,
-				} as never);
-				wrapped.push(t);
-				return t;
-			});
-			if (!this.draw(model, sources, W, H, nonce)) return null;
+			if (!this.draw(model, ranges, W, H, nonce)) return null;
 			const words = silMaskWords(W, H) * ranges.length;
 			const bytes = words * 4;
 			// a fresh pack buffer per read = orphaned storage (geometry-pass.ts readPixelsInto)
@@ -250,7 +234,6 @@ export class SilhouetteMaskGL {
 			return null;
 		} finally {
 			readback?.destroy();
-			for (const t of wrapped) t.destroy();
 			this.busy = false;
 		}
 	}
