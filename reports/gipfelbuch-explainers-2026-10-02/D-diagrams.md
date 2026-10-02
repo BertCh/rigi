@@ -177,4 +177,39 @@ For each figure below, check `?theme=light` and `?theme=dark`, 1280 px and 390 p
 
 ## 7. Landed, negative, deferred
 
-To be filled at the end of round 2.
+**Landed on master** (all browser-unverified; one batch-ledger row covers them):
+- `b3568d1`: real ground (scene bake and `viz/scene.ts`), the interim causal clock, SketchSpill v2, PoseExplorer, play-once with settled stills on 23 figures, Anatomy unfiltered, `Mark` without raw `<text>`, and this spec.
+- `5af6abd`: PinLock on real summits with a tap script, RayMarch on the real section, and the round-1 review fixes.
+- `ae08394`: the RayMarch caption and callout hunks were dropped (see deferred).
+- **Round 3:**
+  - PoseExplorer and PinLock moved to pod G's `useBeatClock` and `rampAt`, and `script.ts` and `useScript.ts` were deleted.
+  - rigi Registration and camera-roll PanoramaStrip moved to real ground and once-scripts.
+  - Shas are in the final report.
+
+**Review findings fixed in round 2:**
+- A static reader could not step: seek and scrub were pinned to the end. The same issue was fixed in `useBeatClock` (21ba3c0).
+- The observer resumed over a manual step.
+- Steps landed one beat late.
+- Anatomy's float floor stopped one layer short.
+- PoseJourney picks showed t = 0 under webdriver.
+- The spill reveal transition stayed on under reduced motion.
+- PoseExplorer had colliding summit labels and a wrong pitch note, and its yaw slider could leave the baked horizon.
+
+**Negative or limited:**
+- The real relief is small: demo-09's horizon spans −0.4° to 5.1°.
+  - Camera views at true angles are flat, so Registration and PanoramaStrip use a stated vertical exaggeration.
+  - PoseExplorer and PinLock use true angles.
+- The real pitch, roll and focal corrections on demo-09 are 1°, 0.9° and 2 %. They are honest but barely visible, so the story's weight is on yaw (18.5°). Sliders let the reader exaggerate.
+- `defineScript` and the grammar forbid evidence after change. PinLock's taps 2 and 3 are therefore typed `change`, although they are really evidence. The grammar rule may be too strict for iterative methods; this is open with pod G.
+- The 23 play-once figures still run on `useTime`. It commits at 30 fps but keeps ticking after the result, until the figure leaves the screen. Moving each to `useBeatClock` (which stops at the result) is deferred.
+
+**Deferred:**
+- The dem-horizon RayMarch caption and the "Why curvature" callout still say "invented terrain / 26 km ridge". Another session holds uncommitted copy edits on those exact lines; the coordinator has been asked. The replacement text is in `inbox/COORD.md`.
+- The `viewport-inference` Legacy trio and dem-horizon `Sweep` keep invented terrain. They share a 360° model, and the bake covers 170°.
+- `Plot`'s raw `<text>` and `real.tsx` raw `<text>` (pod P) remain.
+- Phone legibility of the 640–800-unit viewBoxes (5–7 px labels): no figure was re-laid out for phones yet.
+- `notebook/figures.tsx` sketches (used only by NotebookMap, pod M's index) were not touched.
+
+**Open for the user:**
+1. Is demo-09 (the landing photo) the right single real ground for every synthetic diagram? The alternative is following the page's photo picker, which needs async bakes and loses determinism.
+2. Is a stated vertical exaggeration acceptable for diagrams, given that photos are never exaggerated?

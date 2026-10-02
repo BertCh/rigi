@@ -54,6 +54,14 @@ import {
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
 import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
+import {
+	type BeatSpec,
+	buildTimeline,
+	ease,
+	rampAt,
+	startOf,
+	useBeatClock,
+} from "#/components/gipfelbuch/viz/motion";
 import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
 import {
@@ -62,13 +70,6 @@ import {
 	SCENE,
 	summitOnSkyline,
 } from "#/components/gipfelbuch/viz/scene";
-import {
-	defineScript,
-	easeOut,
-	ramp,
-	reached,
-} from "#/components/gipfelbuch/viz/script";
-import { useScript } from "#/components/gipfelbuch/viz/useScript";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Tap-a-peak: how a few user taps turn into a pose.
@@ -277,20 +278,21 @@ const fmtS = (v: number, d = 1) =>
 
 // The story plays once: the guess, then each tap lands (evidence) and the solver locks more of the pose
 // (change). The kinds keep the script's causal order (a tap after a lock is still part of the solver loop).
-const PINS = defineScript([
-	{ id: "guess", kind: "setup", dur: 2.8, label: "phone's guess" },
-	{ id: "tap-1", kind: "evidence", dur: 1.2, label: "tap 1" },
-	{ id: "lock-1", kind: "change", dur: 1.4, label: "yaw + pitch" },
-	{ id: "tap-2", kind: "change", dur: 1.2, label: "tap 2" },
-	{ id: "lock-2", kind: "change", dur: 1.4, label: "roll" },
-	{ id: "tap-3", kind: "change", dur: 1.2, label: "tap 3" },
-	{ id: "lock-3", kind: "change", dur: 1.4, label: "focal" },
-	{ id: "solved", kind: "result", dur: 4.5, label: "solved" },
-]);
+const PINS: BeatSpec[] = [
+	{ id: "guess", kind: "setup", dwell: 2800, label: "phone's guess" },
+	{ id: "tap-1", kind: "evidence", dwell: 1200, label: "tap 1" },
+	{ id: "lock-1", kind: "change", dwell: 1400, label: "yaw + pitch" },
+	{ id: "tap-2", kind: "change", dwell: 1200, label: "tap 2" },
+	{ id: "lock-2", kind: "change", dwell: 1400, label: "roll" },
+	{ id: "tap-3", kind: "change", dwell: 1200, label: "tap 3" },
+	{ id: "lock-3", kind: "change", dwell: 1400, label: "focal" },
+	{ id: "solved", kind: "result", dwell: 4500, label: "solved" },
+];
+const PINS_TL = buildTimeline(PINS);
 /** Index of the beat where n taps are locked (the stepper's target for "n taps"). */
 const lockIndex = (n: number) => (n === 0 ? 0 : 2 * n);
-const TAP_FADE_S = 0.42;
-const LOCK_S = 1.4;
+const TAP_FADE_MS = 420;
+const LOCK_MS = 1400;
 const lerpCam = (a: Cam, b: Cam, k: number): Cam => ({
 	yaw: lerp(a.yaw, b.yaw, k),
 	pitch: lerp(a.pitch, b.pitch, k),
@@ -343,20 +345,22 @@ const DOF = [
 // Fig. 1: the hero. Each tap locks degrees of freedom; the skyline overlay tightens.
 // ======================================================================================
 function PinLock() {
-	const clock = useScript<HTMLDivElement>(PINS);
-	const t = clock.t;
+	const clock = useBeatClock<HTMLDivElement>(PINS);
+	const t = clock.ms;
 	const poses = useMemo(() => [0, 1, 2, 3].map(solveTaps), []);
 	const truthRidge = useMemo(() => ridgePts(TRUTH), []);
 	const startRidge = useMemo(() => ridgePts(START), []);
 
 	// every overlay is a function of the clock: taps land in their evidence beat, locks ease the pose
-	const stage = [1, 2, 3].filter((n) => reached(PINS, t, `lock-${n}`)).length;
-	const tapsShown = [1, 2, 3].filter((n) =>
-		reached(PINS, t, `tap-${n}`),
+	const stage = [1, 2, 3].filter(
+		(n) => t >= startOf(PINS_TL, `lock-${n}`),
+	).length;
+	const tapsShown = [1, 2, 3].filter(
+		(n) => t >= startOf(PINS_TL, `tap-${n}`),
 	).length;
 	let cam: Cam = poses[0];
 	for (const n of [1, 2, 3]) {
-		const k = ramp(PINS, t, `lock-${n}`, 0, LOCK_S, easeOut);
+		const k = rampAt(PINS_TL, t, `lock-${n}`, 0, LOCK_MS, ease.out);
 		if (k > 0) cam = lerpCam(poses[n - 1], poses[n], k);
 	}
 	const { yaw, pitch, roll, f } = cam;
@@ -365,8 +369,9 @@ function PinLock() {
 		[yaw, pitch, roll, f],
 	);
 	const shown = TAPS.slice(0, tapsShown);
-	const tapFade = (n: number) => ramp(PINS, t, `tap-${n + 1}`, 0, TAP_FADE_S);
-	const ghost = ramp(PINS, t, "solved", 0, TAP_FADE_S);
+	const tapFade = (n: number) =>
+		rampAt(PINS_TL, t, `tap-${n + 1}`, 0, TAP_FADE_MS);
+	const ghost = rampAt(PINS_TL, t, "solved", 0, TAP_FADE_MS);
 	const pinned = new Set(shown.map((s) => s.peak));
 	const truthXY = PEAKS.map(
 		(p) => project(TRUTH, p.az, p.el) as [number, number],
@@ -391,7 +396,7 @@ function PinLock() {
 	// the spill's cursor follows the latest tap while the story runs (the settled frame shows none)
 	const lastTap = shown[shown.length - 1];
 	const cursor =
-		lastTap && clock.beat.beat.id !== "solved"
+		lastTap && PINS[clock.index].id !== "solved"
 			? {
 					u: lastTap.x / W,
 					label: `${Math.round((((TRUTH.yaw + Math.atan((lastTap.x - CX) / TRUTH.f) / DEG) % 360) + 360) % 360)}°`,

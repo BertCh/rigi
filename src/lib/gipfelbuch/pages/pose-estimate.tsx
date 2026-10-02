@@ -60,18 +60,19 @@ import {
 } from "#/components/gipfelbuch/viz/explain";
 import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
 import {
+	type BeatSpec,
+	buildTimeline,
+	ease,
+	rampAt,
+	smooth,
+	useBeatClock,
+} from "#/components/gipfelbuch/viz/motion";
+import {
 	horizonEl,
 	peak,
 	SCENE,
 	summitOnSkyline,
 } from "#/components/gipfelbuch/viz/scene";
-import {
-	defineScript,
-	easeOut,
-	ramp,
-	smooth,
-} from "#/components/gipfelbuch/viz/script";
-import { useScript } from "#/components/gipfelbuch/viz/useScript";
 import { byId, gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -180,15 +181,21 @@ const SUMMITS = [
 });
 const skyEl = (az: number) => horizonEl(az);
 
-const EXPLORE = defineScript([
-	{ id: "guess", kind: "setup", dur: 2.8, label: "the phone's guess" },
-	{ id: "skyline", kind: "evidence", dur: 2.2, label: "the photo's skyline" },
-	{ id: "yaw", kind: "change", dur: 2.4, label: "yaw" },
-	{ id: "pitch", kind: "change", dur: 1.6, label: "pitch" },
-	{ id: "roll", kind: "change", dur: 1.6, label: "roll" },
-	{ id: "focal", kind: "change", dur: 1.6, label: "focal length" },
-	{ id: "solved", kind: "result", dur: 4.5, label: "solved" },
-]);
+const EXPLORE: BeatSpec[] = [
+	{ id: "guess", kind: "setup", dwell: 2800, label: "the phone's guess" },
+	{
+		id: "skyline",
+		kind: "evidence",
+		dwell: 2200,
+		label: "the photo's skyline",
+	},
+	{ id: "yaw", kind: "change", dwell: 2400, label: "yaw" },
+	{ id: "pitch", kind: "change", dwell: 1600, label: "pitch" },
+	{ id: "roll", kind: "change", dwell: 1600, label: "roll" },
+	{ id: "focal", kind: "change", dwell: 1600, label: "focal length" },
+	{ id: "solved", kind: "result", dwell: 4500, label: "solved" },
+];
+const EXPLORE_TL = buildTimeline(EXPLORE);
 /** What each beat's note says, written by hand under the image. */
 const EXPLORE_NOTE: Record<string, string> = {
 	guess: "the phone's compass and gravity: a guess",
@@ -200,17 +207,12 @@ const EXPLORE_NOTE: Record<string, string> = {
 	solved: "four numbers, one pose: the lines agree",
 };
 
-/** The pose the story shows at time t: each change beat moves one number from the guess to the solve. */
-function explorePose(t: number): Pose {
-	const k = (id: string) =>
-		ramp(
-			EXPLORE,
-			t,
-			id,
-			0,
-			EXPLORE.beats.find((b) => b.id === id)?.dur ?? 1,
-			easeOut,
-		);
+/** The pose the story shows at `ms`: each change beat moves one number from the guess to the solve. */
+function explorePose(ms: number): Pose {
+	const k = (id: string) => {
+		const b = EXPLORE_TL.beats.find((x) => x.id === id);
+		return rampAt(EXPLORE_TL, ms, id, 0, b ? b.end - b.start : 1, ease.out);
+	};
 	const mix = (a: number, b: number, u: number) => a + (b - a) * u;
 	return {
 		yaw: mix(PRIOR.yaw, SOLVED.yaw, k("yaw")),
@@ -403,30 +405,30 @@ const ExploreLand = memo(function ExploreLand() {
 });
 
 function PoseExplorer() {
-	const clock = useScript<HTMLDivElement>(EXPLORE);
+	const clock = useBeatClock<HTMLDivElement>(EXPLORE);
 	const [manual, setManual] = useState<Pose | null>(null);
-	const t = clock.t;
+	const t = clock.ms;
 	const story = explorePose(t);
 	const pose = manual ?? story;
 	const set = (k: keyof Pose) => (v: number) => setManual({ ...pose, [k]: v });
-	const beat = clock.beat;
-	const solved = !manual && beat.beat.kind === "result";
+	const beatId = EXPLORE[clock.index].id;
+	const solved = !manual && clock.kind === "result";
 	const B = poseBasis(pose);
 	const now = horizonPaths(pose);
 	const hfov = hfovOf(pose);
 	// the measured skyline wipes in left to right during its beat, and stays
-	const wipe = ramp(EXPLORE, t, "skyline", 0, 0.9, smooth);
-	const ghost = ramp(EXPLORE, t, "solved", 0, 0.42);
+	const wipe = rampAt(EXPLORE_TL, t, "skyline", 0, 900, smooth);
+	const ghost = rampAt(EXPLORE_TL, t, "solved");
 	const inView = (az: number) =>
 		Math.abs(((az - pose.yaw + 540) % 360) - 180) <= hfov / 2;
 	const marks = SUMMITS.map((s) => ({
 		...s,
 		p: project(pose, ASPECT, dirENU(s.az, s.el), B),
 	}));
-	const active = manual ? null : beat.beat.id;
+	const active = manual ? null : beatId;
 	const note = manual
 		? "your pose: drag any slider"
-		: (EXPLORE_NOTE[beat.beat.id] ?? "");
+		: (EXPLORE_NOTE[beatId] ?? "");
 	const dyaw = pose.yaw - SOLVED.yaw;
 
 	return (
@@ -612,7 +614,7 @@ function PoseExplorer() {
 					</g>
 				</svg>
 				<div className="flex flex-wrap items-center gap-2 px-4 pt-3 print:hidden">
-					{EXPLORE.beats.map((b, i) => (
+					{EXPLORE.map((b, i) => (
 						<button
 							key={b.id}
 							type="button"
@@ -620,9 +622,9 @@ function PoseExplorer() {
 								setManual(null);
 								clock.seek(i);
 							}}
-							aria-pressed={!manual && beat.index === i}
+							aria-pressed={!manual && clock.index === i}
 							className={`px-2.5 py-1 font-mono ${TYPE.micro} ${
-								!manual && beat.index === i
+								!manual && clock.index === i
 									? "bg-[var(--gb-paper-deep)] text-[var(--gb-ink)] underline decoration-[var(--gb-red)] decoration-2 underline-offset-4"
 									: "gb-secondary"
 							}`}
@@ -642,7 +644,7 @@ function PoseExplorer() {
 					</button>
 				</div>
 				<ol className="hidden list-decimal pl-8 pt-2 print:block">
-					{EXPLORE.beats.map((b) => (
+					{EXPLORE.map((b) => (
 						<li key={b.id} className={TYPE.caption}>
 							{EXPLORE_NOTE[b.id]}
 						</li>

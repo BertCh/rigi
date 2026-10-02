@@ -35,8 +35,6 @@ import {
 	RealPhoto,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
-	useReducedMotion,
-	useTime,
 } from "#/components/gipfelbuch/viz";
 import {
 	Beat,
@@ -48,7 +46,15 @@ import {
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
 import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
+import {
+	type BeatSpec,
+	buildTimeline,
+	ease,
+	rampAt,
+	useBeatClock,
+} from "#/components/gipfelbuch/viz/motion";
 import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
+import { horizonEl, SCENE } from "#/components/gipfelbuch/viz/scene";
 import { byId, gipfelbuchHref, groupColor } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -68,16 +74,55 @@ const LABEL = (13 * W) / 720;
 const BASE = 262;
 const PX_PER_DEG = 13;
 
-/** A deterministic ridgeline, in px above BASE, as a function of horizontal px. */
-function ridge(x: number): number {
-	return (
-		92 +
-		46 * Math.sin(x / 71 + 0.6) +
-		30 * Math.sin(x / 33 + 2.1) +
-		16 * Math.sin(x / 15.5 + 0.3) +
-		7 * Math.sin(x / 7.3 + 1.4)
-	);
+/**
+ * Vertical exaggeration of the ridge: demo-09's real horizon has 1 to 5° of relief, which at 13 px per degree
+ * would be a flat line, so heights are drawn x3 (a pencil note says so). Bearings are true to scale.
+ */
+const VEX = 3;
+const SOLVED_YAW = SCENE.solved.yaw;
+/** The bearing at horizontal px `x` of the frame, as the solved pose sees it. */
+const azAt = (x: number) => SOLVED_YAW + (x - W / 2) / PX_PER_DEG;
+/** The real DEM horizon in px above BASE at horizontal px `x`, or null outside the baked bearings. */
+function ridgeAt(x: number): number | null {
+	const el = horizonEl(azAt(x));
+	return el == null ? null : el * PX_PER_DEG * VEX;
 }
+const ridge = (x: number) => ridgeAt(x) ?? 0;
+const REG_RELIEF = (() => {
+	let lo = Infinity;
+	let hi = -Infinity;
+	for (let x = 0; x <= W; x += 4) {
+		const el = horizonEl(azAt(x));
+		if (el == null) continue;
+		lo = Math.min(lo, el);
+		hi = Math.max(hi, el);
+	}
+	return [lo, hi] as const;
+})();
+const REG_START_OFF = 3.4;
+const REG_CAPTION = `Real mountains (demo-09, the landing photo), synthetic camera. The ridge is that photo's DEM horizon, bearings ${azAt(0).toFixed(0)}° to ${azAt(W).toFixed(0)}° at ${PX_PER_DEG} px per degree, relief ${REG_RELIEF[0].toFixed(1)} to ${REG_RELIEF[1].toFixed(1)}° drawn ×${VEX}. The candidate starts ${REG_START_OFF}° off, about ${Math.round(REG_START_OFF * PX_PER_DEG)} px. Within 1° counts as aligned.`;
+
+// The story plays once: a candidate pose 3.4° off, the solve closes the gap, the lines coincide.
+const REG_BEATS: BeatSpec[] = [
+	{ id: "guess", kind: "setup", dwell: 2000, label: "candidate 3.4° off" },
+	{ id: "converge", kind: "change", dwell: 2600, label: "solve" },
+	{ id: "accepted", kind: "result", dwell: 4500, label: "accepted" },
+];
+const REG_TL = buildTimeline(REG_BEATS);
+const REG_SUMMITS = [...SCENE.peaks]
+	.sort((a, b) => b.ele - a.ele)
+	.flatMap((p) => {
+		const x = W / 2 + (p.az - SOLVED_YAW) * PX_PER_DEG;
+		const el = horizonEl(p.az) ?? p.el;
+		return [
+			{
+				u: x / W,
+				row: (BASE - el * PX_PER_DEG * VEX) / H,
+				name: p.name,
+				sub: `${p.ele} m · ${p.km} km`,
+			},
+		];
+	});
 
 function path(offsetPx: number, close = false): string {
 	let d = "";
@@ -88,22 +133,14 @@ function path(offsetPx: number, close = false): string {
 	return close ? `${d}L${W},${BASE}L0,${BASE}Z` : d;
 }
 
-const smooth = (u: number) => u * u * (3 - 2 * u);
-
 function Registration() {
-	const [ref, t] = useTime<HTMLDivElement>();
-	const reduced = useReducedMotion();
+	const clock = useBeatClock<HTMLDivElement>(REG_BEATS);
 	const [manual, setManual] = useState<number | null>(null);
 
-	// Auto cycle: start 3.4 deg off, converge, hold, then drift away again.
-	const ph = (t % 9) / 9;
-	const auto = reduced
-		? 0.4
-		: ph < 0.5
-			? 3.4 * (1 - smooth(ph / 0.5))
-			: ph < 0.75
-				? 0.05 * Math.sin(t * 6)
-				: 3.4 * smooth((ph - 0.75) / 0.25);
+	// once: the candidate holds 3.4° off, then eases to the solved pose
+	const auto =
+		REG_START_OFF *
+		(1 - rampAt(REG_TL, clock.ms, "converge", 0, 2600, ease.out));
 	const off = manual ?? auto;
 	const px = off * PX_PER_DEG;
 	const ok = Math.abs(off) <= 1;
@@ -121,20 +158,29 @@ function Registration() {
 	residual += "Z";
 
 	return (
-		<div ref={ref}>
+		<div ref={clock.ref}>
 			{/* the same ridge runs on past the frame, and the DEM line slides with it */}
 			<SketchSpill
 				seed="rigi-registration"
-				bearing={(u) => (u * W - W / 2) / PX_PER_DEG}
+				bearing={(u) => SOLVED_YAW + (u * W - W / 2) / PX_PER_DEG}
+				label={(deg) => `${Math.round(deg)}°`}
+				summits={REG_SUMMITS}
+				reveal={manual !== null && Math.abs(off) > 1 ? 0.3 : 1}
 				ridges={[
 					{
-						at: (u) => (BASE - ridge(u * W)) / H,
+						at: (u) => {
+							const r = ridgeAt(u * W);
+							return r == null ? null : (BASE - r) / H;
+						},
 						color: SWISS.ink,
 						width: 1.8,
 						depth: true,
 					},
 					{
-						at: (u) => (BASE - ridge(u * W - px)) / H,
+						at: (u) => {
+							const r = ridgeAt(u * W - px);
+							return r == null ? null : (BASE - r) / H;
+						},
 						color: LAYER_INKS.solved.paper,
 						width: 1.8,
 						opacity: 0.8,
@@ -148,64 +194,92 @@ function Registration() {
 						role="img"
 						aria-label="A photographed skyline and the DEM horizon being aligned"
 					>
-						{/* pencil construction: the guide lines the ridge was laid out on */}
-						<PencilLayer>
-							<PenLine
-								seed="rigi-guide-top"
-								from={[0, BASE - 150]}
-								to={[W, BASE - 150]}
-								color="pencil"
-								width={0.8}
-							/>
-							<PenLine
-								seed="rigi-guide-mid"
-								from={[0, BASE - 92]}
-								to={[W, BASE - 92]}
-								color="pencil"
-								width={0.8}
-							/>
-							{[1, 3, 5, 7, 9, 11].map((i) => (
+						<g data-layer="ground">
+							{/* pencil construction: the guide lines the ridge was laid out on */}
+							<PencilLayer>
 								<PenLine
-									key={`guide-${i}`}
-									seed={`rigi-guide-v${i}`}
-									from={[40 + i * 60, BASE - 150]}
-									to={[40 + i * 60, BASE]}
+									seed="rigi-guide-top"
+									from={[0, BASE - 150]}
+									to={[W, BASE - 150]}
 									color="pencil"
-									width={0.7}
+									width={0.8}
 								/>
-							))}
-						</PencilLayer>
-						<Hachure
-							d={rockPath}
-							seed="rigi-rock"
-							color="pencil"
-							angle={-45}
-							gap={7}
-							opacity={0.3}
-							width={0.7}
-						/>
-						{/* the residual band: a wash, red when off, forest when within 1 degree */}
-						<Wash
-							d={residual}
-							seed="rigi-residual"
-							color={tone}
-							opacity={0.12}
-						/>
+								<PenLine
+									seed="rigi-guide-mid"
+									from={[0, BASE - 92]}
+									to={[W, BASE - 92]}
+									color="pencil"
+									width={0.8}
+								/>
+								{[1, 3, 5, 7, 9, 11].map((i) => (
+									<PenLine
+										key={`guide-${i}`}
+										seed={`rigi-guide-v${i}`}
+										from={[40 + i * 60, BASE - 150]}
+										to={[40 + i * 60, BASE]}
+										color="pencil"
+										width={0.7}
+									/>
+								))}
+							</PencilLayer>
+							<Hachure
+								d={rockPath}
+								seed="rigi-rock"
+								color="pencil"
+								angle={-45}
+								gap={7}
+								opacity={0.3}
+								width={0.7}
+							/>
+						</g>
+						<g data-layer="derived">
+							{/* the residual band: a wash, red when off, forest when within 1 degree */}
+							<Wash
+								d={residual}
+								seed="rigi-residual"
+								color={tone}
+								opacity={0.12}
+							/>
+							<SketchPath
+								d={candidatePath}
+								seed="rigi-candidate"
+								data
+								color={LAYER_STYLE.solved.color}
+								width={2.8}
+							/>
+						</g>
 						{/* measured lines stay on their pixels: one pen pass each */}
-						<SketchPath
-							d={photoPath}
-							seed="rigi-photo-skyline"
-							data
-							color="ink"
-							width={2.2}
-						/>
-						<SketchPath
-							d={candidatePath}
-							seed="rigi-candidate"
-							data
-							color={LAYER_STYLE.solved.color}
-							width={2.8}
-						/>
+						<g data-layer="measured">
+							<SketchPath
+								d={photoPath}
+								seed="rigi-photo-skyline"
+								data
+								color="ink"
+								width={2.2}
+							/>
+						</g>
+						<g data-layer="notes">
+							{["Schreckhorn", "Eiger", "Mönch"].map((name) => {
+								const sp = SCENE.peaks.find((q) => q.name === name);
+								if (!sp) return null;
+								const x = W / 2 + (sp.az - SOLVED_YAW) * PX_PER_DEG;
+								return (
+									<HandLabel
+										key={name}
+										x={x}
+										y={BASE - ridge(x) - 8}
+										anchor="middle"
+										size={LABEL_SMALL}
+										color="var(--gb-secondary)"
+									>
+										{name}
+									</HandLabel>
+								);
+							})}
+							<HandText x={16} y={72} size={14} color="pencil">
+								{`vertical ×${VEX}: the real relief is only a few degrees`}
+							</HandText>
+						</g>
 						{/* ground strip: the DEM-side readout */}
 						<PenLine
 							seed="rigi-base"
@@ -234,7 +308,7 @@ function Registration() {
 											size={LABEL_SMALL}
 											color={inkColor("faint")}
 										>
-											{`${(((i - 6) * 60) / PX_PER_DEG).toFixed(0)}°`}
+											{`${Math.round(azAt(x))}°`}
 										</HandLabel>
 									)}
 								</g>
@@ -312,11 +386,18 @@ function Registration() {
 				</div>
 				<button
 					type="button"
-					onClick={() => setManual(null)}
-					disabled={manual === null}
+					onClick={() => {
+						setManual(null);
+						clock.play();
+					}}
+					disabled={manual === null && clock.playing}
 					className="bg-[var(--gb-paper-deep)] px-3 py-1 text-[var(--gb-ink)] hover:brightness-95 disabled:opacity-60"
 				>
-					{manual === null ? "auto-solving" : "resume solve"}
+					{manual !== null
+						? "resume solve"
+						: clock.playing
+							? "auto-solving"
+							: "replay solve"}
 				</button>
 			</div>
 		</div>
@@ -706,11 +787,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					<A id="tap-a-peak">Tapping a peak</A> is the manual route to a pose.
 				</p>
 				<h3>Schematic: aligning the lines</h3>
-				<Figure
-					label="Fig. D1"
-					caption="Synthetic ridge, not a photo. Within 1° counts as aligned."
-					bleed
-				>
+				<Figure label="Fig. D1" caption={REG_CAPTION} pinned={SCENE.id} bleed>
 					<Registration />
 				</Figure>
 				<h3>Parts, by stage</h3>

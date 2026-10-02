@@ -47,7 +47,20 @@ import {
 	Stages,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import {
+	type BeatSpec,
+	buildTimeline,
+	ease,
+	rampAt,
+	useBeatClock,
+} from "#/components/gipfelbuch/viz/motion";
 import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
+import {
+	horizonEl,
+	peak,
+	SCENE,
+	summitOnSkyline,
+} from "#/components/gipfelbuch/viz/scene";
 import { RollCompasses } from "#/components/site/meta/RollCompasses";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -957,9 +970,9 @@ function CompassBias() {
 type CamPose = { yaw: number; pitch: number; roll: number; vfov: number };
 const ASPECT = 4 / 3;
 const TRUE_POSES: CamPose[] = [
-	{ yaw: 8, pitch: 2, roll: 0, vfov: 42 },
-	{ yaw: 36, pitch: 1.5, roll: 0, vfov: 42 },
-	{ yaw: 64, pitch: 2, roll: 0, vfov: 42 },
+	{ yaw: 100, pitch: 3, roll: 0, vfov: 42 },
+	{ yaw: 125, pitch: 3.5, roll: 0, vfov: 42 },
+	{ yaw: 150, pitch: 3, roll: 0, vfov: 42 },
 ];
 type V3 = [number, number, number];
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -1022,47 +1035,83 @@ function unprojectAzEl(p: CamPose, u: number, v: number): [number, number] {
 		Math.asin(Math.max(-1, Math.min(1, d[2] / n))) / D,
 	];
 }
-const skyline = (az: number) =>
-	5 +
-	3.2 * Math.sin(az * 0.1) +
-	2.1 * Math.sin(az * 0.27 + 1) +
-	1.1 * Math.sin(az * 0.61 + 2);
-const farRidge = (az: number) =>
-	8.5 + 2.4 * Math.sin(az * 0.07 + 2) + 1.4 * Math.sin(az * 0.21);
+// The ridge is demo-09's real DEM horizon (viz/scene.ts); the three cameras are synthetic. A real horizon
+// only has 2 to 5° of relief, so the canvas stretches the elevation axis by PANO_VY (a hand note says so);
+// the azimuth axis and every pose are true to scale.
+const PANO_VY = 2;
+const skyline = (az: number) => horizonEl(az) ?? 3;
+const PANO_SUMMITS = [
+	"Finsteraarhorn",
+	"Eiger",
+	"Mönch",
+	"Jungfrau",
+	"Schreckhorn",
+].map((name) => {
+	const p = peak(name);
+	return { name, ele: p.ele, km: p.km, ...summitOnSkyline(p) };
+});
 
 const PW = 640;
-const AZ0 = -22;
-const AZ1 = 100;
-const EL0 = -22;
-const EL1 = 28;
+const AZ0 = 68;
+const AZ1 = 182;
+const EL0 = -12;
+const EL1 = 16;
 const PS = PW / (AZ1 - AZ0);
-const PH = (EL1 - EL0) * PS;
+const PH = (EL1 - EL0) * PS * PANO_VY;
 const px = (az: number) => (az - AZ0) * PS;
-const py = (el: number) => (EL1 - el) * PS;
+const py = (el: number) => (EL1 - el) * PS * PANO_VY;
+const PANO_ERR = { yaw: 7, roll: 3.2 };
+const PANO_RELIEF = (() => {
+	let lo = Infinity;
+	let hi = -Infinity;
+	for (let a = AZ0; a <= AZ1; a += 0.5) {
+		const e = skyline(a);
+		lo = Math.min(lo, e);
+		hi = Math.max(hi, e);
+	}
+	return [lo, hi] as const;
+})();
+const PANO_SPILL_SUMMITS = PANO_SUMMITS.map((p) => ({
+	u: (p.az - AZ0) / (AZ1 - AZ0),
+	row: (EL1 - p.el) / (EL1 - EL0),
+	name: p.name,
+	sub: `${p.ele} m · ${p.km} km`,
+}));
+
+// The story plays once: the middle photo starts off, the seam shows, the solve settles it.
+const PANO_BEATS: BeatSpec[] = [
+	{ id: "off", kind: "setup", dwell: 1800, label: "middle photo off" },
+	{ id: "seam", kind: "evidence", dwell: 1600, label: "the seam" },
+	{ id: "settle", kind: "change", dwell: 2600, label: "pose solved" },
+	{ id: "continuous", kind: "result", dwell: 4500, label: "continuous" },
+];
+const PANO_TL = buildTimeline(PANO_BEATS);
+
+const ridgePath = (fn: (a: number) => number) =>
+	Array.from({ length: (AZ1 - AZ0) * 2 + 1 }, (_, k) => {
+		const a = AZ0 + k / 2;
+		return `${k ? "L" : "M"}${px(a).toFixed(1)} ${py(fn(a)).toFixed(1)}`;
+	}).join("");
+const PANO_RIDGE_D = ridgePath(skyline);
 
 function PanoramaStrip() {
-	const [ref, t] = useTime<HTMLDivElement>(8);
+	const clock = useBeatClock<HTMLDivElement>(PANO_BEATS);
+	const t = clock.ms;
 	const [manual, setManual] = useState<{ yaw: number; roll: number } | null>(
 		null,
 	);
-	const auto = (() => {
-		const ph = t % 11;
-		if (ph < 1.8) return { yaw: 7, roll: 3.2 };
-		if (ph > 7.6) return { yaw: 0, roll: 0 };
-		const k = (ph - 1.8) / 5.8;
-		const e = Math.exp(-3.6 * k) * Math.cos(7 * k);
-		return { yaw: 7 * e, roll: 3.2 * e };
-	})();
+	// the clock's own error: held through the setup and the seam, eased out in the change beat
+	const left = 1 - rampAt(PANO_TL, t, "settle", 0, 2600, ease.out);
+	const auto = { yaw: PANO_ERR.yaw * left, roll: PANO_ERR.roll * left };
 	const err = manual ?? auto;
 	const aligned = Math.abs(err.yaw) < 0.4 && Math.abs(err.roll) < 0.3;
+	const seamK = manual
+		? 1
+		: rampAt(PANO_TL, t, "seam", 0, 420, ease.out) *
+			Math.min(1, Math.abs(err.yaw) / PANO_ERR.yaw + 0.001);
 	const assumed = TRUE_POSES.map((p, i) =>
 		i === 1 ? { ...p, yaw: p.yaw + err.yaw, roll: p.roll + err.roll } : p,
 	);
-	const ridge = (fn: (a: number) => number) =>
-		Array.from({ length: 123 }, (_, k) => {
-			const a = AZ0 + k;
-			return `${k ? "L" : "M"}${px(a).toFixed(1)} ${py(fn(a)).toFixed(1)}`;
-		}).join("");
 	const photos = TRUE_POSES.map((tp, i) => {
 		const ap = assumed[i];
 		const edge = (pts: [number, number][]) =>
@@ -1109,6 +1158,7 @@ function PanoramaStrip() {
 					.join(""),
 			);
 		}
+		const mid = skyAz[Math.floor(skyAz.length * 0.25)];
 		return {
 			outline: `${outline.map(([a, e], k) => `${k ? "L" : "M"}${px(a).toFixed(1)} ${py(e).toFixed(1)}`).join("")}Z`,
 			sky: skyAz
@@ -1118,83 +1168,114 @@ function PanoramaStrip() {
 				)
 				.join(""),
 			grid,
+			seam: mid ? ([px(mid[0]), py(mid[1])] as [number, number]) : null,
 		};
 	});
+	const midYaw = assumed[1].yaw;
+	const spillRow = (az: number) => (EL1 - skyline(az)) / (EL1 - EL0);
 	return (
 		<Figure
 			label="D5"
 			bleed
+			pinned={SCENE.id}
 			source="Skizze"
-			caption="Invented scene, real mapping. Photos from one viewpoint stitch without feature matching: each photo is a grid of rays, and its pose sends every ray to an azimuth and elevation on a shared canvas, so roll turns the image and wide lenses bend. Terrain ridges from the viewpoint (red) lie behind; the app overlays them as the match cue. Each photo's own skyline (black) lies on them only when its pose is right: the middle photo starts with a compass and roll error and settles as the pose is found."
+			caption={`Real mountains (demo-09, the landing photo), synthetic cameras. The ridge is the DEM horizon of that photo's viewpoint (${PANO_RELIEF[0].toFixed(1)} to ${PANO_RELIEF[1].toFixed(1)}° of relief, elevation axis stretched ×${PANO_VY}). Photos from one viewpoint stitch without feature matching: each photo is a grid of rays, and its pose sends every ray to an azimuth and elevation on a shared canvas, so roll turns the image and wide lenses bend. The terrain ridge (red) is the match cue the app overlays. Each photo's own skyline (black) lies on it only when its pose is right: the middle photo starts ${PANO_ERR.yaw}° off in yaw and ${PANO_ERR.roll}° in roll, and settles as the pose is found.`}
 		>
-			<div ref={ref} className="-m-1 sm:-m-2">
-				{/* the viewpoint's ridges run on round the horizon past the canvas */}
+			<div ref={clock.ref} className="-m-1 sm:-m-2">
+				{/* the viewpoint's real horizon runs on past the canvas; the dashed line is the middle photo's skyline at its tried pose */}
 				<SketchSpill
 					seed="pano-strip"
 					bearing={(u) => AZ0 + u * (AZ1 - AZ0)}
 					label={(deg) => `${deg}°`}
+					summits={PANO_SPILL_SUMMITS}
+					cursor={
+						aligned
+							? null
+							: {
+									u: (midYaw - AZ0) / (AZ1 - AZ0),
+									label: `${Math.round(midYaw)}°`,
+								}
+					}
+					reveal={1}
 					ridges={[
 						{
-							at: (u) => (EL1 - farRidge(AZ0 + u * (AZ1 - AZ0))) / (EL1 - EL0),
-							color: SWISS.contour,
-							width: 1.4,
-							opacity: 0.7,
-						},
-						{
-							at: (u) => (EL1 - skyline(AZ0 + u * (AZ1 - AZ0))) / (EL1 - EL0),
+							at: (u) => {
+								const az = AZ0 + u * (AZ1 - AZ0);
+								return horizonEl(az) == null ? null : spillRow(az);
+							},
 							color: SWISS.red,
 							width: 1.8,
 							depth: true,
 						},
+						...(aligned
+							? []
+							: [
+									{
+										at: (u: number) => {
+											const az = AZ0 + u * (AZ1 - AZ0) - err.yaw;
+											return horizonEl(az) == null ? null : spillRow(az);
+										},
+										color: SWISS.ink,
+										dash: "4 4",
+										width: 1.4,
+										opacity: 0.7,
+									},
+								]),
 					]}
 				>
 					<svg
 						viewBox={`0 0 ${PW} ${PH}`}
 						className="block h-auto w-full"
 						role="img"
-						aria-label="Three photos warped onto an azimuth by elevation canvas over DEM ridgelines"
+						aria-label="Three photos warped onto an azimuth by elevation canvas over the DEM horizon"
 					>
 						<title>Panorama canvas with warped photo meshes</title>
-						<SketchPath
-							d={ridge(farRidge)}
-							seed="pano-far"
-							data
-							color="pencil"
-							width={1}
-							opacity={0.7}
-							passes={1}
-						/>
-						<SketchPath
-							d={ridge(skyline)}
-							seed="pano-ridge"
-							data
-							color="red"
-							width={aligned ? 3 : 1.8}
-							opacity={aligned ? 0.9 : 0.8}
-							passes={1}
-						/>
-						{photos.map((ph, i) => (
-							<g key={`ph-${TRUE_POSES[i].yaw}`}>
-								{ph.grid.map((g) => (
+						<defs>
+							<clipPath id="pano-clip">
+								<rect width={PW} height={PH} />
+							</clipPath>
+						</defs>
+						{/* derived: the terrain horizon (the match cue) and each photo's warped grid and frame */}
+						<g data-layer="derived" clipPath="url(#pano-clip)">
+							<SketchPath
+								d={PANO_RIDGE_D}
+								seed="pano-ridge"
+								color="red"
+								width={aligned ? 3 : 1.8}
+								opacity={aligned ? 0.9 : 0.8}
+								passes={1}
+							/>
+							{photos.map((ph, i) => (
+								<g key={TRUE_POSES[i].yaw}>
+									{ph.grid.map((g, gi) => (
+										<SketchPath
+											// stable key and seed: the path updates in place as the pose moves
+											// biome-ignore lint/suspicious/noArrayIndexKey: fixed grid of five lines
+											key={gi}
+											d={g}
+											seed={`pano-grid-${i}-${gi}`}
+											color="pencil"
+											width={0.6}
+											opacity={0.3}
+											passes={1}
+										/>
+									))}
 									<SketchPath
-										key={g}
-										d={g}
-										seed={`pano-grid-${i}-${g.length}-${g.slice(1, 8)}`}
-										color="pencil"
-										width={0.6}
-										opacity={0.3}
+										d={ph.outline}
+										seed={`pano-frame-${i}`}
+										color={i === 1 ? "ink" : "pencil"}
+										width={i === 1 ? 1.2 : 1}
+										opacity={i === 1 ? 0.9 : 0.75}
 										passes={1}
 									/>
-								))}
+								</g>
+							))}
+						</g>
+						{/* measured: each photo's own skyline, through its tried pose */}
+						<g data-layer="measured" clipPath="url(#pano-clip)">
+							{photos.map((ph, i) => (
 								<SketchPath
-									d={ph.outline}
-									seed={`pano-frame-${i}`}
-									color={i === 1 ? "ink" : "pencil"}
-									width={i === 1 ? 1.2 : 1}
-									opacity={i === 1 ? 0.9 : 0.75}
-									passes={1}
-								/>
-								<SketchPath
+									key={TRUE_POSES[i].yaw}
 									d={ph.sky}
 									seed={`pano-sky-${i}`}
 									data
@@ -1203,38 +1284,76 @@ function PanoramaStrip() {
 									passes={1}
 									tolerance={0.6}
 								/>
-							</g>
-						))}
-						{[0, 30, 60, 90].map((a) => (
-							<HandLabel
-								key={a}
-								x={px(a)}
-								y={PH - 8}
-								anchor="middle"
-								size={FIG_LABEL_SMALL}
-								color="var(--nb-faint)"
-							>
-								{`${a}°`}
+							))}
+						</g>
+						<g data-layer="notes">
+							{/* the real summits on the ridge */}
+							{PANO_SUMMITS.map((p) => (
+								<HandLabel
+									key={p.name}
+									x={px(p.az)}
+									y={py(p.el) - 12}
+									anchor="middle"
+									size={FIG_LABEL_SMALL}
+									color={SWISS.secondary}
+								>
+									{p.name}
+								</HandLabel>
+							))}
+							{photos[1].seam && seamK > 0.02 && (
+								<g opacity={seamK}>
+									<PenCircle
+										center={photos[1].seam}
+										radiusX={20}
+										seed="pano-seam"
+										color="red"
+										width={1.6}
+									/>
+									<HandText
+										x={photos[1].seam[0] - 30}
+										y={photos[1].seam[1] + 44}
+										size={14}
+										color="red"
+										anchor="end"
+									>
+										seam
+									</HandText>
+								</g>
+							)}
+							{[90, 120, 150, 180].map((a) => (
+								<HandLabel
+									key={a}
+									x={px(a)}
+									y={PH - 8}
+									anchor="middle"
+									size={FIG_LABEL_SMALL}
+									color="var(--nb-faint)"
+								>
+									{`${a}°`}
+								</HandLabel>
+							))}
+							<HandLabel x={10} y={18} size={FIG_LABEL} color={SWISS.secondary}>
+								azimuth → · elevation ↑
 							</HandLabel>
-						))}
-						<HandLabel x={10} y={18} size={FIG_LABEL} color={SWISS.secondary}>
-							azimuth → · elevation ↑
-						</HandLabel>
-						<HandText x={10} y={40} size={14} color="pencil">
-							the DEM ridge drawn over each photo is the match cue
-						</HandText>
-						<HandText
-							x={PW - 10}
-							y={18}
-							anchor="end"
-							size={14}
-							color={aligned ? "forest" : "pencil"}
-							halo={false}
-						>
-							{aligned
-								? "ridge continuous · match cue on"
-								: "seam: pose is off"}
-						</HandText>
+							<HandText x={10} y={40} size={14} color="pencil">
+								the DEM ridge drawn over each photo is the match cue
+							</HandText>
+							<HandText x={10} y={PH - 28} size={13} color="pencil">
+								{`elevation axis ×${PANO_VY}: the real relief is only a few degrees`}
+							</HandText>
+							<HandText
+								x={PW - 10}
+								y={18}
+								anchor="end"
+								size={14}
+								color={aligned ? "forest" : "pencil"}
+								halo={false}
+							>
+								{aligned
+									? "ridge continuous · match cue on"
+									: "seam: pose is off"}
+							</HandText>
+						</g>
 					</svg>
 				</SketchSpill>
 			</div>
@@ -1259,8 +1378,14 @@ function PanoramaStrip() {
 					signed
 					onChange={(v) => setManual({ yaw: err.yaw, roll: v })}
 				/>
-				<Chip on={manual === null} onClick={() => setManual(null)}>
-					{manual === null ? "auto-playing" : "replay the solve"}
+				<Chip
+					on={manual === null}
+					onClick={() => {
+						setManual(null);
+						clock.play();
+					}}
+				>
+					{manual === null && clock.playing ? "solving" : "replay the solve"}
 				</Chip>
 			</div>
 		</Figure>
