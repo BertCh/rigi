@@ -7,6 +7,7 @@ import {
 	type KeyboardEvent,
 	type PointerEvent,
 	type ReactNode,
+	useCallback,
 	useContext,
 	useEffect,
 	useLayoutEffect,
@@ -636,12 +637,18 @@ export function Stages({
 	// the clock runs only while the figure is armed; the pencil follows (same root, same threshold)
 	const { ref: armRef, armed } = useArmedInView({ arm: ARM_SEQUENCE });
 	const progress = beats.motion && beats.playing && !held && armed;
+	// both observe the root: the clock (useBeats) and the pencil's arming; both refs are stable
+	const beatsRef = beats.ref;
+	const rootRef = useCallback(
+		(el: HTMLDivElement | null) => {
+			beatsRef(el);
+			armRef(el);
+		},
+		[beatsRef, armRef],
+	);
 	return (
 		<div
-			ref={(el) => {
-				(beats.ref as { current: HTMLDivElement | null }).current = el;
-				(armRef as { current: HTMLDivElement | null }).current = el;
-			}}
+			ref={rootRef}
 			data-beat={beats.kind}
 			className={cn("py-2 [container-type:inline-size]", className)}
 		>
