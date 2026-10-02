@@ -130,3 +130,147 @@ export function poolInside(
 			}
 	return true;
 }
+
+/**
+ * C[M,N] (+ bias) = A[M,K] * B for one batch entry, 4x4 register tiles over K. B(k, n) is read at
+ * bo + k * bk + n * bn (transB: bk = 1, bn = K; else bk = N, bn = 1). Same f64 accumulation as the reference.
+ */
+export function matmulTiled(
+	A: Float32Array,
+	ao: number,
+	B: Float32Array,
+	bo: number,
+	bk: number,
+	bn: number,
+	bias: Float32Array | null,
+	O: Float32Array,
+	oo: number,
+	M: number,
+	N: number,
+	K: number,
+) {
+	for (let m = 0; m < M; m += 4) {
+		const mm = Math.min(4, M - m);
+		for (let n = 0; n < N; n += 4) {
+			const nn = Math.min(4, N - n);
+			if (mm < 4 || nn < 4) {
+				// edge tile: plain dot products
+				for (let i = 0; i < mm; i++)
+					for (let j = 0; j < nn; j++) {
+						let s = bias ? bias[n + j] : 0;
+						const ar = ao + (m + i) * K;
+						const bb = bo + (n + j) * bn;
+						for (let k = 0; k < K; k++) s += A[ar + k] * B[bb + k * bk];
+						O[oo + (m + i) * N + n + j] = s;
+					}
+				continue;
+			}
+			const r0 = ao + m * K;
+			const r1 = r0 + K;
+			const r2 = r1 + K;
+			const r3 = r2 + K;
+			const c0 = bo + n * bn;
+			const c1 = c0 + bn;
+			const c2 = c1 + bn;
+			const c3 = c2 + bn;
+			let a00 = 0;
+			let a01 = 0;
+			let a02 = 0;
+			let a03 = 0;
+			let a10 = 0;
+			let a11 = 0;
+			let a12 = 0;
+			let a13 = 0;
+			let a20 = 0;
+			let a21 = 0;
+			let a22 = 0;
+			let a23 = 0;
+			let a30 = 0;
+			let a31 = 0;
+			let a32 = 0;
+			let a33 = 0;
+			for (let k = 0; k < K; k++) {
+				const x0 = A[r0 + k];
+				const x1 = A[r1 + k];
+				const x2 = A[r2 + k];
+				const x3 = A[r3 + k];
+				const kb = k * bk;
+				const y0 = B[c0 + kb];
+				const y1 = B[c1 + kb];
+				const y2 = B[c2 + kb];
+				const y3 = B[c3 + kb];
+				a00 += x0 * y0;
+				a01 += x0 * y1;
+				a02 += x0 * y2;
+				a03 += x0 * y3;
+				a10 += x1 * y0;
+				a11 += x1 * y1;
+				a12 += x1 * y2;
+				a13 += x1 * y3;
+				a20 += x2 * y0;
+				a21 += x2 * y1;
+				a22 += x2 * y2;
+				a23 += x2 * y3;
+				a30 += x3 * y0;
+				a31 += x3 * y1;
+				a32 += x3 * y2;
+				a33 += x3 * y3;
+			}
+			const b0 = bias ? bias[n] : 0;
+			const b1 = bias ? bias[n + 1] : 0;
+			const b2 = bias ? bias[n + 2] : 0;
+			const b3 = bias ? bias[n + 3] : 0;
+			let q = oo + m * N + n;
+			O[q] = a00 + b0;
+			O[q + 1] = a01 + b1;
+			O[q + 2] = a02 + b2;
+			O[q + 3] = a03 + b3;
+			q += N;
+			O[q] = a10 + b0;
+			O[q + 1] = a11 + b1;
+			O[q + 2] = a12 + b2;
+			O[q + 3] = a13 + b3;
+			q += N;
+			O[q] = a20 + b0;
+			O[q + 1] = a21 + b1;
+			O[q + 2] = a22 + b2;
+			O[q + 3] = a23 + b3;
+			q += N;
+			O[q] = a30 + b0;
+			O[q + 1] = a31 + b1;
+			O[q + 2] = a32 + b2;
+			O[q + 3] = a33 + b3;
+		}
+	}
+}
+
+/** Constant-value padding by rows: fills the output with `value`, then copies each input row. */
+export function padConstantRows(
+	X: Float32Array,
+	O: Float32Array,
+	inShape: readonly number[],
+	outShape: readonly number[],
+	pads: readonly (readonly [number, number])[],
+	value: number,
+) {
+	O.fill(value);
+	const r = outShape.length;
+	const rowLen = inShape[r - 1];
+	const rowOff = pads[r - 1][0];
+	const outer = inShape.slice(0, r - 1);
+	const rows = outer.reduce((a, b) => a * b, 1);
+	const idx = new Array<number>(Math.max(0, r - 1)).fill(0);
+	for (let row = 0; row < rows; row++) {
+		let dst = 0;
+		for (let d = 0; d < r - 1; d++)
+			dst = dst * outShape[d] + idx[d] + pads[d][0];
+		O.set(
+			X.subarray(row * rowLen, (row + 1) * rowLen),
+			dst * outShape[r - 1] + rowOff,
+		);
+		for (let d = r - 2; d >= 0; d--) {
+			if (++idx[d] < outer[d]) break;
+			idx[d] = 0;
+		}
+	}
+}

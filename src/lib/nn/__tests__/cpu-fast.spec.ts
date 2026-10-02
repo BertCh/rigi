@@ -143,3 +143,113 @@ describe("CpuNn fast paths are identical to the naive ops", () => {
 		);
 	});
 });
+
+describe("convTranspose2d fast path", () => {
+	const fast = new CpuNn();
+	const slow = new CpuNn();
+	slow.fastConv = false;
+	const cases: [
+		string,
+		number[],
+		number[],
+		Record<string, number | number[]>,
+	][] = [
+		["k2 s2", [1, 5, 7, 6], [5, 6, 2, 2], { stride: 2 }],
+		[
+			"k3 s2 pad 1 outpad 1",
+			[2, 4, 5, 5],
+			[4, 3, 3, 3],
+			{ stride: 2, padding: 1, outputPadding: 1 },
+		],
+		[
+			"k4 s2 pad 1, 5 taps tail",
+			[1, 3, 6, 6],
+			[3, 5, 4, 4],
+			{ stride: 2, padding: 1 },
+		],
+	];
+	for (const [name, xs, ws, o] of cases)
+		it(`matches the reference: ${name}`, () => {
+			const n = (s: number[]) => s.reduce((a, b) => a * b, 1);
+			const x = random(n(xs));
+			const w = random(n(ws));
+			const b = random(ws[1]);
+			const run = (nn: CpuNn) =>
+				(
+					nn.convTranspose2d(
+						nn.fromArray(x, xs),
+						nn.fromArray(w, ws),
+						nn.fromArray(b, [ws[1]]),
+						o,
+					) as CpuTensor
+				).data;
+			const a = run(fast);
+			const r = run(slow);
+			let peak = 0;
+			let err = 0;
+			for (let i = 0; i < r.length; i++) {
+				peak = Math.max(peak, Math.abs(r[i]));
+				err = Math.max(err, Math.abs(r[i] - a[i]));
+			}
+			expect(a.length).toBe(r.length);
+			expect(err / peak).toBeLessThanOrEqual(1e-5);
+		});
+});
+
+describe("matmul and pad fast paths", () => {
+	const fast = new CpuNn();
+	const slow = new CpuNn();
+	slow.fastConv = false;
+	const rel = (a: Float32Array, r: Float32Array) => {
+		let peak = 0;
+		let err = 0;
+		for (let i = 0; i < r.length; i++) {
+			peak = Math.max(peak, Math.abs(r[i]));
+			err = Math.max(err, Math.abs(r[i] - a[i]));
+		}
+		expect(a.length).toBe(r.length);
+		return err / peak;
+	};
+	for (const [B, M, N, K] of [
+		[1, 8, 8, 16],
+		[3, 7, 9, 5],
+		[2, 4, 13, 33],
+	])
+		for (const transposeB of [false, true])
+			it(`matmul ${B}x${M}x${N}x${K} transposeB=${transposeB}`, () => {
+				const a = random(B * M * K);
+				const b = random(B * K * N);
+				const bs = transposeB ? [B, N, K] : [B, K, N];
+				const run = (nn: CpuNn) =>
+					(
+						nn.matmul(nn.fromArray(a, [B, M, K]), nn.fromArray(b, bs), {
+							transposeB,
+						}) as CpuTensor
+					).data;
+				expect(rel(run(fast), run(slow))).toBeLessThanOrEqual(1e-5);
+			});
+	it("linear with bias", () => {
+		const x = random(5 * 11);
+		const w = random(7 * 11);
+		const b = random(7);
+		const run = (nn: CpuNn) =>
+			(
+				nn.linear(
+					nn.fromArray(x, [5, 11]),
+					nn.fromArray(w, [7, 11]),
+					nn.fromArray(b, [7]),
+				) as CpuTensor
+			).data;
+		expect(rel(run(fast), run(slow))).toBeLessThanOrEqual(1e-5);
+	});
+	it("constant pad matches", () => {
+		const x = random(2 * 3 * 4 * 5);
+		const run = (nn: CpuNn) =>
+			(
+				nn.pad(nn.fromArray(x, [2, 3, 4, 5]), [1, 2, 0, 1, 2, 0, 0, 3], {
+					value: 0.5,
+				}) as CpuTensor
+			).data;
+		expect(Array.from(run(fast))).toEqual(Array.from(run(slow)));
+	});
+});

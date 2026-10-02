@@ -84,6 +84,7 @@ function packWeights(
 	return packed;
 }
 
+const tileScratch = new Float64Array(16);
 let padScratch = new Float64Array(0);
 let offsetScratch = new Int32Array(0);
 
@@ -335,15 +336,27 @@ export function conv2dFast(
 						}
 						// partial tile (cout or width tail)
 						const nx = full ? 4 : Wo - ox;
-						const acc = [
-							[a00, a01, a02, a03],
-							[a10, a11, a12, a13],
-							[a20, a21, a22, a23],
-							[a30, a31, a32, a33],
-						];
+						const acc = tileScratch;
+						acc[0] = a00;
+						acc[1] = a01;
+						acc[2] = a02;
+						acc[3] = a03;
+						acc[4] = a10;
+						acc[5] = a11;
+						acc[6] = a12;
+						acc[7] = a13;
+						acc[8] = a20;
+						acc[9] = a21;
+						acc[10] = a22;
+						acc[11] = a23;
+						acc[12] = a30;
+						acc[13] = a31;
+						acc[14] = a32;
+						acc[15] = a33;
 						for (let c = 0; c < nc; c++) {
 							const bc = bias ? bias[co + c] : 0;
-							for (let x = 0; x < nx; x++) O[q + c * HoWo + x] = acc[c][x] + bc;
+							for (let x = 0; x < nx; x++)
+								O[q + c * HoWo + x] = acc[c * 4 + x] + bc;
 						}
 					}
 				}
@@ -450,4 +463,149 @@ function convOneOutput(
 				}
 			}
 		}
+}
+
+const packedTranspose = new WeakMap<Float32Array, Float64Array>();
+
+/**
+ * convTranspose2d with groups = 1: per input pixel the output taps are one matrix-vector product over Cin
+ * (weights packed [tap tile of 4][ci][4], 4 pixels per pass), scattered into an f64 accumulator.
+ */
+export function convTranspose2dFast(
+	X: Float32Array,
+	Wt: Float32Array,
+	bias: Float32Array | null,
+	p: ConvParams,
+): Float32Array {
+	const { N, Cin, H, W, Cout, kh, kw, sh, sw, ph, pw, dh, dw, Ho, Wo } = p;
+	const taps = Cout * kh * kw;
+	const tiles = Math.ceil(taps / 4);
+	let Wk = packedTranspose.get(Wt);
+	if (!Wk) {
+		Wk = new Float64Array(tiles * Cin * 4);
+		for (let ci = 0; ci < Cin; ci++)
+			for (let j = 0; j < taps; j++)
+				Wk[((j >> 2) * Cin + ci) * 4 + (j & 3)] = Wt[ci * taps + j];
+		packedTranspose.set(Wt, Wk);
+	}
+	const HW = H * W;
+	const HoWo = Ho * Wo;
+	const acc = new Float64Array(N * Cout * HoWo);
+	const Xd = new Float64Array(Cin * HW);
+	const khw = kh * kw;
+	for (let n = 0; n < N; n++) {
+		for (let i = 0; i < Cin * HW; i++) Xd[i] = X[n * Cin * HW + i];
+		const accBase = n * Cout * HoWo;
+		for (let pix = 0; pix < HW; pix += 4) {
+			const np = Math.min(4, HW - pix);
+			for (let tt = 0; tt < tiles; tt++) {
+				let wi = tt * Cin * 4;
+				let a00 = 0;
+				let a01 = 0;
+				let a02 = 0;
+				let a03 = 0;
+				let a10 = 0;
+				let a11 = 0;
+				let a12 = 0;
+				let a13 = 0;
+				let a20 = 0;
+				let a21 = 0;
+				let a22 = 0;
+				let a23 = 0;
+				let a30 = 0;
+				let a31 = 0;
+				let a32 = 0;
+				let a33 = 0;
+				if (np === 4) {
+					for (let ci = 0; ci < Cin; ci++) {
+						const o = ci * HW + pix;
+						const x0 = Xd[o];
+						const x1 = Xd[o + 1];
+						const x2 = Xd[o + 2];
+						const x3 = Xd[o + 3];
+						const w0 = Wk[wi];
+						const w1 = Wk[wi + 1];
+						const w2 = Wk[wi + 2];
+						const w3 = Wk[wi + 3];
+						wi += 4;
+						a00 += w0 * x0;
+						a01 += w0 * x1;
+						a02 += w0 * x2;
+						a03 += w0 * x3;
+						a10 += w1 * x0;
+						a11 += w1 * x1;
+						a12 += w1 * x2;
+						a13 += w1 * x3;
+						a20 += w2 * x0;
+						a21 += w2 * x1;
+						a22 += w2 * x2;
+						a23 += w2 * x3;
+						a30 += w3 * x0;
+						a31 += w3 * x1;
+						a32 += w3 * x2;
+						a33 += w3 * x3;
+					}
+				} else {
+					for (let ci = 0; ci < Cin; ci++) {
+						const o = ci * HW + pix;
+						const x0 = Xd[o];
+						const x1 = np > 1 ? Xd[o + 1] : 0;
+						const x2 = np > 2 ? Xd[o + 2] : 0;
+						const w0 = Wk[wi];
+						const w1 = Wk[wi + 1];
+						const w2 = Wk[wi + 2];
+						const w3 = Wk[wi + 3];
+						wi += 4;
+						a00 += w0 * x0;
+						a01 += w0 * x1;
+						a02 += w0 * x2;
+						a10 += w1 * x0;
+						a11 += w1 * x1;
+						a12 += w1 * x2;
+						a20 += w2 * x0;
+						a21 += w2 * x1;
+						a22 += w2 * x2;
+						a30 += w3 * x0;
+						a31 += w3 * x1;
+						a32 += w3 * x2;
+					}
+				}
+				const t = tileScratch;
+				t[0] = a00;
+				t[1] = a01;
+				t[2] = a02;
+				t[3] = a03;
+				t[4] = a10;
+				t[5] = a11;
+				t[6] = a12;
+				t[7] = a13;
+				t[8] = a20;
+				t[9] = a21;
+				t[10] = a22;
+				t[11] = a23;
+				t[12] = a30;
+				t[13] = a31;
+				t[14] = a32;
+				t[15] = a33;
+				for (let lane = 0; lane < 4; lane++) {
+					const j = tt * 4 + lane;
+					if (j >= taps) break;
+					const kx = j % kw;
+					const ky = ((j / kw) | 0) % kh;
+					const co = (j / khw) | 0;
+					for (let x = 0; x < np; x++) {
+						const q = pix + x;
+						const oy = ((q / W) | 0) * sh - ph + ky * dh;
+						const ox = (q % W) * sw - pw + kx * dw;
+						if (oy < 0 || oy >= Ho || ox < 0 || ox >= Wo) continue;
+						acc[accBase + co * HoWo + oy * Wo + ox] += t[lane * 4 + x];
+					}
+				}
+			}
+		}
+	}
+	const O = new Float32Array(acc.length);
+	for (let i = 0; i < acc.length; i++)
+		O[i] = acc[i] + (bias ? bias[((i / HoWo) | 0) % Cout] : 0);
+	return O;
 }

@@ -16,8 +16,15 @@ import {
 	type ReducePrim,
 	type UnaryPrim,
 } from "./base";
-import { conv2dFast, conv2dReference } from "./cpu-conv";
-import { binarySameShape, poolInside, reluInto, resizeFast } from "./cpu-fast";
+import { conv2dFast, conv2dReference, convTranspose2dFast } from "./cpu-conv";
+import {
+	binarySameShape,
+	matmulTiled,
+	padConstantRows,
+	poolInside,
+	reluInto,
+	resizeFast,
+} from "./cpu-fast";
 import { fetchModel } from "./fetch";
 import { entryF32, parseSafetensors } from "./safetensors";
 import {
@@ -275,7 +282,12 @@ export class CpuNn extends BaseNn<CpuTensor> {
 			);
 			return t([N, Cout, Ho, Wo], O);
 		}
-		// transpose: scatter each input pixel through the kernel
+		if (this.fastConv && groups === 1)
+			return t(
+				[N, Cout, Ho, Wo],
+				convTranspose2dFast(X, Wt, b ? b.data : null, p),
+			);
+		// transpose: scatter each input pixel through the kernel (the reference)
 		const out = t([N, Cout, Ho, Wo]);
 		const O = out.data;
 		const acc = new Float64Array(N * Cout * Ho * Wo);
@@ -402,6 +414,23 @@ export class CpuNn extends BaseNn<CpuTensor> {
 		const O = out.data;
 		const row = new Float64Array(N);
 		forEachStrided(batch, [aBatchStrides, bBatchStrides], (bi, [ao, bo]) => {
+			if (this.fastConv) {
+				matmulTiled(
+					A,
+					ao,
+					B,
+					bo,
+					transB ? 1 : N,
+					transB ? K : 1,
+					bias ? bias.data : null,
+					O,
+					bi * M * N,
+					M,
+					N,
+					K,
+				);
+				return;
+			}
 			for (let m = 0; m < M; m++) {
 				if (bias) for (let n = 0; n < N; n++) row[n] = bias.data[n];
 				else row.fill(0);
@@ -905,6 +934,22 @@ export class CpuNn extends BaseNn<CpuTensor> {
 		out: number[],
 	) {
 		const o = t(out);
+		if (
+			this.fastConv &&
+			mode === "constant" &&
+			out.length > 0 &&
+			pads.every(([a, b]) => a >= 0 && b >= 0)
+		) {
+			padConstantRows(
+				x.data,
+				o.data,
+				x.shape,
+				out,
+				pads as [number, number][],
+				value,
+			);
+			return o;
+		}
 		const r = out.length;
 		const xs = stridesOf(x.shape);
 		const idx = new Array<number>(r).fill(0);
