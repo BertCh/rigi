@@ -1579,7 +1579,7 @@ function WorldLayers({ settings, style, state }: ViewProps) {
 	);
 }
 
-/** Lake waves (needs the alpine water albedo) and wind-drift particles (WebGPU world view only). */
+/** Lake waves (needs the alpine water albedo) and wind-drift particles (world view, both engines). */
 function WaterWindControls({ style }: { style: ViewStyle }) {
 	const w = style.world.wind;
 	const patchWind = (p: DeepPartial<ViewStyle["world"]["wind"]>) =>
@@ -1588,6 +1588,7 @@ function WaterWindControls({ style }: { style: ViewStyle }) {
 		<>
 			<Toggle
 				label="Lake waves"
+				title="Shows on lakes drawn with the alpine water colouring (terrain albedo), world view only"
 				checked={style.world.water === "waves"}
 				onChange={(on) => patch({ world: { water: on ? "waves" : "flat" } })}
 			/>
