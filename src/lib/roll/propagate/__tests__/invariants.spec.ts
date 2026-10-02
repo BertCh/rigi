@@ -120,7 +120,7 @@ describe("suggestion-only invariants", () => {
 		expect(s.provenance).toBe("propagated-suggestion");
 		expect(loadSolvedPose("t")).toBeNull();
 		expect(
-			[...store.keys()].filter((k) => k !== "mt-image:propagate:v1"),
+			[...store.keys()].filter((k) => k !== storageKey("propagate")),
 		).toEqual([]);
 	});
 
