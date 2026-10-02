@@ -243,6 +243,11 @@ async function main() {
 	];
 	const before = cacheDirs.map(dirSize);
 	const positions = mode === "gt" ? readGtPositions() : readDemoPositions();
+	// GT photos are private: their positions are printed at 0.1° and their ids are left out
+	const where = (p: Position) =>
+		mode === "gt"
+			? `${p.lat.toFixed(1)}, ${p.lon.toFixed(1)}`
+			: `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
 	const out: string[] = [];
 	out.push(
 		`DEM band sensitivity, positions=${mode} (DEM-only; not an accuracy result)`,
@@ -267,12 +272,12 @@ async function main() {
 	);
 	for (const p of positions)
 		out.push(
-			`  ${p.region.padEnd(5)}${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}  (${p.ids.length} photos: ${p.ids.join(",")})`,
+			`  ${p.region.padEnd(5)}${where(p)}  (${p.ids.length} photos${mode === "gt" ? "" : `: ${p.ids.join(",")}`})`,
 		);
 
 	const pooled = { CH: newSamples(), other: newSamples() };
-	for (const pos of positions) {
-		const tag = pos.ids[0];
+	for (const [index, pos] of positions.entries()) {
+		const tag = mode === "gt" ? `viewpoint ${index + 1}` : pos.ids[0];
 		const base = await horizonFor(
 			MAPTERHORN,
 			MAPTERHORN.levels,
@@ -329,7 +334,7 @@ async function main() {
 		);
 		out.push(
 			formatTable(
-				`viewpoint ${pos.region} ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}: |delta elevation| over ${base.horizon.elevation.length} azimuths`,
+				`viewpoint ${pos.region} ${where(pos)}: |delta elevation| over ${base.horizon.elevation.length} azimuths`,
 				own,
 			),
 		);
