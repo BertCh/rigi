@@ -52,7 +52,7 @@
 5. **Step Inside v1.1** as an opt-in beta, or wait for the smear gate?
 6. **Completion provenance:** reuse `generated` or add a code?
 7. **Funding:** one GEN3C rented-GPU run; gated downloads for completion P1.
-8. **WAG P2/P3** ([whole-app-graph-plan.md](whole-app-graph-plan.md) §5): defer photo rasterisation parity (recommended); keep WebGL as a CPU-crossing fallback (recommended), which decides whether `/roll` moves to WebGPU.
+8. **WAG P2/P3** ([whole-app-graph-plan.md](whole-app-graph-plan.md) §5): defer photo rasterisation parity (recommended); keep WebGL as a CPU-crossing fallback (recommended), which decides whether `/roll` moves to WebGPU. Memo: [p3-roll-webgpu-memo.md](../research_notes/gpu-pod-d-2026-10-02/p3-roll-webgpu-memo.md) (recommends compute first, render port later behind a flag).
 9. **Landeskarte as the default look:** keep after the browser pass, or revert 9b2a6e8?
 
 ## Housekeeping
