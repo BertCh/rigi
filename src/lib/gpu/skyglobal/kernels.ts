@@ -14,8 +14,10 @@ import type { GpuOut, GridGpuOptions, GridGpuStats } from "./index";
 import {
 	CELLS_WGSL,
 	FLAGS_WGSL,
+	PICK_WGSL,
 	REDUCE_SG_WGSL,
 	REDUCE_WGSL,
+	RESCORE_WGSL,
 } from "./skyglobal.wgsl";
 
 const spec = (id: string, source: string, layout: [string, BindKind][]) =>
@@ -51,6 +53,26 @@ export const K_FLAGS = spec("flags", FLAGS_WGSL, [
 	["red", "read-only-storage"],
 	["vals", "storage"],
 	["flags", "storage"],
+]);
+
+// the optional GPU re-score (GridGpuOptions.rescore "gpu"); bestKey / argOut are atomic arrays
+export const K_RESCORE = spec("rescore", RESCORE_WGSL, [
+	["u", "uniform"],
+	["S", "read-only-storage"],
+	["prof", "read-only-storage"],
+	["alpha", "read-only-storage"],
+	["vfs", "read-only-storage"],
+	["combos", "read-only-storage"],
+	["list", "read-only-storage"],
+	["score", "storage"],
+	["bestKey", "storage"],
+]);
+export const K_PICK = spec("pick", PICK_WGSL, [
+	["u", "uniform"],
+	["list", "read-only-storage"],
+	["score", "read-only-storage"],
+	["bestKey", "storage"],
+	["argOut", "storage"],
 ]);
 
 /** REDUCE with subgroup ops where the device has them (identical output), else the shared-memory tree. */
@@ -136,19 +158,58 @@ export async function collect(
 		readBytes,
 		reads,
 		subgroups: a.sub,
+		rescore: "cpu",
 	};
-	let dbg: GpuOut["dbg"] = {};
-	if (cb) {
-		const C = new Float32Array(cb, 0, nCells * 4);
-		const mid = new Float32Array(nCells);
-		const lo = new Float32Array(nCells);
-		const hi = new Float32Array(nCells);
-		for (let i = 0; i < nCells; i++) {
-			mid[i] = C[i * 4];
-			lo[i] = C[i * 4 + 1];
-			hi[i] = C[i * 4 + 2];
-		}
-		dbg = { mid, lo, hi };
-	}
+	const dbg: GpuOut["dbg"] = cb ? debugGrid(cb, nCells) : {};
 	return { L, Ru: new Uint32Array(rb), count, stats, dbg };
+}
+
+/** Decode the GPU-rescore readback ([count, bestKey, argOut]) into GpuOut (L / Ru empty, `rescored` set). */
+export function decodeGpuRescore(
+	r: { count: number; key: Uint32Array; arg: Uint32Array },
+	a: {
+		nCells: number;
+		readBytes: number;
+		sub: boolean;
+		t0: number;
+		t1: number;
+	},
+	cb: ArrayBuffer | undefined,
+): GpuOut {
+	const t2 = performance.now();
+	const stats: GridGpuStats = {
+		gpuMs: t2 - a.t1,
+		uploadMs: a.t1 - a.t0,
+		rescoreMs: 0,
+		nCells: a.nCells,
+		nCand: r.count,
+		maxCandPerYaw: 0,
+		midArgFlips: 0,
+		fellBack: false,
+		readBytes: a.readBytes,
+		reads: 1,
+		subgroups: a.sub,
+		rescore: "gpu",
+	};
+	return {
+		L: new Uint32Array([r.count]),
+		Ru: new Uint32Array(0),
+		count: r.count,
+		stats,
+		dbg: cb ? debugGrid(cb, a.nCells) : {},
+		gpuRescore: { key: r.key, arg: r.arg },
+	};
+}
+
+function debugGrid(cb: ArrayBuffer, nCells: number): GpuOut["dbg"] {
+	const C = new Float32Array(cb, 0, nCells * 4);
+	const mid = new Float32Array(nCells);
+	const lo = new Float32Array(nCells);
+	const hi = new Float32Array(nCells);
+	for (let i = 0; i < nCells; i++) {
+		mid[i] = C[i * 4];
+		lo[i] = C[i * 4 + 1];
+		hi[i] = C[i * 4 + 2];
+	}
+	return { mid, lo, hi };
 }

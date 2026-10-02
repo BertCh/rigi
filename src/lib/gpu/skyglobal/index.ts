@@ -12,6 +12,10 @@
 // (coordinate descent, ~1400 sequential pose scores) stay on the CPU: they are cheap there and the
 // polish is inherently sequential.
 //
+// `rescore: "gpu"` moves that re-score into the same graph (RESCORE → PICK, float32 point estimates,
+// per-yaw atomic max): only the count and the per-yaw {best, arg} are read back, at the cost of the
+// bit-exactness of the float64 re-score (near-ties can pick another combo).
+//
 // Not wired into the service: see the parity / timing report (scripts/gpu/skyglobal-bench.mjs).
 //
 // Plumbing (src/lib/gpu/core): one core ComputeGraph encoding (./graph.ts; cells / red / compaction scratch are graph
@@ -64,6 +68,12 @@ export type GridGpuOptions = {
 	noSubgroups?: boolean;
 	/** also read back the GPU's point estimates (combo × yaw, float32) for parity reports */
 	debugGrid?: boolean;
+	/**
+	 * Where the candidates are re-scored: "cpu" (default) reads the candidate list back and re-scores
+	 * it in float64 (bit-exact with gridCpu); "gpu" re-scores inside the same graph in float32 (RESCORE
+	 * → PICK) and reads back only the count and the per-yaw {best, arg}.
+	 */
+	rescore?: "cpu" | "gpu";
 };
 
 export type GridGpuStats = {
@@ -87,6 +97,8 @@ export type GridGpuStats = {
 	reads: number;
 	/** REDUCE ran with subgroup ops */
 	subgroups: boolean;
+	/** where the candidates were re-scored */
+	rescore: "cpu" | "gpu";
 };
 
 export type GridGpuResult = GridResult & {
@@ -127,6 +139,8 @@ export type GpuOut = {
 	count: number;
 	stats: GridGpuStats;
 	dbg: Pick<GridGpuResult, "mid" | "lo" | "hi">;
+	/** rescore "gpu": the per-yaw order-preserving best-score key and complemented best combo (0 = none) */
+	gpuRescore?: { key: Uint32Array; arg: Uint32Array };
 };
 
 /**
@@ -229,6 +243,7 @@ function rescore(
 ): GridGpuResult {
 	const { L, Ru, count, stats, dbg } = r;
 	const nYaw = g.nYaw;
+	if (r.gpuRescore) return finishGpuRescore(sg, g, P, r, t0);
 	const { cap, T } = P;
 	// exact re-score of the candidates, per yaw in combo order (gridCpu's strict ">" keeps the first max)
 	const t3 = performance.now();
@@ -268,6 +283,41 @@ function rescore(
 		cands: L.slice(1, count + 1),
 		...dbg,
 	};
+}
+
+/** rescore "gpu": decode the per-yaw {best, arg} the graph produced; gridCpu when unusable. */
+function finishGpuRescore(
+	sg: SkyGlobal,
+	g: GridPlan,
+	P: Packed,
+	r: GpuOut,
+	t0: number,
+): GridGpuResult {
+	const { count, stats, dbg } = r;
+	const { key, arg: argc } = r.gpuRescore as NonNullable<GpuOut["gpuRescore"]>;
+	const nYaw = g.nYaw;
+	const best = new Float64Array(nYaw);
+	const arg = new Int32Array(nYaw);
+	const f32 = new Float32Array(1);
+	const u32 = new Uint32Array(f32.buffer);
+	let ok = count <= P.cap;
+	for (let iy = 0; ok && iy < nYaw; iy++) {
+		// no candidate at this yaw (key / complemented arg still 0): unusable
+		if (argc[iy] === 0 || key[iy] === 0) {
+			ok = false;
+			break;
+		}
+		const kk = key[iy];
+		u32[0] = kk & 0x80000000 ? kk & 0x7fffffff : ~kk;
+		best[iy] = f32[0];
+		arg[iy] = ~argc[iy] >>> 0;
+	}
+	if (!ok) {
+		stats.fellBack = true;
+		const c = sg.gridCpu(g);
+		return { ...c, ms: performance.now() - t0, stats, ...dbg };
+	}
+	return { best, arg, ms: performance.now() - t0, stats, ...dbg };
 }
 
 /** SkyGlobal.search with the GPU grid (CPU grid when there is no device). Same result shape. */

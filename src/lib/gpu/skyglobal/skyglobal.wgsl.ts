@@ -22,6 +22,12 @@
 // candidate list. The CPU re-scores exactly those cells in float64 (cpu.ts cellScore), which yields
 // the CPU grid's per-yaw winner exactly.
 //
+// RESCORE / PICK (optional, GridGpuOptions.rescore "gpu"): the candidate re-score on the GPU. RESCORE
+// recomputes each candidate cell's point estimate (the same expressions as CELLS' `mid`, float32)
+// and keeps the per-yaw max through an order-preserving u32 key (atomicMax into bestKey); PICK then
+// takes, among the candidates whose key equals the yaw's best, the smallest combo (gridCpu's "first
+// max in combo order"), as an atomicMax of the complemented combo (the clear node can only write 0).
+//
 // @workgroup_size(64) for CELLS: 64 consecutive yaws of one combo per workgroup, so neighbouring
 // invocations read neighbouring profile bins and the same combo constants. REDUCE uses 256
 // invocations per yaw (one workgroup each) striding over the ≤ ~4000 combos. FLAGS is 256 × 1 over the flat cell index.
@@ -260,6 +266,113 @@ fn main(
       if (om > rMid || (om == rMid && oa < rArg)) { rMid = om; rArg = oa; }
     }
     red[iy] = vec4<f32>(rLo, rMid, bitcast<f32>(rArg), bitcast<f32>(rZero));
+  }
+}
+`;
+
+// Order-preserving float32 -> u32 key (bigger float = bigger key; -0 folded into +0 so ties match
+// the CPU's ==). Key 0 is below every real key (it would be a negative NaN): "no candidate yet".
+const KEY_FN = /* wgsl */ `
+fn sortKey(f: f32) -> u32 {
+  let b = bitcast<u32>(select(f, 0.0, f == 0.0));
+  return select(b | 0x80000000u, ~b, (b & 0x80000000u) != 0u);
+}
+`;
+
+/** RESCORE: one invocation per candidate slot; score[i] = f32 point estimate, bestKey[iy] = max key. */
+export const RESCORE_WGSL = /* wgsl */ `${HEADER}${KEY_FN}
+@group(0) @binding(0) var<uniform> u: U;
+@group(0) @binding(1) var<storage, read> S: array<f32>;
+@group(0) @binding(2) var<storage, read> prof: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> alpha: array<vec2<f32>>;
+@group(0) @binding(4) var<storage, read> vfs: array<u32>;
+@group(0) @binding(5) var<storage, read> combos: array<f32>;
+@group(0) @binding(6) var<storage, read> list: array<u32>;
+@group(0) @binding(7) var<storage, read_write> score: array<f32>;
+@group(0) @binding(8) var<storage, read_write> bestKey: array<atomic<u32>>;
+
+fn px(x: i32, y: i32) -> f32 {
+  let xx = clamp(x, 0, i32(u.w) - 1);
+  let yy = clamp(y, 0, i32(u.h) - 1);
+  return S[u32(yy) * u.w + u32(xx)];
+}
+
+// CELLS' point estimate (midSum / midCnt branch) for cell (iy, ci), expression for expression
+fn cellMid(iy: u32, ci: u32) -> f32 {
+  let b = ci * 12u;
+  let fy = combos[b]; let fz = combos[b + 1u];
+  let rx = combos[b + 2u]; let ry = combos[b + 3u]; let rz = combos[b + 4u];
+  let ux = combos[b + 5u]; let uy = combos[b + 6u]; let uz = combos[b + 7u];
+  let ta = combos[b + 8u]; let t = combos[b + 9u]; let covDen = combos[b + 10u];
+  let vi = u32(combos[b + 11u]);
+  let off = vfs[vi * 2u];
+  let hb = vfs[vi * 2u + 1u];
+  let na = 2u * hb + 1u;
+  let n = i32(u.n);
+  var k = (i32(iy * u.sy) - i32(hb)) % n;
+  if (k < 0) { k += n; }
+  let fw = f32(u.w); let fh = f32(u.h);
+  let x0 = 0.01 * fw; let x1 = 0.99 * fw;
+  let y0 = 0.01 * fh; let y1 = 0.99 * fh;
+  var midSum = 0.0; var midCnt = 0u;
+  for (var j = 0u; j < na; j++) {
+    let a = alpha[off + j];
+    let p = prof[u32(k)];
+    k += 1;
+    if (k == n) { k = 0; }
+    let dx = a.x * p.y;
+    let dy = a.y * p.y;
+    let dz = p.x;
+    let z = dy * fy + dz * fz;
+    let zs = select(1.0, z, z > 0.1);
+    let X = (0.5 + (dx * rx + dy * ry + dz * rz) / zs / ta * 0.5) * fw;
+    let Y = (0.5 - (dx * ux + dy * uy + dz * uz) / zs / t * 0.5) * fh;
+    let inMid = z > 0.1 && X >= x0 && X <= x1 && Y >= y0 && Y <= y1;
+    if (inMid) { midSum += px(i32(floor(X)), i32(floor(Y))); midCnt += 1u; }
+  }
+  let nc = f32(u.n) * covDen;
+  var mid = 0.0;
+  if (midCnt >= u.cntReq) { mid = midSum * min(1.0 / nc, 1.0 / f32(midCnt)); }
+  return mid;
+}
+
+// @workgroup_size(256), 1-D over u.cap (2-D past the dispatch limit, linearised here)
+@compute @workgroup_size(256)
+fn main(
+  @builtin(workgroup_id) wid: vec3<u32>,
+  @builtin(num_workgroups) nwg: vec3<u32>,
+  @builtin(local_invocation_index) lid: u32,
+) {
+  let i = (wid.y * nwg.x + wid.x) * 256u + lid;
+  if (i >= u.cap || i >= list[0]) { return; }
+  let c = list[1u + i];
+  let iy = c % u.nYaw;
+  let m = cellMid(iy, c / u.nYaw);
+  score[i] = m;
+  atomicMax(&bestKey[iy], sortKey(m));
+}
+`;
+
+/** PICK: per candidate whose key equals its yaw's best, argOut[iy] = max(~combo) (= the first combo). */
+export const PICK_WGSL = /* wgsl */ `${HEADER}${KEY_FN}
+@group(0) @binding(0) var<uniform> u: U;
+@group(0) @binding(1) var<storage, read> list: array<u32>;
+@group(0) @binding(2) var<storage, read> score: array<f32>;
+@group(0) @binding(3) var<storage, read_write> bestKey: array<atomic<u32>>;
+@group(0) @binding(4) var<storage, read_write> argOut: array<atomic<u32>>;
+
+@compute @workgroup_size(256)
+fn main(
+  @builtin(workgroup_id) wid: vec3<u32>,
+  @builtin(num_workgroups) nwg: vec3<u32>,
+  @builtin(local_invocation_index) lid: u32,
+) {
+  let i = (wid.y * nwg.x + wid.x) * 256u + lid;
+  if (i >= u.cap || i >= list[0]) { return; }
+  let c = list[1u + i];
+  let iy = c % u.nYaw;
+  if (sortKey(score[i]) == atomicLoad(&bestKey[iy])) {
+    atomicMax(&argOut[iy], ~(c / u.nYaw));
   }
 }
 `;

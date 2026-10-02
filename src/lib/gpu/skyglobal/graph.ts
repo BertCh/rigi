@@ -65,11 +65,14 @@ import type { GridPlan, SkyGlobal } from "./cpu";
 import type { GpuOut, GridGpuOptions, Packed } from "./index";
 import {
 	collect,
+	decodeGpuRescore,
 	headFor,
 	K_CELLS,
 	K_FLAGS,
+	K_PICK,
 	K_REDUCE,
 	K_REDUCE_SG,
+	K_RESCORE,
 	key,
 	OWNER,
 	STORAGE,
@@ -80,7 +83,13 @@ export const SKYGLOBAL_GRAPH_GROUP = OWNER;
 /** Compiled graphs kept per device (each holds a cells transient of up to ~32 MB). */
 const MAX_GRAPHS = 2;
 
-type Params = { nYaw: number; nCombo: number; head: number; debug: number };
+type Params = {
+	nYaw: number;
+	nCombo: number;
+	head: number;
+	debug: number;
+	cap: number;
+};
 type GraphStats = NonNullable<ComputeGraph<Params>["stats"]>;
 
 const INPUTS = ["u", "S", "prof", "alpha", "vfs", "combos", "list"] as const;
@@ -93,6 +102,7 @@ function build(
 	sub: boolean,
 	cellsBytes: number,
 	redBytes: number,
+	gpuRescore: boolean,
 ) {
 	const imp = (id: keyof Inputs, usage = STORAGE) =>
 		g.importBuffer(id, bufs[id].byteLength, undefined, usage);
@@ -161,13 +171,53 @@ function build(
 					});
 				},
 			}),
-		})
-		// count + the first `head` slots, the reduction, (debug) the whole grid; one staging slot
-		.readNode("read", [
-			{ buffer: list, size: (p) => (p.head + 1) * 4 },
-			{ buffer: red, size: (p) => p.nYaw * 16 },
-			{ buffer: cells, size: (p) => p.debug * 16 },
-		]);
+		});
+	if (gpuRescore) {
+		// GPU re-score (GridGpuOptions.rescore "gpu"): RESCORE → PICK over the candidate slots, then only
+		// [count, bestKey, argOut] (+ debug cells) are read. bestKey / argOut are atomic transients,
+		// cleared (to 0) before use; PICK keeps the max of the complemented combo, so 0 = "none".
+		// score[i] is written for i < count and read only there (PICK): it needs no clear.
+		const slots = Math.max(capCells, (bufs.list.byteLength >> 2) - 1);
+		const score = g.transientBuffer("score", slots * 4);
+		const bestKey = g.transientBuffer("bestKey", redBytes / 4);
+		const argOut = g.transientBuffer("argOut", redBytes / 4);
+		const nSlotGroups = Math.ceil(slots / 256);
+		const slotX = Math.min(nSlotGroups, maxDim);
+		const slotY = Math.ceil(nSlotGroups / slotX);
+		g.clearNode("clear-best", { buffer: bestKey, size: (p) => p.nYaw * 4 })
+			.clearNode("clear-arg", { buffer: argOut, size: (p) => p.nYaw * 4 })
+			.addKernel({
+				id: "rescore",
+				spec: K_RESCORE,
+				bindings: { u, S, prof, alpha, vfs, combos, list, score, bestKey },
+				workgroups: () => [slotX, slotY],
+				writes: { bestKey: "atomic" },
+				cleared: ["bestKey"],
+				dependsOn: ["cands-count", "clear-best"],
+			})
+			.addKernel({
+				id: "pick",
+				spec: K_PICK,
+				bindings: { u, list, score, bestKey, argOut },
+				workgroups: () => [slotX, slotY],
+				writes: { argOut: "atomic" },
+				cleared: ["argOut"],
+				dependsOn: ["rescore", "clear-arg"],
+			})
+			.readNode("read", [
+				{ buffer: list, size: () => 4 },
+				{ buffer: bestKey, size: (p) => p.nYaw * 4 },
+				{ buffer: argOut, size: (p) => p.nYaw * 4 },
+				{ buffer: cells, size: (p) => p.debug * 16 },
+			]);
+		return;
+	}
+	// count + the first `head` slots, the reduction, (debug) the whole grid; one staging slot
+	g.readNode("read", [
+		{ buffer: list, size: (p) => (p.head + 1) * 4 },
+		{ buffer: red, size: (p) => p.nYaw * 16 },
+		{ buffer: cells, size: (p) => p.debug * 16 },
+	]);
 }
 
 /** Last-run info for benches (cache key / hit, the compiled graph's stats). */
@@ -194,6 +244,7 @@ export async function gridOnGraph(
 	const nCells = nYaw * nCombo;
 	const { cap } = P;
 	const head = headFor(device, o, cap);
+	const gpuRescore = o.rescore === "gpu";
 	const sub = !o.noSubgroups && hasFeature(device, "subgroups");
 	// pooled uploads under the "skyglobal" lease
 	const bufs: Inputs = {
@@ -213,14 +264,14 @@ export async function gridOnGraph(
 	};
 	const cellsBytes = capacityFor(nCells * 16);
 	const redBytes = capacityFor(nYaw * 16);
-	const k = `${sub ? "sg" : "tree"},${INPUTS.map((i) => `${i}${bufs[i].byteLength}`).join(",")},cells${cellsBytes},red${redBytes}`;
+	const k = `${sub ? "sg" : "tree"},${INPUTS.map((i) => `${i}${bufs[i].byteLength}`).join(",")},cells${cellsBytes},red${redBytes},rs${gpuRescore ? 1 : 0}`;
 	// cachedGraph inside the "skyglobal" lease, run() queued synchronously after it (no await between),
 	// so an eviction's destroy lands after this run
 	const { graph, hit } = cachedGraph<Params, void>(
 		device,
 		SKYGLOBAL_GRAPH_GROUP,
 		k,
-		(gr) => build(gr, bufs, sub, cellsBytes, redBytes),
+		(gr) => build(gr, bufs, sub, cellsBytes, redBytes, gpuRescore),
 		MAX_GRAPHS,
 	);
 	graph.compile();
@@ -232,11 +283,32 @@ export async function gridOnGraph(
 	const debug = o.debugGrid ? nCells : 0;
 	const t1 = performance.now();
 	const { reads } = await graph.run(
-		{ nYaw, nCombo, head, debug },
+		{ nYaw, nCombo, head, debug, cap },
 		{ buffers: bufs },
 	);
 	const [lb, rb, cb] = reads.read ?? [];
 	if (!lb || !rb) throw new Error("skyglobal graph: read node did not run");
+	if (gpuRescore) {
+		const [cb0, kb, ab, dbgCells] = reads.read ?? [];
+		if (!cb0 || !kb || !ab)
+			throw new Error("skyglobal graph: read node did not run");
+		const count = new Uint32Array(cb0, 0, 1)[0];
+		return decodeGpuRescore(
+			{
+				count,
+				key: new Uint32Array(kb, 0, nYaw),
+				arg: new Uint32Array(ab, 0, nYaw),
+			},
+			{
+				nCells,
+				readBytes: 4 + nYaw * 8 + debug * 16,
+				sub,
+				t0,
+				t1,
+			},
+			o.debugGrid ? dbgCells : undefined,
+		);
+	}
 	return collect(
 		device,
 		{
