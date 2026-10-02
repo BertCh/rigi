@@ -119,7 +119,6 @@ for (const variant of ["plain", "drain"]) {
 						total: performance.now() - t0,
 						...m.ms,
 						refineOn: m.refineOn,
-						ortDevice: m.ortDevice,
 						source: m.source,
 						backend: m.backend,
 					});
@@ -156,7 +155,6 @@ for (const variant of ["plain", "drain"]) {
 			refineP90: +p90(p.runs.map((r) => r.refine)).toFixed(1),
 			sub,
 			refineOn: p.runs.at(-1).refineOn,
-			ortDevice: p.runs.at(-1).ortDevice,
 		};
 		console.log(variant, p.name, p.size, JSON.stringify(p.summary));
 	}

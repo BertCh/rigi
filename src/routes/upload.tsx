@@ -484,8 +484,7 @@ function Credits() {
 					>
 						libheif bundle
 					</a>
-					) that you may replace with your own build (licence texts, including
-					onnxruntime-web's third-party notices, are under{" "}
+					) that you may replace with your own build (licence texts are under{" "}
 					<a
 						className="text-cyan-300/80 light:text-[var(--rigi-glow)]/80 hover:underline"
 						href="/licenses/README.txt"

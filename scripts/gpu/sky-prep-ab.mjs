@@ -77,7 +77,6 @@ async function arm(gpuPrep) {
 					size: `${m.width}x${m.height}`,
 					source: m.source,
 					backend: m.backend,
-					ortDevice: m.ortDevice,
 					runs,
 					mask: btoa(bin),
 				});

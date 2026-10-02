@@ -761,7 +761,7 @@ async function enumerateKernels() {
 			if (e.isDirectory()) walk(p);
 			else if (
 				/\.ts$/.test(e.name) &&
-				!/\.(check|test)\.ts$|^bench/.test(e.name) &&
+				!/\.(check|test|spec)\.tsx?$|^bench/.test(e.name) &&
 				fs.readFileSync(p, "utf8").includes("defineKernel(")
 			)
 				kernelFiles.push(p);

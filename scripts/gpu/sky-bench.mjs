@@ -98,7 +98,6 @@ const e2e = (page) =>
 						total: performance.now() - t0,
 						...m.ms,
 						refineOn: m.refineOn,
-						ortDevice: m.ortDevice,
 					});
 				}
 				let bin = "";
@@ -175,7 +174,7 @@ try {
 			log(`  preload ${JSON.stringify(runs[label].preload)}`);
 			for (const p of runs[label].photos)
 				log(
-					`  ${p.name} ${p.size} ${p.source}/${p.backend} refineOn=${p.runs.at(-1).refineOn} ortDevice=${p.runs.at(-1).ortDevice}`,
+					`  ${p.name} ${p.size} ${p.source}/${p.backend} refineOn=${p.runs.at(-1).refineOn}`,
 					JSON.stringify(summarise(p.runs)),
 				);
 		}
@@ -186,7 +185,6 @@ try {
 				photos: r.photos.map(({ mask, runs, ...p }) => ({
 					...p,
 					refineOn: runs.at(-1).refineOn,
-					ortDevice: runs.at(-1).ortDevice,
 					median: summarise(runs),
 					runs: runs.map((x) =>
 						Object.fromEntries(
