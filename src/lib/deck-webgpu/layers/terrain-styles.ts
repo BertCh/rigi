@@ -62,6 +62,12 @@ import {
 	deckTerrainStyle,
 } from "#/lib/style/deck-apply";
 import { CLASSIC } from "#/lib/style/defaults";
+import {
+	ALPINE_TINT,
+	alpineBaseBody,
+	type Rgb,
+	shaderFloat,
+} from "#/lib/style/palette";
 import { TER_BLOCK } from "#/lib/terroir/glsl/terrain";
 import {
 	coverTexels,
@@ -234,6 +240,7 @@ export function harmonizeUniforms(v: ReturnType<typeof harmonizeValues>) {
 // WGSL (ports of the GLSL chunks; ts_ prefix keeps them apart from the core's names)
 
 const f = (x: number) => x.toExponential(9);
+const wgslVec3 = (c: Rgb) => `vec3<f32>(${c.map(shaderFloat).join(", ")})`;
 
 /** Shared helpers every style program gets. */
 const COMMON_WGSL = /* wgsl */ `\
@@ -287,17 +294,7 @@ fn ts_fbm(p: vec2<f32>) -> f32 {
 // valley greens ~400 m, forest belt, alpine meadow above the treeline (1900 m), rock from the
 // rockline (2450 m); stops sRGB, mixed in linear
 fn ts_alpine_base(h: f32) -> vec3<f32> {
-  let c0 = ts_srgb(vec3<f32>(0.56, 0.66, 0.45));
-  let c1 = ts_srgb(vec3<f32>(0.40, 0.53, 0.34));
-  let c2 = ts_srgb(vec3<f32>(0.35, 0.47, 0.31));
-  let c3 = ts_srgb(vec3<f32>(0.60, 0.65, 0.42));
-  let c4 = ts_srgb(vec3<f32>(0.64, 0.62, 0.52));
-  let c5 = ts_srgb(vec3<f32>(0.64, 0.64, 0.63));
-  if (h < 900.0) { return mix(c0, c1, smoothstep(400.0, 900.0, h)); }
-  if (h < 1500.0) { return mix(c1, c2, smoothstep(900.0, 1500.0, h)); }
-  if (h < 2050.0) { return mix(c2, c3, smoothstep(1650.0, 2050.0, h)); }
-  if (h < 2450.0) { return mix(c3, c4, smoothstep(2050.0, 2450.0, h)); }
-  return mix(c4, c5, smoothstep(2450.0, 2950.0, h));
+${alpineBaseBody("wgsl", "ts_srgb")}
 }
 fn ts_alpine_albedo(elev: f32, n: vec3<f32>, xy: vec2<f32>, grad: f32) -> vec3<f32> {
   let slopeDeg = degrees(acos(clamp(n.z, -1.0, 1.0)));
@@ -309,15 +306,15 @@ fn ts_alpine_albedo(elev: f32, n: vec3<f32>, xy: vec2<f32>, grad: f32) -> vec3<f
   // rock on steep slopes; below the treeline steep ground is mostly forest
   let rockStart = mix(50.0, 30.0, smoothstep(1400.0, 2650.0, h));
   let rock = smoothstep(rockStart - 4.0, rockStart + 14.0, slopeDeg + fine * 5.0);
-  col = mix(col, ts_srgb(mix(vec3<f32>(0.54, 0.52, 0.48), vec3<f32>(0.6), smoothstep(1500.0, 3000.0, h))), rock);
+  col = mix(col, ts_srgb(mix(${wgslVec3(ALPINE_TINT.rockLow)}, vec3<f32>(${shaderFloat(ALPINE_TINT.rockHigh)}), smoothstep(1500.0, 3000.0, h))), rock);
   // snow above the snowline (2900 m), only where it can lie
   let sl = 2900.0 + nz * 220.0;
   let snowH = smoothstep(sl - 120.0, sl + 180.0, elev);
   let snowS = 1.0 - smoothstep(32.0, 48.0, slopeDeg + fine * 10.0 - smoothstep(sl, sl + 900.0, elev) * 8.0);
-  col = mix(col, ts_srgb(vec3<f32>(0.95, 0.97, 1.0)), snowH * snowS);
+  col = mix(col, ts_srgb(${wgslVec3(ALPINE_TINT.snow)}), snowH * snowS);
   // lakes: a DEM lake is one constant elevation, so its gradient is exactly 0 (below 2600 m)
   let water = (1.0 - smoothstep(0.0004, 0.0015, grad)) * (1.0 - smoothstep(2500.0, 2600.0, elev));
-  return mix(col, ts_srgb(vec3<f32>(0.33, 0.50, 0.60)), water * 0.9);
+  return mix(col, ts_srgb(${wgslVec3(ALPINE_TINT.lake)}), water * 0.9);
 }
 `;
 

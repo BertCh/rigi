@@ -33,6 +33,7 @@ import {
 	FLOW_LIFT_M,
 	FLOW_MAX_PARTICLES,
 	FLOW_PARAM_FLOATS,
+	FLOW_STREAK_COLOR,
 	FLOW_STREAK_OPACITY,
 	FLOW_STREAK_WIDTH,
 	FLOW_TAIL_SECONDS,
@@ -45,6 +46,7 @@ import {
 	newFlowParticles,
 	packFlowParams,
 } from "#/lib/look/flow/field";
+import { shaderFloat } from "#/lib/style/palette";
 import { cameraModule } from "../camera";
 import {
 	type GpuLayerCore,
@@ -205,7 +207,7 @@ fn enuAt(p: vec2<f32>) -> vec3<f32> {
 
 @fragment fn fragmentMain(v: Varyings) -> @location(0) vec4<f32> {
   let alpha = flow.opacity * v.fade;
-  return vec4<f32>(vec3<f32>(0.92, 0.96, 1.0) * alpha, alpha);
+  return vec4<f32>(vec3<f32>(${FLOW_STREAK_COLOR.map(shaderFloat).join(", ")}) * alpha, alpha);
 }
 `;
 

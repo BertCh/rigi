@@ -49,6 +49,7 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | Literature | [Mountain photo georeferencing SoTA.md](<Mountain photo georeferencing SoTA.md>) | Skyline/DEM pose literature (2026-09-24). Later verdicts are in negative-results.md |
 | Aesthetics | [Geospatial rendering aesthetics frontier.md](<Geospatial rendering aesthetics frontier.md>) | Visual/rendering frontier vs current system: new default look, quick wins, art modes, licence traps (2026-09-30) |
 | Cartography | [terroir-cartography.md](terroir-cartography.md) | Cartographic/data-viz evaluation (scorecard, per-surface findings from screenshots) and the terroir plan: honest encodings (phase 0), real land cover/names/glaciers "terroir pack" (1), organic rendering (2), place stories (3); data + licence table (2026-09-30). Advisory |
+| Cartography | [cartography-consolidation-2026-10-02.md](cartography-consolidation-2026-10-02.md) | Deep dive + refactor of every cartographic style surface (2026-10-02): inventory, style-system research, `style/palette.ts` tokens with GLSL/WGSL emitters, `PRESET_INFO` registry + `?style=landeskarte`, swisstopo name typography wired, Landeskarte casing/bands fixes; open decisions and ranked follow-ups |
 
 ## Frozen records (never edit)
 

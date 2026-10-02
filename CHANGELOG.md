@@ -4,6 +4,14 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Cartography consolidation (2026-10-02)
+
+- **One cartographic palette.** `src/lib/style/palette.ts` names the map colours that were copied across modules (contour brown, cover inks, warm/Berann/dark ink, paper, classic sky and haze, the Alpine tint) with their provenance. Presets, `terroir/classes.ts CONTOUR_INK`, `terroir/hatch-lk.ts HATCH_LK_INK`, `CLASSIC`, the world-sky constants, the `patterson` ramp and the flow streak colour read it. The LOOK_ALPINE tint is generated for GLSL and WGSL from `ALPINE_TINT`. Pixel-neutral: resolved presets and deck terrain styles are identical, and the shader text is identical up to float spelling.
+- **Preset registry.** `PRESET_INFO` holds each preset's label, aliases and the layers it switches to (`PRESET_IDS`, `PRESET_LABELS`, `PRESET_OVERLAY_LAYER` and `PRESET_MAP_LAYERS` are derived from it). Terroir and Field sketch share one layer set, and the Swiss-look presets share one contour definition. `?style=landeskarte` (and a stored "landeskarte") selects the Landeskarte preset, whose id stays `swiss`.
+- **Landeskarte fixes** (swiss-cartography-review D1, D2, D7): Swiss contours sit on a thin dark-brown casing instead of Classic's navy one (Landeskarte, Field sketch), the bands layer uses the `swiss` ramp, and place names can use the swisstopo typography through the new `style.terroir.names.typography` ("terroir" | "swisstopo", switch in the Terroir panel; Landeskarte = swisstopo). Browser-unverified.
+- Labels: one SVG halo-width rule (`svgHaloWidth`) for peak labels and place names; the terroir overlays reuse `LABEL_FONT_FAMILY`; the swisstopo font stack drops Manrope.
+- Report: `reports/cartography-consolidation-2026-10-02.md`.
+
 ### Consolidation pass (2026-10-02)
 
 - Docs: `reports/status.md` and `reports/roadmap.md` rewritten short and current (open work only; retired row ids point at `bab0f28`); every report indexed in `reports/README.md`; code-review backlog now 53 fixed, 3 partial, 3 obsolete, 16 open.

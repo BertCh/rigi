@@ -12,6 +12,7 @@ import { flagFrom } from "#/lib/flags";
 import { storageKey } from "#/lib/ontology/core/storage";
 import {
 	isPresetId,
+	presetIdFrom,
 	presetStyle,
 	resolveStyle,
 	stateFromStyle,
@@ -43,8 +44,9 @@ export function parseStoredState(raw: string | null | undefined): StyleState {
 		return DEFAULT_STYLE_STATE;
 	const o = v as Record<string, unknown>;
 	// v: 1 is the only version so far; a future v2 migrates here
-	if (o.v !== 1 || !isPresetId(o.preset)) return DEFAULT_STYLE_STATE;
-	return { preset: o.preset, overrides: pruneOverrides(o.overrides) };
+	const preset = presetIdFrom(o.preset);
+	if (o.v !== 1 || !preset) return DEFAULT_STYLE_STATE;
+	return { preset, overrides: pruneOverrides(o.overrides) };
 }
 
 export function serializeState(s: StyleState): string {
@@ -52,11 +54,11 @@ export function serializeState(s: StyleState): string {
 	return JSON.stringify(out);
 }
 
-/** `?style=<preset>` from a location.search string, or null. */
+/** `?style=<preset>` (an id or alias, e.g. landeskarte) from a location.search string, or null. */
 export function urlPreset(search: string | null | undefined): PresetId | null {
 	if (!search) return null;
 	const p = flagFrom(search, STYLE_URL_PARAM);
-	return isPresetId(p) ? p : null;
+	return presetIdFrom(p);
 }
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;

@@ -6,6 +6,7 @@
 // the same order as today's hypso()/coolRamp() (materials.ts:90–121). Adapters must keep it.
 import { smoothstep } from "../math";
 import { hexToRgb01 } from "./color";
+import { ALPINE_TINT } from "./palette";
 import type { Ramp, RampName, RampRef } from "./types";
 
 export const MAX_RAMP_STOPS = 8;
@@ -109,17 +110,17 @@ export const RAMPS: Record<RampName, Ramp> = {
 			{ t: 1, c: [0.97, 0.97, 0.98] },
 		],
 	},
-	/** Patterson natural tint: valley green, forest, alpine meadow, scree, rock (look/glsl/ramps.ts alpineBase) */
+	/** Patterson natural tint: valley green, forest, alpine meadow, scree, rock (style/palette.ts ALPINE_TINT, the LOOK_ALPINE belts) */
 	patterson: {
 		kind: "stops",
 		stops: [
-			{ t: 0, c: [0.56, 0.66, 0.45] }, // 400 m
-			{ t: 0.1613, c: [0.4, 0.53, 0.34], ease: "smooth" }, // 900 m
-			{ t: 0.3548, c: [0.35, 0.47, 0.31], ease: "smooth" }, // 1500 m
-			{ t: 0.4032, c: [0.35, 0.47, 0.31] }, // 1650 m
-			{ t: 0.5323, c: [0.6, 0.65, 0.42], ease: "smooth" }, // 2050 m
-			{ t: 0.6613, c: [0.64, 0.62, 0.52], ease: "smooth" }, // 2450 m
-			{ t: 0.8226, c: [0.64, 0.64, 0.63], ease: "smooth" }, // 2950 m
+			{ t: 0, c: ALPINE_TINT.belts[0].c }, // 400 m
+			{ t: 0.1613, c: ALPINE_TINT.belts[1].c, ease: "smooth" }, // 900 m
+			{ t: 0.3548, c: ALPINE_TINT.belts[2].c, ease: "smooth" }, // 1500 m
+			{ t: 0.4032, c: ALPINE_TINT.belts[2].c }, // 1650 m
+			{ t: 0.5323, c: ALPINE_TINT.belts[3].c, ease: "smooth" }, // 2050 m
+			{ t: 0.6613, c: ALPINE_TINT.belts[4].c, ease: "smooth" }, // 2450 m
+			{ t: 0.8226, c: ALPINE_TINT.belts[5].c, ease: "smooth" }, // 2950 m
 		],
 	},
 };

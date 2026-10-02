@@ -4,8 +4,9 @@
 
 // The "swisstopo" label preset: Swiss national-map typography on the photo. Hydrography in blue
 // italic, ranges and regions in letter-spaced capitals, peaks upright with the elevation in a
-// lighter weight, contour numerals brown. Exported as constants only; the style defaults do not
-// reference it (the Swiss preset wiring owns that), so classic output is untouched.
+// lighter weight, contour numerals brown. The Landeskarte preset (style/presets.ts "swiss") spreads
+// SWISSTOPO_LABELS into its labels and picks SWISSTOPO_NAME_TYPO for place names
+// (terroir.names.typography "swisstopo"); CLASSIC references neither, so classic output is untouched.
 //
 // Fonts: only faces self-hosted in public/fonts/gipfelbuch are used (src/components/gipfelbuch/swiss/
 // fonts.css, family "GB Sans"): upright 300 / 400 / 500 / 600 and italic 400. There is no 700 and
@@ -18,7 +19,7 @@ import type { NameClass } from "../types";
 
 /** GB Sans first (self-hosted Fira Sans), then the app face, so an unloaded face degrades quietly. */
 export const SWISSTOPO_FONT_FAMILY =
-	'"GB Sans", "Fira Sans", Manrope, system-ui, sans-serif';
+	'"GB Sans", "Fira Sans", system-ui, sans-serif';
 
 /** Faces the preset would take if self-hosted (none is required). */
 export const SWISSTOPO_FONT_NEEDS = [

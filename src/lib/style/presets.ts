@@ -7,46 +7,112 @@
 // overrides survive a preset switch. Values other than classic are first drafts, tuned in chunk 5.
 import { SWISSTOPO_LABELS } from "../terroir/labels/swisstopo";
 import { CLASSIC } from "./defaults";
+import {
+	BERANN_INK,
+	CONTOUR_BROWN,
+	CONTOUR_CASING_BROWN,
+	DARK_INK,
+	TOPO_PAPER,
+	WARM_INK,
+} from "./palette";
 import { ABSOLUTE_RAMP_RANGE } from "./ramps";
 import { diffStyle, mergeStyle, pruneOverrides } from "./schema";
 import type { DeepPartial, PresetId, StyleState, ViewStyle } from "./types";
 
-export const PRESET_IDS: readonly PresetId[] = [
-	"classic",
-	"minimal",
-	"topo-map",
-	"night",
-	"high-contrast",
-	"photo-matched",
-	"swiss",
-	"berann",
-	"topo-ink",
-	"slope",
-	"terroir",
-	"field-sketch",
-];
-
-export const PRESET_LABELS: Record<PresetId, string> = {
-	classic: "Classic",
-	minimal: "Minimal",
-	"topo-map": "Topo",
-	night: "Night",
-	"high-contrast": "High contrast",
-	"photo-matched": "Photo-matched",
-	swiss: "Landeskarte",
-	berann: "Berann",
-	"topo-ink": "Topo ink",
-	slope: "Slope angle",
-	terroir: "Terroir",
-	"field-sketch": "Field sketch",
+/** Everything about a preset except its style values: the picker label and the layers it switches to. */
+export type PresetInfo = {
+	label: string;
+	/** Other names accepted in ?style= and storage (the id stays the persisted form). */
+	aliases?: readonly string[];
+	/** The photo-view layer (Settings.overlayStyle) choosing the preset switches to. */
+	overlayLayer?: "slope";
+	/** Map layers (Settings.mapStyle / worldStyle) choosing the preset switches to; the user can change them back. */
+	mapLayers?: { mapStyle?: "hillshade"; worldStyle?: "hillshade" };
 };
 
+/** The preset registry, in picker order. PRESET_IDS / PRESET_LABELS / PRESET_*_LAYER derive from it. */
+export const PRESET_INFO: Record<PresetId, PresetInfo> = {
+	classic: { label: "Classic" },
+	minimal: { label: "Minimal" },
+	"topo-map": { label: "Topo" },
+	night: { label: "Night" },
+	"high-contrast": { label: "High contrast" },
+	"photo-matched": { label: "Photo-matched" },
+	// the id predates the Landeskarte signature and stays the stored form
+	swiss: { label: "Landeskarte", aliases: ["landeskarte"] },
+	berann: { label: "Berann" },
+	"topo-ink": { label: "Topo ink" },
+	slope: { label: "Slope angle", overlayLayer: "slope" },
+	// the terroir land cover shows on the relief rendering, not on satellite imagery
+	terroir: {
+		label: "Terroir",
+		mapLayers: { mapStyle: "hillshade", worldStyle: "hillshade" },
+	},
+	"field-sketch": {
+		label: "Field sketch",
+		mapLayers: { mapStyle: "hillshade", worldStyle: "hillshade" },
+	},
+};
+
+export const PRESET_IDS = Object.keys(PRESET_INFO) as readonly PresetId[];
+
+export const PRESET_LABELS = Object.fromEntries(
+	PRESET_IDS.map((id) => [id, PRESET_INFO[id].label]),
+) as Record<PresetId, string>;
+
 export function isPresetId(v: unknown): v is PresetId {
-	return typeof v === "string" && (PRESET_IDS as readonly string[]).includes(v);
+	return typeof v === "string" && Object.hasOwn(PRESET_INFO, v);
 }
 
-/** Ink colours (linear, from the former studio): dark map ink, and Swiss / Berann blue-black. */
-const DARK_INK: [number, number, number] = [0.02, 0.025, 0.04];
+/** A preset id or one of its aliases (?style=landeskarte) → the id; anything else → null. */
+export function presetIdFrom(v: unknown): PresetId | null {
+	if (isPresetId(v)) return v;
+	if (typeof v !== "string") return null;
+	return PRESET_IDS.find((id) => PRESET_INFO[id].aliases?.includes(v)) ?? null;
+}
+
+/**
+ * Brown Swiss contours with heavier index lines on a thin dark-brown casing (never Classic's navy:
+ * no Swiss map draws brown lines on a blue-black halo; swiss-cartography-review D1). Landeskarte
+ * and Terroir; Field sketch fades the alphas.
+ */
+const SWISS_CONTOURS = {
+	color: { mode: "solid", ...CONTOUR_BROWN },
+	minorAlpha: 0.55,
+	majorAlpha: 0.9,
+	width: 1.0,
+	majorWidthMul: 1.9,
+	casing: {
+		on: true,
+		color: CONTOUR_CASING_BROWN,
+		extraPx: 1.2,
+		alpha: 0.35,
+	},
+} as const satisfies DeepPartial<ViewStyle["overlay"]["contours"]>;
+
+/**
+ * The full terroir layer set (names, tiers, cover, glaciers, legend, card, furniture…) of the Terroir
+ * preset; Field sketch takes it with hatching instead of the sun path.
+ */
+const TERROIR_LAYERS = {
+	names: {
+		on: true,
+		reach: "near",
+		language: "local+usual",
+		maxLabels: 16,
+	},
+	peakTiers: true,
+	subPill: true,
+	contours: { adaptive: true, swissIndex: true, inkByCover: true },
+	hatch: false,
+	cover: { on: true, snow: "date", pattern: true },
+	glacier: { on: true, year: 1850, style: "outline" },
+	sunPath: true,
+	legend: true,
+	uncertainty: true,
+	placeCard: true,
+	furniture: true,
+} as const satisfies DeepPartial<ViewStyle["terroir"]>;
 
 const OVERLAY_RIDGE_GAIN = CLASSIC.overlay.ridges.gain; // 0.9
 const REPLACE_RIDGE_GAIN = CLASSIC.replace.ridges.gain; // 0.5
@@ -104,7 +170,7 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 			contours: {
 				color: { mode: "solid", minor: "#9a6a3a", major: "#6b4423" },
 				majorWidthMul: 2.0,
-				casing: { on: true, color: "#f4ecd8", alpha: 0.5 },
+				casing: { on: true, color: TOPO_PAPER, alpha: 0.5 },
 			},
 			bands: { ramp: "swiss", shadeMin: 0.4 },
 			ridges: { inner: "#4a3520", skyline: "#4a3520" },
@@ -117,7 +183,7 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 				saturation: 0.8,
 				contrast: 1.06,
 				brightness: 1.02,
-				tint: "#f4ecd8",
+				tint: TOPO_PAPER,
 				tintAmount: 0.12,
 			},
 			sky: { clear: "#ece4d0", background: "#f1eadb" },
@@ -260,12 +326,10 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 		overlay: {
 			contours: {
 				kind: "plain",
-				color: { mode: "solid", minor: "#b98a5e", major: "#8a5a32" },
-				minorAlpha: 0.55,
-				majorAlpha: 0.9,
-				width: 1.0,
-				majorWidthMul: 1.9,
+				...SWISS_CONTOURS,
 			},
+			// school-atlas hypsometry for the bands layer, not Classic's teal-to-magenta (review D2)
+			bands: { ramp: "swiss" },
 		},
 		composite: {
 			harmonize: 0.3,
@@ -274,12 +338,13 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 				strength: 0.5,
 				width: 0.9,
 				crease: 0.2,
-				inner: [0.16, 0.11, 0.07],
-				skyline: [0.1, 0.07, 0.05],
+				...WARM_INK,
 			},
 		},
 		labels: { ...SWISSTOPO_LABELS, export: null },
 		terroir: {
+			// place names stay off without a pack; switched on, they take the national-map type
+			names: { typography: "swisstopo" },
 			contours: { adaptive: true, swissIndex: true, inkByCover: false },
 			hatch: true,
 			hatchStyle: "landeskarte",
@@ -302,8 +367,7 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 				strength: 0.45,
 				width: 1,
 				crease: 0.35,
-				inner: [0.1, 0.12, 0.22],
-				skyline: [0.08, 0.1, 0.2],
+				...BERANN_INK,
 			},
 		},
 		labels: { export: null },
@@ -381,17 +445,7 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 		},
 		overlay: {
 			contours: {
-				color: { mode: "solid", minor: "#b98a5e", major: "#8a5a32" },
-				minorAlpha: 0.55,
-				majorAlpha: 0.9,
-				width: 1.0,
-				majorWidthMul: 1.9,
-				casing: {
-					on: true,
-					color: [0.12, 0.08, 0.04],
-					extraPx: 1.2,
-					alpha: 0.35,
-				},
+				...SWISS_CONTOURS,
 			},
 			bands: { ramp: "berann" },
 		},
@@ -401,32 +455,13 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 			ridges: "ink",
 			ink: {
 				strength: 0.55,
-				inner: [0.16, 0.11, 0.07],
-				skyline: [0.1, 0.07, 0.05],
+				...WARM_INK,
 			},
 		},
 		// classic placement (upright, wrapped, above the summit) with prominence tiers reads calmer than the
 		// rotated panorama layout once place names share the frame
 		labels: { maxLabels: 18, export: null },
-		terroir: {
-			names: {
-				on: true,
-				reach: "near",
-				language: "local+usual",
-				maxLabels: 16,
-			},
-			peakTiers: true,
-			subPill: true,
-			contours: { adaptive: true, swissIndex: true, inkByCover: true },
-			hatch: false,
-			cover: { on: true, snow: "date", pattern: true },
-			glacier: { on: true, year: 1850, style: "outline" },
-			sunPath: true,
-			legend: true,
-			uncertainty: true,
-			placeCard: true,
-			furniture: true,
-		},
+		terroir: TERROIR_LAYERS,
 	},
 
 	/**
@@ -453,13 +488,7 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 			atmosphere: { mode: "physical", strength: 0.7, airlight: "physical" },
 		},
 		overlay: {
-			contours: {
-				color: { mode: "solid", minor: "#b98a5e", major: "#8a5a32" },
-				minorAlpha: 0.5,
-				majorAlpha: 0.85,
-				width: 1.0,
-				majorWidthMul: 1.9,
-			},
+			contours: { ...SWISS_CONTOURS, minorAlpha: 0.5, majorAlpha: 0.85 },
 			bands: { ramp: "berann" },
 		},
 		replace: { haze: 0.7 },
@@ -469,49 +498,33 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 			sketch: 0.6,
 			ink: {
 				strength: 0.6,
-				inner: [0.16, 0.11, 0.07],
-				skyline: [0.1, 0.07, 0.05],
+				...WARM_INK,
 			},
 		},
 		trails: { stroke: "pencil" },
 		labels: { maxLabels: 18, export: null },
-		terroir: {
-			names: {
-				on: true,
-				reach: "near",
-				language: "local+usual",
-				maxLabels: 16,
-			},
-			peakTiers: true,
-			subPill: true,
-			contours: { adaptive: true, swissIndex: true, inkByCover: true },
-			hatch: true,
-			cover: { on: true, snow: "date", pattern: true },
-			glacier: { on: true, year: 1850, style: "outline" },
-			sunPath: false,
-			legend: true,
-			uncertainty: true,
-			placeCard: true,
-			furniture: true,
-		},
+		terroir: { ...TERROIR_LAYERS, hatch: true, sunPath: false },
 	},
 };
 
 /** The photo-view layer (Settings.overlayStyle) a preset switches to when it is chosen. */
-export const PRESET_OVERLAY_LAYER: Partial<Record<PresetId, "slope">> = {
-	slope: "slope",
-};
+export const PRESET_OVERLAY_LAYER: Partial<Record<PresetId, "slope">> =
+	Object.fromEntries(
+		PRESET_IDS.flatMap((id) => {
+			const layer = PRESET_INFO[id].overlayLayer;
+			return layer ? [[id, layer]] : [];
+		}),
+	);
 
-/**
- * Map layers (Settings.mapStyle / worldStyle) a preset switches to when it is chosen: the terroir land
- * cover shows on the relief rendering, not on satellite imagery. The user can still pick another one.
- */
+/** Map layers (Settings.mapStyle / worldStyle) a preset switches to when it is chosen. */
 export const PRESET_MAP_LAYERS: Partial<
-	Record<PresetId, { mapStyle?: "hillshade"; worldStyle?: "hillshade" }>
-> = {
-	terroir: { mapStyle: "hillshade", worldStyle: "hillshade" },
-	"field-sketch": { mapStyle: "hillshade", worldStyle: "hillshade" },
-};
+	Record<PresetId, NonNullable<PresetInfo["mapLayers"]>>
+> = Object.fromEntries(
+	PRESET_IDS.flatMap((id) => {
+		const layers = PRESET_INFO[id].mapLayers;
+		return layers ? [[id, layers]] : [];
+	}),
+);
 
 /** Presets that switch on look features (LOOK_* defines, look-key.ts); the rest stay classic-compatible. */
 export const LOOK_PRESETS: readonly PresetId[] = [

@@ -6,6 +6,7 @@
 // the line it comes from (tree as of 2026-09-25 12:55; engine.ts lines after ~690 are re-verified
 // and differ from styling.md, which predates a +7-line edit there). The chunk-0 pixel diff and scripts/style-check.ts
 // guard it; changing a number here changes the classic look, so don't.
+import { CLASSIC_HAZE, WORLD_CLEAR, WORLD_SKY } from "./palette";
 import type { NebelmeerStyle, ViewStyle } from "./types";
 
 /** Valley fog (look/nebelmeer) when a style turns it on; density 0 = off. */
@@ -24,7 +25,7 @@ export const CLASSIC: ViewStyle = {
 		direct: 0.85, // materials.ts:126 (0.85 * max(n·sun, 0) at :124)
 		reliefRamp: "hypso-classic", // materials.ts:92–105
 		rampRange: { mode: "local" }, // engine.ts:372–381 (local min/max within 25 km, ≥ 500 m)
-		hazeColor: "#b9cde0", // materials.ts:26 (0xb9cde0, double-linearised by :131)
+		hazeColor: CLASSIC_HAZE, // #b9cde0, materials.ts:26 (0xb9cde0, double-linearised by :131)
 		hazeDensity: 0.000018, // materials.ts:130
 		hazeMax: 0.85, // materials.ts:131
 		atmosphere: { mode: "classic" }, // new look features: off (lookKey sets no define)
@@ -105,7 +106,7 @@ export const CLASSIC: ViewStyle = {
 			tint: "#ffffff",
 			tintAmount: 0,
 		}, // materials.ts:183–184
-		sky: { mode: "flat", clear: "#9fb8d0", background: "#a9c2da" }, // engine.ts:883, :884
+		sky: { mode: "flat", clear: WORLD_CLEAR, background: WORLD_SKY }, // #9fb8d0, #a9c2da; engine.ts:883, :884
 		frame: {
 			planeOpacity: 0.95, // engine.ts:792, :846
 			lineColor: "#ffffff", // engine.ts:805
@@ -178,7 +179,13 @@ export const CLASSIC: ViewStyle = {
 	},
 	// Terroir layers (reports/terroir-cartography.md): all off, so classic stays pixel-identical.
 	terroir: {
-		names: { on: false, reach: "near", language: "local", maxLabels: 24 },
+		names: {
+			on: false,
+			reach: "near",
+			language: "local",
+			maxLabels: 24,
+			typography: "terroir",
+		},
 		peakTiers: false,
 		subPill: false,
 		contours: { adaptive: false, swissIndex: false, inkByCover: false },

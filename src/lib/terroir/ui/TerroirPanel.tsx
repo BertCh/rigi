@@ -78,6 +78,20 @@ export function TerroirPanel({
 						]}
 						onChange={(language) => patch({ names: { language } })}
 					/>
+					<Segmented
+						size="sm"
+						value={t.names.typography}
+						options={[
+							{ value: "terroir", label: "Terroir type" },
+							{
+								value: "swisstopo",
+								label: "swisstopo type",
+								title:
+									"National-map lettering: blue italic water, spaced capitals for ranges",
+							},
+						]}
+						onChange={(typography) => patch({ names: { typography } })}
+					/>
 					<Slider
 						label="Max names"
 						value={t.names.maxLabels}

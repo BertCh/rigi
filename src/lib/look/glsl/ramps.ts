@@ -8,7 +8,15 @@
 //                               elevations, slope-dependent rock, gentle-slope snow, flat lakes
 //   tanakaLines(...)            LOOK_TANAKA: illuminated contours, vec4(rgb, alpha)
 //   slopeClass(n)               LOOK_SLOPE: FATMAP 30/35/40/45° avalanche-slope classes, vec4(rgb, alpha)
+import {
+	ALPINE_TINT,
+	alpineBaseBody,
+	type Rgb,
+	shaderFloat,
+} from "../../style/palette";
 import { defineBlock } from "./block";
+
+const glslVec3 = (c: Rgb) => `vec3(${c.map(shaderFloat).join(", ")})`;
 
 export const SLOPE_BLOCK = defineBlock("slope", "slope", {
 	alpha: "float",
@@ -45,17 +53,7 @@ float rampFbm(vec2 p) {
 // valley greens ~400 m, forest belt, alpine meadow above the treeline (1900 m), rock from the
 // rockline (2450 m); stops sRGB, mixed in linear
 vec3 alpineBase(float h) {
-  vec3 c0 = rampSrgb(vec3(0.56, 0.66, 0.45)); //  400 valley floor, pale green
-  vec3 c1 = rampSrgb(vec3(0.40, 0.53, 0.34)); //  900 mixed forest
-  vec3 c2 = rampSrgb(vec3(0.35, 0.47, 0.31)); // 1500 conifer belt
-  vec3 c3 = rampSrgb(vec3(0.60, 0.65, 0.42)); // treeline+ alpine meadow, yellow-green
-  vec3 c4 = rampSrgb(vec3(0.64, 0.62, 0.52)); // rockline, tan scree
-  vec3 c5 = rampSrgb(vec3(0.64, 0.64, 0.63)); // high rock, cool grey
-  if (h < 900.0) return mix(c0, c1, smoothstep(400.0, 900.0, h));
-  if (h < 1500.0) return mix(c1, c2, smoothstep(900.0, 1500.0, h));
-  if (h < 2050.0) return mix(c2, c3, smoothstep(1650.0, 2050.0, h));
-  if (h < 2450.0) return mix(c3, c4, smoothstep(2050.0, 2450.0, h));
-  return mix(c4, c5, smoothstep(2450.0, 2950.0, h));
+${alpineBaseBody("glsl", "rampSrgb")}
 }
 
 vec3 alpineAlbedo(float elev, vec3 n, vec2 xy) {
@@ -68,16 +66,16 @@ vec3 alpineAlbedo(float elev, vec3 n, vec2 xy) {
   // rock on steep slopes; below the treeline steep ground is mostly forest, so rock needs more slope
   float rockStart = mix(50.0, 30.0, smoothstep(1400.0, 2650.0, h));
   float rock = smoothstep(rockStart - 4.0, rockStart + 14.0, slopeDeg + fine * 5.0);
-  col = mix(col, rampSrgb(mix(vec3(0.54, 0.52, 0.48), vec3(0.6), smoothstep(1500.0, 3000.0, h))), rock);
+  col = mix(col, rampSrgb(mix(${glslVec3(ALPINE_TINT.rockLow)}, vec3(${shaderFloat(ALPINE_TINT.rockHigh)}), smoothstep(1500.0, 3000.0, h))), rock);
   // snow above the snowline (2900 m), only where it can lie, more on high ground
   float sl = 2900.0 + nz * 220.0;
   float snowH = smoothstep(sl - 120.0, sl + 180.0, elev);
   float snowS = 1.0 - smoothstep(32.0, 48.0, slopeDeg + fine * 10.0 - smoothstep(sl, sl + 900.0, elev) * 8.0);
-  col = mix(col, rampSrgb(vec3(0.95, 0.97, 1.0)), snowH * snowS);
+  col = mix(col, rampSrgb(${glslVec3(ALPINE_TINT.snow)}), snowH * snowS);
   // lakes: a DEM lake is one constant elevation, so its gradient is exactly 0 (below 2600 m)
   float grad = fwidth(elev) / max(length(fwidth(xy)), 1e-3);
   float water = (1.0 - smoothstep(0.0004, 0.0015, grad)) * (1.0 - smoothstep(2500.0, 2600.0, elev));
-  return mix(col, rampSrgb(vec3(0.33, 0.50, 0.60)), water * 0.9);
+  return mix(col, rampSrgb(${glslVec3(ALPINE_TINT.lake)}), water * 0.9);
 }
 `;
 

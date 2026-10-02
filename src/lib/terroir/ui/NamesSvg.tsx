@@ -7,6 +7,7 @@
 // by class (labels/names.ts + classes.ts NAME_TYPO), laid out clear of each other and of the peak
 // labels already on screen. Peaks the engine labels stay the engine's. TerroirLayer gates the mode.
 import { useLayoutEffect, useRef, useState } from "react";
+import { svgHaloWidth } from "#/lib/look/labels/css";
 import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { toCss } from "#/lib/style/color";
 import { padRect, type Rect } from "../labels/names";
@@ -124,12 +125,7 @@ export function NamesSvg({ ctx }: { ctx: TerroirCtx }) {
       `}</style>
 			{items.map((it) => {
 				const t = it.type;
-				const halo =
-					ls.halo.kind === "stroke"
-						? ls.halo.strokePx
-						: ls.halo.kind === "shadow"
-							? Math.max(2.5, t.px * 0.19)
-							: 0;
+				const halo = svgHaloWidth(ls.halo, t.px);
 				const textStyle = {
 					fontSize: t.px,
 					fontWeight: t.weight,

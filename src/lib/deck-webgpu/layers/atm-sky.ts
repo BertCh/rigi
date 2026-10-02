@@ -44,6 +44,7 @@ import type { ShaderModule } from "@luma.gl/shadertools";
 import { ATM_CURV, type AtmValues } from "#/lib/look/atmosphere";
 import { NEBELMEER_WGSL } from "#/lib/look/nebelmeer";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
+import { WORLD_SKY } from "#/lib/style/palette";
 import { cameraModule } from "../camera";
 import {
 	type GpuLayerCore,
@@ -56,8 +57,8 @@ import {
 import type { TerrainShaderPart } from "../terrain";
 import { fullscreenWGSL } from "../wgsl";
 
-/** engine.ts renderWorld's scene.background (deck/world-view.ts WORLD_SKY; style default). */
-export const WORLD_SKY = "#a9c2da";
+/** The flat world-view sky, classic style default (style/palette.ts; deck/world-view.ts re-exports it too). */
+export { WORLD_SKY };
 
 // ---------- the atmosphere uniform module (ATM_BLOCK) ----------
 

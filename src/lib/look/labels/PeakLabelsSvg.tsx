@@ -10,6 +10,7 @@ import { toCss } from "../../style/color";
 import type { LabelStyle } from "../../style/types";
 import { uncertainOpacity } from "../../terroir/labels/names";
 import { contrastFilter } from "./contrast";
+import { svgHaloWidth } from "./css";
 import { eleSuffix, type PlacedLabel, tierFonts } from "./layout";
 
 export type PeakLabelsSvgProps = {
@@ -110,12 +111,7 @@ export function PeakLabelsSvg({
 				const f = tierFonts(l.tier, fontPx * (l.sizeMul ?? 1), fontFamily);
 				const ele = showEle ? eleSuffix(l) : "";
 				const isHover = hover === l.id;
-				const halo =
-					st.halo.kind === "stroke"
-						? st.halo.strokePx
-						: st.halo.kind === "shadow"
-							? Math.max(2.5, f.size * 0.19)
-							: 0;
+				const halo = svgHaloWidth(st.halo, f.size);
 				const op = l.leaving
 					? 0
 					: isHover

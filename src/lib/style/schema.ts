@@ -383,6 +383,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 			reach: en("near", "all"),
 			language: en("local", "local+usual"),
 			maxLabels: num(0, 80, true),
+			typography: en("terroir", "swisstopo"),
 		}),
 		peakTiers: bool,
 		subPill: bool,

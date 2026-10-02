@@ -5,8 +5,10 @@
 // Pure helpers for the terroir name labels (NamesSvg): reach filter, dedupe against the engine's
 // peak labels, typography, ranking, uncertainty softening and the greedy rectangle declutter.
 // No DOM, no React: run by labels.check.ts in node.
+import type { TerroirStyle } from "../../style/types";
 import { NAME_TYPO, type NameTypography } from "../classes";
 import type { NameClass, TerroirName } from "../types";
+import { SWISSTOPO_NAME_TYPO } from "./swisstopo";
 
 export type Rect = { x0: number; y0: number; x1: number; y1: number };
 
@@ -88,9 +90,20 @@ export type NameType = {
 	priority: number;
 };
 
+/** The per-class type tables style.terroir.names.typography picks from. */
+export const NAME_TYPOGRAPHY: Record<
+	TerroirStyle["names"]["typography"],
+	Record<NameClass, NameTypography>
+> = { terroir: NAME_TYPO, swisstopo: SWISSTOPO_NAME_TYPO };
+
 /** The class's typography at a base label size (style.labels.name.px). */
-export function nameType(cls: NameClass, basePx: number): NameType {
-	const t: NameTypography = NAME_TYPO[cls] ?? NAME_TYPO.other;
+export function nameType(
+	cls: NameClass,
+	basePx: number,
+	typography: TerroirStyle["names"]["typography"] = "terroir",
+): NameType {
+	const table = NAME_TYPOGRAPHY[typography];
+	const t: NameTypography = table[cls] ?? table.other;
 	return {
 		px: basePx * t.size,
 		weight: t.weight,

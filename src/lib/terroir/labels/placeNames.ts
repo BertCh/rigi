@@ -216,7 +216,7 @@ export function placeNames(
 		const cls = n.cls;
 		const id = `${i}:${n.name}`;
 		const isPeak = PEAK_CLASSES.has(cls);
-		const typ = nameType(cls, basePx);
+		const typ = nameType(cls, basePx, names.typography);
 		const alt = usual && n.alt && n.alt !== n.name ? n.alt : undefined;
 		const altType = alt
 			? { ...typ, px: typ.px * 0.82, weight: 400, upper: false, trackPx: 0 }

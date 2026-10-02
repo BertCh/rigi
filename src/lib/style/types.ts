@@ -349,6 +349,9 @@ export type TerroirStyle = {
 		/** 'local' = the official local-language form; 'local+usual' adds the usual/bilingual form as a second line */
 		language: "local" | "local+usual";
 		maxLabels: number;
+		/** Per-class type table: 'terroir' = terroir/classes.ts NAME_TYPO; 'swisstopo' = the national-map
+		 *  typography of terroir/labels/swisstopo.ts (Landeskarte). */
+		typography: "terroir" | "swisstopo";
 	};
 	/** Peak labels sized by prominence class (major / summit / minor) instead of one size. */
 	peakTiers: boolean;
@@ -362,11 +365,11 @@ export type TerroirStyle = {
 		/** brown on soil, black on rock and scree, blue on ice and water (needs the pack's cover) */
 		inkByCover: boolean;
 	};
-	/** Real land cover from the pack in Blend / In map instead of the elevation belts. */
 	/** Slope-driven Swiss rock hatching and scree dots on hillshaded terrain (no pack needed); display only. */
 	hatch: boolean;
 	/** Hatch look: "classic" (pixel-free stripes) or "landeskarte" (hatch v2: shade-dense hachures, taper, scree stipple, glacier lines). */
 	hatchStyle: "classic" | "landeskarte";
+	/** Real land cover from the pack in Blend / In map instead of the elevation belts. */
 	cover: {
 		on: boolean;
 		snow: "none" | "date";

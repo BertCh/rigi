@@ -8,7 +8,7 @@
 // color-mix(in oklab, …) form Tailwind v4 emits for `white/75`, shadows the same rgba() text.
 import type { CSSProperties } from "react";
 import { hexToRgba01, toCss } from "../../style/color";
-import type { Hex, LabelStyle } from "../../style/types";
+import type { Hex, LabelHalo, LabelStyle } from "../../style/types";
 
 /** Tailwind-v4-style colour: opaque → rgb(), translucent → color-mix(in oklab, rgb() a%, transparent). */
 export function cssMixColor(c: Hex, alphaMul = 1): string {
@@ -53,4 +53,14 @@ export function labelCssVars(st: LabelStyle): CSSProperties {
 			: "none",
 	};
 	return vars as CSSProperties;
+}
+
+/**
+ * Halo stroke width of an SVG label at `px` font size: the stroke kind's own width, a soft
+ * size-relative stroke standing in for the shadow kind (≥ 2.5 px), none for 'none'. Peak labels
+ * (PeakLabelsSvg) and terroir place names (NamesSvg) share it.
+ */
+export function svgHaloWidth(halo: LabelHalo, px: number): number {
+	if (halo.kind === "stroke") return halo.strokePx;
+	return halo.kind === "shadow" ? Math.max(2.5, px * 0.19) : 0;
 }

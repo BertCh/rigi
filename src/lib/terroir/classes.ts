@@ -6,6 +6,7 @@
 // name classes (typography, reach, priority). One place so the legend, the labels, the place card
 // and the shaders agree. Colours are sRGB hex; contour inks follow the Swiss three-colour rule
 // (brown on soil, black on rock, blue on ice and water).
+import { COVER_INK } from "../style/palette";
 import type { CoverClassId, NameClass } from "./types";
 
 export type ContourInk = "soil" | "rock" | "ice";
@@ -70,12 +71,8 @@ export const COVER_CLASSES: readonly CoverClassInfo[] = [
 export const coverInfo = (id: number): CoverClassInfo =>
 	COVER_CLASSES[id] ?? COVER_CLASSES[0];
 
-/** Contour ink colours (sRGB) per the Swiss national map convention. */
-export const CONTOUR_INK: Record<ContourInk, `#${string}`> = {
-	soil: "#8a5a32",
-	rock: "#2b2724",
-	ice: "#3f7fb3",
-};
+/** Contour ink colours (sRGB) per the Swiss national map convention (style/palette.ts COVER_INK). */
+export const CONTOUR_INK: Record<ContourInk, `#${string}`> = COVER_INK;
 
 export type NameTypography = {
 	/** relative size to the base label px */

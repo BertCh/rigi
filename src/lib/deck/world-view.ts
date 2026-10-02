@@ -39,8 +39,8 @@ import {
 import { poseBasis } from "../pose";
 import { LOG_DEPTH_FAR } from "./terrain-layer";
 
-/** engine.ts renderWorld: scene.background (the sky behind the world view), classic style. */
-export const WORLD_SKY = "#a9c2da";
+/** The flat sky behind the world view, classic style (style/palette.ts). */
+export { WORLD_SKY } from "../style/palette";
 
 export type WorldViewState = {
 	eye: [number, number, number];
