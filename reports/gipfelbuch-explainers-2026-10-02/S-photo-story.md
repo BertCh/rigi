@@ -161,6 +161,51 @@ For each page in §7 and for /dev/gipfelbuch-live, check with `?theme=light` and
 9. Reduced motion, `navigator.webdriver` and print show the final frame (print mid-play too).
 10. Performance: no long tasks over 50 ms during the turn, and React commits during the turn stay at or under 30 Hz.
 
-## 11. What landed
+## 11. What landed (2026-10-02, all WIP, browser-unverified)
 
-(to be filled: sha, negatives, deferrals, decisions for the user)
+| sha | What |
+| --- | --- |
+| d84004b | `viz/storyFilm.ts`: the film as a pure clock-to-frame script (filmPlan, filmFrame, loopFrame, beatSpan, rowAt, pickTickColumns, ridePoint) with grammar tokens; `story-film.spec.ts`; spec draft |
+| 61215b8, 8a4321a | `viz/story.tsx`: `setT(t, { instant })`, `story.instant` (pod M's proposal) and a stable `setT` identity (pod C's report); `story.spec.tsx` |
+| 0fd5d8c | `PhotoStory.tsx` rewritten as the film, with `viz/storyGeometry.ts` (path, ticks, layers, needle, arming, commit throttle, scrub) and specs, plus a happy-dom spec of the static frames (accepted and refused) |
+| e82ae57 | Fixes from the adversarial review, listed below |
+| bc8498e | Per-page `focus` (trace, gaps, snap, eye, prior, tap, search) with pure note builders, specced against the real JSON; call sites; LIVE.md |
+| 00a67a1 | The guess's pose note ghosts to 0.35, so the static frame keeps the sensor reading |
+| 6b3ff13 | Ledger row |
+| c28b867, b3ac55f, 1ca9c68 | Call-site hunks moved off lines that peers had edited without committing |
+
+The fixes in e82ae57:
+- a stepper click landed on the next beat;
+- the moving horizon disappeared during the hand-over;
+- the film restarted on an inline `crop` or the 640 px breakpoint;
+- print did not flush the settled frame;
+- the picks ignored the crop;
+- the stepper used roving tabindex, and the caption did not freeze while scrubbing.
+
+**Checks.**
+- Run: biome, tsc, spdx, and the gipfelbuch fast checks. `npx vitest run src/components/gipfelbuch` passes (237 tests after the rebase).
+- The fast tier's failing rows are outside pod S:
+  - the Python venv and `src/lib/upload` unit specs;
+  - the biome ratchet in `shell.spec.ts` and `camera-roll.tsx`;
+  - the ontology `picker/schema.ts` check;
+  - the align-cert timeout under load.
+- After the final rebase, `tsc` fails on master's `viz/explain.tsx` duplicate `MOTION` import, which belongs to pod C and has been reported to them.
+
+**Negative or deferred.**
+- **terrain-snapping `focus="snap"` is not on the page.** A peer's uncommitted retitle owns that exact line. Add `focus="snap"` once their edit lands.
+- **No search sweep on viewport-inference.** The photo JSON has no measured search trace (`solved.search` is just "local"), so the page shows only the moving heading needle. Faking a sweep would break "numbers are measured".
+- **`useBeatClock` was not adopted.** It landed (grammar v0.3) after the film's clock was written. The film has a private rAF clock with the same semantics, marked `TODO(grammar)`; swapping is round-3 work.
+- **`Figure ground={photoId}` is not wired.** It waits for pod G's `Figure.ground` to be on master.
+- **No drag-the-horizon interaction.** The landing's spring-back is excluded by the grammar (no overshoot), and a drag would need a pose solver in the page.
+- **Commit rate during the turn.** RealPhoto and GeoSpill still re-render at ≤ 30 Hz during the 1.6 s turn. P-3 (a subscribable t) is deferred until the browser pass shows a cost.
+- **`pickTickColumns` is sparse on demo-06.** It finds 5 of 11 columns: the trace is only confident (weight ≥ 0.4) in part of that photo.
+
+**Open for the user.**
+1. **Playback.** The grammar's once + hold (replay on return, hover or tap) is the default, and `playback="loop"` is opt-in. Should the hero (rigi Fig. 1) loop like the landing's RevealLoop?
+2. **Pose-note ghost.** Ghosting the guess's numbers to 0.35 in the final frame, as opposed to hiding them, keeps the static frame complete but adds ink.
+3. **Duration.** The film is about 15 s (2.8 s beats, a 4.5 s result hold), against the landing's 28 s scene.
+
+**Top next items.**
+1. A browser pass over §10, especially the frame-edge registration of the moving horizon, and riders handing over to the KR8 labels.
+2. Swap to `useBeatClock` and `Figure ground`.
+3. terrain-snapping `focus="snap"` once the peer's line is committed.
