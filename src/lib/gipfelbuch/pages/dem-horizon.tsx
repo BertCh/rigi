@@ -42,6 +42,7 @@ import {
 	HandRange,
 	LAYER_STYLE,
 	LivePanorama,
+	LiveSideSection,
 	MarginNote,
 	Measured,
 	PhotoPicker,
@@ -1729,7 +1730,7 @@ function WorstTenth({ d, k }: { d: GipfelbuchPhotoData; k: number }) {
 function Misses() {
 	return (
 		<Figure
-			label="Fig. 5"
+			label="Fig. 6"
 			caption="The median gap stays small, but a head on the ridge puts the worst tenth of columns 100 px or more off."
 		>
 			<Gallery
@@ -1857,7 +1858,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
-			<LivePanorama number="4" />
+			<LiveSideSection number="4" />
+
+			<LivePanorama number="5" />
 
 			<Beat
 				kicker="Where it fails"

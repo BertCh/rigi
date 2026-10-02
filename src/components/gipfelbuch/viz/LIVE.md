@@ -21,6 +21,9 @@ Each figure is a `LivePlate`. It puts a `Figure` on the wide track, with a hand 
 | `LivePanorama` | `site/DemoSections` `PanoramaSection` | the demo roll | thumbnail contact strip |
 | `LiveTopoBoard` | `site/DemoSections` `TopoSection` | swisstopo Pixelkarte tiles, `site/surround/map.json` | thumbnail contact strip |
 | `LiveHowItWorks` | `site/how/HowItWorksScene` | the baked how-scene | none (the scene holds its own static state) |
+| `LiveFingerprint` | `site/meta/FingerprintRing` | the meta bake (`scripts/meta/bake.ts`) | blank frame (SVG, no GPU) |
+| `LiveSideSection` | `site/meta/SideSection` | the meta bake | blank frame (SVG, no GPU) |
+| `LivePixelToPlace` | `site/meta/PixelToPlace` | the meta bake | blank frame (SVG, no GPU) |
 
 - **Mounting.** A plate mounts its site component only near the viewport (`useNearViewport`), with the poster as placeholder and as Suspense fallback.
   - Under webdriver and in print, every plate shows its poster.
@@ -30,6 +33,7 @@ Each figure is a `LivePlate`. It puts a `Figure` on the wide track, with a hand 
 - **Notes.** `notes: { text, at: [fx, fy], side?, y? }[]`. `at` is a fraction of the frame and may lie outside 0..1 to point into the spill. When the gutters are at least 112 px wide, the notes sit beside the plate with leaders. Otherwise they stack under it as a numbered list, with red numbers on the plate.
 - **Props.** Every figure takes `number`, `title`, `caption`, `notes`, `date` and `className`. The framed ones also take `aspect` and `frame` (the frame's share of the track). `LiveReveal` and `LiveCompare` take `photoId: "demo-01" | "demo-09"`, the two pairs the landing bakes.
 - **Captions** default to measured numbers: the photo JSON for reveal and compare, `camera-roll/roll.json` for drape, panorama and board, and the step bake's counts (`STEP_BAKE`, copied from `public/demo/step/scene.json`) for step inside.
+- The three `site/meta` plates are plain SVG: they mount whenever near (`motion="self"`), take no notes and no spill. They also count against the one-per-sheet rule only loosely; they run no engine.
 - Use one live plate per sheet at most; each runs a GPU engine or a large image.
 
 ## Photo story (`PhotoStory.tsx`)

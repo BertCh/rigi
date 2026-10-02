@@ -32,6 +32,8 @@ import {
 	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	LiveFingerprint,
+	LivePixelToPlace,
 	MarginNote,
 	Measured,
 	PhotoPicker,
@@ -2241,7 +2243,7 @@ function SolveEquation() {
 function Verdicts() {
 	return (
 		<Figure
-			label="Fig. 5"
+			label="Fig. 6"
 			caption={
 				<>
 					All 12 photos at the solved view. Under each: compass error found,
@@ -2362,6 +2364,8 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 
 			<YawSearch />
 
+			<LiveFingerprint number="4" />
+
 			<Beat
 				kicker="Two solvers"
 				title="Every photo ends in one of three outcomes."
@@ -2423,7 +2427,7 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Figure
-				label="Fig. 4"
+				label="Fig. 5"
 				pinned="demo-11"
 				caption="Same head on the ridge, two results: the first solver rejects it and the second rescues it."
 			>
@@ -2456,6 +2460,8 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 			</Figure>
 
 			<Verdicts />
+
+			<LivePixelToPlace number="7" />
 
 			<Numbers
 				items={[

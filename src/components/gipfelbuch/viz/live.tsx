@@ -104,6 +104,22 @@ const HowItWorksScene = lazy(() =>
 	})),
 ) as ComponentType<{ className?: string; at?: number }>;
 
+const FingerprintRing = lazy(() =>
+	import("#/components/site/meta/FingerprintRing").then((m) => ({
+		default: m.FingerprintRing,
+	})),
+) as ComponentType<{ className?: string }>;
+const SideSection = lazy(() =>
+	import("#/components/site/meta/SideSection").then((m) => ({
+		default: m.SideSection,
+	})),
+) as ComponentType<{ className?: string }>;
+const PixelToPlace = lazy(() =>
+	import("#/components/site/meta/PixelToPlace").then((m) => ({
+		default: m.PixelToPlace,
+	})),
+) as ComponentType<{ className?: string }>;
+
 // ---- mounting gate ----------------------------------------------------------------------------
 
 /**
@@ -1267,6 +1283,93 @@ export function LiveHowItWorks({
 			poster={<div className="aspect-[16/11] w-full" />}
 		>
 			{() => <HowItWorksScene className="p-2 sm:p-3" />}
+		</LivePlate>
+	);
+}
+
+/** The landing's under-the-hood figure (FingerprintRing) on a plate; it draws from baked pipeline output and needs no GPU. */
+export function LiveFingerprint({
+	number,
+	title = "Sliding the skyline around the compass",
+	caption = "Slide the photo's skyline along the terrain's horizon and measure the mismatch at each heading; one heading stands out.",
+	notes,
+	date,
+	className,
+}: Omit<FigureProps, "aspect" | "frame">) {
+	return (
+		<LivePlate
+			title={title}
+			number={number}
+			caption={caption}
+			frame={0.82}
+			freeHeight
+			motion="self"
+			margin={600}
+			spill={false}
+			date={date}
+			className={className}
+			notes={notes ?? []}
+			poster={<div className="aspect-[16/11] w-full" />}
+		>
+			{() => <FingerprintRing className="p-2 sm:p-3" />}
+		</LivePlate>
+	);
+}
+
+/** The landing's under-the-hood figure (SideSection) on a plate; it draws from baked pipeline output and needs no GPU. */
+export function LiveSideSection({
+	number,
+	title = "The skyline is the farthest ridge",
+	caption = "Along one bearing the line of sight passes over ridge after ridge; the last one it touches is the skyline in the photo.",
+	notes,
+	date,
+	className,
+}: Omit<FigureProps, "aspect" | "frame">) {
+	return (
+		<LivePlate
+			title={title}
+			number={number}
+			caption={caption}
+			frame={0.82}
+			freeHeight
+			motion="self"
+			margin={600}
+			spill={false}
+			date={date}
+			className={className}
+			notes={notes ?? []}
+			poster={<div className="aspect-[16/11] w-full" />}
+		>
+			{() => <SideSection className="p-2 sm:p-3" />}
+		</LivePlate>
+	);
+}
+
+/** The landing's under-the-hood figure (PixelToPlace) on a plate; it draws from baked pipeline output and needs no GPU. */
+export function LivePixelToPlace({
+	number,
+	title = "Each pixel is a ray to a place",
+	caption = "With the pose solved, each pixel is a ray from the camera; following it to the ground gives the place it shows and its distance.",
+	notes,
+	date,
+	className,
+}: Omit<FigureProps, "aspect" | "frame">) {
+	return (
+		<LivePlate
+			title={title}
+			number={number}
+			caption={caption}
+			frame={0.82}
+			freeHeight
+			motion="self"
+			margin={600}
+			spill={false}
+			date={date}
+			className={className}
+			notes={notes ?? []}
+			poster={<div className="aspect-[16/11] w-full" />}
+		>
+			{() => <PixelToPlace className="p-2 sm:p-3" />}
 		</LivePlate>
 	);
 }

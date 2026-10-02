@@ -16,8 +16,15 @@ import { SITE_THEME, SiteNav } from "#/components/site/SiteNav";
 export const Route = createFileRoute("/dev/meta")({
 	ssr: false,
 	head: () => ({ meta: [{ title: "Under the hood · Rigi" }] }),
-	component: Preview,
+	component: PreviewGate,
 });
+
+// dev-only: the production build shows a stub (same gate as dev.how-scene); the figures live on the
+// Gipfelbuch sheets (dem-horizon, viewport-inference, camera-roll)
+function PreviewGate() {
+	if (!import.meta.env.DEV) return <p>dev only</p>;
+	return <Preview />;
+}
 
 function Preview() {
 	return (
