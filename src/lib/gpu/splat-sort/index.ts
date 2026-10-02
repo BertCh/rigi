@@ -33,15 +33,29 @@ import { type BindKind, defineKernel } from "../core/kernel";
 import { GPUSort } from "../core/luma";
 import { profiling, recordGpuTime } from "../core/profile";
 import { errorChecks, openErrorScopes, submit, submitted } from "../core/queue";
+import {
+	LIVE_ARGS_WGSL,
+	LIVE_BINS,
+	LIVE_DEPTH_WGSL,
+	LIVE_KEYS_WGSL,
+	LIVE_SCAN_WGSL,
+	LIVE_SCATTER_WGSL,
+} from "./live.wgsl";
 import { DEPTH_WGSL, KEYS_WGSL, TILE } from "./splat-sort.wgsl";
-import { packSplatSortParams } from "./uniforms";
+import {
+	LIVE_ARGS_BYTES,
+	packLiveSplatSortParams,
+	packSplatSortParams,
+} from "./uniforms";
 
 /** The kernels' group and the core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "splat-sort"). */
 const GROUP = "splat-sort";
 /** GPUBufferUsage bits (as deck-webgpu/layers/splats.ts). */
 const STORAGE = 0x0080;
 const COPY_DST = 0x0008;
+const COPY_SRC = 0x0004;
 const UNIFORM = 0x0040;
+const INDIRECT = 0x0100;
 
 const U: [string, BindKind] = ["p", "uniform"];
 const DEPTH = defineKernel(
@@ -66,6 +80,57 @@ const KEYS = defineKernel(
 	],
 	{ group: GROUP },
 );
+// The live counting sort (./live.wgsl.ts): the splat count is read on the GPU from `counter`.
+const LIVE_ARGS = defineKernel(
+	"splatsort-live-args",
+	LIVE_ARGS_WGSL,
+	[U, ["counter", "read-only-storage"], ["dispatchArgs", "storage"]],
+	{ group: GROUP },
+);
+const LIVE_DEPTH = defineKernel(
+	"splatsort-live-depth",
+	LIVE_DEPTH_WGSL,
+	[
+		U,
+		["counter", "read-only-storage"],
+		["splatData", "read-only-storage"],
+		["depth", "storage"],
+		["mm", "storage"],
+	],
+	{ group: GROUP },
+);
+const LIVE_KEYS = defineKernel(
+	"splatsort-live-keys",
+	LIVE_KEYS_WGSL,
+	[
+		U,
+		["counter", "read-only-storage"],
+		["depth", "read-only-storage"],
+		["mm", "read-only-storage"],
+		["keys", "storage"],
+		["hist", "storage"],
+	],
+	{ group: GROUP },
+);
+const LIVE_SCAN = defineKernel(
+	"splatsort-live-scan",
+	LIVE_SCAN_WGSL,
+	[U, ["hist", "storage"], ["drawArgs", "storage"]],
+	{ group: GROUP },
+);
+const LIVE_SCATTER = defineKernel(
+	"splatsort-live-scatter",
+	LIVE_SCATTER_WGSL,
+	[
+		U,
+		["counter", "read-only-storage"],
+		["keys", "read-only-storage"],
+		["hist", "storage"],
+		["order", "storage"],
+	],
+	{ group: GROUP },
+);
+
 /** Workgroup storage the sort needs (the old radix tile + digit table; kept as the support gate). */
 const SORT_WORKGROUP_STORAGE_BYTES = (TILE + 512) * 4;
 
@@ -97,6 +162,84 @@ type SortBuffers = Record<
 	"params" | "data" | "order" | "depth" | "mm" | "keys" | "rank" | "tmp",
 	Buffer
 >;
+/** The live sort's buffers by graph import id (no rank / tmp: no GPUSort). */
+type LiveSortBuffers = Record<
+	| "params"
+	| "data"
+	| "order"
+	| "depth"
+	| "mm"
+	| "keys"
+	| "counter"
+	| "hist"
+	| "dispatchArgs"
+	| "drawArgs",
+	Buffer
+>;
+
+/**
+ * The live sort graph: args from the counter, clears, then depth → keys + histogram → scan →
+ * scatter, the three per-splat kernels dispatched indirectly with ceil(count / TILE) workgroups.
+ */
+function buildLiveSortGraph(
+	g: ComputeGraph,
+	buffers: LiveSortBuffers,
+	blocks: number,
+) {
+	const imp = (id: keyof LiveSortBuffers, usage = STORAGE | COPY_DST) =>
+		g.importBuffer(id, buffers[id].byteLength, undefined, usage);
+	const p = imp("params", UNIFORM);
+	const counter = imp("counter", STORAGE);
+	const splatData = imp("data", STORAGE);
+	const order = imp("order");
+	const depth = imp("depth");
+	const mm = imp("mm");
+	const keys = imp("keys");
+	const hist = imp("hist");
+	const dispatchArgs = imp("dispatchArgs", STORAGE | COPY_DST | INDIRECT);
+	const drawArgs = imp("drawArgs", STORAGE | COPY_DST | INDIRECT);
+	const condition = {
+		id: "live-count",
+		source: "gpu",
+		mode: "indirect",
+		buffer: dispatchArgs,
+	} as const;
+	g.addKernel({
+		id: "args",
+		spec: LIVE_ARGS,
+		bindings: { p, counter, dispatchArgs },
+		workgroups: [1],
+	});
+	g.clearNode("clear-mm", mm);
+	g.clearNode("clear-hist", hist);
+	g.addKernel({
+		id: "depth",
+		spec: LIVE_DEPTH,
+		bindings: { p, counter, splatData, depth, mm },
+		workgroups: [blocks],
+		condition,
+	});
+	g.addKernel({
+		id: "keys",
+		spec: LIVE_KEYS,
+		bindings: { p, counter, depth, mm, keys, hist },
+		workgroups: [blocks],
+		condition,
+	});
+	g.addKernel({
+		id: "scan",
+		spec: LIVE_SCAN,
+		bindings: { p, hist, drawArgs },
+		workgroups: [1],
+	});
+	g.addKernel({
+		id: "scatter",
+		spec: LIVE_SCATTER,
+		bindings: { p, counter, keys, hist, order },
+		workgroups: [blocks],
+		condition,
+	});
+}
 
 /** The sort graph for buffers of these sizes: a clear of `mm`, then depth → keys → luma GPUSort. */
 function buildSortGraph(
@@ -147,7 +290,7 @@ export class GpuSplatSorter {
 	readonly stats: GpuSplatSortStats = { sorts: 0, lastEncodeMs: 0 };
 	private readonly blocks: number;
 	private readonly params: Buffer;
-	private readonly buffers: SortBuffers;
+	private readonly buffers: SortBuffers | LiveSortBuffers;
 	private readonly owned: Buffer[];
 	/** cachedGraph key: the buffer sizes (the graph's import capacities and bindings) */
 	private readonly graphKey: string;
@@ -157,17 +300,28 @@ export class GpuSplatSorter {
 	/** Resolves when the graph is compiled; rejects if a pipeline fails (caller falls back). */
 	readonly ready: Promise<void>;
 	private checked = 0;
+	/**
+	 * Live mode only (a `counter` was given): the indirect draw record the scan kernel writes,
+	 * [vertexCount, instanceCount = kept splats, 0, 0], valid after the first sort. Draw it with
+	 * `Model.setIndirectBuffer(drawArgs)`. Null in the fixed-count mode.
+	 */
+	readonly drawArgs: Buffer | null;
 
 	/**
 	 * @param data the splat storage buffer (3 × vec4<u32> per splat, position at word 0 of each
 	 *   splat: deck-webgpu/layers/splats.ts SPLAT_WORDS), read only
 	 * @param order the order buffer (count × u32, STORAGE): written with the sorted indices
+	 * @param count the splat count; in live mode the CAPACITY of `data` / `order`
+	 * @param counter live mode: a buffer whose first u32 is the number of live splats (the prefix of
+	 *   `data`), read on the GPU. The sort then covers only those, indirectly dispatched, writes only
+	 *   the kept ones to the front of `order`, and fills `drawArgs` (./live.wgsl.ts)
 	 */
 	constructor(
 		readonly device: Device,
 		data: Buffer,
 		order: Buffer,
 		readonly count: number,
+		counter?: Buffer,
 	) {
 		this.blocks = Math.max(1, Math.ceil(count / TILE));
 		const n4 = Math.max(16, count * 4);
@@ -178,21 +332,44 @@ export class GpuSplatSorter {
 				usage: usage | COPY_DST,
 			});
 		this.params = mk("params", 32, UNIFORM);
-		const own = {
-			params: this.params,
-			depth: mk("depth", n4),
-			mm: mk("mm", 8),
-			keys: mk("keys", n4),
-			rank: mk("rank", n4),
-			tmp: mk("tmp", n4),
-		};
-		this.owned = Object.values(own);
-		this.buffers = { ...own, data, order };
-		this.graphKey = `${count}:${data.byteLength}:${order.byteLength}`;
-		// the identity payload GPUSort permutes
-		const ident = new Uint32Array(n4 / 4);
-		for (let i = 0; i < ident.length; i++) ident[i] = i;
-		own.tmp.write(ident);
+		if (counter) {
+			const own = {
+				params: this.params,
+				depth: mk("depth", n4),
+				mm: mk("mm", 8),
+				keys: mk("keys", n4),
+				hist: mk("hist", LIVE_BINS * 4),
+				dispatchArgs: mk("dispatch-args", LIVE_ARGS_BYTES, STORAGE | INDIRECT),
+				drawArgs: mk(
+					"draw-args",
+					LIVE_ARGS_BYTES,
+					STORAGE | INDIRECT | COPY_SRC,
+				),
+			};
+			this.owned = Object.values(own);
+			this.drawArgs = own.drawArgs;
+			this.buffers = { ...own, data, order, counter };
+			this.graphKey = `${count}:${data.byteLength}:${order.byteLength}:live`;
+			// nothing to draw until the first sort writes the record
+			own.drawArgs.write(new Uint32Array(4));
+		} else {
+			const own = {
+				params: this.params,
+				depth: mk("depth", n4),
+				mm: mk("mm", 8),
+				keys: mk("keys", n4),
+				rank: mk("rank", n4),
+				tmp: mk("tmp", n4),
+			};
+			this.owned = Object.values(own);
+			this.drawArgs = null;
+			this.buffers = { ...own, data, order };
+			this.graphKey = `${count}:${data.byteLength}:${order.byteLength}`;
+			// the identity payload GPUSort permutes
+			const ident = new Uint32Array(n4 / 4);
+			for (let i = 0; i < ident.length; i++) ident[i] = i;
+			own.tmp.write(ident);
+		}
 		// async compile (createComputePipelineAsync; rejects on a failed pipeline); sort() is refused
 		// until it lands. The graph lookup runs inside the promise, so a throwing build (a lost device,
 		// an import the graph rejects) rejects `ready` too: the layer then fails over to the worker and
@@ -209,8 +386,16 @@ export class GpuSplatSorter {
 		return cachedGraph<void, void>(
 			this.device,
 			GROUP,
-			`${this.graphKey}:gpusort`,
-			(g) => buildSortGraph(g, this.buffers, this.count, this.blocks),
+			`${this.graphKey}:${this.drawArgs ? "live" : "gpusort"}`,
+			(g) =>
+				this.drawArgs
+					? buildLiveSortGraph(g, this.buffers as LiveSortBuffers, this.blocks)
+					: buildSortGraph(
+							g,
+							this.buffers as SortBuffers,
+							this.count,
+							this.blocks,
+						),
 			MAX_GRAPHS,
 		).graph;
 	}
@@ -235,7 +420,11 @@ export class GpuSplatSorter {
 		if (!this.compiled) throw new Error("[splat-sort] sort() before ready");
 		const t0 = performance.now();
 		const { device, blocks, count } = this;
-		this.params.write(packSplatSortParams(row, count, blocks));
+		this.params.write(
+			this.drawArgs
+				? packLiveSplatSortParams(row, count)
+				: packSplatSortParams(row, count, blocks),
+		);
 		// encoded and submitted synchronously, so a cache eviction (a destroy queued under the graph's
 		// lease) can never land in between; a graph rebuilt after one compiles here from the
 		// per-device pipeline cache the first compileAsync filled (throws while another sorter's

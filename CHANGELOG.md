@@ -4,6 +4,8 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- Live Step Inside draws only the live splats: the WebGPU splat layer sorts the live prefix on the GPU (counting sort, indirect dispatch from the compaction counter) and issues `drawIndirect` with the kept count (`gpu/splat-sort` live mode); still-photo clouds are unchanged.
+
 - **Live camera mode `/live` (2026-10-02, browser-unverified).**
   - `/live` points the phone camera (or a recorded clip via `?liveSource=<url>`, with an optional `.sensors.json` sidecar) at the mountains and draws the peak and terrain overlay on the feed.
   - Pieces:

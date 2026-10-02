@@ -508,6 +508,8 @@ type Gpu = {
 	/** spare index array for the next sort (transferred to the worker and back) */
 	spare?: Uint32Array;
 	drawCount: number;
+	/** live source: a sort has filled the sorter's drawArgs, so the colour pass draws indirectly */
+	indirectDraw?: boolean;
 	lastRow?: DepthRow;
 	lastEye?: number[];
 	dirty: boolean;
@@ -756,7 +758,13 @@ export class SplatsCore implements GpuLayerCore {
 		this.stats.sortBackend = wantGpu ? "gpu" : "worker";
 		if (!wantGpu) return;
 		try {
-			const gs = new GpuSplatSorter(d, source.buffer, order, n);
+			const gs = new GpuSplatSorter(
+				d,
+				source.buffer,
+				order,
+				n,
+				source.countBuffer,
+			);
 			g.gpuSort = gs;
 			g.state.watch(gs.ready, "pipeline");
 			gs.ready.then(
@@ -827,6 +835,18 @@ export class SplatsCore implements GpuLayerCore {
 			// no CPU positions to sort: keep the identity order (or the last valid GPU order)
 			g.gpuSort?.destroy();
 			g.gpuSort = undefined;
+			if (g.indirectDraw) {
+				// the live sort wrote only the kept splats to the front of the order: back to identity
+				// (the draw is direct again, `capacity` instances)
+				g.indirectDraw = false;
+				const id = new Uint32Array(n);
+				for (let i = 0; i < n; i++) id[i] = i;
+				try {
+					g.order.write(id);
+				} catch {
+					// lost device: nothing is drawn anyway
+				}
+			}
 			this.stats.sortBackend = "worker";
 			this.onChange?.();
 			return;
@@ -934,6 +954,9 @@ export class SplatsCore implements GpuLayerCore {
 			this.stats.sorts++;
 			this.stats.lastSortMs = gpuSort.stats.lastEncodeMs;
 			g.drawCount = g.cloud.count;
+			// live: the sort wrote the kept count into the indirect draw record, so draw() issues
+			// exactly those instances (a CPU count is never needed)
+			if (gpuSort.drawArgs) g.indirectDraw = true;
 			this.stats.sortVersion++;
 			return;
 		}
@@ -981,13 +1004,17 @@ export class SplatsCore implements GpuLayerCore {
 			count = g.drawCount;
 			this.stats.drawn = count;
 		}
-		if (!count) return;
+		// live source with a completed GPU sort: instanceCount = kept live splats, from the GPU
+		const args =
+			ctx.kind === "color" && g.indirectDraw ? g.gpuSort?.drawArgs : null;
+		if (!args && !count) return;
 		model.shaderInputs.setProps({
 			camera: ctx.camera,
 			splat: splatUniforms(this.options),
 		} as never);
 		model.setBindings({ splatData: g.data, splatOrder: order } as never);
-		model.setInstanceCount(count);
+		model.setIndirectBuffer(args ?? null);
+		if (!args) model.setInstanceCount(count);
 		model.draw(ctx.renderPass);
 	}
 

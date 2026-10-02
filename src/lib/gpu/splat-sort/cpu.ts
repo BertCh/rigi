@@ -84,3 +84,38 @@ export function gpuSplatOrderCpu(
 	const { keys, kept } = splatKeysF32(positions, count, row);
 	return { order: stableOrderByKey(keys, count), keys, kept };
 }
+
+/**
+ * The live counting sort (./live.wgsl.ts) on the CPU, with the scan twinned exactly: the keys of the
+ * first `count` splats (DROPPED_KEY or 0xffffffff = dropped, no slot), an exclusive scan of the
+ * histogram, and a scatter that claims slots per key. `slotOrder` is the claim order within a key
+ * (ascending index = the stable order; the GPU's atomics make it arbitrary). Returns the order of the
+ * `kept` splats and the scan table. Used by the spec to pin the contract: a permutation of the kept
+ * indices, ascending key, an empty tail.
+ */
+export function liveOrderByKey(
+	keys: Uint32Array,
+	count: number,
+	slotOrder: readonly number[] | null = null,
+): { order: Uint32Array; kept: number; starts: Uint32Array } {
+	const bins = 65536;
+	const hist = new Uint32Array(bins);
+	let kept = 0;
+	for (let i = 0; i < count; i++)
+		if (keys[i] < bins) {
+			hist[keys[i]]++;
+			kept++;
+		}
+	const starts = new Uint32Array(bins);
+	let run = 0;
+	for (let k = 0; k < bins; k++) {
+		starts[k] = run;
+		run += hist[k];
+	}
+	const next = starts.slice();
+	const order = new Uint32Array(kept);
+	const sequence = slotOrder ?? Array.from({ length: count }, (_, i) => i);
+	for (const i of sequence)
+		if (i < count && keys[i] < bins) order[next[keys[i]]++] = i;
+	return { order, kept, starts };
+}
