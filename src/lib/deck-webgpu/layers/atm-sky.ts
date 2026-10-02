@@ -38,9 +38,11 @@
 //   terrain.setShaderParts(shading, [...plugins, atmosphereFogPart(() => look(mode).atm)]);
 // atm.eye is ignored: both the sky and the fog use the pass camera's eye (ctx.camera.eye), as the
 // WebGL layers used viewport.cameraPosition.
+
 import type { RenderPipelineParameters } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import { srgbToLinear } from "#/lib/color/srgb";
 import { ATM_CURV, type AtmValues } from "#/lib/look/atmosphere";
 import { NEBELMEER_WGSL } from "#/lib/look/nebelmeer";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
@@ -346,10 +348,7 @@ export type AtmSkyProps = {
  * is a CSS rgb() string); anything unparseable falls back to WORLD_SKY instead of a NaN sky.
  */
 export function hexToLinear(hex: string): Vec3 {
-	const dec = (v: number) => {
-		const c = Math.min(255, Math.max(0, v)) / 255;
-		return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-	};
+	const dec = (v: number) => srgbToLinear(Math.min(255, Math.max(0, v)) / 255);
 	const rgb = /^\s*rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(hex);
 	if (rgb) return [dec(+rgb[1]), dec(+rgb[2]), dec(+rgb[3])];
 	const h = hex.trim().replace("#", "");

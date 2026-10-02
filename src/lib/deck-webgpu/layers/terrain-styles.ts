@@ -243,7 +243,6 @@ const wgslVec3 = (c: Rgb) => `vec3<f32>(${c.map(shaderFloat).join(", ")})`;
 
 /** Shared helpers every style program gets. */
 const COMMON_WGSL = /* wgsl */ `\
-fn ts_srgb(c: vec3<f32>) -> vec3<f32> { return pow(c, vec3<f32>(2.2)); }
 fn ts_elev_t(h: f32) -> f32 {
   return clamp((h - terrain.elevRange.x) / max(terrain.elevRange.y - terrain.elevRange.x, 1.0), 0.0, 1.0);
 }
@@ -293,7 +292,7 @@ fn ts_fbm(p: vec2<f32>) -> f32 {
 // valley greens ~400 m, forest belt, alpine meadow above the treeline (1900 m), rock from the
 // rockline (2450 m); stops sRGB, mixed in linear
 fn ts_alpine_base(h: f32) -> vec3<f32> {
-${alpineBaseBody("wgsl", "ts_srgb")}
+${alpineBaseBody("wgsl", "to_linear")}
 }
 fn ts_alpine_albedo(elev: f32, n: vec3<f32>, xy: vec2<f32>, grad: f32) -> vec3<f32> {
   let slopeDeg = degrees(acos(clamp(n.z, -1.0, 1.0)));
@@ -305,15 +304,15 @@ fn ts_alpine_albedo(elev: f32, n: vec3<f32>, xy: vec2<f32>, grad: f32) -> vec3<f
   // rock on steep slopes; below the treeline steep ground is mostly forest
   let rockStart = mix(50.0, 30.0, smoothstep(1400.0, 2650.0, h));
   let rock = smoothstep(rockStart - 4.0, rockStart + 14.0, slopeDeg + fine * 5.0);
-  col = mix(col, ts_srgb(mix(${wgslVec3(ALPINE_TINT.rockLow)}, vec3<f32>(${shaderFloat(ALPINE_TINT.rockHigh)}), smoothstep(1500.0, 3000.0, h))), rock);
+  col = mix(col, to_linear(mix(${wgslVec3(ALPINE_TINT.rockLow)}, vec3<f32>(${shaderFloat(ALPINE_TINT.rockHigh)}), smoothstep(1500.0, 3000.0, h))), rock);
   // snow above the snowline (2900 m), only where it can lie
   let sl = 2900.0 + nz * 220.0;
   let snowH = smoothstep(sl - 120.0, sl + 180.0, elev);
   let snowS = 1.0 - smoothstep(32.0, 48.0, slopeDeg + fine * 10.0 - smoothstep(sl, sl + 900.0, elev) * 8.0);
-  col = mix(col, ts_srgb(${wgslVec3(ALPINE_TINT.snow)}), snowH * snowS);
+  col = mix(col, to_linear(${wgslVec3(ALPINE_TINT.snow)}), snowH * snowS);
   // lakes: a DEM lake is one constant elevation, so its gradient is exactly 0 (below 2600 m)
   let water = (1.0 - smoothstep(0.0004, 0.0015, grad)) * (1.0 - smoothstep(2500.0, 2600.0, elev));
-  return mix(col, ts_srgb(${wgslVec3(ALPINE_TINT.lake)}), water * 0.9);
+  return mix(col, to_linear(${wgslVec3(ALPINE_TINT.lake)}), water * 0.9);
 }
 `;
 
@@ -331,7 +330,7 @@ fn ts_tanaka_contour(elev: f32, dElev: f32, interval: f32, n: vec3<f32>, lightDi
   var a = 1.0 - smoothstep(widthPx * 0.5, widthPx * 0.5 + 1.0, d);
   // lines denser than ~3 px apart turn into mush; nothing on flat valley floors
   a *= (1.0 - smoothstep(0.06, 0.14, fw)) * smoothstep(0.02, 0.08, sl);
-  let col = select(ts_srgb(vec3<f32>(0.12, 0.13, 0.2)), vec3<f32>(1.0, 0.98, 0.94), lit >= 0.0);
+  let col = select(to_linear(vec3<f32>(0.12, 0.13, 0.2)), vec3<f32>(1.0, 0.98, 0.94), lit >= 0.0);
   return vec4<f32>(col, a * mix(0.55, 1.0, abs(lit)));
 }
 fn ts_tanaka_lines(elev: f32, dElev: f32, interval: f32, majorEvery: f32, n: vec3<f32>, lightDir: vec3<f32>,

@@ -3,10 +3,11 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Small GLSL helpers, one copy each. Every chunk is a complete function definition, so a shader
-// splices in only what it uses. TURBO_GLSL and TO_LINEAR_GLSL are byte-identical to the classic
-// shaders' copies (engine.ts compositeFrag, deck composite-shader.ts, materials.ts, terrain-layer.ts).
-// The classic shaders keep their own srgbEncode variants (clamped / pow 0.41666), which differ in the
-// last bits from the exact OETF below; the look passes (LOOK_OUTPUT) use this one.
+// splices in only what it uses. TURBO_GLSL and SRGB_DECODE_GLSL are byte-identical to the classic
+// shaders' copies (deck composite-shader.ts, terrain-layer.ts, nearfield/deck-splat-shaders.ts).
+// The classic shaders (SRGB_ENCODE_CLASSIC_GLSL, pow 0.41666) differ in the last bits from the exact
+// OETF SRGB_ENCODE_GLSL; the look passes (LOOK_OUTPUT) use the exact one. A shader includes one
+// srgbEncode or the other, never both.
 
 /** Google's polynomial Turbo colormap approximation. */
 export const TURBO_GLSL = /* glsl */ `vec3 turbo(float x) {
@@ -22,8 +23,16 @@ export const TURBO_GLSL = /* glsl */ `vec3 turbo(float x) {
   return vec3(dot(v4, kr) + dot(v2, kr2), dot(v4, kg) + dot(v2, kg2), dot(v4, kb) + dot(v2, kb2));
 }`;
 
-/** The classic ramp decode: stops are mixed in sRGB, then pow 2.2. */
-export const TO_LINEAR_GLSL = /* glsl */ `vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }`;
+/** sRGB EOTF (encoded -> linear), multiply form of the 1/12.92 and 1/1.055 constants. */
+export const SRGB_DECODE_GLSL = /* glsl */ `vec3 srgbDecode(vec3 c) {
+  return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045))));
+}`;
+
+/** Classic sRGB encode (pow 0.41666 approximation of 1/2.4), negatives clamped to 0. */
+export const SRGB_ENCODE_CLASSIC_GLSL = /* glsl */ `vec3 srgbEncode(vec3 c) {
+  c = max(c, vec3(0.0));
+  return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
+}`;
 
 /** Exact sRGB OETF. */
 export const SRGB_ENCODE_GLSL = /* glsl */ `vec3 srgbEncode(vec3 c) {

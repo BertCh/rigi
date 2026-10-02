@@ -13,21 +13,49 @@ import type { DeckTerrainStyle } from "#/lib/style/deck-apply";
  * (rgba8unorm-srgb does it in hardware; srgb_decode for data that arrives encoded), shading and
  * haze happen in linear, the colour target stays linear, the compositor / present pass encodes.
  */
-export const colorWGSL = /* wgsl */ `\
+/** sRGB EOTF (encoded -> linear), multiply form of the 1/12.92 and 1/1.055 constants. */
+export const srgbDecodeWGSL = /* wgsl */ `\
 fn srgb_decode(c: vec3<f32>) -> vec3<f32> {
   let lo = c * 0.0773993808;
   let hi = pow(c * 0.9478672986 + vec3<f32>(0.0521327014), vec3<f32>(2.4));
   return select(hi, lo, c <= vec3<f32>(0.04045));
 }
+`;
+
+/** Classic sRGB encode (pow 0.41666 approximation of 1/2.4), negatives clamped to 0. */
+export const srgbEncodeWGSL = /* wgsl */ `\
 fn srgb_encode(c0: vec3<f32>) -> vec3<f32> {
   let c = max(c0, vec3<f32>(0.0));
   let lo = c * 12.92;
   let hi = pow(c, vec3<f32>(0.41666)) * 1.055 - vec3<f32>(0.055);
   return select(hi, lo, c <= vec3<f32>(0.0031308));
 }
-// materials.ts toLinear (ramps are mixed in sRGB then pow 2.2'd, the classic order)
+`;
+
+export const colorWGSL = /* wgsl */ `\
+${srgbDecodeWGSL}${srgbEncodeWGSL}// Exact sRGB OETF (the look passes' output encode); srgb_encode above is the classic pow 0.41666 one
+fn srgb_encode_exact(c0: vec3<f32>) -> vec3<f32> {
+  let c = max(c0, vec3<f32>(0.0));
+  return mix(c * 12.92, 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - 0.055, step(vec3<f32>(0.0031308), c));
+}
+// The classic ramp decode, materials.ts toLinear: ramp stops are mixed in sRGB and THEN pow 2.2'd
+// (not the sRGB EOTF, srgb_decode). Intended; do not "fix" to the exact curve.
 fn to_linear(c: vec3<f32>) -> vec3<f32> { return pow(max(c, vec3<f32>(0.0)), vec3<f32>(2.2)); }
 fn luminance(c: vec3<f32>) -> f32 { return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722)); }
+`;
+
+/** Noise for dithering / grain: interleaved gradient noise (Jimenez 2014), Hoskins' sine-free hash, and unit-variance gauss. */
+export const noiseWGSL = /* wgsl */ `\
+fn ign(p: vec2<f32>) -> f32 { return fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715)))); }
+fn hash12(p: vec2<f32>) -> f32 {
+  var p3 = fract(vec3<f32>(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+fn gauss(p: vec2<f32>) -> f32 {
+  let s = hash12(p) + hash12(p + 17.31) + hash12(p + 41.7) + hash12(p + 73.1);
+  return (s - 2.0) * 1.7320508;
+}
 `;
 
 /** ENU helpers. Positions are camera-anchored ENU metres with curvature + refraction already baked

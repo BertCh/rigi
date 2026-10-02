@@ -6,8 +6,10 @@
 // disclosure, and the nested "Label style" / "Trail style" disclosures. Edits go to the style store
 // (src/lib/style/store.ts) as diff-only overrides on the chosen preset; the engine picks them up
 // through PhotoWorkspace's useViewStyle → engine.setStyle.
+
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { linearToSrgb } from "#/lib/color/srgb";
 import { GLOW_DEFAULT } from "#/lib/look/labels/glow";
 import { storageKey } from "#/lib/ontology/core/storage";
 import type { Settings } from "#/lib/settings";
@@ -122,8 +124,7 @@ const hex = (c: Hex) => toHexString(c, false);
  */
 function rawHex(c: Hex) {
 	if (typeof c === "string") return hex(c);
-	const enc = (x: number) =>
-		x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055;
+	const enc = linearToSrgb;
 	const [r, g, b] = hexToRgb01(c);
 	return toHexString([enc(r), enc(g), enc(b)], false);
 }

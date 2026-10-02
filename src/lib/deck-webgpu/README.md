@@ -132,7 +132,7 @@ where nothing else did.
 
 ## Shared WGSL (`wgsl.ts`)
 
-- `colorWGSL`: `srgb_decode`, `srgb_encode`, `to_linear`, `luminance`.
+- `colorWGSL`: `srgb_decode`, `srgb_encode` (classic pow 0.41666), `srgb_encode_exact`, `to_linear` (pow 2.2), `luminance`; `noiseWGSL`: `ign`, `hash12`, `gauss`.
 - `enuWGSL`: helpers for bearing and elevation angle.
 - `rampWGSL`: `ramp_eval`, the style ramps in `rampU` layout.
 - `fullscreenWGSL`: `fullscreenVertex` → `FullscreenOut {uv (v down), ndc}`.

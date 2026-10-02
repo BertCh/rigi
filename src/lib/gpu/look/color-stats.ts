@@ -11,7 +11,9 @@
 // Subgroups (default on where the device has them, `subgroups: false` opts out): the per-workgroup reduction by
 // subgroupAdd (BAND_STATS_SG), equal to the shared-memory tree up to float-sum reassociation, with a
 // layout check whose failure re-runs the plain kernel.
+
 import type { Device } from "@luma.gl/core";
+import { srgbToLinear } from "#/lib/color/srgb";
 import {
 	type ColorStats,
 	identityStats,
@@ -97,8 +99,7 @@ export type BandStatsInput = {
 };
 
 export const SRGB_LUT = Float32Array.from({ length: 256 }, (_, i) => {
-	const c = i / 255;
-	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+	return srgbToLinear(i / 255);
 });
 
 export const GROUPS = 32;

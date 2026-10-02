@@ -17,7 +17,11 @@
 // One set of constants feeds the TS reference (checks), the GLSL (deck/trail-layer.ts) and the WGSL
 // (deck-webgpu/layers/trail.ts) text.
 import { smoothstep } from "../math";
-import { sketchNoise } from "./sketch-ridges";
+import {
+	SKETCH_NOISE_GLSL,
+	SKETCH_NOISE_WGSL,
+	sketchNoise,
+} from "./sketch-ridges";
 
 export type TrailStrokeKind = "solid" | "pencil" | "glow";
 
@@ -101,26 +105,19 @@ const F = (n: number) => n.toFixed(4);
  * derivatives of `side` / `along` must be taken by the caller in uniform control flow (aa, grainFade).
  */
 export const TRAIL_STROKE_GLSL = /* glsl */ `\
-float strokeNoise(float coordinate) {
-  float cell = floor(coordinate);
-  float fraction = fract(coordinate);
-  float first = fract(sin(cell * 127.1) * 43758.5453);
-  float second = fract(sin((cell + 1.0) * 127.1) * 43758.5453);
-  return mix(first, second, fraction * fraction * (3.0 - 2.0 * fraction));
-}
-// luma sketchStroke_getCoverage (visgl/luma.gl #3318) for pencil, a Gaussian halo for glow; see look/trail-stroke.ts
+${SKETCH_NOISE_GLSL}// luma sketchStroke_getCoverage (visgl/luma.gl #3318) for pencil, a Gaussian halo for glow; see look/trail-stroke.ts
 float trailStroke(float mode, float side, float along, float width, float aa, float grainFade, out float core) {
   core = 0.0;
   if (mode < 0.5) return 1.0;
   if (mode < 1.5) {
     float t = along / ${F(PENCIL_ALONG_M)};
-    float center = (strokeNoise(t * 17.0) * 2.0 - 1.0) * ${F(PENCIL_JITTER)} * width;
-    float variation = mix(1.0, 0.55 + strokeNoise(t * 31.0 + 7.0) * 0.75, ${F(PENCIL_VARIATION)});
+    float center = (sketchNoise(t * 17.0) * 2.0 - 1.0) * ${F(PENCIL_JITTER)} * width;
+    float variation = mix(1.0, 0.55 + sketchNoise(t * 31.0 + 7.0) * 0.75, ${F(PENCIL_VARIATION)});
     float radius = width * 0.5 * variation;
     float distance = abs(side - center) - radius;
     float a = max(aa, ${F(PENCIL_MIN_AA)});
     float cover = 1.0 - smoothstep(-a * 0.5, a * 0.5, distance);
-    float paper = strokeNoise(t * 237.0 + floor(side * 3.0) * 13.0);
+    float paper = sketchNoise(t * 237.0 + floor(side * 3.0) * 13.0);
     return cover * (1.0 - ${F(PENCIL_GRAIN)} * grainFade * paper);
   }
   float hw_ = width * 0.5;
@@ -134,25 +131,18 @@ float trailStroke(float mode, float side, float along, float width, float aa, fl
 
 /** WGSL twin: `trail_stroke(mode, side, along, width, aa, grainFade) -> vec2` (coverage, core). */
 export const TRAIL_STROKE_WGSL = /* wgsl */ `\
-fn stroke_noise(coordinate: f32) -> f32 {
-  let cell = floor(coordinate);
-  let fraction = fract(coordinate);
-  let first = fract(sin(cell * 127.1) * 43758.5453);
-  let second = fract(sin((cell + 1.0) * 127.1) * 43758.5453);
-  return mix(first, second, fraction * fraction * (3.0 - 2.0 * fraction));
-}
-// luma sketchStroke_getCoverage (visgl/luma.gl #3318) for pencil, a Gaussian halo for glow; see look/trail-stroke.ts
+${SKETCH_NOISE_WGSL}// luma sketchStroke_getCoverage (visgl/luma.gl #3318) for pencil, a Gaussian halo for glow; see look/trail-stroke.ts
 fn trail_stroke(mode: f32, side: f32, along: f32, width: f32, aa: f32, grainFade: f32) -> vec2<f32> {
   if (mode < 0.5) { return vec2<f32>(1.0, 0.0); }
   if (mode < 1.5) {
     let t = along / ${F(PENCIL_ALONG_M)};
-    let center = (stroke_noise(t * 17.0) * 2.0 - 1.0) * ${F(PENCIL_JITTER)} * width;
-    let variation = mix(1.0, 0.55 + stroke_noise(t * 31.0 + 7.0) * 0.75, ${F(PENCIL_VARIATION)});
+    let center = (sketch_noise(t * 17.0) * 2.0 - 1.0) * ${F(PENCIL_JITTER)} * width;
+    let variation = mix(1.0, 0.55 + sketch_noise(t * 31.0 + 7.0) * 0.75, ${F(PENCIL_VARIATION)});
     let radius = width * 0.5 * variation;
     let distance = abs(side - center) - radius;
     let a = max(aa, ${F(PENCIL_MIN_AA)});
     let cover = 1.0 - smoothstep(-a * 0.5, a * 0.5, distance);
-    let paper = stroke_noise(t * 237.0 + floor(side * 3.0) * 13.0);
+    let paper = sketch_noise(t * 237.0 + floor(side * 3.0) * 13.0);
     return vec2<f32>(cover * (1.0 - ${F(PENCIL_GRAIN)} * grainFade * paper), 0.0);
   }
   let hw = width * 0.5;

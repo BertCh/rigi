@@ -49,15 +49,16 @@
 // Parity (textures-bench.ts, scripts/gpu/textures-bench.mjs): the gathered inputs are bit-identical
 // to the arrays capture.ts / composite.ts / haze.ts build on the CPU, so every downstream kernel
 // output is bit-identical to the array path's.
+
 import {
 	Buffer,
 	type CommandEncoder,
 	type Device,
 	Texture,
 } from "@luma.gl/core";
+import { srgbToLinear } from "#/lib/color/srgb";
 import { type ColorStats, N_BANDS } from "#/lib/look/color-stats";
 import { gridSize, MASK_LONG_SIDE } from "#/lib/look/composite";
-import { srgbToLinear } from "#/lib/style/color";
 import {
 	type CachedGraph,
 	ComputeGraph,
@@ -990,8 +991,7 @@ export type StatsTexResult = {
 };
 
 const SRGB_LUT_STATS = Float32Array.from({ length: 256 }, (_, i) => {
-	const c = i / 255;
-	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+	return srgbToLinear(i / 255);
 });
 // color-stats.ts GROUPS (statsParamWords dispatches GROUPS × WG invocations)
 const SGROUPS = 32;

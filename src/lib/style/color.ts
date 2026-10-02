@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Colour helpers for style values (no renderer imports).
+import { srgbToLinear } from "#/lib/color/srgb";
 import type { Hex } from "./types";
 
 const HEX_RE = /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
@@ -48,9 +49,7 @@ export function toCss(c: Hex): string {
 		: `rgba(${q(r)},${q(g)},${q(b)},${+a.toFixed(4)})`;
 }
 
-export function srgbToLinear(x: number) {
-	return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-}
+export { srgbToLinear };
 
 /**
  * The hex as linear-sRGB (the haze colour's first linearisation).

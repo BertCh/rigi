@@ -38,6 +38,7 @@ import {
 	type PassKind,
 	passModelProps,
 } from "../pass";
+import { srgbDecodeWGSL } from "../wgsl";
 import { PIN_STRIDE_BYTES, packPins } from "./pins-pack";
 
 export { PIN_STRIDE_BYTES, packPins, packRGBA8 } from "./pins-pack";
@@ -78,10 +79,7 @@ struct PinOut {
   @location(3) @interpolate(flat) line: vec4<f32>,
 };
 
-fn pin_srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
-  return select(pow((c + 0.055) / 1.055, vec3<f32>(2.4)), c / 12.92, c <= vec3<f32>(0.04045));
-}
-
+${srgbDecodeWGSL}
 // a position the rasteriser clips away (depth > 1)
 const PIN_CULLED: vec4<f32> = vec4<f32>(0.0, 0.0, 2.0, 1.0);
 
@@ -97,8 +95,8 @@ const PIN_CULLED: vec4<f32> = vec4<f32>(0.0, 0.0, 2.0, 1.0);
   var o: PinOut;
   o.px = q[vi] * ext;
   o.radii = vec2<f32>(outer, outer - lw);
-  o.fill = vec4<f32>(pin_srgb_to_linear(i.fill.rgb), i.fill.a);
-  o.line = vec4<f32>(pin_srgb_to_linear(i.line.rgb), i.line.a);
+  o.fill = vec4<f32>(srgb_decode(i.fill.rgb), i.fill.a);
+  o.line = vec4<f32>(srgb_decode(i.line.rgb), i.line.a);
   // billboard: keep z and w, move xy by the pixel offset (clip = ndc · w)
   let moved = vec4<f32>(c.xy + o.px * 2.0 / camera.viewport * c.w, c.z, c.w);
   o.position = select(moved, PIN_CULLED, c.w < camera.near);

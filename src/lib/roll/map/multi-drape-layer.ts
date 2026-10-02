@@ -69,6 +69,7 @@ import { MIN_SIN_INC } from "#/lib/deck/drape-vote";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import { LOG_DEPTH_FAR } from "#/lib/deck/terrain-layer";
 import { ATM_CURV } from "#/lib/look/atmosphere";
+import { SRGB_DECODE_GLSL } from "#/lib/look/glsl/common";
 import { COARSE, type DrapeAtlas } from "./drape-atlas";
 
 /** Photos blended per fragment (the best by weight; see the header). */
@@ -230,9 +231,7 @@ vec3 photoTexel(int a, vec2 uv, vec2 gx, vec2 gy) {
   return textureGrad(photo3, uv, gx, gy).rgb;
 }
 
-vec3 srgbToLin(vec3 c) {
-  return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
-}
+${SRGB_DECODE_GLSL}
 vec3 linToSrgb(vec3 c) {
   c = clamp(c, 0.0, 1.0);
   return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
@@ -266,7 +265,7 @@ vec3 clearAndExpose(vec3 s, vec3 p, vec3 eye, int k) {
   bool fixT = a.w > 0.0;
   bool fixG = any(notEqual(g, vec3(1.0)));
   if (!fixT && !fixG) return s;
-  vec3 pc = srgbToLin(s);
+  vec3 pc = srgbDecode(s);
   if (fixT) {
     float floorT = texelFetch(photoParams, ivec2(2, k), 0).z;
     vec3 T = dcTransmittance(k, p, eye);

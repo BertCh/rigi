@@ -5,15 +5,11 @@
 // sRGB8 <-> OKLab (Bjorn Ottosson's matrices), CPU, f64. The WGSL unpack kernel in palette.ts
 // repeats the same maths in f32.
 
+import { linearToSrgb, srgbToLinear } from "#/lib/color/srgb";
+
 export type Oklab = [number, number, number];
 
-/** sRGB electro-optical transfer: encoded 0..1 -> linear light. */
-export const srgbToLinear = (encoded: number): number =>
-	encoded <= 0.04045 ? encoded / 12.92 : ((encoded + 0.055) / 1.055) ** 2.4;
-
-/** Inverse of srgbToLinear. */
-export const linearToSrgb = (linear: number): number =>
-	linear <= 0.0031308 ? linear * 12.92 : 1.055 * linear ** (1 / 2.4) - 0.055;
+export { linearToSrgb, srgbToLinear };
 
 const cubeRoot = (value: number) => (value > 0 ? Math.cbrt(value) : 0);
 

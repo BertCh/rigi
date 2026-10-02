@@ -24,6 +24,7 @@ import {
 	screenModelProps,
 	targetKey,
 } from "../pass";
+import { srgbEncodeWGSL } from "../wgsl";
 
 export const GLOW_ORDER = 50;
 
@@ -61,14 +62,10 @@ struct GlowOut {
   return o;
 }
 
-fn glowSrgbEncode(c: vec3<f32>) -> vec3<f32> {
-  let v = max(c, vec3<f32>(0.0));
-  return select(pow(v, vec3<f32>(0.41666)) * 1.055 - vec3<f32>(0.055), v * 12.92, v <= vec3<f32>(0.0031308));
-}
-
+${srgbEncodeWGSL}
 @fragment fn fragmentMain(v: GlowOut) -> @location(0) vec4<f32> {
   let radiance = pointGlow_getColor(v.coord, glowSprite.tint.rgb) * glowSprite.params.y;
-  return vec4<f32>(glowSrgbEncode(radiance), 0.0);
+  return vec4<f32>(srgb_encode(radiance), 0.0);
 }
 `;
 

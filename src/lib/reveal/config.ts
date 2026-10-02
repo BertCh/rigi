@@ -10,6 +10,7 @@
 // the front shows its overlay, a band of light rides the front, and ridgelines run slightly ahead.
 
 import { useCallback, useSyncExternalStore } from "react";
+import { srgbToLinear } from "#/lib/color/srgb";
 import { getFlag } from "#/lib/flags";
 import { storageKey } from "#/lib/ontology/core/storage";
 
@@ -268,10 +269,9 @@ export function frontAt(t: number, soft: number, grain: number) {
 
 export function hexToLinear(hex: string): [number, number, number] {
 	const n = Number.parseInt(hex.slice(1, 7), 16);
-	const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
-		const s = v / 255;
-		return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-	});
+	const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) =>
+		srgbToLinear(v / 255),
+	);
 	return c as [number, number, number];
 }
 

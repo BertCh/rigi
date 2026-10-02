@@ -17,6 +17,7 @@ import {
 import type { Buffer } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { pointGlow, type ShaderModule } from "@luma.gl/shadertools";
+import { SRGB_ENCODE_CLASSIC_GLSL } from "../look/glsl/common";
 import {
 	GLOW_STRIDE,
 	type GlowMarkers,
@@ -57,10 +58,7 @@ const fs = /* glsl */ `#version 300 es
 precision highp float;
 in vec2 vCoord;
 out vec4 fragColor;
-vec3 srgbEncode(vec3 c) {
-  c = max(c, vec3(0.0));
-  return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
-}
+${SRGB_ENCODE_CLASSIC_GLSL}
 void main() {
   vec3 radiance = pointGlow_getColor(vCoord, glowSprite.tint.rgb) * glowSprite.intensity;
   // additive into the sRGB-encoded canvas; alpha untouched (blend: src alpha 0, dst alpha 1)

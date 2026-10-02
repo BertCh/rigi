@@ -18,6 +18,9 @@
 // reads it back at pose settle; bandInputs() pairs it with the photo and the range buffer (photo
 // Oklab + log-range, layer Oklab + validity) and reduceBands() reduces them into 4 log-range bands.
 // Sky, people, layer holes and a skyline margin are masked out.
+
+import { srgbToLinear } from "#/lib/color/srgb";
+
 export const BAND_EDGES_M = [1000, 5000, 20000] as const;
 /** Band centres in log10(m): near 0.5 km, mid √5 km, far 10 km, very far 40 km. */
 export const BAND_CENTERS_LOG10 = [
@@ -84,8 +87,7 @@ function toOklab(
 }
 
 const SRGB_LUT = Float32Array.from({ length: 256 }, (_, i) => {
-	const c = i / 255;
-	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+	return srgbToLinear(i / 255);
 });
 
 /**

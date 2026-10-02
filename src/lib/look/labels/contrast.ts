@@ -6,6 +6,7 @@
 // its text box (a small luminance map of the photo, or the export canvas itself) and gets an extra
 // soft glow in the halo colour when the text would otherwise wash out — white names on bright cloud
 // or snow. Over dark rock or deep sky the need is 0 and the label is drawn exactly as before.
+import { srgbToLinear } from "#/lib/color/srgb";
 import { hexToRgba01, toCss } from "../../style/color";
 import type { Hex, LabelStyle } from "../../style/types";
 
@@ -15,8 +16,7 @@ export type LumaMap = { w: number; h: number; data: Float32Array };
 /** A box in px of a `width` × `height` frame. */
 export type Box = { x0: number; y0: number; x1: number; y1: number };
 
-const lin = (c: number) =>
-	c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+const lin = srgbToLinear;
 /** sRGB byte → linear, precomputed */
 const LIN = Float32Array.from({ length: 256 }, (_, i) => lin(i / 255));
 

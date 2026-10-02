@@ -10,7 +10,11 @@
 //   brushTex  brush mask canvas (top → bottom, uvT); fgTex people mask (top → bottom, uvT)
 import type { Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
-import { TURBO_GLSL } from "../look/glsl/common";
+import {
+	SRGB_DECODE_GLSL,
+	SRGB_ENCODE_CLASSIC_GLSL,
+	TURBO_GLSL,
+} from "../look/glsl/common";
 import { COMP_BLOCK, compositeChunk, HARM_BLOCK } from "../look/glsl/composite";
 import { SKETCH_RIDGES_GLSL } from "../look/sketch-ridges";
 import { REVEAL_GLSL } from "../reveal/glsl";
@@ -201,13 +205,8 @@ uniform sampler2D occlTex;
 in vec2 vUv;
 out vec4 fragColor;
 
-vec3 srgbDecode(vec3 c) {
-  return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045))));
-}
-vec3 srgbEncode(vec3 c) {
-  c = clamp(c, 0.0, 1.0);
-  return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
-}
+${SRGB_DECODE_GLSL}
+${SRGB_ENCODE_CLASSIC_GLSL}
 
 ${TURBO_GLSL}
 ${SKETCH_RIDGES_GLSL}
@@ -350,7 +349,7 @@ void main() {
 #ifdef LOOK_OUTPUT
   fragColor = vec4(lookOutput(col, grainA, gl_FragCoord.xy), 1.0);
 #else
-  fragColor = vec4(srgbEncode(col), 1.0);
+  fragColor = vec4(srgbEncode(clamp(col, 0.0, 1.0)), 1.0);
 #endif
 }
 `;

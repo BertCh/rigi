@@ -21,6 +21,7 @@ import type { Buffer } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import { pathDash, type ShaderModule } from "@luma.gl/shadertools";
 import { distanceM, type EnuFrame } from "../geodesy";
+import { SRGB_ENCODE_CLASSIC_GLSL } from "../look/glsl/common";
 import type { TrailStrokeKind } from "../look/trail-stroke";
 import {
 	strokeKind,
@@ -215,6 +216,7 @@ in float vLogW;
 in float vDist;
 in float vSide;
 out vec4 fragColor;
+${SRGB_ENCODE_CLASSIC_GLSL}
 ${TRAIL_STROKE_GLSL}
 void main() {
   // derivatives before any divergent branch; pathDash.gapLength <= 0 (the default) = solid, coverage 1
@@ -230,8 +232,7 @@ void main() {
   // straight to the canvas (the world view)
   vec3 c = vColor;
   if (trail.srgbOut > 0.5) {
-    c = max(c, vec3(0.0));
-    c = mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
+    c = srgbEncode(c);
   }
   c = mix(c, vec3(1.0), core * ${TRAIL_GLOW_WHITEN});
   fragColor = vec4(c, trail.opacity * dash * cover);

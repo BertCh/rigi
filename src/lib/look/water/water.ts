@@ -72,11 +72,11 @@ fn ts_water_shade(col: vec3<f32>, elev: f32, xy: vec2<f32>, grad: f32, n: vec3<f
                        ts_noise(q2 + vec2<f32>(0.0, e)) - ts_noise(q2 - vec2<f32>(0.0, e)));
   let nw = normalize(vec3<f32>(n.xy - g * amp${waves ? " + ts_water_wave_tilt(xy, terrainWater.time, range)" : ""}, max(n.z, 1e-3)));
   let depth = clamp(0.35 + 0.9 * (ts_fbm(xy / 380.0) - 0.4), 0.0, 1.0);
-  let body = mix(ts_srgb(vec3<f32>(0.30, 0.55, 0.58)), ts_srgb(vec3<f32>(0.07, 0.24, 0.36)), depth);
+  let body = mix(to_linear(vec3<f32>(0.30, 0.55, 0.58)), to_linear(vec3<f32>(0.07, 0.24, 0.36)), depth);
   let cosT = clamp(dot(nw, view), 0.0, 1.0);
   let fres = 0.02 + 0.98 * pow(1.0 - cosT, 5.0);
   let r = reflect(-view, nw);
-  let sky = mix(ts_srgb(vec3<f32>(0.80, 0.88, 0.95)), ts_srgb(vec3<f32>(0.28, 0.50, 0.84)), pow(clamp(r.z, 0.0, 1.0), 0.5));
+  let sky = mix(to_linear(vec3<f32>(0.80, 0.88, 0.95)), to_linear(vec3<f32>(0.28, 0.50, 0.84)), pow(clamp(r.z, 0.0, 1.0), 0.5));
   return mix(col, mix(body, sky, fres), m * 0.95);
 }
 `;

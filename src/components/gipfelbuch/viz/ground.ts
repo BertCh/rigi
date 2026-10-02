@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { srgbToLinear } from "#/lib/color/srgb";
 import GROUND_PALETTES from "./ground-palette.json";
 
 // The explainer grammar's ground half (reports/gipfelbuch-explainers-2026-10-02/grammar.md §3): a
@@ -85,10 +86,7 @@ export function mixHex(a: string, b: string, t: number): string {
 
 /** WCAG relative luminance, 0..1. */
 export function relativeLuminance(hex: string): number {
-	const [r, g, b] = hexToRgb(hex).map((v) => {
-		const s = v / 255;
-		return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-	});
+	const [r, g, b] = hexToRgb(hex).map((v) => srgbToLinear(v / 255));
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 

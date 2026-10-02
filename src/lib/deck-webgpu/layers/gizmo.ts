@@ -32,10 +32,12 @@
 // `lineColor`, `pinColor`, `pinRadiusM`, `planeOpacity` are exactly DeckWorldStyle's fields, so
 // spreading deckWorldStyle(style) works (its extra `sky` is ignored). The host must be asked to
 // re-render (requestRender("all")) after setProps: the gizmo lives in the colour pass.
+
 import type { Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { type Pose, poseBasis } from "#/lib/camera";
+import { srgbToLinear } from "#/lib/color/srgb";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraModule } from "../camera";
 import {
@@ -270,17 +272,14 @@ struct PinOut {
 
 // ---------- CPU side ----------
 
-const srgbToLinear = (c: number) => {
-	const v = c / 255;
-	return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-};
+const srgbByteToLinear = (c: number) => srgbToLinear(c / 255);
 
 /** 0..255 sRGB RGBA → linear rgb + straight alpha. */
 export function linearRGBA(c: readonly number[]): number[] {
 	return [
-		srgbToLinear(c[0]),
-		srgbToLinear(c[1]),
-		srgbToLinear(c[2]),
+		srgbByteToLinear(c[0]),
+		srgbByteToLinear(c[1]),
+		srgbByteToLinear(c[2]),
 		(c[3] ?? 255) / 255,
 	];
 }

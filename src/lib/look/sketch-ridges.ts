@@ -66,9 +66,12 @@ export function sketchRidgeFactors(
 
 const F = (n: number) => n.toFixed(4);
 
-/** GLSL: `vec3 ridgeSketch(vec2 pos, float sketch)` -> (dx, dy, gain), pos in geometry texels. */
-export const SKETCH_RIDGES_GLSL = /* glsl */ `\
-// luma sketchStroke_noise (visgl/luma.gl #3318), see look/sketch-ridges.ts
+/**
+ * Value noise (luma sketchStroke_noise): `sketchNoise(float)` / `sketch_noise(f32)`, 0..1. Shared by
+ * the trail stroke (look/trail-stroke.ts); a shader splices it once, so it does not also carry
+ * SKETCH_RIDGES_* (which embeds it).
+ */
+export const SKETCH_NOISE_GLSL = /* glsl */ `\
 float sketchNoise(float coordinate) {
   float cell = floor(coordinate);
   float fraction = fract(coordinate);
@@ -76,6 +79,21 @@ float sketchNoise(float coordinate) {
   float second = fract(sin((cell + 1.0) * 127.1) * 43758.5453);
   return mix(first, second, fraction * fraction * (3.0 - 2.0 * fraction));
 }
+`;
+export const SKETCH_NOISE_WGSL = /* wgsl */ `\
+fn sketch_noise(coordinate: f32) -> f32 {
+  let cell = floor(coordinate);
+  let fraction = fract(coordinate);
+  let first = fract(sin(cell * 127.1) * 43758.5453);
+  let second = fract(sin((cell + 1.0) * 127.1) * 43758.5453);
+  return mix(first, second, fraction * fraction * (3.0 - 2.0 * fraction));
+}
+`;
+
+/** GLSL: `vec3 ridgeSketch(vec2 pos, float sketch)` -> (dx, dy, gain), pos in geometry texels. */
+export const SKETCH_RIDGES_GLSL = /* glsl */ `\
+// luma sketchStroke_noise (visgl/luma.gl #3318), see look/sketch-ridges.ts
+${SKETCH_NOISE_GLSL}
 vec3 ridgeSketch(vec2 pos, float sketch) {
   float dx = (sketchNoise(pos.y * 0.061 + pos.x * 0.023 + 3.7) * 2.0 - 1.0) * ${F(SKETCH_JITTER)} * sketch;
   float dy = (sketchNoise(pos.x * 0.061 - pos.y * 0.023 + 11.3) * 2.0 - 1.0) * ${F(SKETCH_JITTER)} * sketch;
@@ -89,13 +107,7 @@ vec3 ridgeSketch(vec2 pos, float sketch) {
 /** WGSL twin: `ridge_sketch(pos, sketch) -> vec3` (dx, dy, gain). */
 export const SKETCH_RIDGES_WGSL = /* wgsl */ `\
 // luma sketchStroke_noise (visgl/luma.gl #3318), see look/sketch-ridges.ts
-fn sketch_noise(coordinate: f32) -> f32 {
-  let cell = floor(coordinate);
-  let fraction = fract(coordinate);
-  let first = fract(sin(cell * 127.1) * 43758.5453);
-  let second = fract(sin((cell + 1.0) * 127.1) * 43758.5453);
-  return mix(first, second, fraction * fraction * (3.0 - 2.0 * fraction));
-}
+${SKETCH_NOISE_WGSL}
 fn ridge_sketch(pos: vec2<f32>, sketch: f32) -> vec3<f32> {
   let dx = (sketch_noise(pos.y * 0.061 + pos.x * 0.023 + 3.7) * 2.0 - 1.0) * ${F(SKETCH_JITTER)} * sketch;
   let dy = (sketch_noise(pos.x * 0.061 - pos.y * 0.023 + 11.3) * 2.0 - 1.0) * ${F(SKETCH_JITTER)} * sketch;

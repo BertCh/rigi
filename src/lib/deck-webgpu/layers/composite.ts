@@ -63,7 +63,7 @@ import {
 	targetKey,
 } from "../pass";
 import { imageTexture, maskTexture } from "../textures";
-import { colorWGSL, fullscreenWGSL, rampWGSL } from "../wgsl";
+import { colorWGSL, fullscreenWGSL, noiseWGSL, rampWGSL } from "../wgsl";
 import {
 	circleRect,
 	extractRed,
@@ -517,23 +517,9 @@ fn layer_premul() -> bool {
   return false;
 #endif
 }
-fn look_encode(c0: vec3<f32>) -> vec3<f32> {
-  let c = max(c0, vec3<f32>(0.0));
-  return mix(c * 12.92, 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - 0.055, step(vec3<f32>(0.0031308), c));
-}
-fn ign(p: vec2<f32>) -> f32 { return fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715)))); }
-fn hash12(p: vec2<f32>) -> f32 {
-  var p3 = fract(vec3<f32>(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-fn gauss(p: vec2<f32>) -> f32 {
-  let s = hash12(p) + hash12(p + 17.31) + hash12(p + 41.7) + hash12(p + 73.1);
-  return (s - 2.0) * 1.7320508;
-}
-// linear → display: exact sRGB, grain on the replaced pixels, triangular ±1 LSB dither everywhere
+${noiseWGSL}// linear → display: exact sRGB, grain on the replaced pixels, triangular ±1 LSB dither everywhere
 fn look_output(col: vec3<f32>, grainA: f32, frag: vec2<f32>) -> vec3<f32> {
-  let c = look_encode(col) + grainA * lookComposite.grain * gauss(frag);
+  let c = srgb_encode_exact(col) + grainA * lookComposite.grain * gauss(frag);
   return c + (ign(frag) + ign(frag + vec2<f32>(47.0, 17.0)) - 1.0) / 255.0;
 }
 `;

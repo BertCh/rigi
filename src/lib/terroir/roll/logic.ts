@@ -5,6 +5,7 @@
 // Pure helpers for the terroir roll/site furniture (no DOM, no deck): sun-band colours, scale-bar
 // numbers, pose-source glyphs and the prior-pose uncertainty fan. Checked by roll.check.ts.
 // Display-only: nothing here feeds the matcher or any pose.
+import { srgbToLinear } from "#/lib/color/srgb";
 import { tileYToLat } from "../../dem/tiles";
 import type { PoseSource } from "../../roll/types";
 
@@ -46,10 +47,7 @@ export function sunBandColor(elev: number): [number, number, number] {
 
 /** Relative luminance (sRGB, 0..1) of an 0..255 colour. */
 export function luminance([r, g, b]: readonly number[]) {
-	const f = (v: number) => {
-		const c = v / 255;
-		return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-	};
+	const f = (v: number) => srgbToLinear(v / 255);
 	return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
 }
 
