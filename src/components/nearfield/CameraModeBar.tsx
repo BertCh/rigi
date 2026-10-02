@@ -46,7 +46,7 @@ export function CameraModeBar({ si }: { si: StepInside }) {
 	if (!si.camModesAllowed) return null;
 	return (
 		<fieldset
-			className="pointer-events-auto m-0 flex gap-0.5 border-0 rounded-xl bg-black/55 p-0.5 ring-1 ring-white/15 backdrop-blur"
+			className="pointer-events-auto m-0 flex gap-0.5 border-0 rounded-lg bg-black/55 p-0.5 backdrop-blur"
 			aria-label="Camera"
 			data-camera-mode={si.camMode}
 		>
@@ -63,7 +63,7 @@ export function CameraModeBar({ si }: { si: StepInside }) {
 						className={cn(
 							"flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold",
 							on
-								? "bg-white text-slate-900"
+								? "bg-[var(--rigi-ember)] text-white"
 								: "text-white/80 hover:bg-white/10 hover:text-white",
 						)}
 					>

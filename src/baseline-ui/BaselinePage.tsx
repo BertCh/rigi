@@ -848,7 +848,9 @@ export function BaselinePage({
 								label="Detected photo skyline"
 								checked={layers.detected}
 								onChange={(v) => setLayers({ ...layers, detected: v })}
-								swatch={<span className="inline-block h-0.5 w-5 bg-cyan-400" />}
+								swatch={
+									<span className="inline-block h-0.5 w-5 bg-[var(--rigi-glow)]" />
+								}
 							/>
 						</div>
 					</Section>

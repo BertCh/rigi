@@ -97,8 +97,8 @@ function FlagRow({
 							className={cn(
 								"flex items-center gap-1 rounded-md px-2 py-1 font-mono text-[10px] ring-1 transition-colors",
 								active
-									? "bg-white text-slate-900 ring-white light:text-[var(--rigi-ink)]"
-									: "bg-white/5 text-white/60 ring-white/10 hover:text-white",
+									? "bg-[var(--rigi-ember)] text-white ring-[var(--rigi-ember)]"
+									: "bg-white/5 text-white/60 hover:text-white",
 							)}
 						>
 							{active && <Check className="size-2.5" />}
@@ -124,7 +124,7 @@ function FlagRow({
 					value={num}
 					placeholder={ui.placeholder}
 					onChange={(e) => setNum(e.target.value)}
-					className="min-w-0 flex-1 rounded-md bg-white/6 px-2 py-1 font-mono text-[11px] text-white/85 ring-1 ring-white/10 outline-none placeholder:text-white/25 focus:ring-cyan-400/50"
+					className="min-w-0 flex-1 rounded-md bg-white/6 px-2 py-1 font-mono text-[11px] text-white/85 outline-none placeholder:text-white/25 focus:ring-1 focus:ring-[var(--rigi-ember)]/60"
 				/>
 				<Button className="px-2 py-1" onClick={submit}>
 					Set
@@ -150,7 +150,7 @@ function FlagRow({
 					{ui.label}
 				</span>
 				{flagSet(ui.name) && (
-					<span className="rounded bg-cyan-400/15 px-1 py-px font-mono text-[9px] text-cyan-200 light:text-[var(--rigi-glow)]">
+					<span className="rounded bg-[var(--rigi-glow)]/15 px-1 py-px font-mono text-[9px] text-[var(--rigi-glow)]">
 						set
 					</span>
 				)}
@@ -210,7 +210,7 @@ export function AdvancedPanel() {
 				return (
 					<div
 						key={g.id}
-						className="space-y-2.5 rounded-lg bg-white/[0.025] p-2.5 ring-1 ring-white/6"
+						className="space-y-2.5 rounded-lg bg-white/[0.025] p-2.5"
 						data-flag-group={g.id}
 					>
 						<div className="space-y-0.5">

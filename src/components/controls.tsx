@@ -76,7 +76,7 @@ export function Section({
 	);
 	return (
 		<section
-			className="border-b border-white/8 px-4 py-3.5"
+			className="px-4 py-3.5"
 			data-section={collapse?.id}
 			data-open={collapse ? String(open) : undefined}
 		>
@@ -121,10 +121,8 @@ export function PanelBand({
 	return (
 		<div
 			className={cn(
-				"flex items-baseline justify-between gap-2 border-b px-4 pt-5 pb-1.5",
-				tone === "muted"
-					? "border-amber-300/15 bg-amber-300/[0.03]"
-					: "border-white/10 bg-white/[0.02]",
+				"flex items-baseline justify-between gap-2 px-4 pt-5 pb-1.5",
+				tone === "muted" ? "bg-[var(--rigi-lesson)]/[0.05]" : "bg-white/[0.03]",
 			)}
 		>
 			<span
@@ -132,7 +130,7 @@ export function PanelBand({
 					"text-[10px] font-bold tracking-[0.2em] uppercase",
 					tone === "muted"
 						? "text-amber-200/60 light:text-[var(--rigi-lesson)]"
-						: "text-cyan-200/70 light:text-[var(--rigi-glow)]",
+						: "text-[var(--rigi-glow)]",
 				)}
 			>
 				{label}
@@ -192,7 +190,7 @@ export function Segmented<T extends string>({
 	size?: "sm" | "md";
 }) {
 	return (
-		<div className="flex rounded-lg bg-white/6 p-0.5 ring-1 ring-white/8">
+		<div className="flex rounded-lg bg-white/6 p-0.5">
 			{options.map((o) => (
 				<button
 					key={o.value}
@@ -203,7 +201,7 @@ export function Segmented<T extends string>({
 						"flex-1 rounded-md font-medium transition-colors",
 						size === "sm" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs",
 						value === o.value
-							? "bg-white text-slate-900 shadow light:text-[var(--rigi-ink)]"
+							? "bg-[var(--rigi-ember)] text-white"
 							: "text-white/60 hover:text-white",
 					)}
 				>
@@ -233,7 +231,7 @@ export function Toggle({
 			<span
 				className={cn(
 					"relative h-4 w-7 rounded-full transition-colors",
-					checked ? "bg-cyan-400" : "bg-white/15",
+					checked ? "bg-[var(--rigi-ember)]" : "bg-white/15",
 				)}
 			>
 				<span
@@ -299,11 +297,11 @@ export function Button({
 			onClick={onClick}
 			className={cn(
 				"inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40",
-				variant === "ghost" &&
-					"bg-white/6 text-white/80 ring-1 ring-white/10 hover:bg-white/12",
+				variant === "ghost" && "bg-white/6 text-white/80 hover:bg-white/12",
 				variant === "solid" &&
 					"bg-white text-slate-900 hover:bg-white/90 light:text-[var(--rigi-ink)]",
-				variant === "accent" && "bg-cyan-400 text-slate-950 hover:bg-cyan-300",
+				variant === "accent" &&
+					"bg-[var(--rigi-ember)] text-white hover:opacity-90",
 				className,
 			)}
 		>

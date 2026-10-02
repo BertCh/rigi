@@ -49,11 +49,11 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 				className={cn(
 					"flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 backdrop-blur",
 					status === "stepping" || (state.phase === "ready" && !state.lowTrust)
-						? "bg-cyan-500/20 text-cyan-100 ring-cyan-300/30"
+						? "bg-[var(--rigi-glow)]/20 text-white/85 ring-[var(--rigi-glow)]/30"
 						: state.phase === "ready" && state.lowTrust
-							? "bg-amber-500/25 text-amber-100 ring-amber-300/40"
+							? "bg-[var(--rigi-lesson)]/25 text-white/90 ring-[var(--rigi-lesson)]/40"
 							: state.phase === "error" || state.phase === "low-quality"
-								? "bg-red-500/20 text-red-100 ring-red-300/30"
+								? "bg-[var(--rigi-trap)]/20 text-white/90 ring-[var(--rigi-trap)]/30"
 								: "bg-black/50 text-white/70 ring-white/10",
 				)}
 				data-status={status}
@@ -87,7 +87,7 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 						type="button"
 						onClick={si.back}
 						data-nearfield-back=""
-						className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow hover:bg-white/90"
+						className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[var(--khipu-lk)] hover:bg-white/90"
 					>
 						<Undo2 className="size-3.5" /> Back to photo
 					</button>
@@ -121,7 +121,7 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 						className={cn(
 							"flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 backdrop-blur",
 							si.truth
-								? "bg-cyan-400 text-slate-950 ring-cyan-300"
+								? "bg-[var(--rigi-ember)] text-white ring-[var(--rigi-ember)]"
 								: "bg-black/55 text-white/85 ring-white/15 hover:bg-black/75",
 						)}
 					>

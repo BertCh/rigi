@@ -1371,11 +1371,11 @@ export function PhotoWorkspace({
 				<header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 p-3">
 					<Link
 						to="/library"
-						className="pointer-events-auto flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 ring-1 ring-white/10 backdrop-blur hover:text-white"
+						className="pointer-events-auto flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 backdrop-blur hover:text-white"
 					>
 						<ArrowLeft className="size-3.5" /> Library
 					</Link>
-					<div className="rounded-lg bg-black/50 px-2.5 py-1.5 text-xs text-white/70 ring-1 ring-white/10 backdrop-blur">
+					<div className="rounded-lg bg-black/50 px-2.5 py-1.5 text-xs text-white/70 backdrop-blur">
 						<span className="font-semibold text-white">{place}</span> · {taken}{" "}
 						· {photo.id}
 					</div>
@@ -1383,7 +1383,7 @@ export function PhotoWorkspace({
 						type="button"
 						onClick={exportImage}
 						disabled={exportLocked}
-						className="pointer-events-auto ml-auto flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 ring-1 ring-white/10 backdrop-blur hover:text-white disabled:opacity-40"
+						className="pointer-events-auto ml-auto flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 backdrop-blur hover:text-white disabled:opacity-40"
 					>
 						<Download className="size-3.5" /> Save image
 					</button>
@@ -1451,9 +1451,9 @@ export function PhotoWorkspace({
 											className={cn(
 												"absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ring-1 transition",
 												active
-													? "z-10 bg-cyan-400 text-slate-950 ring-cyan-200"
+													? "z-10 bg-[var(--rigi-ember)] text-white ring-[var(--rigi-ember)]"
 													: pinned
-														? "bg-emerald-400/90 text-slate-950 ring-emerald-200"
+														? "bg-[var(--rigi-result)] text-[var(--rigi-ink)] ring-[var(--rigi-result)]"
 														: "bg-black/55 text-white/85 ring-white/25 hover:bg-black/80",
 											)}
 											style={{ left: `${c.u * 100}%`, top: `${c.v * 100}%` }}
@@ -1466,7 +1466,7 @@ export function PhotoWorkspace({
 								pins.map((p) => (
 									<div
 										key={`pin-${p.world.join(",")}`}
-										className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-emerald-300 bg-emerald-400/40"
+										className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--rigi-result)] bg-[var(--rigi-result)]/40"
 										style={{ left: `${p.u * 100}%`, top: `${p.v * 100}%` }}
 									/>
 								))}
@@ -1489,7 +1489,10 @@ export function PhotoWorkspace({
 										away
 									</div>
 									{hover.source === "object" && (
-										<div className="text-cyan-200" data-hover-source="object">
+										<div
+											className="text-[var(--rigi-glow)]"
+											data-hover-source="object"
+										>
 											object · near-field estimate
 										</div>
 									)}
@@ -1587,8 +1590,8 @@ export function PhotoWorkspace({
 								className={cn(
 									"flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 backdrop-blur",
 									verify === "verified"
-										? "bg-emerald-500/20 text-emerald-200 ring-emerald-300/30"
-										: "bg-cyan-500/20 text-cyan-100 ring-cyan-300/30",
+										? "bg-[var(--rigi-result)]/20 text-white/85 ring-[var(--rigi-result)]/30"
+										: "bg-[var(--rigi-glow)]/20 text-white/85 ring-[var(--rigi-glow)]/30",
 								)}
 								title={alignNote}
 							>
@@ -1607,7 +1610,7 @@ export function PhotoWorkspace({
 						className="pointer-events-none absolute inset-x-0 top-12 z-20 flex justify-center px-3"
 						data-unverified=""
 					>
-						<div className="flex max-w-md items-start gap-2 rounded-lg bg-amber-500/90 px-3 py-2 text-[11px] leading-snug text-slate-950 shadow-lg">
+						<div className="flex max-w-md items-start gap-2 rounded-lg bg-[var(--rigi-lesson)] px-3 py-2 text-[11px] leading-snug text-[var(--khipu-lk)]">
 							<AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
 							<span>
 								<b>Unverified alignment.</b>{" "}
@@ -1623,7 +1626,7 @@ export function PhotoWorkspace({
 
 				{(status || error) && (
 					<div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-						<div className="w-72 rounded-xl bg-[#121820] p-4 ring-1 ring-white/10">
+						<div className="w-72 rounded-lg bg-[var(--rigi-slate)] p-4">
 							{error ? (
 								<p className="text-sm text-red-300">{error}</p>
 							) : (
@@ -1631,7 +1634,7 @@ export function PhotoWorkspace({
 									<p className="mb-2 text-sm text-white/80">{status?.msg}…</p>
 									<div className="h-1 overflow-hidden rounded bg-white/10">
 										<div
-											className="h-full bg-cyan-400 transition-all"
+											className="h-full bg-[var(--rigi-glow)] transition-all"
 											style={{ width: `${(status?.frac ?? 0) * 100}%` }}
 										/>
 									</div>
@@ -1644,9 +1647,9 @@ export function PhotoWorkspace({
 
 			{/* panel */}
 			{/* panel: mode switch (sticky) → View → Pose → Experimental & dev → credits (always shown) */}
-			<aside className="flex max-h-[45dvh] w-full shrink-0 flex-col border-white/8 bg-[#10151c] md:max-h-none md:w-80 md:border-l light:bg-[var(--rigi-slate)]">
+			<aside className="flex max-h-[45dvh] w-full shrink-0 flex-col border-white/8 bg-[var(--rigi-slate)] md:max-h-none md:w-80 md:border-l">
 				<div className="min-h-0 flex-1 overflow-y-auto">
-					<div className="sticky top-0 z-10 border-b border-white/8 bg-[#10151c]/95 px-4 pt-4 pb-3 backdrop-blur light:bg-[var(--rigi-slate)]">
+					<div className="sticky top-0 z-10 bg-[var(--rigi-slate)]/95 px-4 pt-4 pb-3 backdrop-blur">
 						<div className="flex items-center gap-2">
 							<div className="min-w-0 flex-1">
 								<Segmented
@@ -2133,7 +2136,7 @@ export function PhotoWorkspace({
 					<AdvancedPanel />
 				</div>
 				{/* attribution is a licence requirement: pinned, never collapsed */}
-				<div className="shrink-0 border-t border-white/8 px-4 py-2">
+				<div className="shrink-0 px-4 py-2">
 					<CreditLine
 						className="text-[10px] leading-relaxed text-white/30"
 						lat={photo.lat}

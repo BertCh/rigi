@@ -134,7 +134,7 @@ export function EyeSuggestion({
 					<span className="flex-1">{progressText(phase.progress)}</span>
 					<button
 						type="button"
-						className="text-cyan-300 hover:underline light:text-[var(--rigi-glow)]"
+						className="text-[var(--rigi-glow)] hover:underline"
 						onClick={dismiss}
 					>
 						Cancel
@@ -177,7 +177,7 @@ function ResultCard({
 	const how = `${r.gpu ? "GPU" : "CPU"} · ${r.eyesMarched} horizons · ${(r.ms / 1000).toFixed(1)} s`;
 	return (
 		<div
-			className="relative space-y-1.5 rounded-lg bg-amber-400/8 p-2.5 text-[11px] leading-snug text-white/75 ring-1 ring-amber-300/25 light:ring-[var(--rigi-lesson)]/25"
+			className="relative space-y-1.5 rounded-lg bg-[var(--rigi-lesson)]/10 p-2.5 text-[11px] leading-snug text-white/75"
 			data-eye-moved={r.moved ? "1" : "0"}
 		>
 			<button
