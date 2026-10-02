@@ -23,6 +23,11 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - Near field (S1 prep, opt-in): cliff-lip anchoring (`nearfield/cliff-lip.ts`, `AnchorOpts.cliffLip`, flag `anchorCliff`, off by default) drops DEM range discontinuities and the lip face from the anchor fit; `nearfield/anchor-parity.ts` compares the DEM grids two engines feed the anchor; segmenter licence shortlist in `research_notes/segmenter-shortlist-2026-10-02/`.
 - **`?colorTarget=rg11b10` is now downgraded to rgba16float with a console warning** (rg11b10ufloat has no destination alpha: the photo overlay turns opaque and the world sky, blended under with `one-minus-dst-alpha`, is never drawn). `?colorTarget=rg11b10-unsafe` forces the old behaviour for experiments.
 
+### Research phase 1 (2026-10-02, Pod C)
+
+- FUND E5 ray-cast oracle, `src/lib/raycast/` (not wired, no flag): a per-pixel max-mip heightfield ray caster with curvature + refraction per ray on the horizon-fast mosaics, an f64 CPU reference and a WGSL twin on `gpu/core` (range, ENU xyz, sky per pixel; horizon per azimuth). On dev eyes it matches the horizon-fast march to 0.19 px p95 and renders 1024x768 at 150 km in ~19 ms median on Dawn (PASS; `tools/research/fund/e5_raycast/`, `research_notes/raycast-oracle-2026-10-02/`). Browser-unverified.
+- FUND E4 step 1 (dense feature-metric refinement, research only, `tools/research/fund/e4_featuremetric/`) killed on dev; E0r (unclipped-skyline rotation observability) and the skyline-parallax eye test killed on dev; C4 label/drape hooks landed unconsumed (see above). Details: `reports/negative-results.md`.
+
 ### Step review (2026-10-02, step pods)
 
 - Upload EXIF guards (`src/lib/upload/exif.ts`): GPS at (0, 0) or out of range, a zeroed or garbled Apple gravity vector, an out-of-range 35 mm focal and a pre-1980 GPS date stamp now read as unknown, not as trusted placeholders. Headings wrap to [0, 360). Square images let gravity choose the holding. `scripts/ingest.mjs` shares the MakerNote, gravity and time code with uploads. In-range values are unchanged.

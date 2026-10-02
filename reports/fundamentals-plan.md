@@ -5,6 +5,8 @@
 - *two new literature and data sweeps. These deliberately skipped everything [tm_literature_2026-09.md](../research_notes/tm_literature_2026-09.md) already covers;*
 - *the existing records: [status.md](status.md), [terrain-matching-research.md](terrain-matching-research.md), [terrain-matching-research.md](terrain-matching-research.md) (final section), [concordance-research.md](concordance-research.md) and [negative-results.md](negative-results.md).*
 
+> **Update (2026-10-02):** phase 1 ran on dev: **E5 passed** its fixed criterion (`tools/research/fund/e5_raycast/REPORT.txt`; module `src/lib/raycast`, not wired), **E4 step 1 was killed** (`tools/research/fund/e4_featuremetric/REPORT.txt`), and the E0 rotation half re-run without clipping was killed (`tools/research/fund/e0r_rotation/REPORT.txt`).
+>
 > **Update (2026-10-01):** phase 0 ran on 2026-09-29 and **all four studies were killed** (E0–E3; reports in `tools/research/fund/*/REPORT.txt`, rows in [negative-results.md](negative-results.md)). E1 accepted 10/56 displaced-eye decoys, so it does **not** absorb R1/R2 as §4 proposed: the H1 → H2 veto plan stands, and the displaced-eye decoys are the test any future veto must pass. E4 and E5 are open, pending a phase-1 decision ([status.md](status.md)). In §1's audit, the three.js renderer was removed 2026-10-01 (583e2b7); the matcher's renders now come from the deck engines (5dbdfc5).
 
 ## 1. The short answer

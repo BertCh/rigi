@@ -44,7 +44,7 @@ About 20% of wild photos auto-accept with held-out HIGH precision 1.00; recall i
 | R5 | **Pose propagation**: accepted photos anchor overlapping neighbours as suggestions (0/83 wrong pairs pass). DEM render check inconclusive | Sign-off on `tools/nearfield/propagate/PREREG_DRAFT.txt`; held-out roll set from N3 | Library built and wired into `/roll` |
 | R6 | **v3 prereg** ([v3-prereg.md](v3-prereg.md)): fold in R2/R3, add `STAGE1_MANIFEST` and code stamps, smoke the re-based stage-1 workers, `V2_SUGGEST_ONLY` dry run | Owner sign-off | Draft |
 | R7 | Measure the target input (iPhone with GPS, heading, gravity) at scale, incl. the 14 non-Swiss `data_v3` photos | Part of N3 | Not started |
-| R8 | **Research phase 1** (dev only): E4 dense feature-metric refinement, E5 ray-cast oracle ([fundamentals-plan.md](fundamentals-plan.md)); GEO GB/GC gated on phase A ([geometry-first-pose.md](geometry-first-pose.md)). Phase 0 (E0–E3) and GA2–GA5 are killed, see negative results | Fixed kill criteria in each plan | Owner decision |
+| R8 | **Research phase 1** (dev only), ran 2026-10-02: **E5 ray-cast oracle PASS** on dev (`src/lib/raycast`, not wired; horizon parity p95 0.19 px, 18.7 ms per 1024×768 frame); **E4 step 1 KILLED** (flat DINOv2 token cost); E0r and the skyline-parallax eye test KILLED ([negative-results.md](negative-results.md)). GEO GB/GC gated on phase A ([geometry-first-pose.md](geometry-first-pose.md)) | E5 adoption (matcher geometry off headless Chromium, ortho colour output, quiet-machine timing batch) | Owner decision |
 
 ## Next: whole-image concordance and the near field (0–4 months, parallel)
 
