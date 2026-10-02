@@ -31,6 +31,7 @@ import type { BinaryOp, DType, NnBackend, Tensor, Weights } from "../types";
 import { attentionKernel } from "./k-attention";
 import {
 	binaryExpr,
+	coalesce,
 	copyIntoKernel,
 	fillKernel,
 	type KernelCall,
@@ -64,8 +65,18 @@ import {
 } from "./k-spatial";
 import { topkPlan } from "./k-topk";
 import {
+	LUMA_REDUCE_MIN,
+	LUMA_TOPK_MIN,
+	lumaBinary,
+	lumaBinaryOp,
+	lumaReduce,
+	lumaTopkPlan,
+	lumaTranspose,
+} from "./luma-ops";
+import {
 	type Activation,
 	GpuTensor,
+	type LumaCall,
 	type Node,
 	Recording,
 	Runtime,
@@ -102,6 +113,15 @@ const DIRECT_CONV_COG = 8;
 export class GpuNn extends BaseNn<GpuTensor> {
 	readonly backend: NnBackend;
 	readonly runtime: Runtime;
+	/**
+	 * Which ops run on luma operators (luma-ops.ts) and from what size: `enabled: false` forces every
+	 * nn kernel (benches, A/B). Thresholds are element counts of the reduced row / sorted row.
+	 */
+	readonly lumaOps = {
+		enabled: true,
+		reduceMin: LUMA_REDUCE_MIN,
+		topkMin: LUMA_TOPK_MIN,
+	};
 	private rec: Recording | null = null;
 	private implicit: Recording | null = null;
 
@@ -148,6 +168,28 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		extra: Pick<Node, "act" | "fuse"> = {},
 	): GpuTensor {
 		return this.node(call, inputs, [shape], extra)[0];
+	}
+
+	/** Record a node run by a luma operator producing new f32 tensors of `shapes`. */
+	private lumaNode(
+		call: LumaCall,
+		inputs: GpuTensor[],
+		shapes: number[][],
+	): GpuTensor[] {
+		const rec = this.current();
+		const outs = shapes.map((sh) => {
+			const st = new Storage(Math.max(4, numel(sh) * 4), "f32", rec);
+			rec.produced.push(st);
+			return new GpuTensor(sh, "f32", st);
+		});
+		rec.nodes.push({
+			luma: call,
+			inputs: inputs.map((t) => t.st),
+			outputs: outs.map((t) => t.st),
+			meta: [],
+			wg: [1, 1, 1],
+		});
+		return outs;
 	}
 
 	private flushImplicit(): Promise<void> {
@@ -501,6 +543,18 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		b: GpuTensor | number,
 		out: number[],
 	) {
+		const lumaOp = lumaBinaryOp(op);
+		if (
+			this.lumaOps.enabled &&
+			lumaOp &&
+			typeof a !== "number" &&
+			typeof b !== "number" &&
+			a.dtype === "f32" &&
+			b.dtype === "f32" &&
+			numel(a.shape) === numel(out) &&
+			numel(b.shape) === numel(out)
+		)
+			return this.lumaNode(lumaBinary(lumaOp, numel(out)), [a, b], [out])[0];
 		const call = naryKernel(
 			`bin-${op}`,
 			["a", "b"],
@@ -668,6 +722,25 @@ export class GpuNn extends BaseNn<GpuTensor> {
 	}
 
 	pCopy(x: GpuTensor, out: number[], strides: number[], offset: number) {
+		// a 2-D transpose of a plain f32 matrix runs on luma's GPUTranspose (bench: 1.4-2x faster)
+		if (
+			this.lumaOps.enabled &&
+			x.dtype === "f32" &&
+			offset === 0 &&
+			numel(out) === numel(x.shape)
+		) {
+			const c = coalesce(out, [strides]);
+			if (
+				c.shape.length === 2 &&
+				c.sets[0][0] === 1 &&
+				c.sets[0][1] === c.shape[0]
+			)
+				return this.lumaNode(
+					lumaTranspose(c.shape[1], c.shape[0]),
+					[x],
+					[out],
+				)[0];
+		}
 		return this.one(stridedCopyKernel(x.dtype, out, strides, offset), [x], out);
 	}
 
@@ -728,10 +801,39 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		inner: number,
 		out: number[],
 	) {
+		// one long row: GPUReduction is multi-workgroup (bench: 2.5x at 2^20, 10x at 2^22)
+		if (
+			this.lumaOps.enabled &&
+			x.dtype === "f32" &&
+			outer === 1 &&
+			inner === 1 &&
+			len >= this.lumaOps.reduceMin &&
+			(op === "sum" || op === "mean" || op === "max" || op === "min")
+		) {
+			const r = this.lumaNode(
+				lumaReduce(op === "mean" ? "sum" : op, len),
+				[x],
+				[out],
+			)[0];
+			return op === "mean" ? this.scale(r, 1 / len) : r;
+		}
 		return this.one(reduceKernel(op, x.dtype, outer, len, inner), [x], out);
 	}
 
 	pTopk(x: GpuTensor, rows: number, len: number, k: number, out: number[]) {
+		if (
+			this.lumaOps.enabled &&
+			x.dtype === "f32" &&
+			rows === 1 &&
+			len >= this.lumaOps.topkMin
+		) {
+			// luma GPUSort (stable radix) of (key, index): 3x faster than the bitonic nodes at 786k
+			const plan = lumaTopkPlan(len, k);
+			const [keys, idx] = this.node(plan.init, [x], [[len], [len]]);
+			const [sk, sv] = this.lumaNode(plan.sort, [keys, idx], [[len], [len]]);
+			const [values, indices] = this.node(plan.final, [sk, sv], [out, out]);
+			return { values, indices };
+		}
 		const plan = topkPlan(x.dtype, rows, len, k);
 		const [keys, idx] = this.node(
 			plan.init,

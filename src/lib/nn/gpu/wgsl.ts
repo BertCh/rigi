@@ -49,6 +49,8 @@ export function nnKernel(
 	outputs: string[],
 	body: string,
 	textures: string[] = [],
+	/** element type override by binding name (e.g. `u32` for sort keys); such inputs have no ld_<name>() */
+	elem: Record<string, string> = {},
 ): KernelSpec {
 	const id = `nn/${key}|${inputs.map((i) => i.dtype).join(",")}`;
 	let s = specs.get(id);
@@ -60,10 +62,10 @@ export function nnKernel(
 	for (const t of textures)
 		src += `@group(0) @binding(${b++}) var ${t}: texture_2d<f32>;\n`;
 	for (const i of inputs)
-		src += `@group(0) @binding(${b++}) var<storage, read> ${i.name}: array<${i.dtype}>;\n`;
+		src += `@group(0) @binding(${b++}) var<storage, read> ${i.name}: array<${elem[i.name] ?? i.dtype}>;\n`;
 	for (const o of outputs)
-		src += `@group(0) @binding(${b++}) var<storage, read_write> ${o}: array<f32>;\n`;
-	for (const i of inputs)
+		src += `@group(0) @binding(${b++}) var<storage, read_write> ${o}: array<${elem[o] ?? "f32"}>;\n`;
+	for (const i of inputs.filter((i) => !elem[i.name]))
 		src += `fn ld_${i.name}(i: u32) -> f32 { return f32(${i.name}[i]); }\n`;
 	src += PRELUDE + body;
 	s = defineKernel(

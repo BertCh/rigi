@@ -60,8 +60,50 @@ export class GpuTensor implements Tensor {
 	) {}
 }
 
+/** A slot of a luma operator node: `len` elements read / written as `format` (same bytes as the f32 storage). */
+export type LumaSlot = { len: number; format: "float32" | "uint32" };
+
+/**
+ * A node run by a luma operator (GPUMatMul-style contributor) instead of an nn kernel: `add` puts it
+ * in the graph with views of its input / output storages. `key` identifies the operator and its
+ * parameters (it is part of the graph cache key).
+ */
+export type LumaCall = {
+	key: string;
+	ins: LumaSlot[];
+	outs: LumaSlot[];
+	add(g: ComputeGraph, ins: GraphDataView[], outs: GraphDataView[]): void;
+};
+
+/** `binding` (a graph buffer handle, or already a view of the caller's graph) as a typed view. */
+function asView(
+	g: ComputeGraph,
+	binding: unknown,
+	slot: LumaSlot,
+): GraphDataView {
+	if (binding && typeof binding === "object" && "format" in binding)
+		return binding as GraphDataView;
+	return g.view(binding as never, slot.format, slot.len);
+}
+
+function addLuma(
+	g: ComputeGraph,
+	call: LumaCall,
+	ins: unknown[],
+	outs: unknown[],
+) {
+	call.add(
+		g,
+		ins.map((b, i) => asView(g, b, call.ins[i])),
+		outs.map((b, i) => asView(g, b, call.outs[i])),
+	);
+}
+
 export type Node = {
-	spec: KernelSpec;
+	/** kernel nodes; absent on a luma node */
+	spec?: KernelSpec;
+	/** a node run by a luma operator (spec, textures, meta and wg unused) */
+	luma?: LumaCall;
 	/** sampled textures, bound to the spec's texture entries (before the storage inputs) */
 	textures?: Texture[];
 	inputs: Storage[];
@@ -334,6 +376,11 @@ export class Runtime {
 			return b;
 		};
 		keep.forEach((n, i) => {
+			if (n.luma) {
+				addLuma(g, n.luma, n.inputs.map(name), n.outputs.map(name));
+				return;
+			}
+			const spec = n.spec as KernelSpec;
 			const bindings: Record<string, unknown> = {
 				M: g.view(mh, "uint32", Math.max(1, n.meta.length), metaAt[i] * 4),
 			};
@@ -357,16 +404,16 @@ export class Runtime {
 					);
 					texs.set(t, h);
 				}
-				bindings[n.spec.layout[1 + j][0]] = h;
+				bindings[spec.layout[1 + j][0]] = h;
 			});
-			const names = n.spec.layout.map(([nm]) => nm).slice(1 + tex.length);
+			const names = spec.layout.map(([nm]) => nm).slice(1 + tex.length);
 			const all = [...n.inputs, ...n.outputs];
 			names.forEach((nm, j) => {
 				bindings[nm] = name(all[j]);
 			});
 			g.addKernel({
 				id: `${pre}n${i}`,
-				spec: n.spec,
+				spec,
 				bindings: bindings as never,
 				workgroups: n.wg,
 			});
@@ -429,7 +476,7 @@ export class Runtime {
 			metaOffsets.push(metaWords);
 			metaWords += Math.ceil(Math.max(1, n.meta.length) / words) * words;
 			parts.push(
-				`${n.spec.id}(${ins})>${os}@${n.meta.join(",")}/${n.wg.join(",")}`,
+				`${n.luma ? n.luma.key : (n.spec as KernelSpec).id}(${ins})>${os}@${n.meta.join(",")}/${n.wg.join(",")}`,
 			);
 		}
 		const full = `${decl.join(" ")}\n${parts.join("\n")}`;
@@ -480,6 +527,16 @@ export class Runtime {
 			g.own([metaBuf]);
 			const mh = g.importBuffer("meta", meta.byteLength, metaBuf);
 			keep.forEach((n, i) => {
+				if (n.luma) {
+					addLuma(
+						g,
+						n.luma,
+						n.inputs.map((s) => handles.get(slot.get(s) as string)),
+						n.outputs.map((s) => handles.get(slot.get(s) as string)),
+					);
+					return;
+				}
+				const spec = n.spec as KernelSpec;
 				const bindings: Record<string, unknown> = {
 					M: g.view(
 						mh,
@@ -490,16 +547,16 @@ export class Runtime {
 				};
 				const tex = n.textures ?? [];
 				tex.forEach((t, j) => {
-					bindings[n.spec.layout[1 + j][0]] = texHandles.get(t);
+					bindings[spec.layout[1 + j][0]] = texHandles.get(t);
 				});
-				const names = n.spec.layout.map(([nm]) => nm).slice(1 + tex.length);
+				const names = spec.layout.map(([nm]) => nm).slice(1 + tex.length);
 				const all = [...n.inputs, ...n.outputs];
 				names.forEach((nm, j) => {
 					bindings[nm] = handles.get(slot.get(all[j]) as string);
 				});
 				g.addKernel({
 					id: `n${i}`,
-					spec: n.spec,
+					spec,
 					bindings: bindings as never,
 					workgroups: n.wg,
 				});

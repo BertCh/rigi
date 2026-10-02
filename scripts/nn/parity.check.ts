@@ -496,6 +496,37 @@ const cases: Case[] = [
 		fn: (nn, x) => [nn.topk(x, 1, 1), nn.topk(x, 1, 2), nn.topk(x, 1, 0)],
 	},
 	{ name: "topk-large", shapes: [[1, 70000]], fn: (nn, x) => nn.topk(x, 2048) },
+	// luma GPUSort path: heavy ties (values on a 1/64 grid, signed zeros), ties go to the lower index
+	{
+		name: "topk-ties-luma",
+		shapes: [[1, 70000]],
+		data: [
+			Float32Array.from({ length: 70000 }, (_, i) =>
+				i % 7 === 0 ? -0 : Math.round(Math.sin(i * 0.37) * 8) / 64,
+			),
+		],
+		fn: (nn, x) => nn.topk(x, 700),
+	},
+	// luma GPUReduction path (one long row) and the mean built on it
+	{
+		name: "reduce-huge",
+		shapes: [[1, 300000]],
+		fn: (nn, x) => [
+			nn.sum(x, 1),
+			nn.mean(x, 1),
+			nn.max(x, 1),
+			nn.min(x, 1, true),
+		],
+	},
+	// luma GPUTranspose / GPUElementwise paths
+	{
+		name: "transpose-luma",
+		shapes: [[37, 301]],
+		fn: (nn, x) => [
+			nn.transpose(x, 0, 1),
+			nn.permute(nn.reshape(x, [1, 37, 301]), [0, 2, 1]),
+		],
+	},
 	// epilogue fusion: unary after conv / linear / deform folds into the store, unless the pre-activation is also used
 	{
 		name: "fused-act",
