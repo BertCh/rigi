@@ -161,6 +161,22 @@ describe("NearFieldClient", () => {
 		);
 		expect(await c.health(true)).toEqual({ ok: true, models: [], device: "3" });
 	});
+	it("available: needs moge2 when the service lists models, else trusts ok", async () => {
+		const c = new NearFieldClient("http://svc");
+		fetchMock.mockImplementation(async () =>
+			jsonResponse({ ok: true, models: ["da3", "lama"], device: "cpu" }),
+		);
+		expect(await c.available(true)).toBe(false);
+		fetchMock.mockImplementation(async () =>
+			jsonResponse({ ok: true, models: ["moge2", "lift"], device: "cpu" }),
+		);
+		expect(await c.available(true)).toBe(true);
+		fetchMock.mockImplementation(async () =>
+			jsonResponse({ ok: true, device: "cpu", version: "v1" }),
+		);
+		expect(await c.available(true)).toBe(true);
+		expect((await c.health())?.version).toBe("v1");
+	});
 	it("health: shares one in-flight request and a down cache expires sooner than an ok one", async () => {
 		vi.useFakeTimers();
 		fetchMock.mockImplementation(async () => jsonResponse(healthy));

@@ -99,7 +99,14 @@ Sources: [SHARP model card](https://huggingface.co/apple/Sharp), [SHARP paper](h
 
 ## 7. Log
 
-- **U1 committed 690ca62** (`nearfield: Step Inside keeps a built scene and its Back button when the health probe
+- **U3 (`nearfield service: honest /health …`)**: F8, F10. `/health` is honest without importing torch or loading a model:
+  `models.moge_status(key)` / `da3_status()` check the weights path plus `find_spec` of the package and torch;
+  `models` lists only what is installed (`lift` iff moge2), per-model reasons under `depth`, plus `version`.
+  `SERVICE_VERSION` (`_env.py`, "2026-10-02.1") is hashed into `cache.key` (bump it when outputs change). Client
+  `available()` is true only when ok and (no models field, or models includes moge2); `NearFieldHealth.version?`.
+  Tests: `tools/nearfield/service/tests/test_health.py` (5; service suite 23 OK), +1 vitest in `client.spec.ts`
+  (nearfield dir 402 pass). Service-only and client gate change; no rendering change, no ledger row.
+- **U1 committed a568761** (`nearfield: Step Inside keeps a built scene and its Back button when the health probe
   fails; …`): F1–F7. Specs: `src/lib/nearfield/__tests__/controller.spec.ts` (15: gate, per-pose cache, shared
   in-flight build, low-quality hide, error not cached, service down, pose moved during the call vs during the
   object prior, dispose, probe vs ready, unsupported engine, view options, poseKey, SHARP dev gate),

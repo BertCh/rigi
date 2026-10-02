@@ -20,6 +20,8 @@ TM = ROOT / "tools/research/tm"
 PYLIB = NF / ".pylib"
 SHARP_SRC = PYLIB / "ml-sharp" / "src"
 X2_WEIGHTS = TM / "weights" / "x2"
+# Bump when /depth, /gaussians, /multiview or /inpaint outputs change (code or model weights): it is part of every disk-cache key.
+SERVICE_VERSION = "2026-10-02.1"
 SHARP_CKPT = Path(os.environ.get("NEARFIELD_SHARP_CKPT", HERE / "weights" / "sharp_2572gikvuh.pt"))
 CACHE_DIR = Path(os.environ.get("NEARFIELD_CACHE_DIR", NF / ".cache"))
 GPU_LOCK_FILE = TM / ".gpu.lock"  # same file as tm_common.gpu_lock()

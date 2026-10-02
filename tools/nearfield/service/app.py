@@ -2,7 +2,7 @@
 
     tools/nearfield/run.sh [--host 127.0.0.1] [--port 8767]
 
-GET  /health      -> {ok, models, device, licences, loaded, sharp:{available, reason}, cache}
+GET  /health      -> {ok, version, models (only what is installed), depth:{key:{available, reason}},  device, licences, loaded, sharp:{available, reason}, cache}
 POST /depth       multipart: image, model? (moge2 | moge2b | da3), maxSide? (1024), fovX? (deg, MoGe only),
                   processRes? (da3, 756), nocache? -> NearFieldDepthWire JSON (base64 LE float16 depth/normal, u8 valid)
 POST /gaussians   multipart: image, model? (lift | sharp), depthModel? (lift: moge2|moge2b|da3), maxSide?, stride? (2),
@@ -341,8 +341,13 @@ def one_image(files) -> bytes:
 def health() -> dict:
     ok_sharp, why = models.sharp_status()
     ok_lama, why_lama = inpaint.status()
-    avail = ["moge2", "moge2b", "da3", "lift"] + (["sharp"] if ok_sharp else []) + (["lama"] if ok_lama else [])
-    return {"ok": True, "models": avail, "device": MGR.dev, "loaded": MGR.key, "gpuLockHeld": MGR.gpu.held,
+    depth = {k: dict(zip(("available", "reason"), models.moge_status(k))) for k in models.MOGE}
+    depth["da3"] = dict(zip(("available", "reason"), models.da3_status()))
+    avail = [k for k, v in depth.items() if v["available"]]
+    if depth["moge2"]["available"]:
+        avail.append("lift")  # lift reuses /depth (default MoGe-2 L)
+    avail += (["sharp"] if ok_sharp else []) + (["lama"] if ok_lama else [])
+    return {"ok": True, "version": _env.SERVICE_VERSION, "models": avail, "depth": depth, "device": MGR.dev, "loaded": MGR.key, "gpuLockHeld": MGR.gpu.held,
             "licences": {**models.LICENCES, "lama": inpaint.LICENCE}, "sharp": {"available": ok_sharp, "reason": why},
             "inpaint": {"available": ok_lama, "reason": why_lama, "loaded": inpaint.LAMA.m is not None},
             "endpoints": {"depth": list(DEPTH_MODELS), "gaussians": ["lift", "sharp"], "multiview": ["da3"], "inpaint": ["lama"]},

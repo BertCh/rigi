@@ -1,4 +1,4 @@
-"""Disk cache: key = sha1(endpoint, sha1(image bytes)..., sorted params). LRU by mtime, capped (default 1 GB)."""
+"""Disk cache: key = sha1(SERVICE_VERSION, endpoint, sha1(image bytes)..., sorted params). LRU by mtime, capped (default 1 GB)."""
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +18,7 @@ def cap_bytes() -> int:
 
 def key(endpoint: str, images: list[bytes], params: dict) -> str:
     h = hashlib.sha1()
+    h.update(_env.SERVICE_VERSION.encode())  # stale entries from older code/models become misses
     h.update(endpoint.encode())
     for b in images:
         h.update(hashlib.sha1(b).digest())

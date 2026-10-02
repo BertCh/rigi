@@ -18,7 +18,13 @@ const HEALTH_TIMEOUT_MS = 800;
 const HEALTH_TTL_OK_MS = 60_000;
 const HEALTH_TTL_DOWN_MS = 15_000;
 
-export type NearFieldHealth = { ok: boolean; models: string[]; device: string };
+export type NearFieldHealth = {
+	ok: boolean;
+	models: string[];
+	device: string;
+	/** Service build id (absent on older services). */
+	version?: string;
+};
 export type DepthModel = "moge2" | "da3";
 export type GaussianModel = "sharp" | "lift";
 export type RequestOpts = { signal?: AbortSignal; timeoutMs?: number };
@@ -149,6 +155,7 @@ export class NearFieldClient {
 						ok: true,
 						models: Array.isArray(j.models) ? j.models : [],
 						device: String(j.device ?? ""),
+						...(typeof j.version === "string" ? { version: j.version } : {}),
 					};
 			} catch {
 				h = null;
@@ -163,7 +170,11 @@ export class NearFieldClient {
 	}
 
 	async available(force = false): Promise<boolean> {
-		return (await this.health(force))?.ok === true;
+		const h = await this.health(force);
+		// The app always calls /depth with moge2: a service without it is not usable. Old services report no models.
+		return (
+			h?.ok === true && (h.models.length === 0 || h.models.includes("moge2"))
+		);
 	}
 
 	/** POST /depth. null when the service is down, times out (default 60 s), is aborted or errors. */

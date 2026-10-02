@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import fcntl
 import gc
+import importlib.util
 import math
 import os
 import sys
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 
@@ -56,6 +58,34 @@ def sharp_status() -> tuple[bool, str]:
         except Exception as e:  # noqa: BLE001
             return False, f"SHARP dependency {m} not importable: {e}"
     return True, "ok (research-only weights)"
+
+
+def _spec(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _deps_status(weights: Path, pkg: str) -> tuple[bool, str]:
+    """Cheap availability check: weights on disk and the packages findable, WITHOUT importing torch or loading a model."""
+    try:
+        if not weights.exists():
+            return False, f"weights not found at {weights}"
+        for m in (pkg, "torch"):
+            if not _spec(m):
+                return False, f"python package {m} not installed"
+        return True, "ok"
+    except Exception as e:  # noqa: BLE001
+        return False, f"status check failed: {e}"
+
+
+def moge_status(key: str) -> tuple[bool, str]:
+    return _deps_status(_env.X2_WEIGHTS / MOGE[key] / "model.pt", "moge")
+
+
+def da3_status() -> tuple[bool, str]:
+    return _deps_status(_env.X2_WEIGHTS / DA3_NAME, "depth_anything_3")
 
 
 class GpuLock:
