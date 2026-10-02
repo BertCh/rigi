@@ -343,3 +343,47 @@
 		border-bottom: 2px dotted CanvasText;
 	}
 }
+
+/* Explainer grammar (reports/gipfelbuch-explainers-2026-10-02/grammar.md §1): the motion tokens for
+ * CSS-only motion. Keep in step with viz/motion.ts (MOTION, EASE); __tests__/motion-css.spec.ts pins them. */
+.gb-swiss {
+	--gb-dur-quick: 160ms;
+	--gb-dur-fade: 420ms;
+	--gb-dur-settle: 620ms;
+	--gb-dur-crossfade: 700ms;
+	--gb-dur-draw: 900ms;
+	--gb-ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+	--gb-ease-draw: cubic-bezier(0.55, 0.1, 0.3, 1);
+	--gb-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+	--gb-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes gb-stage-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+/* A pencil progress stroke (pathLength="1", stroke-dasharray 1): draws over --gb-progress-ms. */
+@keyframes gb-progress {
+	from {
+		stroke-dashoffset: 1;
+	}
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.gb-swiss .gb-stage-in {
+		animation: gb-stage-in var(--gb-dur-crossfade) var(--gb-ease-out) both;
+	}
+
+	.gb-swiss .gb-progress {
+		stroke-dasharray: 1;
+		animation: gb-progress var(--gb-progress-ms, 2800ms) linear both;
+	}
+}

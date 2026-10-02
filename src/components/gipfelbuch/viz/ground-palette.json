@@ -1,0 +1,98 @@
+{
+	"demo-01": {
+		"sky": "#afbdd1",
+		"terrain": "#455568",
+		"horizon": "#8ca1bd",
+		"skyL": 0.501,
+		"terrainL": 0.088,
+		"horizonL": 0.347
+	},
+	"demo-02": {
+		"sky": "#9aabbd",
+		"terrain": "#232b2f",
+		"horizon": "#7c92aa",
+		"skyL": 0.397,
+		"terrainL": 0.023,
+		"horizonL": 0.277
+	},
+	"demo-03": {
+		"sky": "#93aacb",
+		"terrain": "#657a6b",
+		"horizon": "#8fa7c5",
+		"skyL": 0.393,
+		"terrainL": 0.177,
+		"horizonL": 0.375
+	},
+	"demo-04": {
+		"sky": "#b7c9dd",
+		"terrain": "#716e76",
+		"horizon": "#99b0ce",
+		"skyL": 0.571,
+		"terrainL": 0.16,
+		"horizonL": 0.423
+	},
+	"demo-05": {
+		"sky": "#bccce0",
+		"terrain": "#738db4",
+		"horizon": "#a0b6d6",
+		"skyL": 0.593,
+		"terrainL": 0.26,
+		"horizonL": 0.458
+	},
+	"demo-06": {
+		"sky": "#b3bfcf",
+		"terrain": "#3f4239",
+		"horizon": "#8fa4bf",
+		"skyL": 0.514,
+		"terrainL": 0.052,
+		"horizonL": 0.362
+	},
+	"demo-07": {
+		"sky": "#a8bedc",
+		"terrain": "#726d56",
+		"horizon": "#9fa9b4",
+		"skyL": 0.503,
+		"terrainL": 0.152,
+		"horizonL": 0.39
+	},
+	"demo-08": {
+		"sky": "#a3b8d8",
+		"terrain": "#716a53",
+		"horizon": "#99a1aa",
+		"skyL": 0.47,
+		"terrainL": 0.144,
+		"horizonL": 0.352
+	},
+	"demo-09": {
+		"sky": "#bacce0",
+		"terrain": "#787c72",
+		"horizon": "#94acc9",
+		"skyL": 0.59,
+		"terrainL": 0.196,
+		"horizonL": 0.4
+	},
+	"demo-10": {
+		"sky": "#99b0d2",
+		"terrain": "#6b6e5a",
+		"horizon": "#8fa2be",
+		"skyL": 0.425,
+		"terrainL": 0.15,
+		"horizonL": 0.354
+	},
+	"demo-11": {
+		"sky": "#b2c9e6",
+		"terrain": "#78725f",
+		"horizon": "#a2b1c5",
+		"skyL": 0.57,
+		"terrainL": 0.169,
+		"horizonL": 0.432
+	},
+	"demo-12": {
+		"sky": "#adc5e2",
+		"terrain": "#857b6a",
+		"horizon": "#a4b1be",
+		"skyL": 0.543,
+		"terrainL": 0.202,
+		"horizonL": 0.431
+	}
+}

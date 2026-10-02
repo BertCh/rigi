@@ -99,8 +99,10 @@ export function useRaf(cb: (t: number, dt: number) => void, active = true) {
 }
 
 /**
- * Seconds since the figure first came into view, re-rendering every frame while it is visible.
- * Attach `ref` to the figure's root. With reduced motion `t` is frozen at `still` (default 2).
+ * Seconds since the figure first came into view, re-rendering at most 30 times a second while it is visible.
+ * Attach `ref` to the figure's root. Where nothing animates (reduced motion, webdriver, print, no
+ * IntersectionObserver: grammar §4) `t` is frozen at `still` (default 2), which should be the figure's
+ * fully informative frame.
  *   const [ref, t] = useTime(); <svg ref={ref}> ... Math.sin(t) ...
  */
 export function useTime<T extends Element = HTMLDivElement>(
@@ -108,13 +110,31 @@ export function useTime<T extends Element = HTMLDivElement>(
 ): [RefObject<T | null>, number] {
 	const [ref, inView] = useInView<T>({ once: false, margin: "80px" });
 	const reduce = useReducedMotion();
+	const [frozen, setFrozen] = useState(true);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: re-read the static rule when reduced motion flips
+	useEffect(() => {
+		const update = () => setFrozen(revealsImmediately());
+		const freeze = () => setFrozen(true);
+		update();
+		window.addEventListener("beforeprint", freeze);
+		window.addEventListener("afterprint", update);
+		return () => {
+			window.removeEventListener("beforeprint", freeze);
+			window.removeEventListener("afterprint", update);
+		};
+	}, [reduce]);
 	const [t, setT] = useState(still);
 	const t0 = useRef<number | null>(null);
-	useRaf((now) => {
-		t0.current ??= now;
-		setT(now - t0.current);
-	}, inView && !reduce);
-	return [ref, reduce ? still : t];
+	useRaf(
+		(now) => {
+			t0.current ??= now;
+			// commit on a 30 fps grid (grammar MOTION.fps): a big SVG need not re-render at 60 Hz
+			const q = Math.floor((now - t0.current) * 30) / 30;
+			setT((p) => (p === q ? p : q));
+		},
+		inView && !reduce && !frozen,
+	);
+	return [ref, reduce || frozen ? still : t];
 }
 
 /** A3: same-document view transition for sheet-to-sheet links, off under reduced motion and webdriver. */

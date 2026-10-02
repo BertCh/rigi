@@ -9,6 +9,18 @@ export { Figure, type FigureImprint } from "./Figure";
 export { FigureSkeleton } from "./FigureSkeleton";
 export type { SpillCursor, SpillEcho } from "./GeoSpill";
 export {
+	contrastRatio,
+	ensureContrast,
+	GROUND_BASE,
+	GROUND_CONTRAST,
+	type GroundPalette,
+	type GroundSurface,
+	type GroundVar,
+	groundPalette,
+	groundVars,
+	mixHex,
+} from "./ground";
+export {
 	scrubValue,
 	useAutoScrub,
 	useDrawOn,
@@ -43,6 +55,43 @@ export {
 } from "./live";
 export { MarginNote } from "./MarginNote";
 export { Eq, Frac, Op, Sym } from "./math";
+export {
+	ARM,
+	ARM_SEQUENCE,
+	BEAT_ORDER,
+	type BeatClock,
+	type BeatKind,
+	type BeatSpec,
+	type Beats,
+	beatScriptProblem,
+	buildTimeline,
+	EASE,
+	type EaseName,
+	ease,
+	MOTION,
+	type Playback,
+	RESET,
+	sampleTimeline,
+	spillTAt,
+	stagger,
+	type Timeline,
+	transitionOf,
+	useArmedInView,
+	useBeatClock,
+	useBeats,
+	useMotionAllowed,
+} from "./motion";
+export {
+	GHOST_OPACITY,
+	type LayerState,
+	layerOpacity,
+	OVERLAY_ROLES,
+	OVERLAY_STACK,
+	OverlayLayer,
+	type OverlayRole,
+	overlayStyle,
+	sortByStack,
+} from "./overlay";
 export { PhotoStory, type PhotoStoryProps } from "./PhotoStory";
 export { Plot, type PlotScale } from "./Plot";
 export { Reveal } from "./Reveal";

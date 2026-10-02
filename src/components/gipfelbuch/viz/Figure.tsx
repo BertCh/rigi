@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { cn } from "#/lib/utils";
 import { TYPE } from "../swiss/type";
+import { type GroundPalette, type GroundSurface, groundVars } from "./ground";
 import { HandSideRule, HandUnderline, seedUnit } from "./hand";
 import { useInView } from "./hooks";
 
@@ -39,6 +40,8 @@ export function Figure({
 	imprint,
 	printCaption = false,
 	pinned,
+	ground,
+	surface = "paper",
 }: {
 	children: ReactNode;
 	caption?: ReactNode;
@@ -65,13 +68,28 @@ export function Figure({
 	printCaption?: boolean;
 	/** The demo photo the figure is fixed on ("demo-10"): a small hand chip "demo-10 · pinned" before the caption. */
 	pinned?: string;
+	/**
+	 * Grammar §3: the photo whose tones the ground takes ("demo-09", or a palette). Sets the `--fig-*`
+	 * vars (wash, sky, terrain and horizon inks, halo) on the figure; the plate and well read `--fig-wash`.
+	 * The photo itself is never filtered. Without it the vars are unset and every reader falls back.
+	 */
+	ground?: string | GroundPalette;
+	/** The ground the vars are computed for: the paper sheet (default) or a dark plate island. */
+	surface?: GroundSurface;
 }) {
 	const [ref, on] = useInView();
 	const lettering = number ?? label;
 	const seed = `fig-${lettering ?? ""}-${typeof caption === "string" ? caption.slice(0, 24) : ""}`;
+	const vars = ground
+		? (groundVars(ground, surface) as CSSProperties)
+		: undefined;
 	return (
 		<figure
 			ref={ref}
+			style={vars}
+			data-ground={
+				vars ? (typeof ground === "string" ? ground : "custom") : undefined
+			}
 			className={cn(
 				"my-12 transition duration-1000 ease-out motion-reduce:transition-none print:translate-y-0 print:opacity-100",
 				on
@@ -107,7 +125,8 @@ export function Figure({
 			<div
 				className={cn(
 					"relative",
-					(well || plate) && "bg-[var(--gb-paper-deep,transparent)]",
+					(well || plate) &&
+						"bg-[var(--fig-wash,var(--gb-paper-deep,transparent))] print:bg-transparent",
 					well && pad && "p-6",
 					plate && "px-4 py-6 sm:px-6",
 				)}
