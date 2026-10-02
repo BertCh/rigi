@@ -67,7 +67,7 @@ The skyline can't see eye-position error; interior error grows as 1/distance. Pl
 | G1 | **WAG-next** (was the WAG-next row). Landed 10-02 (session cd, browser-unverified): sky-worker graph release, no imagery re-upload between matcher views (a15eeca), near-first terrain on 256-layer devices + idle atlas compaction (e499995), lake floor on the GPU height gather, `GPUProgram` lowerings verified on Dawn (a921f82; no further stages qualify), page flags forwarded to workers (5bb8d0a). Open: precision gate on the dev split (both engines), P3 (`/roll` to WebGPU if WebGL becomes fallback-only), imagery overflow eviction, blank first silhouette draw (browser). Plan: [whole-app-graph-plan.md](whole-app-graph-plan.md) | Batch browser pass, then the open items |
 | G2 | **skylineGpu** default: root cause of the IMG_6958 flip is `refinePose` on a wrong-focal seed, not the GPU maths | Off; fix the seed path, then re-run the unknown-pose A/B |
 | G3 | **renderBundles**, **rg11b10** colour target | Wired, opt-in; judge in a batch pass |
-| G4 | luma watch (was LF8) (`node scripts/upstream/luma-watch.mjs`): re-sweep on alpha.3, a moved vendored PR head or deck #10752 activity | Tooling built |
+| G4 | luma watch (was LF8) (`node scripts/upstream/luma-watch.mjs`): re-sweep on alpha.3, a moved vendored PR head or deck #10752 activity | Tooling built; 10-02 run: no trigger fired, no re-sweep ([note](../research_notes/gpu-pod-d-2026-10-02/luma-watch-2026-10-02.md)) |
 | G5 | Animated looks (water, wind) watched live; waves fade by ~10 km | Still-frame only |
 
 ## Later: beta, pilots, service (3–18 months)
