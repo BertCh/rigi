@@ -78,9 +78,22 @@ const config = defineConfig({
 			: [],
 	},
 	// gpu-core is imported lazily (src/lib/gpu/**): on a cold cache Vite would re-optimise on first import
-	// and load a second @luma.gl/core, which breaks graph destroy.
+	// and load a second @luma.gl/core, which breaks graph destroy. The rest are reached only through lazy
+	// imports (the WebGPU engine, tiles3d, Step Inside, lv95): discovered mid-session, they re-optimise and
+	// stale the ?v= hash of an already-loaded graph ("Failed to fetch dynamically imported module" on
+	// deck-webgpu/engine.ts).
 	optimizeDeps: {
-		include: ["@luma.gl/gpgpu/gpu-core"],
+		include: [
+			"@luma.gl/gpgpu/gpu-core",
+			"@luma.gl/gpgpu/gpu-vector-search",
+			"@luma.gl/experimental/gpu-raster",
+			"@luma.gl/splats",
+			"@loaders.gl/core",
+			"@loaders.gl/tiles",
+			"@loaders.gl/3d-tiles/bundled",
+			"@loaders.gl/splats",
+			"@math.gl/proj4",
+		],
 	},
 	server: {
 		// TM research and the test scripts write here constantly: watching it reloaded pages mid-test
