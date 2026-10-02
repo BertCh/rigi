@@ -8,8 +8,10 @@
 import { Deck, picking, project, project32 } from "@deck.gl/core";
 import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
+import { getFlag } from "#/lib/flags";
 import { RAISED_LIMITS, resetComputeDevice } from "#/lib/gpu/core/device";
 import { adoptRenderDevice } from "#/lib/gpu/device";
+import { applyColorTargetFormat } from "./targets";
 
 /** Features the renderer cannot run without: rgba32float geometry targets and r32float height
  * arrays are bound as filterable `texture_2d<f32>` (README rule 14). */
@@ -264,6 +266,8 @@ export async function createWebgpuDeck(
  * that couples the renderer and src/lib/gpu.
  */
 export function adoptForCompute(device: Device) {
+	// opt-in ?colorTarget=rg11b10 (targets.ts): chosen once per device, before any target exists
+	applyColorTargetFormat(device, getFlag("colorTarget"));
 	adoptRenderDevice(device);
 }
 

@@ -49,6 +49,12 @@ export const FLAG_SCHEMA = {
 	backend: oneOf(["auto", "webgpu", "webgl"], "auto"),
 	/** off: ?renderer=auto / webgpu act as if navigator.gpu were missing (proves the WebGL fallback) */
 	webgpu: onOff("on"),
+	/**
+	 * WebGPU colour-pass format (src/lib/deck-webgpu/targets.ts): rgba16 (default) or rg11b10 = rg11b10ufloat for
+	 * the 4x MSAA target + resolve (half the VRAM, NO destination alpha: only for views the sky covers). Needs the
+	 * rg11b10ufloat-renderable feature, else rgba16.
+	 */
+	colorTarget: oneOf(["rgba16", "rg11b10"], "rgba16"),
 	/** deck only: one instanced grid per resolution, or one mesh per tile */
 	terrain: oneOf(["batched", "tiles"], "batched"),
 	// GPU compute sidecar (src/lib/gpu); the CPU path is always the reference

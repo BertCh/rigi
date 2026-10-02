@@ -102,6 +102,8 @@ const device = (await luma.createDevice({
 	type: "webgpu",
 	adapters: [webgpuAdapter],
 	createCanvasContext: false,
+	// ?colorTarget=rg11b10 variants (enumerateColorTargetRg11b10)
+	optionalFeatures: ["rg11b10ufloat-renderable"],
 } as never)) as Device;
 const raw = (device as unknown as { handle: GPUDevice }).handle;
 
@@ -813,12 +815,97 @@ async function enumerateKernels() {
 		});
 }
 
+// ---- ?colorTarget=rg11b10 --------------------------------------------------------------------------------------
+// The colour-pass programs whose pipeline declares the MSAA colour format (passModelProps("color")), rebuilt
+// with the opt-in rg11b10ufloat format (targets.ts applyColorTargetFormat), then the default restored.
+
+async function enumerateColorTargetRg11b10() {
+	if (!device.features.has("rg11b10ufloat-renderable" as never)) {
+		skipped.push("colortarget: device lacks rg11b10ufloat-renderable");
+		return;
+	}
+	const { applyColorTargetFormat, getColorTargetFormat } = await import(
+		"../../src/lib/deck-webgpu/targets"
+	);
+	if (applyColorTargetFormat(device, "rg11b10") !== "rg11b10ufloat")
+		throw new Error("applyColorTargetFormat did not select rg11b10ufloat");
+	try {
+		const fakeCtx = {
+			kind: "color",
+			target: {
+				width: 64,
+				height: 64,
+				colorFormats: [getColorTargetFormat()],
+				depthFormat: "depth24plus",
+				samples: 4,
+			},
+		} as never;
+		const g = "colortarget";
+		const { TrailCore } = await import(
+			"../../src/lib/deck-webgpu/layers/trail"
+		);
+		await compileVariant(g, "rg11b10 trail", () => [
+			(new TrailCore(device) as never as { model(): ModelType }).model(),
+		]);
+		const { FlowCore } = await import("../../src/lib/deck-webgpu/layers/flow");
+		await compileVariant(g, "rg11b10 flow draw", () => [
+			(new FlowCore(device) as never as { model(): ModelType }).model(),
+		]);
+		const { GizmoCore } = await import(
+			"../../src/lib/deck-webgpu/layers/gizmo"
+		);
+		for (const part of ["plane", "edges", "pin"])
+			await compileVariant(g, `rg11b10 gizmo ${part}`, () => [
+				(
+					new GizmoCore("g", device) as never as {
+						model(d: Device, p: string): ModelType;
+					}
+				).model(device, part),
+			]);
+		const { SplatsCore } = await import(
+			"../../src/lib/deck-webgpu/layers/splats"
+		);
+		await compileVariant(g, "rg11b10 splats color", () => [
+			(
+				new SplatsCore(device) as never as { model(k: string): ModelType }
+			).model("color"),
+		]);
+		const { MultiDrapeCore } = await import(
+			"../../src/lib/deck-webgpu/layers/multi-drape"
+		);
+		await compileVariant(g, "rg11b10 multi-drape", () => [
+			(
+				new MultiDrapeCore(device) as never as { model(c: unknown): ModelType }
+			).model(fakeCtx),
+		]);
+		const { SKY_WGSL, skyModule, atmosphereModule, skyParameters } =
+			await import("../../src/lib/deck-webgpu/layers/atm-sky");
+		const { cameraModule } = await import("../../src/lib/deck-webgpu/camera");
+		await compileVariant(g, "rg11b10 world sky", () => [
+			new Model(device, {
+				id: "world-sky-compile-rg11b10",
+				source: SKY_WGSL,
+				vertexEntryPoint: "fullscreenVertex",
+				fragmentEntryPoint: "fragmentMain",
+				modules: [cameraModule, atmosphereModule, skyModule] as never,
+				...passModelProps("color", { depth: "test" }),
+				parameters: skyParameters(),
+				topology: "triangle-list",
+				vertexCount: 3,
+			} as never),
+		]);
+	} finally {
+		applyColorTargetFormat(device, "rgba16");
+	}
+}
+
 // ---- run ---------------------------------------------------------------------------------------------------------
 
 await enumerateTerrain();
 for (const run of pending) await run();
 await enumerateComposite();
 await enumerateLayers();
+await enumerateColorTargetRg11b10();
 await enumerateKernels();
 
 if (LIST) process.exit(0);

@@ -163,6 +163,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "colorTarget",
+		label: "Colour target",
+		help: "WebGPU colour pass format. rg11b10 halves the MSAA colour VRAM but has no alpha: experimental, only for views the sky fully covers.",
+		group: "render",
+		options: { rgba16: "RGBA16F (default)", rg11b10: "RG11B10 (no alpha)" },
+	},
+	{
 		name: "gpu",
 		label: "WebGPU (master)",
 		help: "Kill switch for every GPU kernel below. Off runs everything on the CPU.",

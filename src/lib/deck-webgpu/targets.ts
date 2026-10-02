@@ -21,7 +21,12 @@
 //                             does photo·(1 − a) + rgb and encodes sRGB.
 //
 // Row order: WebGPU textures are top-down (row 0 = top of the image), unlike WebGL readPixels.
-import type { Device, Framebuffer, Texture } from "@luma.gl/core";
+import type {
+	Device,
+	Framebuffer,
+	Texture,
+	TextureFormat,
+} from "@luma.gl/core";
 import { REVERSED_Z } from "./depth";
 
 /** GPUTextureUsage bits (luma's Texture.* statics mirror these). */
@@ -36,18 +41,79 @@ export const USAGE = {
 /** Readable by render passes, compute kernels (storage + sampled) and CPU readback. */
 const SHARED = USAGE.RENDER | USAGE.SAMPLE | USAGE.STORAGE | USAGE.COPY_SRC;
 
+/**
+ * Opt-in colour-pass format (?colorTarget=rg11b10): rg11b10ufloat (4 B/px, no alpha channel) for the
+ * 4x MSAA target and its resolve instead of rgba16float (8 B/px). It carries NO destination alpha, so
+ * the compositor reads alpha = 1 everywhere: only correct for views whose colour pass covers every
+ * pixel (world view with sky). Set once, before any ColorTargets / pipeline exists, by
+ * applyColorTargetFormat (device.ts); default rgba16float.
+ */
+export type ColorTargetFormat = "rgba16float" | "rg11b10ufloat";
+let colorTargetFormat: ColorTargetFormat = "rgba16float";
+
+/** Which format the colour pass uses now. */
+export function getColorTargetFormat(): ColorTargetFormat {
+	return colorTargetFormat;
+}
+
+/**
+ * Select the colour-pass format: `requested` rg11b10 is honoured only when the device grants
+ * rg11b10ufloat-renderable (MSAA and resolve are then both rg11b10ufloat), else rgba16float.
+ * Returns the format in force.
+ */
+export function applyColorTargetFormat(
+	device: Pick<Device, "features">,
+	requested: "rgba16" | "rg11b10",
+): ColorTargetFormat {
+	colorTargetFormat =
+		requested === "rg11b10" &&
+		device.features.has("rg11b10ufloat-renderable" as never)
+			? "rg11b10ufloat"
+			: "rgba16float";
+	return colorTargetFormat;
+}
+
+/** Bytes per pixel of the colour pass attachments (MSAA + resolve) for a format, analytic VRAM. */
+export function colorPassBytes(
+	width: number,
+	height: number,
+	format: ColorTargetFormat,
+	samples = MSAA_SAMPLES,
+) {
+	const bpp = format === "rgba16float" ? 8 : 4;
+	return width * height * bpp * (samples + 1);
+}
+
 export const TARGET_FORMATS = {
-	geometry: { format: "rgba32float", usage: SHARED, samples: 1 },
-	normal: { format: "rgba16float", usage: SHARED, samples: 1 },
+	geometry: { format: "rgba32float" as const, usage: SHARED, samples: 1 },
+	normal: { format: "rgba16float" as const, usage: SHARED, samples: 1 },
 	geometryDepth: {
-		format: REVERSED_Z.format,
+		format: REVERSED_Z.format as TextureFormat,
 		usage: USAGE.RENDER | USAGE.SAMPLE | USAGE.COPY_SRC,
 		samples: 1,
 	},
-	colorMS: { format: "rgba16float", usage: USAGE.RENDER, samples: 4 },
-	colorDepthMS: { format: REVERSED_Z.format, usage: USAGE.RENDER, samples: 4 },
-	color: { format: "rgba16float", usage: SHARED, samples: 1 },
-} as const;
+	get colorMS() {
+		return {
+			format: colorTargetFormat,
+			usage: USAGE.RENDER,
+			samples: 4,
+		} as const;
+	},
+	colorDepthMS: {
+		format: REVERSED_Z.format as TextureFormat,
+		usage: USAGE.RENDER,
+		samples: 4,
+	},
+	get color() {
+		// rg11b10ufloat is not a storage format: compute reads the resolve as a sampled texture only
+		return {
+			format: colorTargetFormat,
+			usage:
+				colorTargetFormat === "rgba16float" ? SHARED : SHARED & ~USAGE.STORAGE,
+			samples: 1,
+		} as const;
+	},
+};
 
 export const GEOMETRY_LONG_SIDE = 1024;
 export const MSAA_SAMPLES = 4;
@@ -59,7 +125,11 @@ export function geometrySize(aspect: number, longSide = GEOMETRY_LONG_SIDE) {
 		: { width: Math.max(1, Math.round(longSide * aspect)), height: longSide };
 }
 
-type Spec = (typeof TARGET_FORMATS)[keyof typeof TARGET_FORMATS];
+type Spec = {
+	format: TextureFormat;
+	usage: number;
+	samples: number;
+};
 
 function tex(
 	device: Device,
@@ -283,8 +353,10 @@ export const PASS_ATTACHMENTS = {
 		sampleCount: 1,
 	},
 	color: {
-		colorAttachmentFormats: [TARGET_FORMATS.colorMS.format],
+		get colorAttachmentFormats() {
+			return [TARGET_FORMATS.colorMS.format] as const;
+		},
 		depthStencilAttachmentFormat: REVERSED_Z.format,
 		sampleCount: MSAA_SAMPLES,
 	},
-} as const;
+};
