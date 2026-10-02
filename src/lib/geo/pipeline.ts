@@ -58,12 +58,10 @@ export async function sceneHorizon(
 	eye: number,
 ): Promise<HorizonProfile> {
 	try {
-		return (await import("../horizon-fast/march")).computeHorizonFastCompat(
-			terrain,
-			lat,
-			lon,
-			eye,
-		);
+		// `return await`: the fallback must also catch a rejection, should the march become async
+		return await (
+			await import("../horizon-fast/march")
+		).computeHorizonFastCompat(terrain, lat, lon, eye);
 	} catch (e) {
 		console.warn("[pipeline] horizon-fast failed, using computeHorizon", e);
 		return computeHorizon(terrain, lat, lon, eye);
@@ -79,9 +77,12 @@ export type CascadeOptions = {
 export type CascadeStage = "solve" | "refine";
 
 /**
- * solvePose, escalating a reject to refinePose (scripts/eval.ts SOLVER=cascade). Returns the first
- * accepting stage, else solvePose's (with no heading, refine's rejected pose can be 130–175° off),
- * plus every stage that ran as `candidates`.
+ * solvePose, escalating a reject to refinePose. Returns the first accepting stage, else solvePose's
+ * (with no heading, refine's rejected pose can be 130–175° off), plus every stage that ran as
+ * `candidates`. scripts/eval.ts SOLVER=cascade and tools/bench/harness/cascade.ts keep their own
+ * copies of this rule; __tests__/pipeline-escalate.spec.ts pins this one. Refine accepts at its own
+ * 0.5 bar: a caller with no heading or focal must apply the 0.75 bar itself (unknown-pose-core.ts,
+ * src/baseline-ui/align-options.ts).
  */
 export function cascade(
 	prior: Camera,

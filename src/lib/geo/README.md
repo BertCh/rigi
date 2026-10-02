@@ -46,7 +46,7 @@ The UI is at `/baseline` (`src/routes/baseline.tsx`, `src/baseline-ui/`), with 1
 
 ## Accuracy (2026-09-24, 12 hand-registered photos in `data/ground-truth.json`)
 
-**Recommended pipeline: `detectSkyline` → `solvePose` → on reject, `refinePose` (the cascade).** This is what `/baseline` Auto-align runs. Reproduce it with `SOLVER=cascade npm run baseline:eval`.
+**Recommended pipeline: `detectSkyline` → `solvePose` → on reject, `refinePose` (the cascade).** This is what `/baseline` Auto-align runs (for a photo without a compass, gravity or focal length, with the unknown-pose options and the 0.75 bar: `src/baseline-ui/align-options.ts`). Reproduce it with `SOLVER=cascade npm run baseline:eval`.
 
 | Variant (`SKY=… SOLVER=… npm run baseline:eval`) | accepted | false accepts | worst accepted yaw | median final yaw / skyline | skyline ≤10 px |
 |---|---|---|---|---|---|
