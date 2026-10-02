@@ -20,6 +20,10 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - Near field (S1 prep, opt-in): cliff-lip anchoring (`nearfield/cliff-lip.ts`, `AnchorOpts.cliffLip`, flag `anchorCliff`, off by default) drops DEM range discontinuities and the lip face from the anchor fit; `nearfield/anchor-parity.ts` compares the DEM grids two engines feed the anchor; segmenter licence shortlist in `research_notes/segmenter-shortlist-2026-10-02/`.
 - **`?colorTarget=rg11b10` is now downgraded to rgba16float with a console warning** (rg11b10ufloat has no destination alpha: the photo overlay turns opaque and the world sky, blended under with `one-minus-dst-alpha`, is never drawn). `?colorTarget=rg11b10-unsafe` forces the old behaviour for experiments.
 
+### Code health, Pod A (2026-10-02, N7)
+
+- fixes for CR-12 (sky device loss → WASM), CR-14 (imagery bitmap LRU, both engines), CR-40 (DeckHost one draw per frame), CR-45 (terrain slot allocator at the layer cap), CR-52 (ownerless render locks reclaimed, memory wait bounded), CR-W6 (TopoBoard keeps dragged cards across resize; `unpack --keep-prior` null pose), and four new review findings: CR-70 sky idle release on the request queue, CR-71 IDB open timeout closing a live connection, CR-72 render lock reclaiming a live owner when `ps` fails, CR-73 roll import leaving photos "saving" after a failed save. `buildTrailSegments` wrote the densify step index as the trail class (recolour threw). About 350 new Vitest specs (deck/deck-webgpu, gpu CPU-side, upload, sky, cache, geocam map, unknown-pose core, nearfield cameras); dead `SHARED_MODULES` / `IMAGERY_LAYER_SIZE` exports removed. Runtime fixes are browser-unverified.
+
 ### Unit test system (2026-10-01)
 
 - **Vitest.** `npm test` runs the unit suite: `*.spec.ts` under node and `*.spec.tsx` (React components) under happy-dom, configured in `vitest.config.ts` without the app's Vite plugins. `npm run test:watch`, `npm run test:coverage` (v8, `out/coverage`, ratchet thresholds). Conventions and helpers in `src/test/README.md` (`src/test/helpers.ts`, `src/test/dom.ts`, `src/test/setup.ts`).
