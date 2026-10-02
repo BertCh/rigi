@@ -135,20 +135,29 @@ class IdbStore implements ByteStore {
 				if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
 			};
 			const opened = reqP(req);
-			const db = await Promise.race([
-				opened,
-				// a blocked/hung open (another tab mid-upgrade) must not stall tile loading
-				new Promise<never>((_, rej) =>
-					setTimeout(() => {
-						// a late open must not leak its connection
-						opened.then(
-							(late) => late.close(),
-							() => {},
-						);
-						rej(new Error("idb open timeout"));
-					}, 3000),
-				),
-			]);
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			let timedOut = false;
+			let db: IDBDatabase;
+			try {
+				db = await Promise.race([
+					opened,
+					// a blocked/hung open (another tab mid-upgrade) must not stall tile loading
+					new Promise<never>((_, rej) => {
+						timer = setTimeout(() => {
+							timedOut = true;
+							// a late open must not leak its connection (only closed when it
+							// really lost the race, never a connection that opened in time)
+							opened.then(
+								(late) => late.close(),
+								() => {},
+							);
+							rej(new Error("idb open timeout"));
+						}, 3000);
+					}),
+				]);
+			} finally {
+				if (!timedOut) clearTimeout(timer);
+			}
 			// another tab upgrades / deletes the database: release ours
 			db.onversionchange = () => db.close();
 			return new IdbStore(db);
