@@ -305,15 +305,30 @@ export class Runtime {
 		purgeBuffers(this.device);
 	}
 
-	/** A ready storage holding `data` (written in queue order). */
+	/** Live exact (weight) buffers, for the device memory ledger (weightBytes). */
+	private exactBuffers = new Set<Buffer>();
+
 	/** A dedicated buffer of exactly `bytes` (weights; destroyed, never recycled). */
 	allocateExact(bytes: number): Buffer {
-		return this.device.createBuffer({
+		const b = this.device.createBuffer({
 			id: "nn-weight",
 			usage: STORAGE,
 			byteLength: bytes,
 		});
+		this.exactBuffers.add(b);
+		return b;
 	}
+
+	/** Bytes of the live weight buffers (destroyed ones are pruned here). */
+	weightBytes(): number {
+		let n = 0;
+		for (const b of this.exactBuffers)
+			if (b.destroyed) this.exactBuffers.delete(b);
+			else n += b.byteLength;
+		return n;
+	}
+
+	/** A ready storage holding `data` (written in queue order). */
 
 	upload(data: ArrayBufferView, dtype: DType, exact = false): Storage {
 		const st = new Storage(pad4(data.byteLength), dtype, null);

@@ -47,11 +47,17 @@ export async function getNn(
 	let nn = entry.get(consumer);
 	if (!nn) {
 		const forDevice = device;
-		nn = import("./gpu/gpu-nn")
-			.then(
-				({ GpuNn }): Nn =>
-					new GpuNn(forDevice, { graphGroup: nnGraphGroup(consumer) }),
-			)
+		nn = Promise.all([import("./gpu/gpu-nn"), import("#/lib/gpu/core/memory")])
+			.then(([{ GpuNn }, { registerDeviceBytes }]): Nn => {
+				const created = new GpuNn(forDevice, {
+					graphGroup: nnGraphGroup(consumer),
+				});
+				// the device memory ledger (gpu/core deviceBytes) counts this runtime's weights
+				registerDeviceBytes(forDevice, `nn-weights/${consumer}`, () =>
+					created.runtime.weightBytes(),
+				);
+				return created;
+			})
 			.catch((e) => {
 				console.warn(`[nn] no GPU runtime for ${consumer}`, e);
 				return null;

@@ -8,6 +8,13 @@ import { describe, expect, it, vi } from "vitest";
 const released = vi.hoisted(() => ({
 	nn: [] as unknown[],
 	groups: [] as string[],
+	ledger: new Map<string, () => number>(),
+}));
+vi.mock("#/lib/gpu/core/memory", () => ({
+	registerDeviceBytes: (_d: unknown, name: string, bytes: () => number) => {
+		released.ledger.set(name, bytes);
+		return () => released.ledger.delete(name);
+	},
 }));
 vi.mock("#/lib/gpu/core/graph", () => ({
 	releaseCachedGraphs: async (_d: unknown, group?: string) => {
@@ -16,6 +23,7 @@ vi.mock("#/lib/gpu/core/graph", () => ({
 }));
 vi.mock("../gpu/gpu-nn", () => ({
 	GpuNn: class {
+		runtime = { weightBytes: () => 1234 };
 		async release() {
 			released.nn.push(this);
 		}
@@ -117,5 +125,13 @@ describe("releaseNn", () => {
 		await releaseNn("never-made", fakeDevice().device);
 		await releaseNn("x", null);
 		expect(released.nn).toEqual([]);
+	});
+});
+
+describe("device memory ledger", () => {
+	it("registers each runtime's weight bytes", async () => {
+		const { device } = fakeDevice();
+		await getNn("ledger", device);
+		expect(released.ledger.get("nn-weights/ledger")?.()).toBe(1234);
 	});
 });
