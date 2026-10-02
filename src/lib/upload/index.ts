@@ -262,7 +262,7 @@ export async function refreshLocalRegion(
 		...opts,
 		force: true,
 	});
-	// a partial refetch (trails failed) must not wipe trails the stored region already has
+	// a refetch carries no trails (they are fetched on demand); keep the stored region's trails
 	const keepTrails = !fresh.trails.length && !!old?.trails?.length;
 	const region = await attachPhotoToRegion(
 		keepTrails && old ? { ...fresh, trails: old.trails } : fresh,
