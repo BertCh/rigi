@@ -162,6 +162,7 @@ export class LocalNearFieldClient {
 		device: Device | null;
 	} | null> | null = null;
 	private reachable: { ok: boolean; at: number } | null = null;
+	private gpuNn: { device: Device; nn: Promise<Nn | null> } | null = null;
 	private photos = new WeakMap<Blob, Promise<PhotoResult | null>>();
 
 	constructor(opts: { tokens?: number } = {}) {
@@ -171,7 +172,10 @@ export class LocalNearFieldClient {
 	/** Same shape as the service's /health. ok = WebGPU compute + reachable weights. */
 	async health(force = false) {
 		const device = await getComputeDevice().catch(() => null);
-		const ok = !!device && (await this.weightsReachable(force));
+		const ok =
+			!!device &&
+			!!(await this.nnFor(device)) &&
+			(await this.weightsReachable(force));
 		return {
 			ok,
 			models: ok ? ["moge2", "lift"] : [],
@@ -207,13 +211,27 @@ export class LocalNearFieldClient {
 		return ok;
 	}
 
+	/** The nn GPU backend on `device` (null when it cannot be created: no WebGPU kernels → unavailable). */
+	private nnFor(device: Device): Promise<Nn | null> {
+		if (this.gpuNn?.device !== device) {
+			const nn = import("#/lib/nn")
+				.then(({ createNn }) => createNn({ device, backend: "gpu" }))
+				.catch((e) => {
+					console.warn("[nearfield] no nn GPU backend", e);
+					return null;
+				});
+			this.gpuNn = { device, nn };
+		}
+		return this.gpuNn.nn;
+	}
+
 	private load(onProgress?: (message: string) => void) {
 		if (!this.loaded) {
 			const p = (async () => {
 				const device = await getComputeDevice();
 				if (!device) return null;
-				const { createNn } = await import("#/lib/nn");
-				const nn: Nn = await createNn({ device, backend: "gpu" });
+				const nn = await this.nnFor(device);
+				if (!nn) return null;
 				const total = modelEntry(MOGE2_VITS.file)?.bytes ?? 0;
 				const net = await MogeDepthNet.load(nn, {
 					onProgress: (loaded, t) =>
