@@ -34,6 +34,7 @@ import {
 } from "../src/lib/style/schema.ts";
 import {
 	createStyleStore,
+	DEFAULT_STYLE_STATE,
 	parseStoredState,
 	STYLE_STORAGE_KEY,
 	urlPreset,
@@ -614,30 +615,39 @@ ok(
 // ---- 7. store: storage, fallback, ?style=, cross-tab --------------------------------------------
 {
 	ok(
-		eq(parseStoredState(null), { preset: "classic", overrides: {} }),
-		"empty storage → classic",
+		eq(parseStoredState(null), {
+			preset: DEFAULT_STYLE_STATE.preset,
+			overrides: {},
+		}),
+		"empty storage → default",
 	);
 	ok(
-		eq(parseStoredState("{nope"), { preset: "classic", overrides: {} }),
-		"corrupt JSON → classic",
+		eq(parseStoredState("{nope"), {
+			preset: DEFAULT_STYLE_STATE.preset,
+			overrides: {},
+		}),
+		"corrupt JSON → default",
 	);
 	ok(
 		eq(parseStoredState('{"v":2,"preset":"night","overrides":{}}'), {
-			preset: "classic",
+			preset: DEFAULT_STYLE_STATE.preset,
 			overrides: {},
 		}),
-		"unknown version → classic",
+		"unknown version → default",
 	);
 	ok(
 		eq(parseStoredState('{"v":1,"preset":"zzz","overrides":{}}'), {
-			preset: "classic",
+			preset: DEFAULT_STYLE_STATE.preset,
 			overrides: {},
 		}),
-		"unknown preset → classic",
+		"unknown preset → default",
 	);
 	ok(
-		eq(parseStoredState("[1,2]"), { preset: "classic", overrides: {} }),
-		"array → classic",
+		eq(parseStoredState("[1,2]"), {
+			preset: DEFAULT_STYLE_STATE.preset,
+			overrides: {},
+		}),
+		"array → default",
 	);
 	ok(
 		eq(
@@ -677,7 +687,10 @@ ok(
 	const s = createStyleStore(env);
 	let n = 0;
 	s.subscribe(() => n++);
-	ok(s.getStyle() === CLASSIC, "store starts at classic");
+	ok(
+		s.getStyle() === presetStyle(DEFAULT_STYLE_STATE.preset),
+		"store starts at the default look",
+	);
 	s.setPreset("night");
 	ok(
 		s.getState().preset === "night" &&
@@ -723,12 +736,20 @@ ok(
 	);
 	ext?.(null);
 	ok(
-		s.getState().preset === "classic",
-		"cleared storage in another tab → classic",
+		s.getState().preset === DEFAULT_STYLE_STATE.preset,
+		"cleared storage in another tab → default",
 	);
 	s.setPreset("night");
+	s.setState({ preset: DEFAULT_STYLE_STATE.preset, overrides: {} });
+	ok(
+		!mem.has(STYLE_STORAGE_KEY),
+		"the default look with no overrides removes the key",
+	);
 	s.setState({ preset: "classic", overrides: {} });
-	ok(!mem.has(STYLE_STORAGE_KEY), "classic with no overrides removes the key");
+	ok(
+		mem.has(STYLE_STORAGE_KEY),
+		"classic is stored once it is not the default",
+	);
 	s.dispose();
 	ok(ext === null, "dispose unsubscribes");
 
@@ -770,7 +791,10 @@ ok(
 		"throwing storage: in-memory only",
 	);
 	const none = createStyleStore();
-	ok(none.getStyle() === CLASSIC, "no storage → classic");
+	ok(
+		none.getStyle() === presetStyle(DEFAULT_STYLE_STATE.preset),
+		"no storage → default look",
+	);
 }
 
 // ---- 7. colour helpers + labels (the three.js adapter checks went with that renderer, 2026-10-01) ----

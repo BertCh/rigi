@@ -22,14 +22,15 @@ import type { DeepPartial, PresetId, StyleState, ViewStyle } from "./types";
 export const STYLE_STORAGE_KEY = storageKey("viewStyle");
 export const STYLE_URL_PARAM = "style";
 
+/** The app's default look: Landeskarte (preset id "swiss"). Classic stays selectable and byte-identical. */
 export const DEFAULT_STYLE_STATE: StyleState = {
-	preset: "classic",
+	preset: "swiss",
 	overrides: {},
 };
 
 type Stored = { v: 1; preset: PresetId; overrides: DeepPartial<ViewStyle> };
 
-/** Untrusted JSON (storage) → a valid StyleState; anything unusable → classic. */
+/** Untrusted JSON (storage) → a valid StyleState; anything unusable → the default look. */
 export function parseStoredState(raw: string | null | undefined): StyleState {
 	if (!raw) return DEFAULT_STYLE_STATE;
 	let v: unknown;
@@ -103,7 +104,9 @@ export function createStyleStore(env: StyleStoreEnv = {}): StyleStore {
 	};
 	const apply = (next: StyleState) => {
 		const clean: StyleState = {
-			preset: isPresetId(next.preset) ? next.preset : "classic",
+			preset: isPresetId(next.preset)
+				? next.preset
+				: DEFAULT_STYLE_STATE.preset,
 			overrides: pruneOverrides(next.overrides),
 		};
 		if (serializeState(clean) === serializeState(state)) return false;
@@ -124,7 +127,10 @@ export function createStyleStore(env: StyleStoreEnv = {}): StyleStore {
 		if (!apply(n)) return;
 		if (!fromUrl) {
 			try {
-				if (state.preset === "classic" && !Object.keys(state.overrides).length)
+				if (
+					state.preset === DEFAULT_STYLE_STATE.preset &&
+					!Object.keys(state.overrides).length
+				)
 					env.storage?.removeItem(STYLE_STORAGE_KEY);
 				else env.storage?.setItem(STYLE_STORAGE_KEY, serializeState(state));
 			} catch {
@@ -190,7 +196,7 @@ function safeLocalStorage(): StorageLike | null {
 	}
 }
 
-/** The app-wide store (lazy, browser only; on the server it is a memory store at classic). */
+/** The app-wide store (lazy, browser only; on the server it is a memory store at the default look). */
 export function getStyleStore(): StyleStore {
 	if (browserStore) return browserStore;
 	const hasWindow = typeof window !== "undefined";
@@ -212,7 +218,7 @@ export function getStyleStore(): StyleStore {
 }
 
 const serverState = () => DEFAULT_STYLE_STATE;
-const serverStyle = () => presetStyle("classic");
+const serverStyle = () => presetStyle(DEFAULT_STYLE_STATE.preset);
 
 /** [resolved style, stored state, setter]. Re-renders on local edits and on edits in other tabs. */
 export function useViewStyle(): [
