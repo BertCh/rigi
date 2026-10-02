@@ -99,6 +99,19 @@ describe("priorsFromPhoto", () => {
 		expect(p.roll).toEqual({ value: -1, sigma: 2 });
 		expect(p.position?.sigmaV).toBe(30);
 	});
+	it("treats a null heading, pitch or roll (PhotoMeta) as unknown, not a prior at 0°", () => {
+		const p = priorsFromPhoto({
+			vfov: 50,
+			hAccuracy: null,
+			heading: null,
+			pitch: null,
+			roll: null,
+		});
+		expect(p.yaw).toEqual({ value: 0, sigma: undefined });
+		expect(p.pitch).toEqual({ value: 0, sigma: undefined });
+		expect(p.roll).toEqual({ value: 0, sigma: undefined });
+		expect(p.position?.sigmaH).toBe(15);
+	});
 	it("honours overrides and copies the eye", () => {
 		const eye = [1, 2, 3];
 		const p = priorsFromPhoto(

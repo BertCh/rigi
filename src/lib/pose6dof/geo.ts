@@ -83,7 +83,10 @@ export function azimuthCorr(
 /**
  * Priors from photo metadata as stored in public/photos/photos.json.
  * Defaults: σH = max(hAccuracy, 5) m, σV = max(1.5·σH, 10) m, gravity σ 2°, compass σ 10°
- * (unknown if no heading), vfov σ 3 %.
+ * (unknown if no heading), vfov σ 3 %. A missing heading, pitch or roll may be undefined or null
+ * (PhotoMeta stores null); either leaves that angle unknown instead of a confident prior at 0°.
+ * `heading` must be TRUE north: pass `priorHeading(photo)` (geocam/priors/heading.ts) for uploads
+ * whose EXIF ref is magnetic.
  *
  * `o.eye` is the absolute eye position in the correspondences' frame. With the app's engine frame
  * (engineFrame / EnuFrame(lat, lon, 0)) it MUST be `[engine.eye.x, engine.eye.y, engine.eye.z]`;
@@ -91,10 +94,10 @@ export function azimuthCorr(
  */
 export function priorsFromPhoto(
 	photo: {
-		hAccuracy?: number;
-		heading?: number;
-		pitch?: number;
-		roll?: number;
+		hAccuracy?: number | null;
+		heading?: number | null;
+		pitch?: number | null;
+		roll?: number | null;
 		vfov: number;
 	},
 	o: {
@@ -115,15 +118,15 @@ export function priorsFromPhoto(
 		},
 		yaw: {
 			value: photo.heading ?? 0,
-			sigma: photo.heading === undefined ? undefined : (o.compassSigma ?? 10),
+			sigma: photo.heading == null ? undefined : (o.compassSigma ?? 10),
 		},
 		pitch: {
 			value: photo.pitch ?? 0,
-			sigma: photo.pitch === undefined ? undefined : (o.gravitySigma ?? 2),
+			sigma: photo.pitch == null ? undefined : (o.gravitySigma ?? 2),
 		},
 		roll: {
 			value: photo.roll ?? 0,
-			sigma: photo.roll === undefined ? undefined : (o.gravitySigma ?? 2),
+			sigma: photo.roll == null ? undefined : (o.gravitySigma ?? 2),
 		},
 		vfov: { value: photo.vfov, sigma: photo.vfov * (o.vfovSigmaFrac ?? 0.03) },
 	};
