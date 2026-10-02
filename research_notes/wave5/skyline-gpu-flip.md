@@ -60,7 +60,11 @@ solve support), never add one; precision-wise that is the direction to check, se
 
 Evidence (dev, GT-12, CPU path, node):
 - `src/lib/integration/focal-seed-noise.check.ts` (row noise 0, 1e-6, 1e-5, 1e-4, 1e-3 px on IMG_6958 none+nofocal):
-  see the result table in the commit message; CI row `focal-seed-noise` (SKIPs without the gitignored inputs).
+  with 4 noise realisations per level (`... IMG_6958 4`, 17 CPU solves): the post-fix decision is accept in all 17; the
+  pre-fix rule (`isAmbiguousFocal(..., false)`, computed from the same seeds) flips to reject in 3 of 17 (1e-5 #3, 1e-4 #2,
+  1e-3 #2: seed 3 solve 0.063..0.064 -> refine accept 0.69..0.70 at yaw 47.5) and is accept in the other 14. The default
+  run (1 realisation per level, CI row `focal-seed-noise`, SKIPs without the gitignored inputs) does not hit a flipping
+  realisation; the 4-realisation run does. Flipping is by realisation, not monotone in amplitude.
 - `scripts/gpu/unknown-gpu-node.ts --set gt12 --unknown-gpu off --skyline-gpu off`, before vs after: 60 decisions
   (12 photos x 5 conditions; the harness's GT-12 set), 0 changed (accept, pose and confidence all identical), 34 accepts
   before and after, no new accept. The wild set was not run (sealed / out of scope), so a refine-only veto that
