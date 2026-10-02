@@ -249,16 +249,16 @@ export function stepNote(
 					<Struck>
 						yaw {degrees(solved.yaw)}, pitch {degrees(solved.pitch)}
 					</Struck>{" "}
-					stays the phone's guess until you tap a peak
+					stays at the phone's values until you tap a peak
 				</>
 			);
 		case "tap-a-peak":
 			return solved.accepted ? (
-				<>not needed here; only when a photo is refused</>
+				<>not needed here; used only when a photo is refused</>
 			) : (
 				<>
-					<span className="nb-mark">needed here</span>: tap one peak for
-					direction, three for the lens
+					<span className="nb-mark">needed here</span>: tap one peak to set the
+					direction, three to set the lens
 				</>
 			);
 		case "dem-source": {
@@ -313,7 +313,12 @@ export function stepNote(
 			);
 		}
 		case "dem-anchoring":
-			return <>photo depth has no scale; the terrain turns it into metres</>;
+			return (
+				<>
+					depth estimated from the photo has no scale; the terrain model
+					converts it to metres
+				</>
+			);
 		case "photo-workspace": {
 			const names = data.peaks
 				.filter((peak) => peak.labelled)
@@ -339,13 +344,13 @@ export function stepNote(
 						: ""}
 				</>
 			) : (
-				<>a day of photos becomes a place</>
+				<>photos are grouped by where they were taken</>
 			);
 		case "step-inside":
 			return (
 				<>
-					walk into the photo: near ground from the image, far mountains from
-					terrain data
+					step into the photo: nearby ground is rebuilt from the image, distant
+					mountains come from terrain data
 				</>
 			);
 		default:

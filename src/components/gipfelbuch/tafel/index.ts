@@ -20,3 +20,4 @@ export {
 	type TafelNote,
 } from "./Tafel";
 export { type TafelBake, useTafelBake } from "./useTafelBake";
+export { Wegnetz } from "./Wegnetz";

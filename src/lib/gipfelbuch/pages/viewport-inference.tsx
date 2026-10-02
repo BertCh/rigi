@@ -328,7 +328,7 @@ const LockScene = memo(function LockScene() {
 				size={13 * (W / 720)}
 				color="var(--gb-secondary)"
 			>
-				roof: no sky, no vote
+				roof: no sky, ignored
 			</HandLabel>
 			<HandLabel
 				x={TREE_X0 - 4}
@@ -386,7 +386,7 @@ function HorizonLock() {
 		<Figure
 			label="Fig. D3"
 			bleed
-			caption="Synthetic scene. The photo's skyline (ink, one dot per column) stays fixed; the modelled horizon (brown) slides in yaw and pitch. Stems show the gap per column: blue when it fits, red and faded when the fit ignores it (the tree). Columns under the roof have no sky and no vote."
+			caption="Synthetic scene. The photo's skyline (ink, one dot per column) stays fixed; the modelled horizon (brown) slides in yaw and pitch. Stems show the gap per column: blue when it fits, red and faded when the fit ignores it (the tree). Columns under the roof have no sky and are ignored."
 		>
 			<div ref={ref}>
 				{/* the scene runs on past the frame: the photo's ridge stays, the modelled horizon slides */}
@@ -1233,7 +1233,7 @@ const SCENES: Scene[] = [
 		relief: 0.18,
 		tiltDeg: 0.4,
 		search: "local",
-		note: "Sea or plain: every column fits, but a flat line cannot fix yaw. Low relief vetoes it.",
+		note: "Sea or plain: every column fits, but a flat line cannot determine yaw. The low-relief check rejects it.",
 	},
 	{
 		id: "forest",
@@ -1248,7 +1248,7 @@ const SCENES: Scene[] = [
 	},
 	{
 		id: "rhyme",
-		label: "Rhyming ridges, 360°",
+		label: "Repeating ridges, 360°",
 		inlierFraction: 0.74,
 		coverage: 0.8,
 		ambiguity: 0.78,
@@ -1808,16 +1808,16 @@ function Legacy() {
 				<p>
 					A photo arrives with GPS, usually a compass heading, gravity and a 35
 					mm focal length. That gives a first guess for yaw, pitch, roll and
-					field of view. It is close but not right: phone compasses are often
+					field of view. It is close but not exact: phone compasses are often
 					several degrees off. The solver corrects it to a fraction of a degree,
-					or says it cannot.
+					or reports that it cannot.
 				</p>
 				<p>
-					With the eye held at the GPS fix, the problem collapses to{" "}
-					<strong>rotation plus focal</strong>, and the evidence is one curve:
-					where sky meets terrain. The photo gives that curve per column. The{" "}
-					{A("dem-horizon", "DEM horizon")} predicts it for every azimuth.
-					Solving means sliding one onto the other.
+					With the eye held at the GPS fix, the unknowns reduce to{" "}
+					<strong>rotation plus focal length</strong>, and the evidence is one
+					curve: where sky meets terrain. The photo gives that curve per column.
+					The {A("dem-horizon", "DEM horizon")} predicts it for every azimuth.
+					Solving means shifting one curve until it matches the other.
 				</p>
 			</Section>
 
@@ -1832,7 +1832,7 @@ function Legacy() {
 						<strong>Skyline</strong> ({A("skyline", "in the photo")}): the sky
 						colour is fitted, then one boundary row is found per column. Each
 						column gets a weight for edge contrast and for sky above, terrain
-						below. Columns with no sky have no vote.
+						below. Columns with no sky are ignored.
 					</li>
 					<li>
 						<strong>Horizon</strong> (
@@ -1847,29 +1847,29 @@ function Legacy() {
 
 			<Section kicker="Search" title="Coarse grid, then fine fit">
 				<p>
-					An optimiser that starts in the wrong valley stays there. So the
-					solver first scores every small shift on a grid. Yaw is searched ±25°
-					around the compass and pitch ±3° around gravity, in steps of about 1.5
-					px. A column more than 12 px off counts the same however far off it
-					is. The best valleys, up to three and at least 1.5° apart, become
+					A fine fit that starts in the wrong place stays there. So the solver
+					first scores every small shift on a grid. Yaw is searched ±25° around
+					the compass and pitch ±3° around gravity, in steps of about 1.5 px. A
+					column more than 12 px off counts the same however far off it is. The
+					best low-cost points, up to three and at least 1.5° apart, become
 					starting points.
 				</p>
 				<p>
 					From each start, a fine fit adjusts yaw, pitch, roll and focal,
 					ignoring columns far off (beyond about 4 px). Soft limits keep the
 					result near the sensors (yaw 15°, pitch 1.5°, roll 1.5°, focal 6 %).
-					The cheapest result wins.
+					The result with the lowest cost is kept.
 				</p>
 			</Section>
 
 			<CostLandscape />
 			<FullCircle />
 
-			<Section kicker="Gate" title="Knowing when not to answer">
+			<Section kicker="Gate" title="Rejecting unreliable results">
 				<p>
-					The result must then earn a confidence. The tilt check rejects fits
-					that moved more than 3° from gravity, which only happens on the wrong
-					edge. The other factors ask: did enough columns agree, was there
+					The result is then given a confidence score. The tilt check rejects
+					fits that moved more than 3° from gravity, which only happens on the
+					wrong edge. The other factors ask: did enough columns agree, was there
 					enough skyline, was the winner clearly better than the runner-up, and
 					is there enough relief to fix yaw?
 				</p>
@@ -1878,10 +1878,13 @@ function Legacy() {
 			<RealGate />
 			<ConfidenceGate />
 
-			<Section kicker="If it fails" title="Escalate, never guess">
+			<Section
+				kicker="If it fails"
+				title="If a result is rejected, try another method"
+			>
 				<p>
-					A rejection is a hand-off to a different method that fails
-					differently. The steps, in order:
+					A rejection passes the photo to a different method that fails in
+					different cases. The steps, in order:
 				</p>
 				<Flow
 					nodes={[
@@ -1949,11 +1952,11 @@ function Legacy() {
 					Checked against 12 hand-registered photos. Worst accepted yaw error:
 					0.47°.
 				</p>
-				<Callout tone="lesson" title="A wrong answer is worse than none">
+				<Callout tone="lesson" title="A wrong pose is worse than no pose">
 					A wrong view shown as certain is worse than no view. Every threshold
-					makes the solver say &ldquo;don&rsquo;t know&rdquo; before it says
-					something false. A neural sky model fitted more photos but was dropped
-					because it produced one false accept (IMG_7053, 5.6° off). See the{" "}
+					makes the solver reject a photo rather than risk accepting a wrong
+					pose. A neural sky model fitted more photos but was dropped because it
+					produced one false accept (IMG_7053, 5.6° off). See the{" "}
 					{A("accept-rule", "accept rule")}.
 				</Callout>
 			</Section>
@@ -2176,11 +2179,11 @@ function SolveEquation() {
 						c: "solved",
 						text: "row where the map's horizon lands, for camera θ",
 					},
-					{ sym: "w", text: "how sure we are of that column (0 for no sky)" },
+					{ sym: "w", text: "confidence in that column (0 for no sky)" },
 					{ sym: "θ", text: "yaw, pitch, roll and focal length" },
 					{
 						sym: "ρ",
-						text: "robust loss: a column far off, like a tree, stops pulling",
+						text: "robust loss: a column far off, like a tree, has a capped effect on the fit",
 					},
 				]}
 			>
@@ -2262,12 +2265,12 @@ function ViewportStoryCaption() {
 	const [photoId] = useNotebookPhoto();
 	const d = useGipfelbuchPhoto(photoId);
 	if (!d)
-		return <>The phone's guess, the traced skyline, then the solved view.</>;
+		return <>The phone's estimate, the traced skyline, then the solved view.</>;
 	const yaw = Math.abs(d.solved.delta.yaw).toFixed(1);
 	return (
 		<>
 			{d.solved.accepted
-				? `The search turned the view ${yaw}° and snapped the names onto their summits: skyline gap ${d.residual.prior.median.toFixed(0)} → ${d.residual.solved.median.toFixed(1)} px.`
+				? `The search turned the view ${yaw}° and moved the names onto their summits: skyline gap ${d.residual.prior.median.toFixed(0)} → ${d.residual.solved.median.toFixed(1)} px.`
 				: `The search moved the view ${yaw}°, but the fit was rejected (confidence ${d.solved.confidence.toFixed(2)}), so the app keeps the phone's guess.`}{" "}
 			<Measured data={d} />
 		</>
@@ -2291,8 +2294,7 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat kicker="The idea" title="The skyline corrects the compass.">
 				<p>
-					A phone knows where it stands. Its compass is often several degrees
-					off.{" "}
+					A phone records where it is. Its compass is often several degrees off.{" "}
 					{medYaw != null && (
 						<>
 							<HandMark type="strike">Close enough.</HandMark>{" "}
@@ -2302,14 +2304,14 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 						</>
 					)}
 					<MarginNote mark="a">
-						Compass first, then the ridge. Which wins when they disagree?
+						When the compass and the ridge disagree, the ridge is used.
 					</MarginNote>
 				</p>
 				<p>
 					The photo has a skyline. The terrain model predicts the same line (the
 					horizon) from that spot.{" "}
 					<HandMark type="highlight">
-						We slide the horizon until it lands on the skyline.
+						We shift the horizon until it matches the skyline.
 					</HandMark>
 				</p>
 				<p>
@@ -2319,31 +2321,34 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
-			<Beat kicker="How it works" title="Guess, search, polish.">
+			<Beat
+				kicker="How it works"
+				title="Start from the sensors, search, refine."
+			>
 				<p>
 					<CircledNumber value={1} /> sensors give a first view,{" "}
 					<CircledNumber value={2} /> a small grid of turns scores it,{" "}
-					<CircledNumber value={3} /> the winner is polished.
+					<CircledNumber value={3} /> the best result is refined.
 					<MarginNote mark="b">
-						Only four numbers move: yaw, pitch, roll and focal. GPS fixes the
-						spot.
+						Only four values are solved: yaw, pitch, roll and focal length. The
+						GPS position is kept fixed.
 					</MarginNote>
 				</p>
 				<Trio
 					steps={[
 						{
 							title: "Start from the sensors",
-							body: "Compass, gravity and lens give a first view. It is close, not right.",
+							body: "Compass, gravity and lens give a first view. It is close but not exact.",
 							visual: <MiniPhoto id={photoId} layers={["skyline", "prior"]} />,
 						},
 						{
-							title: "Try small turns",
-							body: "Score every yaw and pitch near the guess. Keep the best few.",
+							title: "Try small rotations",
+							body: "Score every yaw and pitch near the first estimate. Keep the best few.",
 							visual: <MiniMap id={photoId} />,
 						},
 						{
-							title: "Polish the winner",
-							body: "Fine-tune all four numbers. Wild columns count less.",
+							title: "Refine the best result",
+							body: "Adjust all four values. Columns far off the fit count less.",
 							visual: <MiniPhoto id={photoId} layers={["skyline", "solved"]} />,
 						},
 					]}
@@ -2353,11 +2358,14 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 			<PhotoStory
 				focus="search"
 				number="2"
-				title="Guess, search, snap"
+				title="Estimate, search, refine"
 				caption={<ViewportStoryCaption />}
 			/>
 
-			<Beat kicker="Where it fails" title="When the fit is weak, we say so.">
+			<Beat
+				kicker="Where it fails"
+				title="When the fit is weak, the photo is rejected."
+			>
 				<p>
 					<HandMark type="wavy" color="red">
 						A person or a tree can pull the detected line off the ridge.
@@ -2365,8 +2373,8 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 					Then too few columns agree.
 				</p>
 				<p>
-					We reject the photo and keep the phone's guess.{" "}
-					<HandMark type="double">We do not show it as certain.</HandMark>
+					We reject the photo and keep the phone's estimate.{" "}
+					<HandMark type="double">It is not shown as certain.</HandMark>
 					<MarginNote mark="c">
 						No wrong answers accepted on 12 hand-registered photos; median yaw
 						error 0.22°.
@@ -2405,7 +2413,7 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Details>
 				<p>
-					Everything below is the full mechanism: grid search, fine fit,
+					The sections below describe the full method: grid search, fine fit,
 					confidence check and fallbacks, with real and synthetic figures.
 				</p>
 				<Legacy />

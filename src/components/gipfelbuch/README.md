@@ -43,6 +43,21 @@ Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelb
 - **Cursor.** `RealPhoto spillCursor={{ x, az, label, layer }}` marks a column or a bearing on the compass ruler; past the frame it drops to the horizon with a ring. Use it for a sweep, a profiled bearing, a tap.
 - **Pose.** `spillT` sets the spill's pose (0 guess .. 1 solved) for a figure that steps through poses without an alignment story. The spill slides (about 600 ms) from the pose it last showed for that photo, so a `Stages` step that remounts the photo moves the margins instead of jumping; a Compare wipe follows at once.
 
+## Atlas niceties, 2026-10-02 (session 05): what came back from the old atlas explainer
+- Shell: signposts carry the target's claim and step (`signpostKicker`: "Weiter · Kapitel II"); the breadcrumb reads "Gipfelbuch › Kapitel I · … › I.3"; a `SheetIndexSketch current=` locator sits under "Standort"; hovering the index contents marks upstream ← and downstream → sheets (`lineageOf`, no lines drawn); the not-found page suggests sheets (`closestSheetIds`).
+- Glossar and dev fold: OntologyPanel is the closed "Glossar" (definition, also called, is a / kinds / has / part of, method). Identifiers (summary, Code, Reports, Shapes, Frame, Identity, Persisted as) live in the closed "Für Entwickler" `DevFold` at the sheet foot. `note` is never rendered. Reader text carries no paths, script names or dates: `Measured` prints "Measured on photo NN." and puts its provenance in `title`.
+- One colour per layer: `viz/inks.ts` (`LAYER_INKS`, `inkFor(layer, "photo"|"paper")`) feeds RealPhoto, DemPatch, StoryMap, `Sym` and `Key layer=`. A key swatch is drawn exactly like the stroke it names.
+- Kit additions:
+  - DemPatch has `coneFill`, and `coneWedge` is exported.
+  - RealPhoto numbers the summit names it drops and lists them in an "also:" footnote (`alsoNames`).
+  - Loading: `FigureSkeleton`; the previous photo stays while a new one loads; a failed load shows "couldn't load".
+  - `useDrawOn`: Flow and Steps draw on, and stay static under reduced motion, webdriver and print.
+  - `useAutoScrub`, plus HandRange `readout`, `onResume` and `manual`.
+  - Gallery `tag`: a circled verdict on failure tiles.
+  - Figure `pinned="demo-NN"`, which replaces "Fixed: demo-NN" captions.
+  - The Stages caption is `aria-live`.
+- Caption rule: a caption is one claim sentence. Caveats go to a MarginNote, a hand note or Details. Synthetic figures carry `source="Skizze"`.
+
 ## Restore pass, 2026-10-01 (sessions 2d and 25)
 
 The record is `reports/gipfelbuch-restore-2026-10-01.md`, and the spec is `reports/gipfelbuch-best-of-both.md` §2.

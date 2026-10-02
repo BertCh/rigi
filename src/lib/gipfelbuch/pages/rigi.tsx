@@ -343,7 +343,7 @@ function Registration() {
 							anchor="end"
 							color={tone === "forest" ? "var(--gb-forest)" : "var(--gb-red)"}
 						>
-							{ok ? "within 1°: show it" : "off: don't claim"}
+							{ok ? "within 1°: show the pose" : "off: do not show the pose"}
 						</HandLabel>
 						<HandLabel
 							x={16}
@@ -356,7 +356,7 @@ function Registration() {
 						</HandLabel>
 						{/* hand notes with leaders */}
 						<HandText x={470} y={92} size={19} color="pencil" rotate={-2}>
-							the band between the lines is the error
+							the gap between the lines is the error
 						</HandText>
 						<PenArrow
 							seed="rigi-note-band"
@@ -366,7 +366,7 @@ function Registration() {
 							width={1.1}
 						/>
 						<HandText x={300} y={H - 12} size={19} color="pencil" rotate={1.5}>
-							{ok ? "lines coincide: accepted ✓" : "why does 3° look so big?"}
+							{ok ? "lines coincide: accepted ✓" : "a 3° error is a large gap"}
 						</HandText>
 						<CircledKey x={W - 30} y={62} value={1} seed="rigi-key-1" />
 					</svg>
@@ -415,7 +415,7 @@ const STAGES: Stage[] = [
 	{
 		key: "capture",
 		label: "1 · Capture",
-		blurb: "A photo, and what the phone recorded about it.",
+		blurb: "The photo and the sensor data the phone recorded with it.",
 		ids: ["photo", "camera-prior", "dem-source", "terrain-sampler"],
 	},
 	{
@@ -433,13 +433,15 @@ const STAGES: Stage[] = [
 	{
 		key: "judge",
 		label: "3 · Snap and judge",
-		blurb: "Pin everything to the ground, and decide what is safe to show.",
+		blurb:
+			"Fix the camera position, summits and depth to the terrain, and decide which poses to show.",
 		ids: ["terrain-snapping", "eye-rule", "peak", "accept-rule", "tap-a-peak"],
 	},
 	{
 		key: "show",
 		label: "4 · Look through it",
-		blurb: "Use the pose: labels, drape, camera roll, step inside.",
+		blurb:
+			"Use the pose for labels, draping photos on terrain, the camera roll and Step Inside.",
 		ids: ["photo-workspace", "camera-roll", "step-inside", "dem-anchoring"],
 	},
 ];
@@ -521,7 +523,7 @@ function HeroStages() {
 				<>
 					{d
 						? `On this photo the phone's compass was ${yaw}° off; the median gap to the skyline falls from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} px.`
-						: "One real photo, four steps."}{" "}
+						: "One real photo, shown in four steps."}{" "}
 					<Measured data={d} />
 				</>
 			}
@@ -604,14 +606,14 @@ function Outcomes() {
 			steps={[
 				{
 					title: "Named peaks",
-					body: "Labels sit on the photo, on the right summits.",
+					body: "Labels are placed on the matching summits in the photo.",
 					visual: (
 						<RealPhoto data={d} layers={["peaks"]} crop={crop} maxLabels={6} />
 					),
 				},
 				{
 					title: "A day on a map",
-					body: "Twelve photos land on the terrain they saw.",
+					body: "Twelve photos are placed on the terrain they show.",
 					visual: (
 						<img
 							src="/demo/shots/drape.jpg"
@@ -622,7 +624,7 @@ function Outcomes() {
 				},
 				{
 					title: "Step inside",
-					body: "Near ground lifted to 3D, seen from the camera's own position.",
+					body: "The nearby ground is rebuilt in 3D and viewed from the camera position.",
 					visual: (
 						<div className="relative">
 							<img
@@ -648,7 +650,7 @@ function Twelve() {
 		<Figure
 			label="Fig. 4"
 			bleed
-			caption="The same search on all 12 photos, solved horizon drawn on each. Two with a person in frame are marked ask."
+			caption="The same search on all 12 photos, solved horizon drawn on each. The two with a person in frame are marked ask."
 		>
 			<Gallery
 				ids={ROLL_IDS}
@@ -680,16 +682,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 		<>
 			<HeroStages />
 
-			<Beat
-				kicker="The idea"
-				title="The skyline tells us where the camera stood."
-			>
+			<Beat kicker="The idea" title="The skyline shows where the camera stood.">
 				<p>
 					Every mountain photo has a{" "}
 					<HandMark type="underline">skyline</HandMark>. The terrain model
 					predicts a horizon for any camera pose.
 					<MarginNote mark="a">
-						The skyline is the one line both the photo and the terrain can draw.
+						Both the photo and the terrain model give a skyline, so the two can
+						be compared.
 					</MarginNote>
 				</p>
 				<p>
@@ -698,29 +698,30 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</HandMark>{" "}
 					Yaw, which way the camera points, is the part the phone gets wrong.
 					<MarginNote mark="b">
-						Yaw is what the compass gets wrong; the rest of the pose holds.
+						The compass is the main source of error; the rest of the pose is
+						reliable.
 					</MarginNote>
 				</p>
 			</Beat>
 
 			<GuessVsSolved />
 
-			<Beat kicker="Watch it solve" title="Guess, measure, correct, snap.">
+			<Beat kicker="Watch it solve" title="The solve in six steps.">
 				<p>
-					One real photo, six beats. Drag the terrain line afterwards to feel
-					the match.
+					One real photo, shown in six steps. Afterwards, drag the terrain line
+					to see how the match changes.
 				</p>
 			</Beat>
 
 			<LiveHowItWorks
 				number="Fig. 3"
-				caption="The six beats of one real solve. Drag the terrain line."
+				caption="The six steps of one real solve. Drag the terrain line."
 			/>
 
-			<Beat kicker="What you get" title="One pose unlocks three things.">
+			<Beat kicker="What you get" title="The pose is used in three ways.">
 				<p>
-					Once the camera is known,{" "}
-					<HandMark type="double">everything else is drawing from it</HandMark>.{" "}
+					Once the camera pose is known,{" "}
+					<HandMark type="double">the rest is drawn from it</HandMark>.{" "}
 					<A id="photo-workspace">Labels</A>, a{" "}
 					<A id="camera-roll">camera roll</A> on a map, and{" "}
 					<A id="step-inside">stepping inside</A> the scene.
@@ -731,7 +732,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="Rigi would rather say nothing than show a wrong pose."
+				title="Rigi shows no pose when it is not confident."
 			>
 				<p>
 					A person in the frame can break the match.{" "}
@@ -740,7 +741,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</HandMark>
 					, and we ask you to confirm or to tap a peak.
 					<MarginNote mark="c">
-						Better a question than a wrong label.
+						Asking is better than showing a wrong label.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -772,9 +773,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<h3>How it fits</h3>
 				<p>
 					The <A id="photo">photo</A> arrives with sensor metadata that becomes
-					a <A id="camera-prior">camera prior</A>: a guess, never a fact. That
-					prior seeds <A id="viewport-inference">viewport inference</A>, which
-					compares the <A id="skyline">skyline</A> found in the photo with the{" "}
+					a <A id="camera-prior">camera prior</A>: an estimate that the solve
+					then corrects. That prior seeds{" "}
+					<A id="viewport-inference">viewport inference</A>, which compares the{" "}
+					<A id="skyline">skyline</A> found in the photo with the{" "}
 					<A id="dem-horizon">horizon</A> predicted from terrain, in the
 					browser, on the GPU where available (
 					<A id="baseline-pipeline">baseline pipeline</A>
@@ -784,7 +786,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					<A id="dem-anchoring">DEM anchoring</A>) to the ground. The{" "}
 					<A id="accept-rule">accept rule</A> decides what is safe to show;
 					about a fifth of tested photos are accepted automatically.{" "}
-					<A id="tap-a-peak">Tapping a peak</A> is the manual route to a pose.
+					<A id="tap-a-peak">Tapping a peak</A> is the manual way to set a pose.
 				</p>
 				<h3>Schematic: aligning the lines</h3>
 				<Figure label="Fig. D1" caption={REG_CAPTION} pinned={SCENE.id} bleed>

@@ -472,7 +472,7 @@ function CurveFigure() {
 		<Figure
 			label="Fig. 3"
 			source="Skizze"
-			caption="Invented scene, real fit. Each dot is a ground pixel: model depth across, terrain distance up. One scale misses the bend; the curve follows it."
+			caption="Invented scene, real fit. Each dot is a ground pixel: model depth across, terrain distance up. One scale misses the bend; the fitted curve follows it."
 		>
 			<div ref={ref}>
 				<div className="mb-3 flex flex-wrap items-center gap-2">
@@ -705,7 +705,7 @@ function CurveFigure() {
 								color={SWISS.pencil}
 								rotate={(a * 180) / Math.PI}
 							>
-								depth taken at face value
+								model depth used unchanged
 							</HandLabel>
 						);
 					})()}
@@ -1455,11 +1455,11 @@ function HeroStages({ d }: { d: TerrainData | null }) {
 					{
 						label: "Photo",
 						caption:
-							"One photo. A depth model can guess its shape, but not its metres.",
+							"One photo. A depth model estimates its shape but not distances in metres.",
 						render: () => <RealPhoto data={photo} layers={[]} bleed />,
 					},
 					{
-						label: "The ruler",
+						label: "Terrain distance",
 						caption:
 							"Once the camera is solved, the map says how far the ground is at every pixel.",
 						render: () => (
@@ -1469,7 +1469,7 @@ function HeroStages({ d }: { d: TerrainData | null }) {
 						),
 					},
 					{
-						label: "Pixels that vote",
+						label: "Pixels used",
 						caption:
 							"Only ground between 15 m and 3 km is used. Sky and far haze stay out.",
 						render: () => (
@@ -1689,7 +1689,7 @@ function RealCurves({ d }: { d: TerrainData | null }) {
 			bleed
 			caption={
 				<>
-					Real photos agree the model compresses distance, by a different amount
+					In real photos the model compresses distance, by a different amount
 					each time. {sp.nFitted} other photos; dashed line: model equals
 					terrain.
 				</>
@@ -1945,7 +1945,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="The terrain is a ruler the depth model never had."
+				title="The terrain model supplies the real distances the depth model lacks."
 			>
 				<p>
 					A depth model gets shape right and metres wrong. Near the camera it is
@@ -1957,7 +1957,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						Once the camera is solved, the terrain model knows the true distance
 						to the ground.
 					</HandMark>{" "}
-					We bend the model's depth onto that ruler.
+					We fit a curve that converts the model's depth to those distances.
 					<MarginNote mark="a">
 						The terrain/model ratio is about 1 at 15 to 30 m and about 2.9 at
 						100 to 300 m.
@@ -1971,12 +1971,12 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Pair up, fit a bendy curve, score the match."
+				title="Pair depths with distances, fit a curve, score the fit."
 			>
 				<Trio
 					steps={[
 						{
-							title: "Pair up",
+							title: "Pair depth and distance",
 							body: "Each ground pixel gives a pair: model depth and terrain distance.",
 							visual: <MiniWindow d={d} />,
 						},
@@ -1987,7 +1987,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						},
 						{
 							title: "Score the match",
-							body: "How well the curve fits becomes a trust score.",
+							body: "The quality of the fit becomes a trust score.",
 							visual: <MiniQuality d={d} />,
 						},
 					]}
@@ -1996,7 +1996,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Why a curve"
-				title="One scale fixes the mountains and breaks the foreground."
+				title="One scale fits the mountains but distorts the foreground."
 			>
 				<p>
 					Switch between one scale and the fitted curve to see the difference.
@@ -2011,7 +2011,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</span>
 					.
 					<MarginNote mark="b">
-						The model squeezes near range least, so the foreground breaks first.
+						The model compresses near range least, so one scale goes wrong in
+						the foreground first.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -2020,7 +2021,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="A poor match hides the scene instead of guessing."
+				title="If depth and terrain disagree, the 3D scene is hidden."
 			>
 				<p>
 					When model and terrain disagree, the near-field scene is hidden or
@@ -2039,7 +2040,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="What it buys"
-				title="Where the fit holds, the photo can be stepped into."
+				title="Where the fit is good, you can step into the photo."
 			>
 				<p>
 					A good fit puts the lifted near-field on the terrain's own metres, so

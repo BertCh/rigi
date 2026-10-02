@@ -533,7 +533,7 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 						anchor="end"
 						rotate={-2}
 					>
-						OSM point here; summit is in the grid
+						OSM point here; the summit is elsewhere in the grid
 					</HandText>
 					<CircledKey
 						x={ex.osmPx[0] - 14}
@@ -717,8 +717,8 @@ function Hero({ d }: { d: TerrainData | null }) {
 			pinned="demo-03"
 			caption={
 				d
-					? `Three things in this photo are pinned to the terrain; a typical peak moves ${d.peakRule.medianMoveMapterhorn} m onto its summit.`
-					: "Three things in this photo are pinned to the terrain."
+					? `Three things in this photo are corrected using the terrain; a typical peak moves ${d.peakRule.medianMoveMapterhorn} m onto its summit.`
+					: "Three things in this photo are corrected using the terrain."
 			}
 		>
 			<RealPhoto bleed data={photo} layers={[]} crop={crop}>
@@ -745,11 +745,11 @@ function Hero({ d }: { d: TerrainData | null }) {
 						)}
 						<Mark x={300} y={790} n={3} k={2} />
 						<HandText x={420} y={846} size={22} rotate={-2}>
-							camera never below ground
+							camera kept above ground
 						</HandText>
 						{d && (
 							<HandText x={300} y={760} size={22} anchor="end" rotate={2}>
-								{`typical peak climbs ${d.peakRule.medianMoveMapterhorn} m`}
+								{`typical peak moves up ${d.peakRule.medianMoveMapterhorn} m`}
 							</HandText>
 						)}
 					</g>
@@ -762,12 +762,12 @@ function Hero({ d }: { d: TerrainData | null }) {
 						{link("eye-rule", "Eye rule")}
 					</>,
 					<>
-						<strong className="gb-ink">Peaks</strong> climb to the highest
-						nearby terrain point. {link("peak", "Peak")}
+						<strong className="gb-ink">Peaks</strong> move to the highest nearby
+						terrain point. {link("peak", "Peak")}
 					</>,
 					<>
-						<strong className="gb-ink">Depth</strong> is bent to the terrain's
-						distances. {link("dem-anchoring", "DEM anchoring")}
+						<strong className="gb-ink">Depth</strong> is fitted to distances
+						from the terrain. {link("dem-anchoring", "DEM anchoring")}
 					</>,
 				]}
 			/>
@@ -945,16 +945,19 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 		<>
 			<Hero d={d} />
 
-			<Beat kicker="The idea" title="The terrain has the final say.">
+			<Beat
+				kicker="The idea"
+				title="The terrain model overrides the photo's metadata where it is more accurate."
+			>
 				<p>
-					A photo brings a GPS spot, maybe an altitude, and named peaks. None
-					match the terrain exactly.
+					A photo comes with a GPS position, sometimes an altitude, and named
+					peaks. None of them match the terrain exactly.
 				</p>
 				<p>
 					<HandMark type="highlight">
-						We trust the terrain only where it is plainly better.
+						We use the terrain only where it is clearly more accurate.
 					</HandMark>{" "}
-					Elsewhere it gives a floor or a hint. In Fig. 1:{" "}
+					Elsewhere it sets a lower limit or a hint. In Fig. 1:{" "}
 					<CircledNumber value={1} seed="ts-p1" /> camera,{" "}
 					<CircledNumber value={2} seed="ts-p2" /> peak,{" "}
 					<CircledNumber value={3} seed="ts-p3" /> depth.
@@ -966,33 +969,36 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
-			<Beat kicker="Three roles" title="Snap it, bound it, or hint at it.">
+			<Beat
+				kicker="Three roles"
+				title="Three ways the terrain is used: snap, bound, hint."
+			>
 				<Trio
 					steps={[
 						{
 							title: "Snap",
-							body: "The terrain is clearly right: move it there. Peaks do this.",
+							body: "The terrain is clearly more accurate, so the value is moved onto it. Peaks work this way.",
 							visual: <MiniSnap />,
 						},
 						{
 							title: "Bound",
-							body: "The terrain only rules out a region: keep the camera above the lake.",
+							body: "The terrain only rules out some values, so it sets a limit: the camera stays above the lake.",
 							visual: <MiniBound />,
 						},
 						{
 							title: "Hint",
-							body: "The sensor still knows something: GPS altitude stays a hint.",
+							body: "The sensor value is still informative, so GPS altitude is used only as a hint.",
 							visual: <MiniPrior />,
 						},
 					]}
 				/>
 			</Beat>
 
-			<PhotoStory number="Fig. 2" title="Names snap onto their summits" />
+			<PhotoStory number="Fig. 2" title="Peak names move onto their summits" />
 
 			<Beat
 				kicker="Peaks"
-				title="OSM peaks sit beside their summits. We move them up."
+				title="OSM peaks are slightly off their summits, so we move them."
 			>
 				<p>
 					Named peaks come from OpenStreetMap, often a few dozen metres off the
@@ -1002,7 +1008,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					3: <CircledNumber value={1} color="ink" seed="ts-p-n1" /> OSM point,{" "}
 					<CircledNumber value={2} seed="ts-p-n2" /> summit.
 					<MarginNote mark="b">
-						Why 9 by 9? Enough samples to find the crest inside the square.
+						Why 9 by 9? That is enough samples to find the crest inside the
+						square.
 					</MarginNote>
 				</p>
 				<SnapEquation d={d} />
@@ -1012,23 +1019,23 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="The answer depends on the terrain model."
+				title="The result depends on which terrain model is used."
 			>
 				<p>
 					Two terrain models put the same spot at different heights. The camera
 					lift changes with them.{" "}
 					<HandMark type="double">
-						Treating a hint as a snap would throw the measurement away.
+						Treating a hint as a snap would discard the sensor measurement.
 					</HandMark>
 					<MarginNote mark="c">
-						Which model is right? Neither gives a true camera height, so none
-						can score the lift.
+						Which model is right? Neither gives the true camera height, so we
+						cannot tell which lift is correct.
 					</MarginNote>
 				</p>
 				{gaps && (
 					<p>
 						<HandMark type="strike">
-							Ground is ground, whichever model.
+							Both models give the same ground height.
 						</HandMark>{" "}
 						<span
 							className="nb-hand"
@@ -1068,7 +1075,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			/>
 
 			<Details>
-				<h3>Every place a coordinate meets the map</h3>
+				<h3>Every place a coordinate is matched to the terrain</h3>
 				<Ledger />
 				<h3>Eye height</h3>
 				<p>
@@ -1110,7 +1117,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					trust, below 0.15 hidden. Neither is a pose check. Each object is then
 					scaled to the DEM range where it touches the terrain.
 				</p>
-				<h3>Curvature is not a snap</h3>
+				<h3>Curvature</h3>
 				<p>
 					{link("curvature-refraction", "Curvature and refraction")} lower every
 					DEM sample by <code>d² / (2 R_eff)</code>,{" "}
@@ -1118,9 +1125,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					m at 100 km.
 				</p>
 				<p>
-					<strong>Lesson.</strong> Snap only what the DEM knows better than the
-					sensor. A lake level only rules out the water below it, so it is a
-					bound. A GPS altitude is still evidence, so it stays a prior.
+					<strong>Rule.</strong> Snap only values the DEM knows better than the
+					sensor does. A lake level only rules out the water below it, so it is
+					a bound. A GPS altitude is still evidence, so it stays a prior.
 				</p>
 				<div className="flex flex-wrap gap-2">
 					<CodeRef path="src/lib/deck/engine.ts" />

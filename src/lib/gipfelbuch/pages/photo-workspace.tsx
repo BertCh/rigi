@@ -1075,7 +1075,7 @@ const PARTS: {
 		x: 1540,
 		y: 655,
 		title: "Far skyline",
-		body: "The terrain horizon (warm line) hugs the real ridge: the proof.",
+		body: "The terrain horizon (warm line) follows the real ridge, which shows the pose is right.",
 	},
 	{
 		n: 4,
@@ -1098,7 +1098,7 @@ function AnnotatedWorkspace() {
 		<Figure
 			label="D4"
 			bleed
-			caption="The exported overlay for one photo. One camera places every numbered part, so a wrong pose moves them all."
+			caption="The exported overlay for one photo. Every numbered part is placed with the same camera pose, so a wrong pose moves all of them."
 		>
 			<svg
 				viewBox="0 0 2048 1536"
@@ -1121,7 +1121,7 @@ function AnnotatedWorkspace() {
 					color="#fff"
 					rotate={-2}
 				>
-					the far horizon hugs the ridge
+					the far horizon follows the ridge
 				</HandText>
 				<PenArrow
 					seed="aw-arrow-far"
@@ -1406,7 +1406,12 @@ function HeroJourney() {
 			ground={d?.id}
 			label="Fig. 1"
 			bleed
-			caption={<>One photo, four moments. The pose changes; export waits.</>}
+			caption={
+				<>
+					One photo at four stages. The pose changes; export stays locked until
+					the last stage.
+				</>
+			}
 		>
 			<AlignmentStoryProvider initial={0}>
 				<Stages
@@ -1510,7 +1515,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 		<>
 			<HeroJourney />
 
-			<Beat kicker="The idea" title="Show a pose fast. Check it later.">
+			<Beat
+				kicker="The idea"
+				title="The pose is shown first and checked afterwards."
+			>
 				<p>
 					<HandMark type="highlight">It shows a preview at once,</HandMark> then
 					a second solver checks it.
@@ -1520,19 +1528,21 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<HandMark type="underline">final</HandMark>. Only the last stage in{" "}
 					<CircledNumber value={1} />, “Export unlocked”, waits.
 					<MarginNote mark="a">
-						I would wait 20 s for a pose I can trust.
+						A trusted pose is worth waiting up to 20 s for.
 					</MarginNote>
 				</p>
 			</Beat>
 
 			<Beat
 				kicker="What you see"
-				title="Every label is a peak pushed through the camera."
+				title="Each label is a peak projected into the photo."
 			>
 				<p>
-					The terrain knows where each summit is. The solved pose says where the
-					camera points.{" "}
-					<HandMark type="circle">Together they give a pixel.</HandMark>
+					The terrain model gives the position of each summit. The solved pose
+					gives the camera position and direction.{" "}
+					<HandMark type="circle">
+						Together they give the pixel for the label.
+					</HandMark>
 					<MarginNote mark="c">
 						Same peak, two yaws: the label moves with the compass error.
 					</MarginNote>
@@ -1591,7 +1601,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Eq>
 
-			<Beat kicker="How it works" title="Preview, check, unlock.">
+			<Beat
+				kicker="How it works"
+				title="Show a preview, check it, then confirm it."
+			>
 				<Trio
 					steps={[
 						{
@@ -1601,7 +1614,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						},
 						{
 							title: "Check",
-							body: "A second solver runs in the background. If they differ by more than 1°, it replaces the preview.",
+							body: "A second solver runs in the background. If its pose differs from the preview by more than 1°, it replaces the preview.",
 							visual: <MiniLayers layers={["skyline", "prior", "solved"]} />,
 						},
 						{
@@ -1624,7 +1637,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				title="The fast solve can be confidently wrong."
 			>
 				<p>
-					One real photo fooled it: <HandMark type="strike">2.98° off</HandMark>
+					On one real photo the fast solve was wrong:{" "}
+					<HandMark type="strike">2.98° off</HandMark>
 					<span className="nb-hand" style={{ color: "var(--gb-red)" }}>
 						{" "}
 						−0.02°
@@ -1690,7 +1704,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					</p>
 				</Section>
 
-				<Section kicker="Your hand" title="You always have the last word">
+				<Section kicker="Your hand" title="Your edits override the solvers">
 					<p>
 						Drag to turn the camera: sideways changes yaw, up and down changes
 						pitch, Shift-drag rolls, the wheel zooms. Your first edit saves the
@@ -1698,7 +1712,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						what you set.
 					</p>
 					<p>
-						Pins are the precise version: pick a peak, click where it is in the
+						Pins give a more precise fix: pick a peak, click where it is in the
 						photo, and the solver fits only as many parameters as the pins
 						support. See {A("tap-a-peak", "Tap a Peak")} for the picker.
 					</p>
@@ -1715,9 +1729,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<Stat value="20 s" label="longest export wait" />
 						<Stat value="0" label="false accepts on 12 test photos" />
 					</div>
-					<Callout tone="lesson" title="Fast to show, slow to check">
-						Show the preview at once, check it later: a quick first paint, and
-						no unchecked pose reaches an export.
+					<Callout tone="lesson" title="Shown first, checked later">
+						The preview appears at once and is checked afterwards. No unchecked
+						pose reaches an export.
 					</Callout>
 				</Section>
 

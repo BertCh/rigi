@@ -1362,12 +1362,13 @@ function Legacy() {
 					A pose is small: yaw, pitch, roll and field of view, in degrees, plus
 					a camera position. Yaw is the heading, clockwise from north. Pitch is
 					positive looking up. Roll is positive when the right side of the image
-					goes down. Field of view is vertical. That is the whole camera.
+					goes down. Field of view is vertical. Together these describe the
+					camera.
 				</p>
 				<p>
-					Small means <HandMark type="underline">one convention</HandMark>. The
-					skyline matcher, pin solver, renderer and position solver all read and
-					write it, so a pose from any one can be dropped into any other.
+					All of these use <HandMark type="underline">one convention</HandMark>.
+					The skyline matcher, pin solver, renderer and position solver all read
+					and write it, so a pose from any one can be dropped into any other.
 				</p>
 			</Section>
 
@@ -1412,7 +1413,7 @@ function Legacy() {
 							),
 						},
 						{
-							title: "Solvers fit what the evidence supports",
+							title: "Solvers fit only what the pins constrain",
 							body: (
 								<>
 									When a person pins points, the solver fits as many parameters
@@ -1421,7 +1422,7 @@ function Legacy() {
 							),
 						},
 						{
-							title: "Wrap it in provenance",
+							title: "Record the provenance",
 							body: (
 								<>
 									The numbers are stored with who made them, a confidence and a
@@ -1436,7 +1437,7 @@ function Legacy() {
 
 			<DofLadder />
 
-			<Section title="Honest about what is known" kicker="Uncertainty">
+			<Section title="Uncertainty" kicker="Uncertainty">
 				<p>
 					The solver reports an uncertainty for every parameter it fits.
 					Parameters it holds fixed keep the phone&rsquo;s uncertainty: gravity
@@ -1960,7 +1961,7 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 		<>
 			<HeroPose />
 
-			<Beat kicker="The idea" title="One small record is the whole camera.">
+			<Beat kicker="The idea" title="A pose is four angles and a position.">
 				<p>
 					Four angles and a position say where a photo was taken and where it
 					looks.{" "}
@@ -1972,18 +1973,16 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					So a pose from the phone, a solver or a person can swap in anywhere.
-					<MarginNote mark="a">
-						One convention, nothing to translate.
-					</MarginNote>
+					<MarginNote mark="a">All modules use the same convention.</MarginNote>
 				</p>
 			</Beat>
 
-			<Beat kicker="How it works" title="A guess, a correction, a label.">
+			<Beat kicker="How it works" title="How a pose is estimated.">
 				<Trio
 					steps={[
 						{
-							title: "Sensors guess",
-							body: "Compass, gravity and lens give a first pose.",
+							title: "Sensors give a first pose",
+							body: "The compass, gravity sensor and lens data give a starting pose.",
 							visual: <MiniPose layers={["skyline", "prior"]} />,
 						},
 						{
@@ -1992,8 +1991,8 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 							visual: <MiniPose layers={["skyline", "solved"]} />,
 						},
 						{
-							title: "A label travels along",
-							body: "Who made the pose, and how sure, stays attached.",
+							title: "The pose records its source",
+							body: "The pose keeps a record of who made it and how confident it is.",
 							visual: <Tag />,
 						},
 					]}
@@ -2003,13 +2002,13 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 			<PhotoStory number="Fig. 2" title="On a real photo" focus="gaps" />
 
 			<Beat
-				kicker="Why the label matters"
-				title="Phone compasses are wrong by degrees, not by hair."
+				kicker="Why the source is recorded"
+				title="Phone compasses can be off by many degrees."
 			>
 				<p>
 					Here the phone pointed <HandMark type="double">19° off</HandMark> on
-					two photos. Trust it blindly and every peak name lands on the wrong
-					summit.
+					two photos. If the compass were trusted, every peak name would land on
+					the wrong summit.
 				</p>
 			</Beat>
 
@@ -2019,7 +2018,7 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="A weak solve never overwrites the guess."
+				title="A weak solve does not replace the phone's pose."
 			>
 				<p>
 					On these two photos the fit was{" "}

@@ -48,7 +48,7 @@ export const NOTEBOOK_ENTRIES: NotebookEntry[] = [
 				label: "Horizon match",
 				needs: [
 					{ id: "dem-horizon", what: "the modelled horizon" },
-					{ id: "camera-prior", what: "the starting guess" },
+					{ id: "camera-prior", what: "the initial estimate" },
 				],
 			},
 			{ id: "accept-rule", label: "Accept or refuse" },
@@ -60,7 +60,7 @@ export const NOTEBOOK_ENTRIES: NotebookEntry[] = [
 		key: "terrain",
 		hub: "terrain-snapping",
 		title: "Terrain snapping",
-		question: "Where is the ground, really?",
+		question: "Where does the camera sit on the terrain?",
 		groups: ["world", "camera", "nearfield"],
 		steps: [
 			{ id: "dem-source", label: "Height tiles" },
@@ -71,14 +71,14 @@ export const NOTEBOOK_ENTRIES: NotebookEntry[] = [
 				label: "Terrain horizon",
 				needs: [{ id: "eye-rule", what: "the camera height" }],
 			},
-			{ id: "peak", label: "Peak at its summit" },
+			{ id: "peak", label: "Peak snapped to its summit" },
 			{ id: "dem-anchoring", label: "Depth in metres" },
 		],
 	},
 	{
 		key: "app",
 		hub: "rigi",
-		title: "What the pose gives us",
+		title: "What the pose is used for",
 		question: "What can we do with it?",
 		groups: ["product", "roll"],
 		steps: [

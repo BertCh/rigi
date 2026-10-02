@@ -918,7 +918,7 @@ function CleanAndFuse() {
 					/>
 				</PencilLayer>
 				<HandText x={W2 * SX - 8} y={H2 * SY + 14} size={15} anchor="end">
-					second detector disagrees: those columns go quiet
+					second detector disagrees: those columns get no vote
 				</HandText>
 				<PenArrow
 					from={[W2 * SX - 150, H2 * SY + 8]}
@@ -989,12 +989,13 @@ function bandCrop(d: GipfelbuchPhotoData): [number, number, number, number] {
 
 const HARD: Partial<Record<GipfelbuchPhotoId, string>> = {
 	"demo-02":
-		"Sun glare and haze: the two ends have no reliable boundary, so those columns stay silent.",
+		"Sun glare and haze: the two ends have no reliable boundary, so those columns get no vote.",
 	"demo-06":
 		"Dark foreground, thin sunlit ridge: only the central ridge votes.",
 	"demo-11":
 		"A head on the skyline: confidence dips where the line jumps onto it.",
-	"demo-12": "Same person, same dip: occluders are where weights fall.",
+	"demo-12":
+		"Same person, same dip: confidence falls where something blocks the skyline.",
 };
 
 function WeightStrip({ d }: { d: GipfelbuchPhotoData }) {
@@ -1210,7 +1211,7 @@ function HeroStages() {
 }
 
 const HARD_SHORT: { id: GipfelbuchPhotoId; note: string }[] = [
-	{ id: "demo-02", note: "Glare at both ends: those columns stay silent." },
+	{ id: "demo-02", note: "Glare at both ends: those columns get no vote." },
 	{ id: "demo-06", note: "Dark foreground: only the sunlit ridge votes." },
 	{
 		id: "demo-11",
@@ -1223,7 +1224,7 @@ function HardCases() {
 	return (
 		<Figure
 			label="Fig. 5"
-			caption="Four hard frames, same view and scale. Gaps are columns that abstain; the head (bottom row) is the failure weighting cannot fully fix."
+			caption="Four hard frames, same view and scale. Gaps are columns that abstain; the head (bottom row) is the case that weighting cannot fully fix."
 		>
 			<Gallery
 				ids={HARD_SHORT.map((h) => h.id)}
@@ -1270,16 +1271,16 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="Every column casts one vote, with a confidence."
+				title="Each pixel column gets a skyline height and a confidence."
 			>
 				<p>
-					The pose search never sees the photo. It gets one number per column,
-					the skyline height, plus how far to trust it.
+					The pose search does not use the photo itself. It receives one number
+					per column, the skyline height, and a confidence for that number.
 				</p>
 				<p>
 					<HandMark type="highlight">
-						A good detector is <strong>honest per column</strong>: sure on a
-						clean crest, silent behind a roof.
+						A good detector gives <strong>a confidence for each column</strong>:
+						high on a clean crest, none behind a roof.
 					</HandMark>
 					{skMed != null && (
 						<MarginNote mark="a">
@@ -1293,7 +1294,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Model the sky, trace one line, weigh it."
+				title="Model the sky colour, trace the skyline, weight each column."
 			>
 				<Trio
 					steps={[
@@ -1304,7 +1305,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 						},
 						{
 							title: "Trace one line",
-							body: "The cheapest path across the whole image, not 800 guesses.",
+							body: "The lowest-cost path across the whole image, instead of a separate guess for each column.",
 							visual: <Mini layers={["skyline"]} />,
 						},
 						{
@@ -1324,12 +1325,12 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					Sweeping left to right, the search keeps the cheapest way to reach
 					every row. At the end it walks back from the best finish, so{" "}
 					<HandMark type="underline">
-						one cloud cannot drag a single column off on its own
+						an isolated cloud edge cannot pull a single column off the path
 					</HandMark>
 					.
 					<MarginNote mark="b">
-						The jump cost is 2 px a row, capped at 80 px: a wobble costs, a
-						cliff is allowed.
+						The jump cost is 2 px a row, capped at 80 px, so small wobbles are
+						penalised but real cliffs are still allowed.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1375,7 +1376,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="What it is for"
-				title="The traced line is what the map is slid against."
+				title="The pose search compares the terrain horizon with the traced line."
 			>
 				<p>
 					The pose search starts from the phone's guess, draws the terrain
@@ -1391,7 +1392,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="Unsure columns abstain. Occluders are the real enemy."
+				title="Unsure columns are skipped. Objects on the skyline cause worse errors."
 			>
 				<p>
 					Glare and dark foregrounds just remove votes. A person on the ridge is
@@ -1435,7 +1436,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					},
 					{
 						value: "0",
-						label: "model downloads: plain arithmetic, runs anywhere",
+						label: "model downloads needed: the detector is plain arithmetic",
 					},
 				]}
 				source={

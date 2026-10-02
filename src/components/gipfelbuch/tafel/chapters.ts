@@ -27,7 +27,7 @@ export const CHAPTERS: readonly TafelChapter[] = [
 		numeral: "I",
 		title: "Which way was it pointing?",
 		intro:
-			"The phone's compass is often off by a few degrees. These sheets read the photo, predict the terrain, and slide one onto the other.",
+			"The phone's compass is often off by a few degrees. These sheets measure the skyline in the photo, compute the skyline from the terrain model, and shift one to match the other.",
 		ids: [
 			"photo",
 			"camera-prior",
@@ -44,9 +44,9 @@ export const CHAPTERS: readonly TafelChapter[] = [
 	},
 	{
 		numeral: "II",
-		title: "Where is the ground, really?",
+		title: "Where does the camera sit on the terrain?",
 		intro:
-			"GPS and maps disagree with the real ground. These sheets pin the camera, the summits and the depth to the terrain model.",
+			"GPS height and the terrain model often disagree. These sheets tie the camera height, the summits and the depth to the terrain model.",
 		ids: [
 			"dem-source",
 			"terrain-sampler",
@@ -62,9 +62,9 @@ export const CHAPTERS: readonly TafelChapter[] = [
 	},
 	{
 		numeral: "III",
-		title: "What a known camera makes possible",
+		title: "What a known camera is used for",
 		intro:
-			"Once the camera is known, the photo becomes a window onto the map, a place in a camera roll, a scene you can step into.",
+			"Once the camera is known, the photo can be overlaid on the map, placed in a camera roll, and explored as a 3D scene.",
 		ids: ["rigi", "photo-workspace", "camera-roll", "step-inside"],
 		fieldNote: (d) =>
 			`one camera, three uses: overlay, roll, scene (compass off by ${signed(d.solved.delta.yaw)}°)`,

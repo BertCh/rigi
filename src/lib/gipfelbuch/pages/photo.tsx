@@ -399,7 +399,7 @@ function Anatomy({
 					</HandLabel>
 					<NorthArrow x={340} y={96} length={30} seed="ph-north" color="ink" />
 					<HandText x={cx + 8} y={cy - 130} size={15} color="red">
-						heading is a prior, not the truth
+						heading is a starting estimate, not a measurement
 					</HandText>
 				</g>
 			</svg>
@@ -767,7 +767,10 @@ function Deep({ accent }: { accent: string }) {
 						magnetic north; iPhones write true.
 					</li>
 				</ul>
-				<Callout tone="warning" title="Compass is a prior, not truth">
+				<Callout
+					tone="warning"
+					title="The compass heading is only a starting estimate"
+				>
 					Heading was up to 19° off on the demo photos. See the{" "}
 					<A id="exif-prior">EXIF prior</A> page.
 				</Callout>
@@ -825,8 +828,8 @@ function HeroMarks() {
 			caption={
 				<>
 					{d
-						? `One photo, six facts the phone wrote down before we looked at a single pixel (GPS accuracy ±${d.gps.hAccuracy.toFixed(0)} m).`
-						: "One photo, six facts the phone wrote down."}{" "}
+						? `One photo, six values the phone recorded before any pixel is analysed (GPS accuracy ±${d.gps.hAccuracy.toFixed(0)} m).`
+						: "One photo, six values the phone recorded."}{" "}
 					<Measured data={d} />
 				</>
 			}
@@ -1155,20 +1158,18 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="A photo is pixels plus what the phone knew."
+				title="A photo is an image plus the phone's sensor readings."
 			>
 				<p>
 					The phone writes down where it was and how it was held.{" "}
 					<HandMark type="highlight">
-						That is a good first guess, not an answer.
+						That is a useful first estimate, not the answer.
 					</HandMark>
-					<MarginNote mark="a">
-						I notice six facts, and none came from the pixels.
-					</MarginNote>
+					<MarginNote mark="a">Six values, none from the pixels.</MarginNote>
 				</p>
 				<p>
-					Only the <HandMark type="underline">pixels</HandMark> can say which
-					way the camera really pointed.
+					Only the <HandMark type="underline">pixels</HandMark> show which way
+					the camera actually pointed.
 				</p>
 			</Beat>
 
@@ -1180,7 +1181,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="We read the tags and turn them into a camera."
+				title="We read the tags and build a camera from them."
 			>
 				<Trio
 					steps={[
@@ -1191,12 +1192,12 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						},
 						{
 							title: "Gravity gives tilt",
-							body: "The phone knows down, so we know the horizon's slope.",
+							body: "The phone records which way is down, which gives the horizon's slope.",
 							visual: <TiltMini d={d1} />,
 						},
 						{
 							title: "Focal gives width",
-							body: "A lens number says how wide a slice of the world we see.",
+							body: "The focal length gives the width of the view.",
 							visual: <LensMini d={d1} />,
 						},
 					]}
@@ -1205,28 +1206,29 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<p>
 					<HandMark type="underline">Gravity</HandMark> fixes pitch and roll,
 					and focal fixes the field of view.
-					<MarginNote mark="d">
-						So yaw is the one that is left to find.
-					</MarginNote>
+					<MarginNote mark="d">That leaves yaw to be found.</MarginNote>
 				</p>
 			</Beat>
 
 			<Beat
 				kicker="Where it fails"
-				title="A tag can lie, so one tag never decides alone."
+				title="A tag can be wrong, so no single tag decides the result."
 			>
 				<p>
 					Photo 09 says it was{" "}
 					<HandMark type="wavy">730 m below the ground</HandMark>. We take the
 					higher of the GPS height and the ground plus 1.6 m.
 					<MarginNote mark="b">
-						730 m under the rock? Then the tag is wrong, not the map.
+						730 m below the ground is impossible, so the tag is wrong, not the
+						map.
 					</MarginNote>
 				</p>
 				<p>
 					If a tag is missing, we{" "}
 					<HandMark type="double">search for that value instead</HandMark>.
-					<MarginNote mark="c">Missing is fine; made up is not.</MarginNote>
+					<MarginNote mark="c">
+						A missing tag is searched for, not invented.
+					</MarginNote>
 				</p>
 			</Beat>
 

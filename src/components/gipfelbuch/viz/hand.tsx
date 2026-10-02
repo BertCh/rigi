@@ -264,7 +264,13 @@ export function HandLoop({
 				STRETCH,
 				className,
 			)}
-			style={{ inset }}
+			// an absolute svg keeps its viewBox ratio under `inset` alone, so both sides are sized
+			style={{
+				left: inset,
+				top: inset,
+				width: `calc(100% - ${2 * inset}px)`,
+				height: `calc(100% - ${2 * inset}px)`,
+			}}
 			aria-hidden="true"
 		>
 			<path

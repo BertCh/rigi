@@ -300,8 +300,8 @@ function Conveyor() {
 						{reject
 							? "run B · first solver rejects, second rescues. "
 							: "run A · first solver accepts. "}
-						Every stage returns a verdict. If both reject, the first guess is
-						shown as unverified and the user taps peaks.
+						Every stage returns accept or reject. If both reject, the first
+						guess is shown as unverified and the user taps peaks.
 					</li>
 				</ol>
 				<svg
@@ -422,11 +422,11 @@ function Conveyor() {
 						anchor="end"
 						rotate={-2}
 					>
-						a reject is an answer, not a crash
+						a rejection is a valid result, not an error
 					</HandText>
 					<HandLabel x={0} y={368} size={11} color={SWISS.secondary}>
-						Every stage returns a verdict. If both reject, the first guess is
-						shown as unverified and the user taps peaks.
+						Every stage returns accept or reject. If both reject, the first
+						guess is shown as unverified and the user taps peaks.
 					</HandLabel>
 					{/* the two outcomes */}
 					<g transform={`translate(0 386)`}>
@@ -1211,7 +1211,7 @@ function MeasuredOnePhoto({
 				</Panel>
 				<Panel
 					n={3}
-					title="Slide one onto the other"
+					title="Align the two"
 					foot={
 						d && (
 							<>
@@ -1237,7 +1237,7 @@ function MeasuredOnePhoto({
 				</Panel>
 				<Panel
 					n={4}
-					title="Label what is there"
+					title="Label the peaks"
 					foot={
 						d && (
 							<>
@@ -1487,12 +1487,15 @@ function Deep() {
 	const idx = useGipfelbuchIndex();
 	return (
 		<>
-			<Section kicker="Mechanism" title="One photo, five stages, one verdict">
+			<Section
+				kicker="Mechanism"
+				title="One photo, five stages, one accept or reject decision"
+			>
 				<p>
 					Everything runs in the browser: read the phone&rsquo;s sensors,
 					predict the 360° horizon from the GPS fix, find the skyline in the
-					pixels, slide one onto the other. The last stage is a gate that may
-					say <em>don&rsquo;t know</em>. How the match is scored is on{" "}
+					pixels, slide one onto the other. The last stage is a gate that can
+					reject the result as unreliable. How the match is scored is on{" "}
 					{A("viewport-inference", "Viewport Inference")}.
 				</p>
 			</Section>
@@ -1524,7 +1527,7 @@ function Deep() {
 									{A("dem-source", "DEM source")},{" "}
 									{A("terrain-sampler", "terrain sampler")}). The camera sits at
 									the higher of GPS altitude and ground + 1.6 m, so a bad
-									altitude never buries it in the hill.
+									altitude cannot place it underground.
 								</>
 							),
 						},
@@ -1547,7 +1550,7 @@ function Deep() {
 									The {A("skyline", "skyline")} in the photo: a sky colour
 									model, then the best boundary per pixel column, each with a
 									weight. About 160 ms at 800 px. Columns with no sky (a roof, a
-									hand) carry no vote.
+									hand) are ignored.
 								</>
 							),
 						},
@@ -1587,9 +1590,12 @@ function Deep() {
 
 			<GroundTruthEval idx={idx} />
 
-			<Section kicker="Why two solvers" title="Cheap first, different second">
+			<Section
+				kicker="Why two solvers"
+				title="A fast solver first, a different one second"
+			>
 				<p>
-					The first solver is fast and sound whenever the compass is roughly
+					The first solver is fast and reliable whenever the compass is roughly
 					right. The second costs 0.4 to 1.3 s in total and fails differently,
 					so it only runs where the first gave up. Together they accept more
 					photos than either alone, and never accepted a wrong pose on the
@@ -1662,7 +1668,8 @@ function HeroStages() {
 					stages={[
 						{
 							label: "Photo",
-							caption: "We start with the photo and what the phone recorded.",
+							caption:
+								"We start with the photo and the sensor data the phone recorded.",
 							render: () => (
 								<RealPhoto bleed data={d} layers={[]} crop={crop} />
 							),
@@ -1689,7 +1696,7 @@ function HeroStages() {
 							),
 						},
 						{
-							label: "Slide to match",
+							label: "Align the lines",
 							pose: 1,
 							caption: `We turn the camera until the two lines overlap, then check how sure we are. ${t(d?.ms.solve)}.`,
 							render: () => (
@@ -1705,7 +1712,7 @@ function HeroStages() {
 							label: "Label",
 							pose: 1,
 							caption:
-								"Once the pose is trusted, we name the peaks that line up.",
+								"Once the pose is accepted, we label the peaks that line up.",
 							render: () => (
 								<RealPhoto
 									bleed
@@ -1777,7 +1784,7 @@ function PipelineNumbers() {
 			items={[
 				{
 					value: `${acc.length} / 12`,
-					label: "demo photos accepted; the rest rejected, not guessed",
+					label: "demo photos accepted; the rest are rejected",
 				},
 				{ value: `${first} / 12`, label: "accepted by the first solver alone" },
 				{
@@ -1985,7 +1992,7 @@ function YawSearch() {
 							anchor="middle"
 							rotate={-2}
 						>
-							deepest dip, my answer
+							deepest dip: the chosen yaw
 						</HandText>
 						<PenArrow
 							seed={`yaw-note-${id}-${full}`}
@@ -2173,7 +2180,7 @@ function YawSearch() {
 			{full && curve && (
 				<p className={`mt-1 ${TYPE.caption} gb-secondary`}>
 					{idxPhoto && !idxPhoto.accepted ? "This photo was rejected. " : ""}
-					With no compass to lean on, rival dips appear all around the circle.
+					With no compass reading, similar dips appear all around the circle.
 					That is why the unknown-heading search needs a higher bar.
 				</p>
 			)}
@@ -2190,7 +2197,7 @@ function YawSearch() {
 						c: "solved",
 						text: "elevation of the horizon in that column, after turning the camera by Δψ (yaw) and Δφ (pitch)",
 					},
-					{ sym: "w", text: "how sure we are of that column (0 to 1)" },
+					{ sym: "w", text: "confidence in that column (0 to 1)" },
 					{
 						sym: "τ",
 						text: "cap on one column's error, 12 px, so a hand on the ridge cannot dominate",
@@ -2229,13 +2236,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="Predict the horizon, find the skyline, slide one onto the other."
+				title="Predict the horizon, find the skyline, and align the two."
 			>
 				<p>
 					Everything runs in the browser, with no neural network. The last step
-					is a gate that is allowed to say{" "}
+					is a gate that can reject an unreliable{" "}
 					<HandMark type="highlight">
-						<em>I don&rsquo;t know</em>
+						<em>result</em>
 					</HandMark>
 					.
 				</p>
@@ -2243,8 +2250,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<LiveHowItWorks
 				number="2"
-				title="Predict, find, slide, snap"
-				caption="The same solve as Fig. 1, replayed live: predicted horizon, traced skyline, the slide, the snap. Drag the terrain line once it has snapped."
+				title="Predicted horizon, traced skyline, alignment"
+				caption="The same solve as Fig. 1, replayed live: predicted horizon, traced skyline, the alignment, the snap. Drag the terrain line once it has snapped."
 				notes={[
 					{
 						text: "all in the browser, no server",
@@ -2253,14 +2260,17 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				]}
 			/>
 
-			<Beat kicker="The solve" title="Sliding is a search for the deepest dip.">
+			<Beat
+				kicker="The solve"
+				title="Alignment searches for the yaw with the lowest score."
+			>
 				<p>
 					We try every yaw (the way the camera points) within 25° of the compass
 					and score how far the skyline and horizon sit apart.
 				</p>
 				<p>
-					<HandMark type="double">The lowest score wins.</HandMark> The nearest
-					rival tells us how far to trust it.
+					<HandMark type="double">The lowest score is chosen.</HandMark> The
+					next-best score shows how far to trust it.
 				</p>
 			</Beat>
 
@@ -2274,7 +2284,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					steps={[
 						{
 							title: "Accept",
-							body: "Lines overlap and we are sure. Photo 03 reaches 0.87.",
+							body: "The lines overlap and confidence is high. Photo 03 reaches 0.87.",
 							visual: (
 								<OutcomeMini id="demo-03" layers={["skyline", "solved"]} />
 							),
@@ -2288,7 +2298,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						},
 						{
 							title: "Reject and ask",
-							body: "Photo 07 stays unsure, so the user taps a peak.",
+							body: "Photo 07 stays low-confidence, so the user taps a peak.",
 							visual: (
 								<OutcomeMini id="demo-07" layers={["skyline", "solved"]} />
 							),
@@ -2299,7 +2309,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="When the skyline is wrong, we reject instead of guessing."
+				title="When the skyline is wrong, the photo is rejected."
 			>
 				<p>
 					<HandMark type="wavy" color="red">
@@ -2307,8 +2317,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</HandMark>{" "}
 					Confidence stays low, so the photo is rejected.
 					<MarginNote mark="a">
-						11 rejected, 12 rescued: same head, two verdicts. Why does the
-						second solver cope?
+						Photo 11 is rejected and photo 12 is rescued, with the same head on
+						the ridge. Why does the second solver cope?
 					</MarginNote>
 				</p>
 			</Beat>
@@ -2316,7 +2326,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			<Figure
 				label="Fig. 4"
 				pinned="demo-11"
-				caption="Same head on the ridge, two verdicts: the first solver rejects it and the second rescues it."
+				caption="Same head on the ridge, two results: the first solver rejects it and the second rescues it."
 			>
 				<Gallery
 					ids={["demo-11", "demo-12"]}

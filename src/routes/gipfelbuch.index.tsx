@@ -21,7 +21,11 @@ import {
 } from "#/components/gipfelbuch/swiss";
 import { ListArrow, MarkerUnderline } from "#/components/gipfelbuch/swiss/hand";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
-import { Blattuebersicht, CHAPTERS } from "#/components/gipfelbuch/tafel";
+import {
+	Blattuebersicht,
+	CHAPTERS,
+	Wegnetz,
+} from "#/components/gipfelbuch/tafel";
 import { sheetTransition } from "#/components/gipfelbuch/viz/hooks";
 import { SiteNav } from "#/components/site/SiteNav";
 import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
@@ -177,8 +181,8 @@ function GipfelbuchIndex() {
 						title="The Rigi Gipfelbuch"
 						subtitle={
 							<>
-								How a photo of a mountain finds its place on the map. Two ideas
-								carry it:{" "}
+								How Rigi works out where a mountain photo was taken. It rests on
+								two ideas:{" "}
 								<IdeaLink id="viewport-inference">
 									working out where the camera points
 								</IdeaLink>{" "}
@@ -193,7 +197,7 @@ function GipfelbuchIndex() {
 					/>
 					<p className={`${TYPE.body} gb-secondary mt-6 max-w-[66ch]`}>
 						A Gipfelbuch is the logbook kept in a tin on a Swiss summit. This
-						one records the ideas each photo passes on its way up. New here?
+						one describes the steps Rigi takes to place each photo. New here?
 						Start with{" "}
 						<Link
 							to="/gipfelbuch/$concept"
@@ -208,6 +212,19 @@ function GipfelbuchIndex() {
 				</header>
 
 				<HandContents />
+
+				{/* the concept graph, drawn as a trail map: stations are sheets, trails the data flow */}
+				<section aria-labelledby="wegnetz-title" className="px-6 pt-6">
+					<div className="relative inline-block">
+						<h2 id="wegnetz-title" className={`${TYPE.h2} m-0`}>
+							Wegnetz
+						</h2>
+						<MarkerUnderline seed="index-wegnetz" />
+					</div>
+					<div className="mt-4">
+						<Wegnetz followed={photoId} />
+					</div>
+				</section>
 
 				<div className="px-6 pt-6">
 					<div ref={mapRef}>

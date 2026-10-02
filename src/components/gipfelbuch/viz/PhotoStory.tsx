@@ -1494,18 +1494,21 @@ function PhotoStoryInner({
 											: "text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]",
 									)}
 								>
-									<span className="nb-num mr-1.5 text-[var(--gb-contour,inherit)] normal-case">
-										{n + 1}.
+									{/* the loop hugs the label, not the stretched grid cell */}
+									<span className="relative inline-block">
+										<span className="nb-num mr-1.5 text-[var(--gb-contour,inherit)] normal-case">
+											{n + 1}.
+										</span>
+										{label}
+										{n === beat && (
+											<HandLoop
+												seed={`story-tab-${label}`}
+												color="red"
+												width={1.6}
+												inset={-6}
+											/>
+										)}
 									</span>
-									{label}
-									{n === beat && (
-										<HandLoop
-											seed={`story-tab-${label}`}
-											color="red"
-											width={1.6}
-											inset={-1}
-										/>
-									)}
 								</button>
 							);
 						})}

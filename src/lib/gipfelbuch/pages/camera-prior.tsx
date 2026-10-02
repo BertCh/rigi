@@ -459,7 +459,7 @@ function PriorErrors({
 					sel={sel}
 					onPick={onPick}
 					fmt={(v) => sgn(v, 1)}
-					note={`${yaw.filter((p) => Math.abs(p.v) > SIG_YAW).length} of 12 outside 1σ. Is the compass lying?`}
+					note={`${yaw.filter((p) => Math.abs(p.v) > SIG_YAW).length} of 12 outside 1σ`}
 				/>
 				<Strip
 					title="Gravity pitch error"
@@ -640,7 +640,7 @@ function PriorLab(_props: { accent: string }) {
 		<Figure
 			label="Fig. D3"
 			source="Skizze"
-			caption="Not a photo. A camera prior is one belief per sensor. Toggle each sensor and watch the possibilities shrink. Widths use the real defaults: GPS 5 to 100 m, compass 5° noise + 5° bias, gravity 1.5°."
+			caption="A diagram, not a photo. The camera prior holds one estimate per sensor. Toggle each sensor to see how the range of possible camera poses changes. Widths use the real defaults: GPS 5 to 100 m, compass 5° noise + 5° bias, gravity 1.5°."
 		>
 			<div ref={ref} className="p-3 sm:p-5">
 				<div className="flex flex-wrap gap-2">
@@ -836,7 +836,7 @@ function PriorLab(_props: { accent: string }) {
 						<KrokiTitle
 							x={14}
 							y={26}
-							title="Plan: where the prior says I stand"
+							title="Plan view: where the prior places the camera"
 							author=""
 							seed="lab-title"
 							size={16}
@@ -851,8 +851,8 @@ function PriorLab(_props: { accent: string }) {
 						/>
 						<HandText x={cx + 16} y={cy + 34} size={15} rotate={-3}>
 							{on.gps
-								? "I am somewhere in this disc"
-								: "no GPS: I could be anywhere"}
+								? "the camera is somewhere in this disc"
+								: "no GPS: the camera could be anywhere"}
 						</HandText>
 						<PenArrow
 							seed="lab-camera-arrow"
@@ -1016,10 +1016,10 @@ function Deep({ accent }: { accent: string }) {
 		<>
 			<Section kicker="Capture" title="What it is">
 				<p>
-					The phone already tells us roughly where the camera is and where it
-					points: a GPS fix with an accuracy radius, a compass heading, a
-					gravity vector (giving pitch and roll) and an EXIF focal length.
-					Together these are the <strong>camera prior</strong>. It feeds the{" "}
+					The phone records roughly where the camera is and which way it points:
+					a GPS fix with an accuracy radius, a compass heading, a gravity vector
+					(giving pitch and roll) and an EXIF focal length. Together these are
+					the <strong>camera prior</strong>. It feeds the{" "}
 					{A("pose-estimate", "pose estimate")};{" "}
 					{A("prior-unknowns", "prior unknowns")} tracks which parts are
 					placeholders.
@@ -1083,15 +1083,14 @@ function Deep({ accent }: { accent: string }) {
 			<Section kicker="Lessons" title="Gotchas">
 				<ul>
 					<li>
-						<strong>A prior is not evidence to pull on.</strong> Switching the
-						priors off helped, and an altitude rule was worse on held-out photos
-						(median 12.0 to 13.4 px). Priors are vetoes and tie-breaks, not
-						pulls.
+						<strong>A prior is not evidence.</strong> Switching the priors off
+						helped, and an altitude rule was worse on held-out photos (median
+						12.0 to 13.4 px). Priors are vetoes and tie-breaks, not pulls.
 					</li>
 					<li>
-						<strong>Missing is not zero.</strong> A photo with no compass or
-						lens carries a placeholder; unknown flags let the solver raise its
-						accept bar instead of trusting it. See{" "}
+						<strong>A missing value is not zero.</strong> A photo with no
+						compass or lens carries a placeholder; unknown flags let the solver
+						raise its accept bar instead of trusting it. See{" "}
 						{A("prior-unknowns", "prior unknowns")}.
 					</li>
 					<li>
@@ -1101,7 +1100,8 @@ function Deep({ accent }: { accent: string }) {
 					</li>
 				</ul>
 				<Callout tone="lesson">
-					Treat the prior as a starting point and a veto; let the image decide.
+					Use the prior as a starting point and a veto. The image decides the
+					final pose.
 				</Callout>
 			</Section>
 
@@ -1131,7 +1131,7 @@ function HeroCompare() {
 			photoId={photoId}
 			focus="prior"
 			number="1"
-			title="The phone's guess, struck through"
+			title="The phone's guess and the solved pose"
 			caption={
 				<>
 					{d
@@ -1337,8 +1337,8 @@ function PriorTrio() {
 		<Trio
 			steps={[
 				{
-					title: "GPS draws a circle",
-					body: "We are somewhere inside it. The phone reports how wide.",
+					title: "GPS gives a circle",
+					body: "The camera is somewhere inside it. The phone reports the radius.",
 					visual: (
 						<svg
 							viewBox="0 0 100 75"
@@ -1391,7 +1391,7 @@ function PriorTrio() {
 					),
 				},
 				{
-					title: "The compass points",
+					title: "The compass gives a direction",
 					body: "Dashed: the compass. Blue: where the camera faced.",
 					visual: (
 						<svg
@@ -1424,7 +1424,7 @@ function PriorTrio() {
 									);
 								})}
 							<HandText x={4} y={10} size={5.5} rotate={-2} halo={false}>
-								{d ? "what it said vs what was true" : ""}
+								{d ? "compass reading vs solved heading" : ""}
 							</HandText>
 							<HandLabel
 								x={50}
@@ -1440,7 +1440,7 @@ function PriorTrio() {
 					),
 				},
 				{
-					title: "Gravity and lens are tight",
+					title: "Gravity and lens are close to the solve",
 					body: "Tilt lands within 3° and view width within 5% of the solve.",
 					visual: (
 						<svg
@@ -1540,16 +1540,16 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="The sensors get close. The compass drifts."
+				title="The sensors are close, but the compass is off."
 			>
 				<p>
-					Before we look at pixels, the phone has told us roughly where the
-					camera is and where it points. That first guess is the{" "}
+					Before Rigi looks at the image, the phone's sensors give a rough
+					camera position and direction. That first guess is the{" "}
 					<strong>camera prior</strong>.
 				</p>
 				<p>
 					<HandMark type="highlight">
-						Yaw, the way the camera points, is the weakest part.
+						Yaw (the direction the camera points) is the least accurate part.
 					</HandMark>{" "}
 					The worst photo is marked <CircledNumber value={1} /> in Fig. 2.
 					<MarginNote mark="a">
@@ -1562,14 +1562,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Each sensor gives one guess with a width."
+				title="Each sensor gives one estimate with an uncertainty width."
 			>
 				<PriorTrio />
 			</Beat>
 
 			<Beat
 				kicker="Where it fails"
-				title="A prior is a place to start, never proof."
+				title="A prior is a starting point, not evidence."
 			>
 				<p>
 					We tried{" "}
@@ -1577,7 +1577,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						trusting the phone&rsquo;s altitude more
 					</HandMark>
 					<MarginNote mark="b">
-						Scratch that: altitude hints are vetoes, not pulls.
+						Altitude hints act as vetoes, not as pulls toward a value.
 					</MarginNote>
 					. On held-out photos the skyline gap got worse:{" "}
 					<HandMark type="double">median 12.0 to 13.4 px</HandMark>. So the

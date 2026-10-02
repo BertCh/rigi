@@ -601,7 +601,7 @@ function ViewpointWalk() {
 							/>
 						))}
 					<HandText x={330} y={-8} size={14} color="pencil">
-						the first photo within 250 m opens a viewpoint, not the nearest
+						a photo joins the first viewpoint within 250 m, not the nearest
 					</HandText>
 					{n >= 6 && owner[5] !== nearest(5) && (
 						<HandText x={14} y={290} size={14} color="pencil">
@@ -675,7 +675,7 @@ function PoseLadder() {
 		<Figure
 			label="D3"
 			source="Skizze"
-			caption="This is a ladder, not a solver: switch what a photo has on file and the first rung that exists wins. The roll never solves just to draw itself, and stores nothing: it is rebuilt on every load."
+			caption="Switch what a photo has on file and the first pose source that exists is used. The roll never solves just to draw itself, and stores nothing: it is rebuilt on every load."
 		>
 			<ol className="list-none space-y-2">
 				{rungs.map((r, i) => {
@@ -1978,7 +1978,7 @@ function HeroStages() {
 			pinned="demo-03"
 			caption={
 				spread == null
-					? "Twelve photos become one place."
+					? "Twelve photos grouped into one viewpoint."
 					: `All 12 photos were taken within ${Math.round(spread)} m of the first, so their views fan out from one spot.`
 			}
 		>
@@ -1986,7 +1986,7 @@ function HeroStages() {
 				interval={3800}
 				stages={[
 					{
-						label: "A pile",
+						label: "Unsorted",
 						caption:
 							"A camera roll starts as frames in time order, each with a rough GPS fix.",
 						render: () => (
@@ -2001,7 +2001,7 @@ function HeroStages() {
 						),
 					},
 					{
-						label: "A place",
+						label: "Aimed",
 						caption:
 							"Each photo is aimed by its solved direction. Brown cones are photos the solve rejected.",
 						render: () =>
@@ -2044,8 +2044,8 @@ function HeroStages() {
 							),
 					},
 					{
-						label: "A drape",
-						caption: "Then every photo is laid onto the terrain it saw.",
+						label: "Draped",
+						caption: "Then every photo is draped onto the terrain it shows.",
 						render: () =>
 							frame(
 								<img
@@ -2170,7 +2170,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					<HandMark type="highlight">
-						The phone's compass is the weak part.
+						The phone's compass is the least accurate input.
 					</HandMark>{" "}
 					Slide it below and watch every photo settle onto the terrain.
 				</p>
@@ -2211,7 +2211,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Group nearby photos, aim each one, lay them down."
+				title="Group nearby photos, solve each direction, place them on the terrain."
 			>
 				<Trio
 					steps={[
@@ -2245,7 +2245,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="Compass errors change within minutes, so a neighbour's fix is only a hint."
+				title="A neighbour's compass correction is only a hint, because compass errors change within minutes."
 			>
 				<p>
 					Photos from one spot often share a compass error. Here it does for a
@@ -2287,7 +2287,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 				<ViewpointWalk />
 
-				<h3>The best pose we already have</h3>
+				<h3>Which pose each photo uses</h3>
 				<div className="space-y-3">
 					<p>
 						Each photo gets a pose with no solver run: the first of four sources
@@ -2300,7 +2300,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 				<PoseLadder />
 
-				<h3>Anchors teach their neighbours</h3>
+				<h3>Solved photos correct their neighbours' compass</h3>
 				<div className="space-y-3">
 					<p>
 						The solver runs on each photo that still has only its phone guess,
@@ -2331,7 +2331,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						viewpoint, in distance bands from 40 m to 120 km, from the same
 						camera position as the {A("dem-horizon", "DEM horizon")}, and the
 						strip draws them over each photo as a match cue. Only solved photos
-						get it, because a phone guess is only a guess.
+						get it, because a phone guess is too inaccurate for it.
 					</p>
 				</div>
 
@@ -2365,9 +2365,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					/>
 				</Figure>
 
-				<Callout tone="result" title="Derived, never stored">
+				<Callout tone="result" title="Computed each time, never stored">
 					Rolls, viewpoints and pose sources are recomputed from metadata every
-					time. Delete a photo and the roll simply re-forms.
+					time. If you delete a photo, the roll is regrouped without it.
 				</Callout>
 
 				<h3>Where to look</h3>
@@ -2414,7 +2414,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					/>
 				</div>
 
-				<h3>Rolls reuse, they do not re-solve</h3>
+				<h3>Rolls reuse the existing solver</h3>
 				<div className="space-y-3">
 					<p>
 						Alignment reuses the solver from{" "}

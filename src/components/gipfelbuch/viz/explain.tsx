@@ -670,23 +670,26 @@ export function Stages({
 									: "text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]",
 							)}
 						>
-							<span
-								className={cn(
-									"nb-num mr-1.5 normal-case",
-									STAGE_NUMBER_INK[script[n]?.kind ?? "evidence"],
+							{/* the loop hugs the label, not the stretched grid cell */}
+							<span className="relative inline-block">
+								<span
+									className={cn(
+										"nb-num mr-1.5 normal-case",
+										STAGE_NUMBER_INK[script[n]?.kind ?? "evidence"],
+									)}
+								>
+									{n + 1}.
+								</span>
+								{st.label}
+								{n === i && (
+									<HandLoop
+										seed={`stage-tab-${st.label}`}
+										color="red"
+										width={1.6}
+										inset={-6}
+									/>
 								)}
-							>
-								{n + 1}.
 							</span>
-							{st.label}
-							{n === i && (
-								<HandLoop
-									seed={`stage-tab-${st.label}`}
-									color="red"
-									width={1.6}
-									inset={-1}
-								/>
-							)}
 							{n === i && progress && (
 								// the clock made visible: a pencil drawn over this stage's dwell
 								<svg

@@ -398,7 +398,7 @@ function Hero() {
 					</HandText>
 					<HandText x={14} y={22} size={15} rotate={-2}>
 						{err == null
-							? "no match: the floor rule stands"
+							? "no match: the floor rule is used"
 							: `floor rule is ${Math.abs(err).toFixed(1)} m too ${err >= 0 ? "high" : "low"} here`}
 					</HandText>
 					<HandText
@@ -793,8 +793,8 @@ function RealContour() {
 			caption={
 				<>
 					Bar: floor-rule eye minus altitude-contour eye, on Mapterhorn. Red,
-					right: the floor rule stands the eye higher. Navy, left: the contour
-					eye is higher. Photo 09 finds no match. <Measured data={data} />
+					right: the floor rule puts the eye higher. Navy, left: the contour eye
+					is higher. Photo 09 finds no match. <Measured data={data} />
 				</>
 			}
 		>
@@ -1005,7 +1005,7 @@ function DriftPlot() {
 							anchor="end"
 							rotate={-3}
 						>
-							only the foreground cares
+							matters only for the foreground
 						</HandText>
 					</>
 				)}
@@ -1075,7 +1075,7 @@ function SideView({
 				ground along the view
 			</HandLabel>
 			<HandText x={px(60)} y={Ht - 10} size={17} color="pencil">
-				inside the mountain
+				below the ground
 			</HandText>
 			{stage >= 1 && (
 				<PenLine
@@ -1133,7 +1133,7 @@ function SideView({
 				color="pencil"
 				rotate={-2}
 			>
-				{`a phone ${under} m under the ground cannot be right`}
+				{`a phone ${under} m below the ground is impossible`}
 			</HandText>
 			{stage >= 2 && (
 				<g>
@@ -1188,8 +1188,8 @@ function HeroStages() {
 			caption={
 				<>
 					{under == null
-						? "One real fix, far under the ground."
-						: `Photo 09: the phone put the camera ${under} m inside the mountain; the rule lifts it onto the slope.`}{" "}
+						? "One real fix, far below the ground."
+						: `Photo 09: the phone's altitude puts the camera ${under} m below the ground; the rule raises it to the slope.`}{" "}
 					{underM != null &&
 						`(Drawn on Terrarium; on Mapterhorn, which Rigi uses, the gap is ${underM} m.) `}
 					<Measured data={d} />
@@ -1199,13 +1199,13 @@ function HeroStages() {
 			<Stages
 				stages={[
 					{
-						label: "The phone says",
+						label: "Phone altitude",
 						caption:
 							"This photo's altitude is far below the ground it was taken on.",
 						render: frame(0),
 					},
 					{
-						label: "The rule",
+						label: "The floor rule",
 						caption:
 							"The camera may never sit below the ground plus a standing eye.",
 						render: frame(1),
@@ -1213,7 +1213,7 @@ function HeroStages() {
 					{
 						label: "Snapped",
 						caption:
-							"The eye stands on the slope, and the horizon is traced from there.",
+							"The camera is placed on the slope, and the horizon is traced from there.",
 						render: frame(2),
 					},
 				]}
@@ -1287,7 +1287,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="The camera never stands inside the mountain."
+				title="The camera is never placed below the ground."
 			>
 				<p>
 					Every photo needs a camera height. We take the higher of two numbers:
@@ -1299,10 +1299,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					<HandMark type="highlight">
-						GPS height is the weakest GPS number: its error is usually 1.5 to 3
-						times the sideways error.
+						GPS height is the least accurate GPS value: its error is usually 1.5
+						to 3 times the horizontal error.
 					</HandMark>{" "}
-					The ground cannot move, so it sets a floor.
+					The ground height is reliable, so it sets a minimum.
 					{bad && (
 						<MarginNote mark="a">
 							{`Photo 09 says ${bad.t.alt.toFixed(0)} m, ${Math.round(bad.t.ground - bad.t.alt)} m under the ground.`}
@@ -1356,21 +1356,21 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="On a summit the rule can stand you too high."
+				title="On a summit the rule can put the camera too high."
 			>
 				<p>
 					Near a summit the GPS spot can land up-slope. The ground there is
 					higher, so{" "}
 					<HandMark type="wavy">the eye is too high by metres</HandMark>.
 					<MarginNote mark="b">
-						Which is right, the rule or the contour? No true eye height to score
-						either against.
+						Neither the rule nor the contour can be checked, because there is no
+						true eye height to compare with.
 					</MarginNote>
 				</p>
 				<p>
 					A second, optional check treats the altitude as a measurement and
-					looks for where it matches the ground. If it finds nothing, it steps
-					aside.
+					looks for where it matches the ground. If it finds no match, Rigi uses
+					the floor rule.
 				</p>
 			</Beat>
 
@@ -1438,12 +1438,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					against Mapterhorn but not Terrarium (Fig. 2), so the photographer
 					most likely stood where <code>DEM + 1.6 ≈ alt</code> inside the
 					horizontal error disk.{" "}
-					<HandMark type="strike">Phone altitude is a floor.</HandMark>{" "}
+					<HandMark type="strike">Phone altitude is a minimum.</HandMark>{" "}
 					<span
 						className="nb-hand"
 						style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
 					>
-						Phone altitude is evidence.
+						Phone altitude is a measurement.
 					</span>
 				</p>
 				<p>
@@ -1469,8 +1469,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					a 4000 px frame (D2), and under a pixel beyond 1 km.
 				</p>
 				<DriftPlot />
-				<Callout tone="lesson" title="Altitude is evidence, not a floor">
-					The floor rule throws altitude away whenever the fix lands on higher
+				<Callout
+					tone="lesson"
+					title="Treat altitude as a measurement, not a minimum"
+				>
+					The floor rule discards altitude whenever the fix lands on higher
 					ground than the photographer's. Treating it as a contour recovers it,
 					but the −7 m bias was fitted on 10 photos (9 Swiss, 4 days), and fixes
 					from US photos read near 0, which is why the prior falls back. See{" "}

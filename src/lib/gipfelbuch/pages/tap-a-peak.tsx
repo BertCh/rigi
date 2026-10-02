@@ -1250,7 +1250,7 @@ function HeroTaps() {
 					},
 					{
 						label: "1 tap",
-						caption: `Yaw snaps to ${f(S && Math.abs(S[1].err.yaw), 2)}° off. Labels now miss by ${f(S?.[1].peakShift.median)} px.`,
+						caption: `Yaw error drops to ${f(S && Math.abs(S[1].err.yaw), 2)}°. Labels now miss by ${f(S?.[1].peakShift.median)} px.`,
 						render: () => (
 							<TapFrame photo={photo} tap={tap} n={1} id="demo-10" bleed />
 						),
@@ -1306,8 +1306,8 @@ function OneTap() {
 			caption={
 				<>
 					A tap&apos;s distance from the image centre, in pixels, is an angle.
-					Subtract it from the summit&apos;s known direction and you have where
-					the camera points.{" "}
+					Subtracting it from the summit&apos;s known direction gives the
+					direction the camera points.{" "}
 				</>
 			}
 		>
@@ -1360,7 +1360,7 @@ function OneTap() {
 							rotate={-2}
 							halo={false}
 						>
-							these two offsets are the whole measurement
+							these two offsets are the measurement
 						</HandText>
 						<PenArrow
 							from={[cx + 60 * k, cy + 14 * k]}
@@ -1590,7 +1590,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 		<>
 			<HeroTaps />
 
-			<Beat kicker="The idea" title="A tap is a measurement with a name on it.">
+			<Beat
+				kicker="The idea"
+				title="Tap peaks you recognise to fix the pose by hand."
+			>
 				<p>You point at a summit you know and say which one it is.</p>
 				<p>
 					<HandMark type="highlight">
@@ -1604,7 +1607,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Each tap unlocks one more thing to solve."
+				title="Each extra tap lets the solver fit more parameters."
 			>
 				<Trio
 					steps={[
@@ -1631,7 +1634,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				photoId="demo-10"
 				focus="tap"
 				number="3"
-				title="A tap is the snap"
+				title="Taps move labels onto their summits"
 				caption={
 					S
 						? `The phone's guess: labels miss their summits by ${S[0].peakShift.median} px (median). One named summit pulls them onto the skyline: ${S[1].peakShift.median} px after one tap.`
@@ -1655,12 +1658,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					after one tap.
 					{S && (
 						<MarginNote mark="a">
-							{`Tempting: one tap fixes everything. It does not: ${S[0].peakShift.median} px, then ${S[1].peakShift.median} px.`}
+							{`One tap does not fix everything: ${S[0].peakShift.median} px, then ${S[1].peakShift.median} px.`}
 						</MarginNote>
 					)}
 				</p>
 				<p>
-					A loose finger counts too: 5 px off is about{" "}
+					Finger imprecision matters too: a tap 5 px off is about{" "}
 					{S ? (Math.atan(5 / S[1].cam.f) / DEG).toFixed(1) : "…"}° of yaw.{" "}
 					<HandMark type="wavy">Naming the wrong summit is worse</HandMark>, so
 					the picker offers only nearby named summits and checks each against
@@ -1702,7 +1705,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 				<Section
 					kicker="The ladder"
-					title="One tap, two angles. Three taps, the lens."
+					title="One tap fits yaw and pitch. Three taps also fit the lens."
 				>
 					<ul>
 						<li>
@@ -1710,8 +1713,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							camera points. Roll and lens keep their sensor values, so the
 							overlay is exact at the pin and tilts or stretches away from it.
 							<MarginNote mark="b">
-								Why does the lens only come with the third pin? Two points give
-								a baseline, not a width.
+								Why does the lens need a third pin? Two points give a baseline,
+								not the field of view.
 							</MarginNote>
 						</li>
 						<li>
@@ -1724,7 +1727,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<li>
 							<strong>3 pins: add the lens.</strong> A third point makes the
 							field of view measurable. A weak prior (10 % of the starting
-							value) keeps a sloppy tap from sending the lens somewhere absurd.
+							value) keeps an imprecise tap from giving an unrealistic lens
+							value.
 						</li>
 					</ul>
 					<p>
@@ -1736,11 +1740,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 				<Section kicker="Which summit?" title="Which summit did you mean?">
 					<p>
-						The hard part is the name, not the maths. The photo may be tens of
-						degrees off, so the summit under your finger is not the one in the
-						world. The picker therefore treats the tap as a ray under{" "}
-						<em>every</em> candidate pose and lets each vote. Only named summits
-						inside the window are offered. In Fig. D2 the pose on screen is ray{" "}
+						The hard part is identifying the summit. The pose may be tens of
+						degrees off, so the nearest summit under the current pose may be the
+						wrong one. The picker therefore turns the tap into a ray under{" "}
+						<em>every</em> candidate pose. Only named summits inside the window
+						are offered. In Fig. D2 the pose on screen is ray{" "}
 						<CircledNumber value={1} seed="tp-prose-1" />.
 					</p>
 				</Section>
@@ -1754,8 +1758,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<p>
 						Each candidate pose is re-solved with the pin. They now all agree at
 						the pin and differ elsewhere, because roll and lens still depend on
-						where each started. The skyline match separates them, evidence you
-						did not have to supply.
+						where each started. The skyline match separates them without any
+						extra input from you.
 					</p>
 					<Flow
 						nodes={[
@@ -1780,7 +1784,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							},
 							{
 								title: "Solve rotation",
-								body: "Least squares over the unlocked values. The camera position is fixed at the GPS point, so a pin only constrains rotation; weak priors keep the rest sane.",
+								body: "Least squares over the unlocked values. The camera position is fixed at the GPS point, so a pin only constrains rotation; weak priors keep the other parameters near their starting values.",
 							},
 							{
 								title: "Rank and preview",
@@ -1823,8 +1827,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<p>
 						Within 12 px of 1000 counts as consistent with a tap.
 						<MarginNote mark="d">
-							12 px of 1000 is about 0.7° of the view: a finger, not a solver,
-							sets the tolerance.
+							12 px of 1000 is about 0.7° of the view, which matches the
+							precision of a finger tap.
 						</MarginNote>
 					</p>
 				</Section>

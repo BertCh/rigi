@@ -221,8 +221,8 @@ export function NotebookMap({ className }: { className?: string }) {
 							Feldbuch · {index?.place ?? "Niederhorn above Lake Thun"}
 						</p>
 						<p className="mt-1.5 max-w-xl text-[13px] leading-relaxed">
-							One photo, followed from phone to terrain and back. Pick another
-							photo and every number updates.
+							This page follows one photo from the phone's sensor readings to
+							the terrain match. Pick another photo and every number updates.
 						</p>
 					</div>
 					<PhotoStrip index={index} selected={photoId} onSelect={setPhotoId} />
@@ -271,12 +271,12 @@ export function NotebookMap({ className }: { className?: string }) {
 								</PastedPrint>
 								<div>
 									<p className="nb-hand text-[16px] leading-tight">
-										the ground straight ahead
+										terrain along the viewing direction
 									</p>
 									<SectionSketch data={data} />
 									<p className="mt-2 text-[13px] leading-relaxed text-[var(--nb-faint)]">
-										Brown ticks: ridge crests on this bearing. Red dashes: the
-										sight line grazing the farthest one.
+										Brown ticks: ridge crests along this direction. Red dashes:
+										the line of sight that just touches the farthest crest.
 									</p>
 								</div>
 							</div>

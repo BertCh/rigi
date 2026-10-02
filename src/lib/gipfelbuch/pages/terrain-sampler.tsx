@@ -311,7 +311,7 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 					/>
 					<NorthArrow x={318} y={48} seed="ts-rings-north" />
 					<HandText x={170} y={336} size={14} anchor="middle" color="brown">
-						log scale: far rings squeeze
+						log scale: far rings are compressed
 					</HandText>
 					<PencilLayer>
 						<PenLine
@@ -883,8 +883,8 @@ function LevelCost({ data }: { data: TerrainData | null }) {
 			bleed
 			caption={
 				<>
-					Black: our answer along a real 12 km line, as height minus the finest
-					map&rsquo;s. Orange: the coarsest map used everywhere.
+					Black: the sampler's answer along a real 12 km line, as height minus
+					the finest map&rsquo;s. Orange: the coarsest map used everywhere.
 				</>
 			}
 		>
@@ -1368,10 +1368,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="Asked millions of times: how high is the ground here?"
+				title="Called millions of times: how high is the ground here?"
 			>
 				<p>
-					Give it a spot and its distance from the camera; it answers in metres.
+					Given a location and its distance from the camera, it returns the
+					height in metres.
 				</p>
 				<p>
 					<HandMark type="highlight">
@@ -1391,7 +1392,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Pick a map, blend four pixels, fall back on a hole."
+				title="Pick a map, blend four pixels, fall back to a coarser map if data is missing."
 			>
 				<Trio
 					steps={[
@@ -1406,8 +1407,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							visual: <BlendMini d={data} />,
 						},
 						{
-							title: "No tile? Go coarser",
-							body: "A missing tile is a hole, so we ask the next map.",
+							title: "Missing tile: use a coarser map",
+							body: "A missing tile gives no value, so the next coarser map is used.",
 							visual: <HoleMini />,
 						},
 					]}
@@ -1436,13 +1437,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				}
 			>
 				<p>
-					Sharp tiles near us, coarse tiles far away.{" "}
+					Sharp tiles near the camera, coarse tiles far away.{" "}
 					<HandMark type="double">
-						That caps the error without loading every tile sharp.
+						This limits the error without loading every tile at full detail.
 					</HandMark>
 					{cost && (
 						<MarginNote mark="c">
-							{`Tempting: coarse everywhere is fine. Up to ${cost.coarse.toFixed(0)} m off. With bands: ${cost.picked.toFixed(0)} m.`}
+							{`Using coarse maps everywhere is up to ${cost.coarse.toFixed(0)} m off. With bands: ${cost.picked.toFixed(0)} m.`}
 						</MarginNote>
 					)}
 				</p>
@@ -1534,7 +1535,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							body: (
 								<>
 									Tiles load 16 at a time. A tile of the wrong size is rejected
-									loudly, because it would silently scramble heights. A tile
+									with an error, because it would give wrong heights. A tile
 									that fails to load leaves a hole.
 								</>
 							),

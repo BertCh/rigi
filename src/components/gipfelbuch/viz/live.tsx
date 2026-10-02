@@ -909,13 +909,13 @@ export function LiveReveal({
 						side: "left",
 					},
 					{
-						text: "names stand on their summits",
+						text: "peak names placed at their summits",
 						at: [0.55, 0.2],
 						side: "right",
 						y: 0.05,
 					},
 					{
-						text: "past the frame: the same ridges, from terrain data",
+						text: "beyond the frame: the same ridges, computed from terrain data",
 						at: [1.18, 0.34],
 						side: "right",
 						y: 0.55,
@@ -1066,7 +1066,7 @@ export function LiveDrape({
 			notes={
 				notes ?? [
 					{
-						text: "a pin is a solved camera; click to enter it",
+						text: "each pin is a solved camera; click to enter it",
 						at: [0.5, 0.5],
 						side: "left",
 					},
@@ -1182,7 +1182,7 @@ export function LivePanorama({
 			notes={
 				notes ?? [
 					{
-						text: "grey between photos: the terrain's own horizon",
+						text: "grey between photos: the horizon computed from terrain data",
 						at: [0.5, 0.5],
 						side: "left",
 					},
@@ -1246,7 +1246,7 @@ export function LiveTopoBoard({
 /** The landing's six-beat method scene (site/how/HowItWorksScene) on a plate; static under reduced motion and webdriver. */
 export function LiveHowItWorks({
 	number,
-	title = "Guess, measure, correct, snap",
+	title = "From the phone's pose to the solved pose",
 	caption = "Six steps of one real solve. Drag the terrain line once it has snapped.",
 	notes,
 	date,

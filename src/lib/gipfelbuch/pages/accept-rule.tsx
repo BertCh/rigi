@@ -398,9 +398,10 @@ function RealDecisions() {
 									{d.app && (
 										<>
 											{" "}
-											Rejected is not wrong: the app's saved yaw is{" "}
-											{d.app.yaw.toFixed(1)}°, here {d.solved.yaw.toFixed(1)}°.
-											The rule only refuses to call it certain.
+											A rejected pose is not necessarily wrong: the app's saved
+											yaw is {d.app.yaw.toFixed(1)}°, here{" "}
+											{d.solved.yaw.toFixed(1)}°. The rule only declines to mark
+											it certain.
 										</>
 									)}
 								</>
@@ -632,7 +633,7 @@ const RULES: Rule[] = [
 		right: 25,
 		wrong: 2,
 		precision: "0.93",
-		note: "Fine around a trusted compass; too loose once yaw is unknown.",
+		note: "Adequate with a trusted compass; too loose once yaw is unknown.",
 	},
 	{
 		id: "c75",
@@ -726,7 +727,7 @@ function PrecisionLadder() {
 		<Figure
 			label="Fig. 6"
 			bleed
-			caption="Five accept rules on the same 100 checked photos. Each dot is an accepted pose: green correct, red confidently wrong, grey unsure. Tighten the rule and the red disappears; fewer dots remain."
+			caption="Five accept rules on the same 100 checked photos. Each dot is an accepted pose: green correct, red confidently wrong, grey unsure. Stricter rules remove the red dots, and fewer dots remain."
 		>
 			<div ref={ref}>
 				<style>{`
@@ -1338,13 +1339,13 @@ function Legacy() {
 				<Steps
 					steps={[
 						{
-							title: "Soft evidence, hard gates",
+							title: "Six factors and fixed thresholds",
 							body: (
 								<>
 									The second solver’s confidence is six ramps multiplied
 									together (yaw peak, runner-up ratio, columns that fit,
-									uncertainty, skyline slope, residual). One weak term drags it
-									down. Accept needs a score of 0.5, at least 30% of columns
+									uncertainty, skyline slope, residual). One low factor lowers
+									it. Accept needs a score of 0.5, at least 30% of columns
 									fitting, and a skyline slope of 0.015.
 								</>
 							),
@@ -1362,7 +1363,7 @@ function Legacy() {
 							),
 						},
 						{
-							title: "Two solvers must not disagree",
+							title: "Two solvers cross-check each other",
 							body: (
 								<>
 									After first draw, a second solver re-solves on its own.
@@ -1374,7 +1375,7 @@ function Legacy() {
 							),
 						},
 						{
-							title: "Look again, then demand independent evidence",
+							title: "A second look, then independent evidence",
 							body: (
 								<>
 									If the skyline is weak, the photo goes to render-and-match.
@@ -1432,9 +1433,8 @@ function Legacy() {
 					))}
 				</div>
 				<Callout tone="lesson">
-					Precision first costs recall on purpose. The rule leaves 10 correct
-					poses on the table to avoid one wrong one; they go to “please
-					confirm”.
+					Favouring precision lowers recall. The rule skips 10 correct poses to
+					avoid one wrong one; they go to “please confirm”.
 				</Callout>
 			</Section>
 		</>
@@ -1485,8 +1485,8 @@ function Verdicts() {
 			caption={
 				<>
 					{nOk == null
-						? "Twelve real photos, twelve decisions."
-						: `Twelve real photos, twelve decisions: ${nOk} shown as certain, ${12 - nOk} kept as guesses.`}{" "}
+						? "Accept decisions for 12 real photos."
+						: `Accept decisions for 12 real photos: ${nOk} shown as certain, ${12 - nOk} kept as guesses.`}{" "}
 					Each tile says why. <Measured data={idx} />
 				</>
 			}
@@ -1823,17 +1823,17 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 			<Beat kicker="The idea" title="A wrong pose is worse than no pose.">
 				<p>
 					<HandMark type="highlight">
-						A wrong pose draws confident names on the wrong mountains.
+						A wrong pose puts confident names on the wrong mountains.
 					</HandMark>{" "}
-					A missing pose just asks the user to tap a peak.
+					A missing pose only asks the user to tap a peak.
 					<MarginNote mark="a">
-						A tap costs a second. A wrong label costs trust: 19 of 60 accepts
-						were wrong.
+						A tap takes a second. A wrong label is worse: 19 of 60 accepts were
+						wrong.
 					</MarginNote>
 				</p>
 				<p>
 					So Rigi calls a pose certain only if a solver accepted it and its
-					confidence clears a bar. Everything else is a guess, and says so.{" "}
+					confidence clears a bar. Everything else is shown as a guess.{" "}
 					<HandMark type="wavy" color="red">
 						Even a pose that looks right can be refused.
 					</HandMark>
@@ -1843,13 +1843,13 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 			<Beat kicker="How it works" title="Four checks multiply into one score.">
 				<p>
 					<HandMark type="underline">
-						A weak check drags the whole product down.
+						One low check lowers the whole score.
 					</HandMark>{" "}
 					Heads and hair count against the fit, so a photo with a person on the
 					ridge can be refused.
 					<MarginNote mark="b">
-						Four factors, each 0 to 1. One zero and the product is zero: I check
-						which one fell.
+						Four factors, each 0 to 1. If one is 0 the score is 0, so check
+						which one is low.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1858,12 +1858,15 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 
 			<RealDecisions />
 
-			<Beat kicker="Two more checks" title="A bar, then a second opinion.">
+			<Beat
+				kicker="Two more checks"
+				title="A confidence threshold, then a second solver."
+			>
 				<Trio
 					className="sm:grid-cols-2"
 					steps={[
 						{
-							title: "Hold it to a bar",
+							title: "Apply a confidence bar",
 							body: "0.5 with a trusted compass. 0.75 when the heading is unknown.",
 							visual: <BarScale />,
 						},
@@ -1880,11 +1883,11 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="The price is correct poses we do not show."
+				title="Strict rules hide some correct poses."
 			>
 				<p>
 					<HandMark type="double">
-						Tighter rules throw away good answers on purpose.
+						Stricter rules discard some correct poses on purpose.
 					</HandMark>{" "}
 					Each dot below is one of 100 photos checked by hand.
 				</p>
@@ -1897,8 +1900,8 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 					: the two wrong accepts sat between 0.5 and 0.75, and the new bar
 					costs 3 correct poses.
 					<MarginNote mark="c">
-						Escalation wins back 2 of those 3. Is the third worth a wrong label?
-						I say no.
+						The second look recovers 2 of those 3. The third is not worth the
+						risk of a wrong label.
 					</MarginNote>
 				</p>
 			</Beat>

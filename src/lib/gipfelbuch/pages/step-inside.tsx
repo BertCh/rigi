@@ -930,8 +930,8 @@ function RealRange() {
 				</span>{" "}
 				of the {ground.length * step} ground rows in the centre column land
 				inside 150 m (nearest {minR.toFixed(0)} m
-				{near.length ? `, farthest ${maxNear.toFixed(0)} m` : ""}). The rest is
-				<em> far</em> and left to the terrain model. Camera height here:{" "}
+				{near.length ? `, farthest ${maxNear.toFixed(0)} m` : ""}). The rest is{" "}
+				<em> far</em> and is left to the terrain model. Camera height here:{" "}
 				{(d.gps.eye - d.gps.ground).toFixed(0)} m above ground.
 			</p>
 		);
@@ -942,9 +942,9 @@ function RealRange() {
 			bleed
 			caption={
 				<>
-					Each image row on the centre line is a ray from the camera; its length
-					is read off the terrain model. Green: inside 150 m. Brown: far. Blue:
-					sky. <Measured data={d} />
+					Each image row on the centre line is a ray from the camera; the
+					terrain model gives the ray's length. Green: inside 150 m. Brown: far.
+					Blue: sky. <Measured data={d} />
 				</>
 			}
 		>
@@ -1119,7 +1119,7 @@ function RealCompression() {
 	return (
 		<Figure
 			label="D4"
-			caption="Why depth needs anchoring. A single-photo depth model squeezes distance: true distance divided by model distance is about 1 at 20 m, 2.9 at 100–300 m, 6.6 at 300–1000 m. One global scale leaves a typical error of 0.34 (log units); a per-photo curve cuts it to 0.13."
+			caption="Why depth needs anchoring. A single-photo depth model compresses distance: true distance divided by model distance is about 1 at 20 m, 2.9 at 100–300 m, 6.6 at 300–1000 m. One global scale leaves a typical error of 0.34 (log units); a per-photo curve cuts it to 0.13."
 		>
 			<svg
 				viewBox={`0 0 ${W} 130`}
@@ -1278,7 +1278,7 @@ function HeroStages() {
 			caption={
 				<>
 					{near == null
-						? "The terrain model tells us how far away each pixel is."
+						? "The terrain model gives the distance to the ground at each pixel."
 						: `Along this photo's centre line, ${near} % of the ground we can see lies within 150 m.`}{" "}
 					<Measured data={d} />
 				</>
@@ -1288,13 +1288,13 @@ function HeroStages() {
 				stages={[
 					{
 						label: "Photo",
-						caption: "A solved photo knows where the camera stood.",
+						caption: "A solved photo has a known camera position.",
 						render: () => <RealPhoto data={d} layers={[]} bleed />,
 					},
 					{
 						label: "How far?",
 						caption:
-							"Down the centre we ask the terrain model: bright is near, dark is far.",
+							"Along the centre column Rigi reads the terrain model's distance: bright is near, dark is far.",
 						render: () => (
 							<RealPhoto data={d} layers={[]} bleed>
 								{(x) => <RangeBar d={x} mode="ramp" />}
@@ -1306,8 +1306,9 @@ function HeroStages() {
 						caption: (
 							<>
 								Inside 150 m,{" "}
-								<Key color="var(--accent)">near things become 3D</Key>. Beyond
-								it, <Key color={DEM_C}>the terrain model draws the world</Key>.
+								<Key color="var(--accent)">nearby objects become 3D</Key>.
+								Beyond it,{" "}
+								<Key color={DEM_C}>the terrain model supplies the surface</Key>.
 							</>
 						),
 						render: () => (
@@ -1657,24 +1658,24 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="Far mountains are measured. Only near things are rebuilt."
+				title="Far terrain comes from the map; only nearby objects are rebuilt in 3D."
 			>
 				<p>
-					The terrain model knows where the mountains are.{" "}
+					The terrain model contains the mountains.{" "}
 					<HandMark type="highlight">
-						It does not know the hut ten metres away.
+						It does not contain a hut ten metres away.
 					</HandMark>
 				</p>
 				<p>
-					So we keep the terrain for the terrain, and lift only what stands in
-					front of it into 3D. Then the camera starts{" "}
+					So Rigi uses the terrain model for the terrain and lifts only objects
+					in front of it into 3D. The camera then starts{" "}
 					<HandMark type="underline">
 						exactly where the photo was taken
 					</HandMark>
 					.
 					<MarginNote mark="a">
-						The 150 m radius is the whole bargain: inside it we rebuild, outside
-						it we trust the terrain model.
+						Inside the 150 m radius Rigi rebuilds objects; outside it Rigi uses
+						the terrain model.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1684,8 +1685,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			<RealSplit />
 
 			<Beat
-				kicker="Down the centre line"
-				title="Every image row has a range, and 150 m splits them."
+				kicker="Along the centre column"
+				title="Each image row has a distance, and 150 m separates near from far."
 			>
 				<p>
 					Pick a photo. The stripe beside it marks each row of the central
@@ -1693,7 +1694,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					m, <CircledNumber value={2} color="brown" /> brown is far, blue is
 					sky.
 					<MarginNote mark="b">
-						Low rows are close ground; the stripe turns brown quickly higher up.
+						Low rows show nearby ground; higher up the stripe turns brown.
 					</MarginNote>
 				</p>
 			</Beat>
@@ -1739,13 +1740,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Fix the depth scale, split every pixel, stand at the eye."
+				title="Rescale depth, split every pixel, place the camera at the photo position."
 			>
 				<Trio
 					steps={[
 						{
 							title: "Fix the scale",
-							body: "A depth model squeezes far range. We re-scale it against the terrain.",
+							body: "A depth model compresses far distances. Rigi rescales it against the terrain.",
 							visual: <MiniBars />,
 						},
 						{
@@ -1754,7 +1755,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							visual: <MiniSplit />,
 						},
 						{
-							title: "Stand where the photo was taken",
+							title: "Place the camera at the photo position",
 							body: "The camera starts where the photo was taken and stays close.",
 							visual: <MiniEye />,
 						},
@@ -1764,13 +1765,15 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="Depth alone cannot tell a hut from the hill behind it."
+				title="Depth alone cannot separate a hut from the hill behind it."
 			>
 				<p>
 					<HandMark type="wavy">Beyond 100 m the depth model drifts</HandMark>,
 					and objects blur into the slope. The camera height is also uncertain,
 					because phone GPS height is rough.
-					<MarginNote mark="c">Why trust a hut at 200 m? We do not.</MarginNote>
+					<MarginNote mark="c">
+						Beyond 150 m Rigi does not rebuild objects.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1799,9 +1802,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<div className="space-y-3">
 					<p>
 						The split in D1 is{" "}
-						<HandMark type="circle">the heart of it</HandMark>. The rest of the
-						pipeline makes that comparison meaningful and turns the result into
-						a place you can walk around.
+						<HandMark type="circle">the core of the method</HandMark>. The rest
+						of the pipeline makes that comparison meaningful and turns the
+						result into a scene you can move around in.
 					</p>
 				</div>
 				<Steps

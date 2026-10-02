@@ -44,7 +44,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "capture",
 		kind: "concept",
 		status: "live",
-		tagline: "What the phone's sensors imply before any solving.",
+		tagline: "The first guess of the camera, from the phone's sensors.",
 		summary:
 			"Compass heading, tilt, lens and GPS position form a first guess of the camera that every solve starts from.",
 		modules: [
@@ -102,7 +102,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		kind: "algorithm",
 		status: "live",
 		tagline:
-			"The 360-degree silhouette the terrain would draw, curvature and refraction included.",
+			"The 360-degree skyline computed from the terrain, with curvature and refraction.",
 		summary:
 			"Rays in 7,200 directions find the highest ridge in each (about 3.5 s, off the main thread). Every skyline match fits against this curve.",
 		modules: ["src/lib/geo/horizon.ts", "src/lib/geo/terrain.ts"],
@@ -126,7 +126,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		kind: "concept",
 		status: "live",
 		tagline:
-			"Which way was the camera pointing? Slide the terrain's skyline onto the photo's.",
+			"Finds the camera direction by matching the terrain skyline to the photo skyline.",
 		summary:
 			"Rigi matches the photo's skyline to the horizon the terrain predicts. A coarse grid from the sensor guess finds candidates, a robust fit refines them, and a confidence score gates the result, with a full-circle retry under a stricter bar. A rejected solve falls back to the sensors and to tapping peaks.",
 		modules: [
@@ -177,8 +177,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "solve",
 		kind: "concept",
 		status: "live",
-		tagline:
-			"Where the camera stood and where it looked, plus how it is known.",
+		tagline: "The camera position and direction, with how each was determined.",
 		summary:
 			"The solved result: direction, tilt, roll, field of view and the camera position in local metres, with how it is known. Every solver reads and writes the same record.",
 		modules: [
@@ -210,7 +209,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "product",
 		kind: "concept",
 		status: "live",
-		tagline: "When unsure, say so.",
+		tagline: "A pose is marked certain only when accepted and confident.",
 		summary:
 			"Precision beats recall. A pose is marked certain only when it is explicitly accepted and confident enough; suggestions and user picks never auto-accept. About a dozen hand-set thresholds implement this.",
 		modules: [
@@ -333,7 +332,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "world",
 		kind: "subsystem",
 		status: "live",
-		tagline: "One function answers: how high is the ground here?",
+		tagline: "One lookup returns the ground height at a point.",
 		summary:
 			"Tiles around the GPS fix load at several zooms; heights are interpolated, falling back to coarser tiles. Horizon, peak visibility and the solvers all ask it.",
 		modules: [
@@ -369,7 +368,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "camera",
 		kind: "algorithm",
 		status: "live",
-		tagline: "GPS height, but never below standing height.",
+		tagline: "GPS height, with a minimum of standing height above ground.",
 		summary:
 			"Without a solve, the eye sits at the GPS altitude but at least standing height above the ground.",
 		modules: [
@@ -424,7 +423,8 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "world",
 		kind: "concept",
 		status: "live",
-		tagline: "Eyes, summits and depth, each pinned to the ground.",
+		tagline:
+			"Camera position, summits and depth are checked against the terrain.",
 		summary:
 			"Everything Rigi places is checked against the terrain: the eye sits at least standing height above ground and not below a still lake; peaks move to the highest ground nearby; near-field depth is scaled to terrain distances. Each is a snap, a bound or a prior.",
 		modules: [
@@ -471,7 +471,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "nearfield",
 		kind: "algorithm",
 		status: "live",
-		tagline: "The terrain is the ruler: depth lands in metres.",
+		tagline: "Model depth is scaled to metres using terrain distances.",
 		summary:
 			"Model depth is fitted to terrain distances with a monotone curve, cutting the median log error from 0.34 to 0.13. A poor fit (score below 0.15) hides the scene.",
 		modules: ["src/lib/nearfield/anchor.ts", "src/lib/nearfield/geom.ts"],
@@ -497,7 +497,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		kind: "concept",
 		status: "live",
 		tagline:
-			"Georeference a mountain photo against real terrain, then look through it.",
+			"Georeference a mountain photo against real terrain, then view the scene from its camera.",
 		summary:
 			"Rigi takes a photograph, solves where the camera stood and looked against the terrain, and renders overlays, camera rolls and a Step Inside view from that pose. Precision beats recall. Everything runs in the browser; optional services help with hard cases.",
 		modules: [
@@ -551,7 +551,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "product",
 		kind: "ui",
 		status: "live",
-		tagline: "The single-photo cockpit: overlay, align, pin, export.",
+		tagline: "The screen for one photo: overlay, align, pin, export.",
 		summary:
 			"One screen per photo: overlay, alignment, pins, looks, export and the eye suggestion. Every photo source loads the same way.",
 		modules: [
@@ -578,7 +578,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		group: "roll",
 		kind: "subsystem",
 		status: "live",
-		tagline: "Grouped, posed, mapped, stitched.",
+		tagline: "Photos are grouped, given poses, mapped and stitched.",
 		summary:
 			"Photos within 15 km form a roll; within 250 m, a viewpoint. Each photo gets the best pose on hand without solving: saved, hand-fitted, else the sensors. Built on the fly, never stored.",
 		modules: [
@@ -612,7 +612,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		kind: "subsystem",
 		status: "live",
 		tagline:
-			"Step into your photo: true camera, true mountains, reconstructed foreground.",
+			"View the photo in 3D: real camera position, terrain mountains, reconstructed foreground.",
 		summary:
 			"A learned near-field rebuild joins the terrain far field, anchored by the solved pose. The camera starts exactly at the photo's eye. Shown only for an accepted pose and a good anchor, and hidden when the service is down.",
 		modules: [

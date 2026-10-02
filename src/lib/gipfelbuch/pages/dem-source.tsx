@@ -337,8 +337,9 @@ function Disagree({ d }: { d: TerrainData | null }) {
 			label="Fig. 2"
 			caption={
 				<>
-					Along 12 km the maps part by up to {Math.abs(diff[worst]).toFixed(0)}{" "}
-					m, at {(tr.d[worst] / 1000).toFixed(1)} km.
+					Along 12 km the maps differ by up to{" "}
+					{Math.abs(diff[worst]).toFixed(0)} m, at{" "}
+					{(tr.d[worst] / 1000).toFixed(1)} km.
 				</>
 			}
 		>
@@ -534,7 +535,7 @@ function GroundGap({ d }: { d: TerrainData | null }) {
 					);
 				})}
 				<HandText x={470} y={150} size={16} color="ink" rotate={-2}>
-					every bar leans the same way: Terrarium is low
+					Terrarium is lower at every camera
 				</HandText>
 				<PenArrow
 					seed="dem-gap-note-arrow"
@@ -974,7 +975,7 @@ export default function Page(_: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="Two free height maps. One keeps the summit."
+				title="Two free height maps. Mapterhorn keeps the summit height; Terrarium rounds it low."
 			>
 				<p>
 					Both are pictures where each pixel&rsquo;s colour is a height.
@@ -987,7 +988,9 @@ export default function Page(_: { node: GipfelbuchNode }) {
 						At their finest, a pixel is {d.box.mapterhorn.nativeMPerPx} m in
 						Mapterhorn and {d.box.terrarium.nativeMPerPx} m in Terrarium. But
 						Terrarium is built from coarser surveys, so its{" "}
-						<HandMark type="wavy">grid is finer than its detail</HandMark>
+						<HandMark type="wavy">
+							pixels are finer than its real detail
+						</HandMark>
 						<MarginNote mark="a">
 							{d
 								? `Same box, ${(d.box.mapterhorn.max - d.box.terrarium.max).toFixed(0)} m apart at the top. Why?`
@@ -1003,23 +1006,23 @@ export default function Page(_: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="A tile is a picture that spells heights."
+				title="A tile is an image whose pixel colours encode heights."
 			>
 				<Trio
 					steps={[
 						{
-							title: "Colour is a height",
+							title: "Colour encodes height",
 							body: "Red, green and blue decode to metres.",
 							visual: <PixelCard d={d} />,
 						},
 						{
 							title: "Distance picks the zoom",
-							body: "Sharp tiles near us, coarse tiles for far ridges.",
+							body: "Sharp tiles near the camera, coarse tiles for far ridges.",
 							visual: <BandsMini d={d} />,
 						},
 						{
-							title: "A hole falls back",
-							body: "No fine tile here? We use the next coarser one.",
+							title: "Missing tiles fall back",
+							body: "If there is no fine tile, the next coarser one is used.",
 							visual: <FallbackMini />,
 						},
 					]}
@@ -1035,7 +1038,7 @@ export default function Page(_: { node: GipfelbuchNode }) {
 				title={
 					gMin == null || gMax == null
 						? "Terrarium sits lower under every camera."
-						: `Terrarium sits ${gMin.toFixed(0)} to ${gMax.toFixed(0)} m lower under our cameras.`
+						: `Terrarium sits ${gMin.toFixed(0)} to ${gMax.toFixed(0)} m lower under the demo cameras.`
 				}
 			>
 				<p>
@@ -1156,8 +1159,8 @@ export default function Page(_: { node: GipfelbuchNode }) {
 					<>
 						<h3>Coverage depends on place</h3>
 						<p>
-							&quot;To z17&quot; is the ceiling, not a promise. Probing the
-							service for the finest tile that exists at six places gave:
+							&quot;To z17&quot; is the maximum zoom, not a guarantee. Probing
+							the service for the finest tile that exists at six places gave:
 						</p>
 						<div className="flex flex-wrap gap-2 font-mono text-[11px]">
 							{d.coverage.map((c) => (
@@ -1209,8 +1212,8 @@ export default function Page(_: { node: GipfelbuchNode }) {
 					</li>
 				</ul>
 				<Callout tone="negative" title="Terrarium costs accuracy">
-					14 correct poses against 25 on Mapterhorn: the smoother map is not a
-					cheaper equivalent.
+					14 correct poses against 25 on Mapterhorn: Terrarium is not a drop-in
+					replacement.
 				</Callout>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">

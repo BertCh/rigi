@@ -1221,8 +1221,8 @@ function YawSlide() {
 			caption={
 				<>
 					Each degree of compass error slides every label sideways by{" "}
-					{pxPerDeg.toFixed(1)} px, whatever the peak. Rings are where the
-					summits really are.
+					{pxPerDeg.toFixed(1)} px, whatever the peak. Rings mark the summits'
+					true positions.
 				</>
 			}
 		>
@@ -1734,16 +1734,18 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="A summit becomes a label only if the eye can see it."
+				title="A summit gets a label only if it is visible from the camera."
 			>
 				<p>
-					A map says a mountain exists.{" "}
-					<HandMark type="highlight">It does not say you can see it.</HandMark>
+					A map shows that a mountain exists.{" "}
+					<HandMark type="highlight">
+						It does not show whether you can see it.
+					</HandMark>
 				</p>
 				<p>
-					For each summit we ask: how high, which way, is it hidden, is it worth
-					the space? Each summit is first {link("terrain-snapping", "snapped")}{" "}
-					onto the real ridge.
+					For each summit we check its height, its direction, whether it is
+					hidden, and whether it is worth the space. Each summit is first{" "}
+					{link("terrain-snapping", "snapped")} onto the real ridge.
 					<MarginNote mark="a">
 						{movedMedian
 							? `Compass ${Math.abs(d1?.solved.delta.yaw ?? 0).toFixed(1)}° off: the median summit slid ${movedMedian.toFixed(0)} px.`
@@ -1788,23 +1790,23 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="Aim at it, look along the ray, keep the best."
+				title="Compute the angle, check the line of sight, keep the best."
 			>
 				<Trio
 					steps={[
 						{
-							title: "Aim",
+							title: "Angle",
 							body: "Height and bearing give the angle above your eye.",
 							visual: <MiniDem />,
 						},
 						{
-							title: "Look",
+							title: "Line of sight",
 							body: "A nearer ridge higher than the summit hides it (red rings).",
 							visual: <HiddenMini />,
 						},
 						{
-							title: "Choose",
-							body: "Best-known first. Drop any label that crowds a neighbour.",
+							title: "Select",
+							body: "Best-known summits first. Drop any label that is too close to a kept one.",
 							visual: <BandPeaks id="demo-03" />,
 						},
 					]}
@@ -1840,7 +1842,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="A few degrees of compass error put every name on the wrong ridge."
+				title="A few degrees of compass error put every label on the wrong ridge."
 			>
 				<p>
 					Every label moves by the same{" "}
@@ -1898,7 +1900,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="The labels, drawn into the photo"
 				notes={[
 					{
-						text: "each name stands on a summit that survived the four questions",
+						text: "each name stands on a summit that passed the four checks",
 						at: [0.5, 0.25],
 						side: "right",
 						y: 0.1,
@@ -1932,21 +1934,19 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			/>
 
 			<Details>
-				<Section
-					title="A summit has to survive four questions"
-					kicker="Mechanism"
-				>
+				<Section title="A summit must pass four checks" kicker="Mechanism">
 					<p>
 						An OSM node says only that a mountain exists somewhere near a point.
-						To become a label in the photo it has to answer: how high is it, in
-						which direction and at what angle from this eye, can the eye
-						actually see it, and is it worth the pixels.
+						To become a label in the photo it needs an answer to each of these:
+						how high it is, in which direction and at what angle it lies from
+						this eye, whether the eye can see it, and whether it is worth the
+						space.
 						<MarginNote mark="b">
-							Four questions, four steps below. The third is the one that drops
-							most.
+							Four checks, four steps below. The third (visibility) removes the
+							most summits.
 						</MarginNote>{" "}
 						The {link("terrain-snapping", "snapping sheet")} covers the first
-						half of question one (moving the node onto the DEM summit).
+						half of the first check (moving the node onto the DEM summit).
 					</p>
 				</Section>
 				<Section title="The mechanism, in isolation" kicker="Schematic">
@@ -2070,9 +2070,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</Section>
 
 				<Callout tone="lesson" title="Lesson">
-					A label is a claim about the photo. Filtering by the same
-					ray-and-angle model that built the horizon means the app never names a
-					mountain the terrain says is behind another.
+					Each label states that a named summit is visible in the photo. The app
+					filters labels with the same ray-and-angle model that built the
+					horizon, so it does not label a mountain that the terrain model puts
+					behind another.
 				</Callout>
 				<div className="mt-10 flex flex-wrap gap-2">
 					<CodeRef path="src/lib/geo/peaks.ts" />

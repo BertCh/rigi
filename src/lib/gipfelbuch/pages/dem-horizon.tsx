@@ -243,7 +243,7 @@ function RayMarch() {
 			label="Fig. D1"
 			pinned={SCENE.id}
 			bleed
-			caption="Invented terrain, real method (the real ray is Fig. 2). One bearing, marched step by step (here every 1 % of distance, in the app 0.4 %). Top: ground height with Earth curvature and refraction, and the best sight line so far. Bottom: the elevation angle of each sample; the running maximum becomes the horizon. Scrub the slider; toggle the Earth to watch the horizon jump."
+			caption="Invented terrain, real method (the real ray is Fig. 2). One bearing, marched step by step (here every 1 % of distance, in the app 0.4 %). Top: ground height with Earth curvature and refraction, and the best sight line so far. Bottom: the elevation angle of each sample; the running maximum becomes the horizon. Drag the slider, and toggle curvature to see the horizon change."
 		>
 			<div ref={ref}>
 				<svg
@@ -486,7 +486,7 @@ function RayMarch() {
 								seed="dh-rm-key1"
 							/>
 							<HandText x={PX0 + 36} y={BOT.y1 - 10} size={16} color="pencil">
-								flat earth would crown a different ridge
+								with a flat Earth, a different ridge would be the horizon
 							</HandText>
 						</>
 					)}
@@ -1183,7 +1183,7 @@ function ProfilePlot({ d }: { d: GipfelbuchPhotoData }) {
 							color="pencil"
 							rotate={-2}
 						>
-							cool dots = far ridges: they pin the compass
+							cool dots = far ridges, which fix the compass bearing
 						</HandText>
 						{prof.flatMap((p, i) =>
 							p.ridges
@@ -1560,9 +1560,9 @@ function Ladder() {
 					items={[
 						<>Camera, {Math.round(eye)} m above sea level.</>,
 						<>
-							The crest that draws this column: {km(live.d)} km away,{" "}
-							{live.el.toFixed(2)}° up. Dotted line: if the Earth were flat. Red
-							bar: how far the curve sinks it.
+							The crest that sets the horizon in this column: {km(live.d)} km
+							away, {live.el.toFixed(2)}° up. Dotted line: if the Earth were
+							flat. Red bar: how far the curve sinks it.
 						</>,
 					]}
 				/>
@@ -1796,7 +1796,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="The idea"
-				title="The map can draw the horizon before we look at the photo."
+				title="The terrain model can predict the horizon before Rigi looks at the photo."
 			>
 				<p>
 					From the camera, we shoot a ray at every compass bearing. Each ray
@@ -1806,17 +1806,17 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					Together the angles form a 360° horizon curve. Distant ground sinks
-					below the line of sight, so we lower it first. Then we slide it
-					against the photo.
+					below the line of sight, so we lower it first. Then we shift it to
+					line up with the photo.
 					<MarginNote mark="a">
-						{`At 50 km the ground has sagged ${drop(50_000).toFixed(0)} m. Not a rounding error.`}
+						{`At 50 km the ground has sagged ${drop(50_000).toFixed(0)} m below the line of sight.`}
 					</MarginNote>
 				</p>
 			</Beat>
 
 			<Ladder />
 
-			<Beat kicker="How it works" title="One ray, three jobs.">
+			<Beat kicker="How it works" title="How one ray is computed.">
 				<Trio
 					steps={[
 						{
@@ -1846,13 +1846,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<HandMark type="double">0.7°, about 10 px</HandMark> at this
 					photo&rsquo;s focal length. A ridge 25 km away moves under 1 px.
 					<MarginNote mark="b">
-						So near ridges forgive nothing and far ones forgive everything.
+						So a position error shifts near ridges a lot and far ridges barely
+						at all.
 					</MarginNote>
 				</p>
 				<p>
 					In Fig. 3 the cool, far parts of the line stay put when the position
 					is off.{" "}
-					<HandMark type="underline">They pin the compass bearing.</HandMark>
+					<HandMark type="underline">They fix the compass bearing.</HandMark>
 				</p>
 			</Beat>
 
@@ -1860,15 +1861,15 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="Where it fails"
-				title="The map knows the ground, not the trees on it."
+				title="The map shows the ground, not the trees on it."
 			>
 				<p>
 					Trees and people on the ridge are in the photo but not in the map.
 					Those columns <HandMark type="wavy">disagree, by a lot</HandMark>.
 					<MarginNote mark="c">
 						{idx
-							? `Median gap is only ${gap?.toFixed(1)} px; the worst tenth is what hurts.`
-							: "The median looks fine; the worst tenth is what hurts."}
+							? `Median gap is only ${gap?.toFixed(1)} px; the worst tenth of columns has the large errors.`
+							: "The median gap is small; the worst tenth of columns has the large errors."}
 					</MarginNote>
 				</p>
 				<p>
@@ -1961,7 +1962,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							),
 						},
 						{
-							title: "Remember the crests that got eclipsed",
+							title: "Record the crests hidden behind the horizon",
 							body: (
 								<>
 									When a new best appears after a stretch of hidden samples, and
@@ -1989,12 +1990,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<span className="nb-hand text-[var(--gb-red)]">3.11°</span> once the
 					Earth drops, on the same crest 29 km out.
 				</p>
-				<Callout tone="result" title="Why curvature earns its place">
+				<Callout tone="result" title="Why curvature matters">
 					In the invented ray, the horizon sits on the 26 km ridge with the
 					Earth&rsquo;s drop and on a 50 km summit without it. On the real photo
 					in Fig. 2 the curve moves it by about 1.5 px. The angular shift is
-					d/2R&prime;, linear in distance (about 0.004° per km), so far horizons
-					and long lenses are where it bites.
+					d/2R&prime;, linear in distance (about 0.004° per km), so it matters
+					most for far horizons and long lenses.
 				</Callout>
 				<p>
 					k = 0.13 is an average; real air varies. With k = 0.18 the drop

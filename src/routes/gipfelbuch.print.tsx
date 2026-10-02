@@ -120,7 +120,7 @@ function GipfelbuchPrint() {
 				<Cartouche
 					kicker="Gipfelbuch · 2026"
 					title="Gipfelbuch, printed edition"
-					subtitle="Nineteen sheets on how a photo of a mountain finds its place on the map."
+					subtitle="Nineteen sheets on how Rigi works out where a mountain photo was taken."
 					edition={`Blatt 1208 Beatenberg · Niederhorn 1963 m · Stand ${STAND}`}
 				/>
 			</section>
