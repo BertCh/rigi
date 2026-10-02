@@ -34,7 +34,7 @@ Rigi is an application, and also a worked example of the luma.gl 10 / deck.gl st
 - **`GPUCommandGraph` compute.** `src/lib/gpu/core` wraps luma's `GPUCommandGraph` as a `ComputeGraph`: multi-pass compute with GPU-resident intermediates, built on luma's engine `Kernel`, `GPUScan`, a readback ring and a device pool. Horizon marching, pose search, haze/relief/band-stats look passes, sky refinement and splat sorting all run as graphs, and the graph is the only GPU path.
 - **deck.gl custom views and layers on WebGPU and WebGL2.** Photo-matched camera views, a batched terrain layer, a geometry pass that writes range to a float target, composite and drape layers, trails, labels and Gaussian splats. `src/lib/deck-webgpu` (WGSL) and `src/lib/deck` (GLSL) implement one `Renderer` interface and are checked against each other (`scripts/deck-engine-smoke.mjs`).
 - **WGSL and GLSL dual shaders.** Layers are written once per backend; `src/lib/deck-webgpu/layers/*.check.ts` compare the WGSL output with a CPU port of the GLSL.
-- **Vendored luma.gl 10 alpha.** `vendor/luma` (`10.0.0-alpha.2-rigi.3`) and `vendor/deck` (deck.gl `9.4.0-rigi.1`, a build of deck master + the luma 10 bump PR) carry the upstream fixes the app needs until they are published; each README lists the exact commits and how to rebuild.
+- **Vendored luma.gl 10 alpha.** `vendor/luma` (`10.0.0-alpha.2-rigi.4`) and `vendor/deck` (deck.gl `9.4.0-rigi.2`, a build of deck master + the luma 10 bump PR) carry the upstream fixes the app needs until they are published; each README lists the exact commits and how to rebuild.
 - Shader modules ported from luma.gl (height fog, precipitation; MIT, vis.gl contributors) drive the "Nebelmeer" and weather looks; see `NOTICE.md`.
 
 Repository conventions follow luma.gl: `AGENTS.md`, `CONTRIBUTING.md` (including AI-assisted contributions), `CODE_OF_CONDUCT.md`, `.github` templates, SPDX headers (`node scripts/ci/spdx.mjs`) and a `CHANGELOG.md`.
@@ -227,7 +227,8 @@ node scripts/eval-app.mjs [photoId ...]      # the app's final pose vs data/cont
 node scripts/leaderboard.mjs                 # every method re-scored on one GT snapshot → reports/leaderboard.md
 
 # regression gate (scripts/ci/README.md): one runner for every check
-node scripts/ci/run.mjs fast                 # ~30 s: tsc, biome ratchet, unit checks (57 fast ids)
+npm test                                     # Vitest unit specs (seconds); also the fast tier's `unit` row
+node scripts/ci/run.mjs fast                 # tsc, biome ratchet, unit specs and node checks (no browser)
 node scripts/ci/run.mjs full                 # + 6 browser checks (style-baseline, deck smoke, eval-app, eval-app-deck, settle-submits, graph-plumbing-ab), via the render lock
 node scripts/ci/run.mjs --list               # every check, its command and inputs
 
