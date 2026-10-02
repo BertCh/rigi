@@ -40,16 +40,23 @@ export function overpassPeaksQuery(
 	return `[out:json][timeout:90];(node["natural"="peak"](${around});node["natural"="volcano"](${around}););out body;`;
 }
 
-/** Parses "1234", "1234 m", "1,234.5" etc. to metres; undefined if unusable. */
-function parseMetres(v: unknown): number | undefined {
+/**
+ * An OSM length tag (`ele`, `prominence`) in metres, or undefined if unusable. The one parser for
+ * OSM heights (upload/region.ts re-exports it): "1234", "1234 m", "~1500", "1234,5" (decimal
+ * comma), "4,810" and "1'234" / "1’234" (thousands separators: a comma or apostrophe followed by
+ * exactly three digits), and feet as "3000 ft", "3000 feet" or a trailing "3000'" mark.
+ */
+export function parseOsmMetres(v: unknown): number | undefined {
 	if (typeof v !== "string") return undefined;
-	const m = v
-		.replace(/(?<=\d),(?=\d{3}(?!\d))/g, "")
-		.replace(/,/g, ".")
-		.match(/-?\d+(\.\d+)?/);
+	const s = v
+		.trim()
+		.replace(/(?<=\d)[,'’](?=\d{3}(?!\d))/g, "")
+		.replace(/,/g, ".");
+	const m = s.match(/-?\d+(\.\d+)?/);
 	if (!m) return undefined;
 	let n = Number.parseFloat(m[0]);
-	if (/ft|feet|'/.test(v)) n *= 0.3048;
+	if (/ft|feet|foot|['’]/i.test(s.slice((m.index ?? 0) + m[0].length)))
+		n *= 0.3048;
 	return Number.isFinite(n) ? n : undefined;
 }
 
@@ -72,8 +79,8 @@ export function parseOverpassPeaks(json: unknown): Peak[] {
 			name: t.name ?? t["name:de"] ?? t["name:en"],
 			lat: e.lat,
 			lon: e.lon,
-			ele: parseMetres(t.ele),
-			prominence: parseMetres(t.prominence),
+			ele: parseOsmMetres(t.ele),
+			prominence: parseOsmMetres(t.prominence),
 			wikidata: t.wikidata,
 		});
 	}

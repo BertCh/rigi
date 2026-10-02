@@ -10,6 +10,7 @@ import type { SWNE } from "#/lib/ontology/core/geometry";
 // Results are cached in memory and IndexedDB, keyed by a snapped centre so nearby uploads share one
 // region.
 import { getFlag } from "../flags";
+import { parseOsmMetres } from "../geo/peaks";
 import { compactLakes, type LakeGeo } from "../geocam/lakes/compact";
 import { distanceBearing } from "../geodesy";
 import { osmExtractEnabled } from "../licences/config";
@@ -62,18 +63,9 @@ export function regionIdFor(lat: number, lon: number) {
 	return `local-region-${a.toFixed(2)}_${b.toFixed(2)}`;
 }
 
-/** "1234", "1234 m", "1'234", "4,810" (thousands), "3000 ft" → metres; null if unusable. */
-export function parseMetres(v: unknown): number | null {
-	if (typeof v !== "string") return null;
-	let s = v.trim().replace(/[’']/g, "");
-	if (/^\d{1,3},\d{3}(\D|$)/.test(s)) s = s.replace(",", "");
-	s = s.replace(",", ".");
-	const m = s.match(/-?\d+(\.\d+)?/);
-	if (!m) return null;
-	let n = Number.parseFloat(m[0]);
-	if (/ft|feet/i.test(s)) n *= 0.3048;
-	return Number.isFinite(n) ? n : null;
-}
+/** OSM `ele` / `prominence` in metres, null if unusable (geo/peaks.ts parseOsmMetres). */
+export const parseMetres = (v: unknown): number | null =>
+	parseOsmMetres(v) ?? null;
 
 export function parsePeaks(els: OsmElement[]): RegionPeak[] {
 	return els

@@ -11,6 +11,7 @@ import {
 	overpassPeaksQuery,
 	type Peak,
 	type PeakView,
+	parseOsmMetres,
 	parseOverpassPeaks,
 	viewPeaks,
 } from "../peaks";
@@ -79,6 +80,29 @@ describe("parseOverpassPeaks", () => {
 			],
 		});
 		expect(p[0].ele).toBeCloseTo(304.8, 6);
+	});
+});
+
+describe("parseOsmMetres", () => {
+	it.each([
+		["4'478", 4478],
+		["4’478 m", 4478],
+		["1'000'", 304.8],
+		["3000 FT", 914.4],
+		["3000 Feet", 914.4],
+		["1,234.5", 1234.5],
+		["1234,5", 1234.5],
+		["~1500", 1500],
+		["-12", -12],
+	])("%s -> %s", (input, want) => {
+		expect(parseOsmMetres(input)).toBeCloseTo(want, 6);
+	});
+	it("a Swiss thousands apostrophe is not a feet mark", () => {
+		expect(parseOsmMetres("4'478")).toBe(4478);
+		expect(parseOsmMetres("12'5")).toBeCloseTo(12 * 0.3048, 6);
+	});
+	it.each([[""], ["n/a"], [undefined], [null], [1234]])("rejects %s", (v) => {
+		expect(parseOsmMetres(v)).toBeUndefined();
 	});
 });
 
