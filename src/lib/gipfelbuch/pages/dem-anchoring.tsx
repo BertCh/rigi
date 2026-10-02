@@ -2024,8 +2024,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="If depth and terrain disagree, the 3D scene is hidden."
 			>
 				<p>
-					When model and terrain disagree, the near-field scene is hidden or
-					marked low trust. The score checks the depth fit.{" "}
+					The score checks the depth fit.{" "}
 					<HandMark type="wavy" color="red">
 						It cannot tell a right camera from a wrong one.
 					</HandMark>
@@ -2076,15 +2075,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			/>
 
 			<Details>
-				<h3>Why the model needs a curve</h3>
+				<h3>The fit, step by step</h3>
 				<p>
-					The model compresses range, and by a different amount per photo. On
-					the test photos the terrain/model ratio was about 1 at 15 to 30 m,
-					about 2.9 at 100 to 300 m and about 6.6 at 300 to 1000 m. Pick one
-					scale to fix the mountains and a person next to the camera drifts
-					behind the ground at their feet. Once the camera is solved (
-					{link("viewport-inference", "viewport inference")}), the terrain model
-					gives the distance to the ground at every terrain pixel.
+					The compression differs per photo. At 300 to 1000 m the terrain/model
+					ratio was about 6.6 on the test photos.
 				</p>
 				<h3>The fit, step by step</h3>
 				<Steps
@@ -2122,61 +2116,16 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					error over all pixels, not just the good ones: with a ±25 % band the
 					median of the good ones is small whatever the fit. Step Inside uses it
 					to decide whether to show the near-field scene. Hide below 0.15, label
-					below 0.35, set on the test photos. Deciding whether the pose is right
-					is the job of the {link("accept-rule", "accept rule")}.
+					below 0.35, set on the test photos.
 				</p>
 				<GaugeFigure />
 				<h3>In the code</h3>
-				<div className="not-prose grid gap-3 sm:grid-cols-2">
-					{[
-						[
-							"Fit and score",
-							"src/lib/nearfield/anchor.ts",
-							"Collects the pixel pairs, fits the curve and scores it.",
-						],
-						[
-							"The curve",
-							"src/lib/nearfield/anchor.ts",
-							"Knots at weighted quantiles, then the best heights.",
-						],
-						[
-							"Applying it",
-							"src/lib/nearfield/anchor.ts",
-							"Evaluates the curve, with a straight extension and a blend back to the near field.",
-						],
-						[
-							"The score",
-							"src/lib/nearfield/anchor.ts",
-							"Share that fits times a falloff in the error; hide below 0.15, label below 0.35.",
-						],
-						[
-							"Geometry",
-							"src/lib/nearfield/geom.ts",
-							"Depth along the axis to distance along the ray, and terrain lookups on the grid.",
-						],
-						[
-							"Terrain side",
-							"src/lib/nearfield/near-dem.ts",
-							"The terrain side of every pair: distance in metres, one source for both renderers.",
-						],
-					].map(([name, path, text]) => (
-						<div key={name} className="bg-[var(--gb-paper-deep)] p-4">
-							<div
-								className={`font-mono ${TYPE.caption} break-all text-[var(--accent)]`}
-							>
-								{name}
-							</div>
-							<p className={`mt-1 ${TYPE.caption} gb-secondary`}>{text}</p>
-							<div className="mt-2">
-								<CodeRef path={path} />
-							</div>
-						</div>
-					))}
-				</div>
 				<p>
-					The terrain side comes from the{" "}
-					{link("terrain-sampler", "terrain sampler")}.
+					The terrain side of every pair comes from the{" "}
+					{link("dem-source", "terrain model")}, read in metres for both
+					renderers.
 				</p>
+				<CodeRef path="src/lib/nearfield/near-dem.ts" />
 			</Details>
 		</>
 	);

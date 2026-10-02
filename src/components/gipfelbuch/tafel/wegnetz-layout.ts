@@ -4,7 +4,7 @@
 
 import type { Point } from "../notebook/sketch";
 
-// The Wegnetz: the 19 sheets as a hand-laid trail map (the old atlas CoreMap's lanes, redrawn as a
+// The Wegnetz: the 16 sheets as a hand-laid trail map (the old atlas CoreMap's lanes, redrawn as a
 // Swiss hiking map). Each chapter is a valley; its hub sheet is the valley name, every other sheet a
 // waymarked station; trails are the curated data flow. Layout is deliberate, not simulated: left to
 // right is the order the pipeline runs. Coordinates are px in a 960 × 600 viewBox.
@@ -50,23 +50,16 @@ export interface WegnetzStation {
 }
 
 export const WEGNETZ_STATIONS: readonly WegnetzStation[] = [
-	// I: prior and observation → horizon match → gate → pose
-	{ id: "photo", label: "Photo", at: [110, 140] },
-	{ id: "skyline", label: "Photo skyline", at: [270, 95] },
-	{
-		id: "camera-prior",
-		label: "Sensor prior",
-		at: [270, 195],
-		labelSide: "below",
-	},
+	// I: phone's guess and both skylines meet at the gate (the match is the valley's hub sheet) → pose
+	{ id: "photo", label: "Photo + sensors", at: [110, 150] },
+	{ id: "skyline", label: "Photo skyline", at: [300, 95] },
 	{
 		id: "dem-horizon",
 		label: "DEM horizon",
 		at: [440, 205],
 		labelSide: "below",
 	},
-	{ id: "baseline-pipeline", label: "Horizon match", at: [490, 110] },
-	{ id: "accept-rule", label: "Accept gate", at: [660, 110] },
+	{ id: "accept-rule", label: "Match + gate", at: [620, 120] },
 	{
 		id: "tap-a-peak",
 		label: "Tap a peak",
@@ -74,9 +67,8 @@ export const WEGNETZ_STATIONS: readonly WegnetzStation[] = [
 		labelSide: "below",
 	},
 	{ id: "pose-estimate", label: "Pose", at: [860, 110] },
-	// II: tiles → sampler; the three snaps fan out beneath it
-	{ id: "dem-source", label: "Height tiles", at: [110, 320] },
-	{ id: "terrain-sampler", label: "Height sampler", at: [300, 320] },
+	// II: the terrain model; the three snaps fan out beneath it
+	{ id: "dem-source", label: "Terrain model", at: [300, 320] },
 	{
 		id: "dem-anchoring",
 		label: "Depth on DEM",
@@ -127,27 +119,19 @@ export const WEGNETZ_TRAILS: readonly WegnetzTrail[] = [
 	{ from: "photo", to: "skyline", kind: "flow", bend: 0.12 },
 	{
 		from: "photo",
-		to: "camera-prior",
+		to: "accept-rule",
 		kind: "flow",
-		label: "compass · tilt · lens",
-		bend: -0.12,
+		label: "compass seed",
+		bend: 0.06,
 	},
-	{ from: "skyline", to: "baseline-pipeline", kind: "flow", label: "seen" },
-	{
-		from: "camera-prior",
-		to: "baseline-pipeline",
-		kind: "flow",
-		label: "seed",
-		bend: 0.1,
-	},
+	{ from: "skyline", to: "accept-rule", kind: "flow", label: "seen" },
 	{
 		from: "dem-horizon",
-		to: "baseline-pipeline",
+		to: "accept-rule",
 		kind: "flow",
 		label: "predicted",
 		bend: -0.1,
 	},
-	{ from: "baseline-pipeline", to: "accept-rule", kind: "flow" },
 	{
 		from: "accept-rule",
 		to: "pose-estimate",
@@ -162,30 +146,29 @@ export const WEGNETZ_TRAILS: readonly WegnetzTrail[] = [
 		bend: 0.15,
 	},
 	{ from: "tap-a-peak", to: "pose-estimate", kind: "fallback", bend: 0.15 },
-	{ from: "dem-source", to: "terrain-sampler", kind: "flow" },
 	{
-		from: "terrain-sampler",
+		from: "dem-source",
 		to: "dem-horizon",
 		kind: "cross",
 		label: "ground heights",
 		bend: -0.12,
 	},
 	{
-		from: "terrain-sampler",
+		from: "dem-source",
 		to: "dem-anchoring",
 		kind: "snap",
 		label: "depth ↔ DEM",
 		bend: 0.15,
 	},
 	{
-		from: "terrain-sampler",
+		from: "dem-source",
 		to: "eye-rule",
 		kind: "snap",
 		label: "ground + eye",
 		bend: 0.1,
 	},
 	{
-		from: "terrain-sampler",
+		from: "dem-source",
 		to: "peak",
 		kind: "snap",
 		label: "local max",
@@ -257,11 +240,9 @@ export function trailLineage(id: string): Set<string> {
 export function photoRoute(accepted: boolean): Set<string> {
 	return new Set([
 		"photo>skyline",
-		"photo>camera-prior",
-		"skyline>baseline-pipeline",
-		"camera-prior>baseline-pipeline",
-		"dem-horizon>baseline-pipeline",
-		"baseline-pipeline>accept-rule",
+		"photo>accept-rule",
+		"skyline>accept-rule",
+		"dem-horizon>accept-rule",
 		...(accepted
 			? ["accept-rule>pose-estimate"]
 			: ["accept-rule>tap-a-peak", "tap-a-peak>pose-estimate"]),

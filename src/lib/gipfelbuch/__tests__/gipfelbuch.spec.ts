@@ -227,8 +227,6 @@ describe("groupByRel and href", () => {
 		expect(groupByRel([])).toEqual([]);
 	});
 	it("builds the page path", () => {
-		expect(gipfelbuchHref("terrain-sampler")).toBe(
-			"/gipfelbuch/terrain-sampler",
-		);
+		expect(gipfelbuchHref("dem-source")).toBe("/gipfelbuch/dem-source");
 	});
 });

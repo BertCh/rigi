@@ -32,7 +32,7 @@ import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
 import { lineageOf, STATUS_META } from "#/lib/gipfelbuch/graph-utils";
 
 // The Rigi Gipfelbuch: the title block, a hand-written table of contents, the Niederhorn sheet map,
-// then the sheet index (Blattübersicht) of the 19 sheets in reading order, every band re-drawn from
+// then the sheet index (Blattübersicht) of the 16 sheets in reading order, every band re-drawn from
 // the photo the reader follows (reports/peak-notebook-plan.md §0 D-PN4, §11; hand pass K-C).
 export const Route = createFileRoute("/gipfelbuch/")({
 	ssr: false,

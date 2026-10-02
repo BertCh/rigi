@@ -28,7 +28,6 @@ import {
 	DemPatch,
 	Eq,
 	Figure,
-	Flow,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
 	HandLabel,
@@ -1106,85 +1105,6 @@ function RealEye() {
 	);
 }
 
-/** Reported DEM/model depth ratios (reports/step-inside-results.md, finding 1; MoGe-2 vs the DEM on terrain pixels). */
-function RealCompression() {
-	const bands = [
-		{ band: "about 20 m", ratio: 1 },
-		{ band: "100–300 m", ratio: 2.9 },
-		{ band: "300–1000 m", ratio: 6.6 },
-	];
-	const W = 720;
-	const L = 110;
-	const X = (v: number) => L + (v / 7) * (W - L - 40);
-	return (
-		<Figure
-			label="D4"
-			caption="Why depth needs anchoring. A single-photo depth model compresses distance: true distance divided by model distance is about 1 at 20 m, 2.9 at 100–300 m, 6.6 at 300–1000 m. One global scale leaves a typical error of 0.34 (log units); a per-photo curve cuts it to 0.13."
-		>
-			<svg
-				viewBox={`0 0 ${W} 130`}
-				className="block h-auto w-full"
-				role="img"
-				aria-label="Ratio of DEM distance to model distance by range band"
-			>
-				<title>DEM to model depth ratio by range band</title>
-				{[1, 2, 3, 4, 5, 6, 7].map((v) => (
-					<g key={v}>
-						<PenLine
-							seed={`si-comp-grid-${v}`}
-							from={[X(v), 8]}
-							to={[X(v), 100]}
-							color="faint"
-							width={0.5}
-						/>
-						<HandLabel
-							x={X(v)}
-							y={118}
-							anchor="middle"
-							size={11}
-							color="var(--gb-secondary)"
-							halo={0}
-						>
-							{v}×
-						</HandLabel>
-					</g>
-				))}
-				{bands.map((b, i) => (
-					<g key={b.band}>
-						<HandLabel
-							x={L - 10}
-							y={30 + i * 30}
-							anchor="end"
-							size={11}
-							color="var(--gb-secondary)"
-							halo={0}
-						>
-							{b.band}
-						</HandLabel>
-						<Wash
-							d={rectPath(L, 18 + i * 30, X(b.ratio) - L, 18)}
-							color="forest"
-							seed="si-wash-4"
-							opacity={0.05 + i * 0.02}
-						/>
-						<Hachure
-							d={rectPath(L, 18 + i * 30, X(b.ratio) - L, 18)}
-							seed={`si-comp-bar-${b.band}`}
-							color="forest"
-							gap={3.2 - i * 0.5}
-							width={1}
-							opacity={0.9}
-						/>
-						<HandLabel x={X(b.ratio) + 8} y={31 + i * 30}>
-							{b.ratio}×
-						</HandLabel>
-					</g>
-				))}
-			</svg>
-		</Figure>
-	);
-}
-
 // ======================================================================================
 // Explainer layer: hero, trio, numbers
 // ======================================================================================
@@ -1746,7 +1666,12 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					steps={[
 						{
 							title: "Fix the scale",
-							body: "A depth model compresses far distances. Rigi rescales it against the terrain.",
+							body: (
+								<>
+									A depth model compresses far distances; Rigi rescales it
+									against the terrain ({A("dem-anchoring", "DEM anchoring")}).
+								</>
+							),
 							visual: <MiniBars />,
 						},
 						{
@@ -1798,7 +1723,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<h3>The split rule, adjustable</h3>
 				<SplitRuler />
 
-				<h3>How it works</h3>
+				<h3>The pipeline, step by step</h3>
 				<div className="space-y-3">
 					<p>
 						The split in D1 is{" "}
@@ -1835,10 +1760,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Anchor model depth to the DEM",
 							body: (
 								<>
-									Single-photo depth is squeezed at long range, so a curve is
-									fitted on terrain pixels to turn it into metres (see{" "}
-									{A("dem-anchoring", "DEM anchoring")}). Fit quality below 0.15
-									hides the scene; below 0.35 it gets a low-trust badge.
+									Model depth is turned into metres against the terrain. How the
+									curve is fitted, and when a poor fit hides the scene, is on{" "}
+									{A("dem-anchoring", "DEM anchoring")}.
 								</>
 							),
 						},
@@ -1847,12 +1771,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							body: (
 								<>
 									Compare model distance with terrain distance (D1). People are
-									always objects. Beyond 150 m everything is far. A pixel with
-									no terrain behind it, like a roof against the sky, is an
-									object. Otherwise it is an object only if it is in front of
-									the terrain by more than half the distance <em>and</em> at
-									least 3 m. The margin is wide because depth error grows with
-									distance.
+									always objects. A pixel with no terrain behind it, like a roof
+									against the sky, is an object. Every other pixel follows the
+									split rule above; its margin is wide because depth error grows
+									with distance.
 								</>
 							),
 						},
@@ -1894,49 +1816,16 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 				<ConfidenceDisc />
 
-				<Flow
-					nodes={[
-						{ label: "accepted pose", sub: "solver or user" },
-						{ label: "depth + points", sub: "cached" },
-						{ label: "anchor", sub: "quality check" },
-						{ label: "split", sub: "terrain / object / far" },
-						{ label: "scene", sub: "points + radius" },
-						{ label: "step in", sub: "camera at the photo" },
-					]}
-				/>
-
 				<Provenance />
 
-				<div className="grid gap-6 sm:grid-cols-3">
-					<Stat
-						value="150 m"
-						label="near radius: beyond it only terrain is drawn"
-					/>
-					<Stat
-						value="200k"
-						label="points render at 60 fps; a million run at about 35-45 fps"
-					/>
-				</div>
-
-				<RealCompression />
-
-				<Callout
-					tone="negative"
-					title="What it does not do yet"
-					className="!mt-0"
-				>
-					Against hand labels, the split removed about{" "}
-					<HandMark type="double">15 %</HandMark> of the ground smear on
-					accepted photos. The goal was <HandMark type="strike">80 %</HandMark>{" "}
-					<span className="nb-hand text-[var(--gb-red)]">not met</span>. Depth
-					cannot separate huts and trees at 100–300 m from the slope behind
-					them. The rest of the feature works; this part is still open.
-				</Callout>
+				<Stat
+					value="200k"
+					label="points render at 60 fps; a million run at about 35-45 fps"
+				/>
 
 				<Callout tone="note" title="Why depth alone is not trusted">
 					The scene is only as good as the camera position and the anchor
-					beneath it. Without an accepted position nothing is drawn; fit quality
-					decides whether it is shown, badged or hidden.{" "}
+					beneath it.{" "}
 					<HandMark type="box">
 						Nothing generated is ever exported as a measurement.
 					</HandMark>
@@ -1976,19 +1865,6 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							<CodeRef path="src/components/nearfield/StepInsidePanel.tsx" />
 						</li>
 					</ul>
-				</div>
-
-				<h3>Where it fits</h3>
-				<div className="space-y-3">
-					<p>
-						Step Inside builds on the solve: the camera position from{" "}
-						{A("pose-estimate", "the pose estimate")}, found by{" "}
-						{A("viewport-inference", "viewport inference")} and corrected by{" "}
-						{A("terrain-snapping", "terrain snapping")}, lets depth be compared
-						with the terrain at all. {A("dem-anchoring", "DEM anchoring")} gives
-						it metres, and {A("camera-roll", "the camera roll")} reuses the same
-						viewer for a day of photos.
-					</p>
 				</div>
 			</Details>
 		</>

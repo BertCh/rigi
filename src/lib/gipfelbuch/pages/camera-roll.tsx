@@ -21,7 +21,6 @@ import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPh
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
-	Callout,
 	CodeRef,
 	DemPatch,
 	Eq,
@@ -33,7 +32,6 @@ import {
 	LiveDrape,
 	MarginNote,
 	RealPhoto,
-	Steps,
 	StoryMap,
 	Sym,
 	useGipfelbuchPhoto,
@@ -2263,7 +2261,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			<Details>
 				<p>
 					A roll is rebuilt on every load from photo metadata plus any poses the
-					browser remembers. Two distance rules group the photos, and a{" "}
+					browser remembers; a photo with no GPS gets a position interpolated
+					between neighbours within 20 minutes, with a growing error estimate.
+					Two distance rules group the photos, and a{" "}
 					<HandMark type="underline">pose ladder</HandMark> picks each
 					photo&rsquo;s direction. Solving from scratch is the job of{" "}
 					{A("viewport-inference", "viewport inference")}; the roll never
@@ -2293,8 +2293,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						Each photo gets a pose with no solver run: the first of four sources
 						wins. A photo stays a phone guess until something better, a person's
 						pin or an accepted solve, replaces it. The{" "}
-						{A("camera-prior", "phone guess")} is the floor: compass heading (0
-						if none), tilt from gravity, and the lens field of view.
+						{A("photo", "phone guess")} is the floor: compass heading (0 if
+						none), tilt from gravity, and the lens field of view.
 					</p>
 				</div>
 
@@ -2304,13 +2304,13 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<div className="space-y-3">
 					<p>
 						The solver runs on each photo that still has only its phone guess,
-						one at a time in capture order, and stores a pose only when it
-						accepts; a rejected photo stays marked &ldquo;needs review&rdquo;.
-						The roll adds one idea: photos at one viewpoint, within minutes,
-						often share the phone&rsquo;s compass error, so each solved photo
-						gives its neighbours a better starting guess (the real roll below
-						shows where that holds). The estimate is the median of the solved
-						photos&rsquo; yaw offsets,{" "}
+						one at a time in capture order, and stores a pose only when the{" "}
+						{A("accept-rule", "accept rule")} passes; a rejected photo stays
+						marked &ldquo;needs review&rdquo;. The roll adds one idea: photos at
+						one viewpoint, within minutes, often share the phone&rsquo;s compass
+						error, so each solved photo gives its neighbours a better starting
+						guess (the real roll below shows where that holds). The estimate is
+						the median of the solved photos&rsquo; yaw offsets,{" "}
 						<HandMark type="double">so one wrong pin cannot drag it</HandMark>.
 						It is used only between 1° and 90°, and only for photos within 45
 						minutes. A photo rejected before its spot had a solved neighbour
@@ -2352,24 +2352,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					</p>
 				</div>
 
-				<Figure
-					label="D6"
-					bleed
-					pad={false}
-					caption="The same 12-photo roll in the roll map: every photo draped at once on the terrain. All 12 camera positions lie within about 110 m, so the orange pins pile up and the photos fan out from one spot over the Niederhorn ridge and the valley."
-				>
-					<img
-						src="/demo/shots/drape.jpg"
-						alt="The Niederhorn roll draped on the 3D terrain: twelve photos fan out from a single viewpoint over the ridge and valley"
-						className="block h-auto w-full"
-					/>
-				</Figure>
-
-				<Callout tone="result" title="Computed each time, never stored">
-					Rolls, viewpoints and pose sources are recomputed from metadata every
-					time. If you delete a photo, the roll is regrouped without it.
-				</Callout>
-
 				<h3>Where to look</h3>
 				<div className="space-y-3">
 					<div className="flex flex-wrap gap-2">
@@ -2384,48 +2366,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<CodeRef path="src/lib/roll/import/interpolate.ts" />
 						<CodeRef path="src/lib/roll/mosaic/loadRoll.ts" />
 					</div>
-				</div>
-
-				<h3>From file to draped roll</h3>
-				<div className="space-y-3">
-					<Steps
-						steps={[
-							{
-								title: "Import",
-								body: "Photos are read for EXIF. A photo with no GPS gets a position interpolated between neighbours within 20 minutes, with a growing error estimate.",
-							},
-							{
-								title: "Cluster and group",
-								body: "Photos within 15 km of a neighbour form a roll; the first match within 250 m gives the viewpoints, re-centred on their photos.",
-							},
-							{
-								title: "Pick poses",
-								body: "Saved, then hand-fitted, then an accepted solve, then the phone guess. Each photo carries its source and confidence.",
-							},
-							{
-								title: "Solve (optional)",
-								body: "The solver runs on phone-guess photos in capture order, starting from the neighbour-corrected guess. Only accepted poses are stored.",
-							},
-							{
-								title: "Show",
-								body: "Mosaic, panorama strip and terrain drape all come from the same poses.",
-							},
-						]}
-					/>
-				</div>
-
-				<h3>Rolls reuse the existing solver</h3>
-				<div className="space-y-3">
-					<p>
-						Alignment reuses the solver from{" "}
-						{A("viewport-inference", "viewport inference")}, and its accepted
-						poses follow the {A("accept-rule", "accept rule")}. The terrain
-						under the drape comes from the {A("dem-source", "DEM")}; the same
-						photos can then {A("step-inside", "step inside")} for a near-field
-						view, and each opens in the{" "}
-						{A("photo-workspace", "photo workspace")}. Snapping to terrain is
-						covered in {A("terrain-snapping", "terrain snapping")}.
-					</p>
 				</div>
 			</Details>
 		</>

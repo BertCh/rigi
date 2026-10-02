@@ -41,7 +41,6 @@ import {
 	PhotoPicker,
 	RealPhoto,
 	Section,
-	Steps,
 	Sym,
 	useGipfelbuchPhoto,
 } from "#/components/gipfelbuch/viz";
@@ -62,7 +61,6 @@ import {
 	startOf,
 	useBeatClock,
 } from "#/components/gipfelbuch/viz/motion";
-import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
 import {
 	horizonEl,
@@ -342,7 +340,7 @@ const DOF = [
 ];
 
 // ======================================================================================
-// Fig. 1: the hero. Each tap locks degrees of freedom; the skyline overlay tightens.
+// Fig. D1: each tap locks degrees of freedom; the skyline overlay tightens.
 // ======================================================================================
 function PinLock() {
 	const clock = useBeatClock<HTMLDivElement>(PINS);
@@ -699,7 +697,7 @@ function PinLock() {
 }
 
 // ======================================================================================
-// Fig. 2: which summit did you mean? A tap is a ray under every candidate pose.
+// Fig. D2: which summit did you mean? A tap is a ray under every candidate pose.
 // ======================================================================================
 const POOL = [
 	{ name: "Summit A", az: 205.2, prom: 300, km: 6.2 },
@@ -1129,7 +1127,7 @@ function RealTaps() {
 	const unlocked = ["", "yaw + pitch", "+ roll", "+ focal", "+ focal"][n];
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 3"
 			bleed
 			caption={
 				<>
@@ -1530,7 +1528,7 @@ function MissBars() {
 		: null;
 	return (
 		<Figure
-			label="Fig. 5"
+			label="Fig. 4"
 			caption={
 				<>
 					After three taps the median label miss is{" "}
@@ -1630,18 +1628,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
-			<PhotoStory
-				photoId="demo-10"
-				focus="tap"
-				number="3"
-				title="Taps move labels onto their summits"
-				caption={
-					S
-						? `The phone's guess: labels miss their summits by ${S[0].peakShift.median} px (median). One named summit pulls them onto the skyline: ${S[1].peakShift.median} px after one tap.`
-						: "The phone's guess, then the names snapped onto their summits."
-				}
-			/>
-
 			<RealTaps />
 
 			<MissBars />
@@ -1672,7 +1658,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Figure
-				label="Fig. 6"
+				label="Fig. 5"
 				caption="One tap, three photos: the tapped peak is exact, the far labels are not."
 			>
 				<Gallery ids={TAP_IDS} cols={3} tile={(d) => <TapTile d={d} />} />
@@ -1703,40 +1689,20 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			<Details>
 				<PinLock />
 
-				<Section
-					kicker="The ladder"
-					title="One tap fits yaw and pitch. Three taps also fit the lens."
-				>
-					<ul>
-						<li>
-							<strong>1 pin: yaw and pitch.</strong> One pixel fixes where the
-							camera points. Roll and lens keep their sensor values, so the
-							overlay is exact at the pin and tilts or stretches away from it.
-							<MarginNote mark="b">
-								Why does the lens need a third pin? Two points give a baseline,
-								not the field of view.
-							</MarginNote>
-						</li>
-						<li>
-							<strong>
-								<HandMark type="double">2 pins: add roll.</HandMark>
-							</strong>{" "}
-							Two far-apart points fix the tilt: the line between them must have
-							the right slope. Only the lens error remains.
-						</li>
-						<li>
-							<strong>3 pins: add the lens.</strong> A third point makes the
-							field of view measurable. A weak prior (10 % of the starting
-							value) keeps an imprecise tap from giving an unrealistic lens
-							value.
-						</li>
-					</ul>
-					<p>
-						<em>Level points</em> also work: a pixel whose height angle is known
-						but not its direction, such as a far lake shore or the sea horizon.
-						Each counts as half a pin for roll and lens.
-					</p>
-				</Section>
+				<p>
+					The camera position is fixed at the GPS point, so a pin only
+					constrains rotation. A weak prior (10 % of the starting value) keeps
+					an imprecise tap from giving an unrealistic lens value.
+					<MarginNote mark="b">
+						Why does the lens need a third pin? Two points give a baseline, not
+						the field of view.
+					</MarginNote>
+				</p>
+				<p>
+					<em>Level points</em> also work: a pixel whose height angle is known
+					but not its direction, such as a far lake shore or the sea horizon.
+					Each counts as half a pin for roll and lens.
+				</p>
 
 				<Section kicker="Which summit?" title="Which summit did you mean?">
 					<p>
@@ -1771,50 +1737,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					/>
 				</Section>
 
-				<Section kicker="How it works" title="From finger to saved pose">
-					<Steps
-						steps={[
-							{
-								title: "Tap the photo",
-								body: "The tap is stored as a position on the image.",
-							},
-							{
-								title: "Name the summit",
-								body: "Nearby summits are ranked by angle to the nearest candidate ray, within 15°, up to 8 shown. Choosing one adds a pin; choosing again replaces it.",
-							},
-							{
-								title: "Solve rotation",
-								body: "Least squares over the unlocked values. The camera position is fixed at the GPS point, so a pin only constrains rotation; weak priors keep the other parameters near their starting values.",
-							},
-							{
-								title: "Rank and preview",
-								body: "Poses that match your taps come first, then by skyline match. The best is previewed over the photo; nothing is saved yet.",
-							},
-							{
-								title: "Confirm",
-								body: "“Use this” saves the pose as user-confirmed. Every tap and solve is logged for later study.",
-							},
-						]}
-					/>
-				</Section>
-
 				<Callout tone="result" title="Provenance is part of the result">
 					A pose solved from your pins is marked user-confirmed, never as an
 					automatic HIGH. It sharpens the overlay now but claims no verification
 					nobody performed. See the {A("accept-rule", "accept rule")}.
 				</Callout>
-
-				<Section kicker="Where it fits" title="The human step in the solve">
-					<p>
-						When the {A("baseline-pipeline", "baseline pipeline")} rejects a
-						pose, tapping a summit needs no new algorithm: it is the same
-						projection and least squares as{" "}
-						{A("viewport-inference", "viewport inference")}, fed by a tap
-						instead of a skyline. The summits offered come from the{" "}
-						{A("peak", "peak")} layer, already snapped to the terrain summit by{" "}
-						{A("terrain-snapping", "terrain snapping")}.
-					</p>
-				</Section>
 
 				<Section kicker="In the code" title="Where to look">
 					<div className="flex flex-wrap gap-2">

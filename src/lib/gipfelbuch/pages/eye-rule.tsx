@@ -50,7 +50,6 @@ import {
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
-import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Constants mirrored from src/lib/concord/priors/altitude.ts (EYE_PRIOR_DEFAULTS) and deck/scene.ts (eyeAltitude).
@@ -1407,15 +1406,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			/>
 
 			<Details>
-				<h3>What it is</h3>
-				<p>
-					<code>eye = max(GPS altitude, DEM + 1.6 m)</code>. With no altitude at
-					all, stand on the{" "}
-					<a href={gipfelbuchHref("terrain-sampler")}>sampled terrain</a> plus a
-					standing eye height. It fixes the vertical component of the{" "}
-					<a href={gipfelbuchHref("eye")}>eye</a> and is the first rung the
-					solver's position prior is built on.
-				</p>
+				<h3>Floor rule and altitude contour</h3>
 				<Flow
 					nodes={[
 						{ label: "EXIF", sub: "lat, lon, GPSAltitude, hAcc" },
@@ -1426,18 +1417,16 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					]}
 				/>
 				<p>
-					The floor rule is right whenever the fix lands on the ground the
-					photographer stood on. It breaks on summits, cliff lips and slopes:
-					the fix is off by <code>hAcc</code> (6 to 70 m), the DEM there is
-					higher, and the rule puts the eye too high. Phone altitude is reported
-					above mean sea level (we did not check this per device) and, where the
-					fix is good, should agree with the DEM to a few metres. A height above
-					the ellipsoid would be about 50 m higher in Switzerland, where the
-					geoid lies 45 to 55 m above it, so mixing the two datums would look
-					like a 50 m altitude error. On the twelve Niederhorn fixes it does
-					against Mapterhorn but not Terrarium (Fig. 2), so the photographer
-					most likely stood where <code>DEM + 1.6 ≈ alt</code> inside the
-					horizontal error disk.{" "}
+					On summits, cliff lips and slopes the fix is off by <code>hAcc</code>{" "}
+					(6 to 70 m), enough to land on higher ground. Phone altitude is
+					reported above mean sea level (we did not check this per device) and,
+					where the fix is good, should agree with the DEM to a few metres. A
+					height above the ellipsoid would be about 50 m higher in Switzerland,
+					where the geoid lies 45 to 55 m above it, so mixing the two datums
+					would look like a 50 m altitude error. On the twelve Niederhorn fixes
+					it does against Mapterhorn but not Terrarium (Fig. 2), so the
+					photographer most likely stood where <code>DEM + 1.6 ≈ alt</code>{" "}
+					inside the horizontal error disk.{" "}
 					<HandMark type="strike">Phone altitude is a minimum.</HandMark>{" "}
 					<span
 						className="nb-hand"
@@ -1454,34 +1443,17 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					m below ground + eye on the photos it was fitted on. It is a prior,
 					never a snap: it returns a Gaussian and a cost term, and when the band
 					is empty it hands back the floor rule, which bounds the damage of a
-					wrong bias.
+					wrong bias. The bias was fitted on 10 photos (9 Swiss, 4 days), and
+					fixes from US photos read near 0, which is why the prior falls back.
 				</p>
 				<Hero />
-				<h3>Why it matters downstream</h3>
+				<h3>How much height matters</h3>
 				<p>
 					Height shapes the horizon profile, which terrain occludes which, and
-					near-field parallax. The{" "}
-					<a href={gipfelbuchHref("camera-prior")}>camera prior</a> and the{" "}
-					<a href={gipfelbuchHref("exif-prior")}>EXIF prior</a> both start here;{" "}
-					<a href={gipfelbuchHref("eye-refinement")}>eye refinement</a> and the{" "}
-					<a href={gipfelbuchHref("eye-search-gpu")}>GPU eye search</a> search
-					around this height. Even 0.2 m is about 6 px on a 100 m foreground in
+					near-field parallax. Even 0.2 m is about 6 px on a 100 m foreground in
 					a 4000 px frame (D2), and under a pixel beyond 1 km.
 				</p>
 				<DriftPlot />
-				<Callout
-					tone="lesson"
-					title="Treat altitude as a measurement, not a minimum"
-				>
-					The floor rule discards altitude whenever the fix lands on higher
-					ground than the photographer's. Treating it as a contour recovers it,
-					but the −7 m bias was fitted on 10 photos (9 Swiss, 4 days), and fixes
-					from US photos read near 0, which is why the prior falls back. See{" "}
-					<a href={gipfelbuchHref("datum-msl-vs-ellipsoid")}>
-						MSL versus ellipsoid
-					</a>{" "}
-					before mixing altitude sources.
-				</Callout>
 				<Callout tone="note" title="Pins carry no altitude">
 					Positions typed in or picked on a map have their altitude nulled on
 					import, so they always use ground + 1.6 m.
@@ -1493,7 +1465,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<CodeRef path="src/lib/deck/scene.ts">eyeAltitude</CodeRef>
 					<CodeRef path="src/lib/geo/pipeline.ts">EYE_ABOVE_GROUND</CodeRef>
 					<CodeRef path="src/lib/roll/mosaic/ridgelines.worker.ts" />
-					<CodeRef path="reports/ontology.md" />
 				</div>
 			</Details>
 		</>

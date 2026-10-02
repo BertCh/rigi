@@ -7,34 +7,39 @@ import {
 	CircledKey,
 	CircledNumber,
 	HandMark,
+	KrokiTitle,
+	NorthArrow,
 	PencilLayer,
 	Wash,
 } from "#/components/gipfelbuch/notebook";
 import {
 	Hachure,
+	HandDot,
 	HandText,
 	PenArrow,
 	PenCircle,
+	PenCross,
 	PenDimension,
 	PenLine,
 	SketchPath,
 	SketchPolyline,
+	SketchRect,
 	Stipple,
 } from "#/components/gipfelbuch/notebook/Ink";
-
+import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
-	Callout,
 	CodeRef,
 	Eq,
 	Figure,
 	Flow,
 	HandLabel,
-	HandRange,
 	LiveDrape,
 	MarginNote,
+	Measured,
 	Plot,
 	Steps,
 	Sym,
+	useTime,
 } from "#/components/gipfelbuch/viz";
 import {
 	Beat,
@@ -44,16 +49,18 @@ import {
 	Numbers,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
-import { MAPTERHORN, TERRAIN_LEVELS, TERRARIUM_AWS } from "#/lib/dem/sources";
+import { PlotSeries } from "#/components/gipfelbuch/viz/Plot";
+import { MAPTERHORN, TERRARIUM_AWS } from "#/lib/dem/sources";
 import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
+// Terrain model: height tiles (MAPTERHORN / TERRARIUM_AWS in src/lib/dem/sources.ts) and the one lookup over them
+//   (TerrainSampler in src/lib/geo/terrain.ts). Level tile counts, the seam patch, the transects and the per-camera
+//   ground heights are MEASURED by scripts/gipfelbuch/data-terrain.ts and loaded from /demo/gipfelbuch/terrain/terrain.json.
 const TERRA = "var(--gb-red)";
 const MAP = "var(--gb-forest)";
 const rectPath = (x: number, y: number, w: number, h: number) =>
 	`M${x} ${y}H${x + w}V${y + h}H${x}Z`;
-const LAT = 46.8; // Swiss Alps, where the benchmark lives
-
 /** Real DEM facts from scripts/gipfelbuch/data-terrain.ts (Niederhorn, demo-01 camera). */
 type Level = {
 	z: number;
@@ -101,6 +108,14 @@ type TerrainData = {
 		d: number[];
 		terrarium: Record<string, number[]>;
 		mapterhorn: Record<string, number[]>;
+		mapterhornAt: number[];
+	};
+	seam: {
+		seamAtCol: number;
+		heights: number[][];
+		fx: number;
+		fy: number;
+		sampled: number;
 	};
 	coverage: { name: string; finest: number }[];
 	eyes: { id: string; groundTerrarium: number; groundMapterhorn: number }[];
@@ -137,11 +152,6 @@ const A = ({ id, children }: { id: string; children: React.ReactNode }) => (
 		{children}
 	</a>
 );
-
-/** Metres per pixel of a Terrarium/Mapterhorn tile at latitude LAT. */
-const mPerPx = (z: number, tile: number) =>
-	(156543.03 * Math.cos((LAT * Math.PI) / 180)) / 2 ** z / (tile / 256);
-
 const fmt = (v: number, n = 0) =>
 	v.toLocaleString("en-US", {
 		minimumFractionDigits: n,
@@ -152,8 +162,50 @@ const fmt = (v: number, n = 0) =>
 // (360-wide viewBox), the ladder at about 900 px (600-wide viewBox), the bar chart at about 900 px (720-wide).
 const HERO_LABEL = 6.5;
 const BAR_LABEL = 9.5;
-const LADDER_LABEL = 7.5;
+const LEVELS = MAPTERHORN.levels;
+const TILE = MAPTERHORN.tileSize;
+const SITE = { lat: 46.71, lon: 7.773 }; // the Niederhorn demo camera
+const DEG = Math.PI / 180;
+const ANSWER = "var(--gb-water)";
+const rectD = (x0: number, y0: number, x1: number, y1: number) =>
+	`M${x0} ${y0}H${x1}V${y1}H${x0}Z`;
+const circleD = (cx: number, cy: number, r: number) =>
+	`M${cx - r} ${cy}A${r} ${r} 0 1 0 ${cx + r} ${cy}A${r} ${r} 0 1 0 ${cx - r} ${cy}Z`;
+const EARTH_R = 6_371_000;
 
+const mpp = (z: number) =>
+	(40_075_016.686 * Math.cos(SITE.lat * DEG)) / (2 ** z * TILE);
+const tx = (lon: number, z: number) => ((lon + 180) / 360) * 2 ** z;
+const ty = (lat: number, z: number) => {
+	const s = Math.sin(lat * DEG);
+	return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 2 ** z;
+};
+/** tilesAround from dem/tiles.ts, count only: used until the measured counts load. */
+function tileCount(radius: number, z: number) {
+	const dLat = radius / EARTH_R / DEG;
+	const dLon = dLat / Math.cos(SITE.lat * DEG);
+	const ax = Math.floor(tx(SITE.lon - dLon, z));
+	const bx = Math.floor(tx(SITE.lon + dLon, z));
+	const ay = Math.floor(ty(SITE.lat + dLat, z));
+	const by = Math.floor(ty(SITE.lat - dLat, z));
+	return (bx - ax + 1) * (by - ay + 1);
+}
+const TILES0 = LEVELS.map((l) => tileCount(l.maxDistance, l.z));
+
+/** sampleAt: start at the level for `distance`, walk coarser until a level answers. */
+function answer(distance: number, missing: boolean[]) {
+	let i = LEVELS.findIndex((l) => distance <= l.maxDistance);
+	if (i < 0) i = LEVELS.length - 1;
+	const start = i;
+	for (; i < LEVELS.length; i++) if (!missing[i]) return { start, hit: i };
+	return { start, hit: -1 };
+}
+
+const fmtM = (m: number) =>
+	m >= 1000
+		? `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`
+		: `${Math.round(m)} m`;
+const fmtRes = (v: number) => (v < 10 ? v.toFixed(1) : String(Math.round(v)));
 /* ---------- Hero: the wipe, on real hillshades ---------- */
 function Hero({ d }: { d: TerrainData | null }) {
 	const box = d?.box;
@@ -478,7 +530,7 @@ function GroundGap({ d }: { d: TerrainData | null }) {
 	const maxAt = rows.findIndex((r) => r.gap === max);
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 7"
 			caption={<>At all 12 cameras, Terrarium puts the ground lower.</>}
 		>
 			<svg
@@ -556,26 +608,6 @@ function GroundGap({ d }: { d: TerrainData | null }) {
 		</Figure>
 	);
 }
-
-/* ---------- Trio visuals ---------- */
-function PixelCard({ d }: { d: TerrainData | null }) {
-	const p = d?.rgb.find((r) => r.source === "mapterhorn");
-	if (!p)
-		return (
-			<div className="aspect-[4/3] animate-pulse bg-[var(--gb-paper-deep)]" />
-		);
-	const [r, g, b] = p.rgb;
-	return (
-		<div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 p-3 font-mono text-[11px] gb-secondary">
-			<span className="size-14" style={{ background: `rgb(${r} ${g} ${b})` }} />
-			<span>
-				R {r} · G {g} · B {b}
-			</span>
-			<span className="text-[var(--accent)]">= {p.height.toFixed(0)} m</span>
-		</div>
-	);
-}
-
 function BandsMini({ d }: { d: TerrainData | null }) {
 	const lv = d?.levels.mapterhorn;
 	if (!lv)
@@ -716,175 +748,6 @@ function FallbackMini() {
 		</svg>
 	);
 }
-
-/* ---------- Fig 2: the distance ladder ---------- */
-function Ladder({ d: data }: { d: TerrainData | null }) {
-	const [d, setD] = useState(3000);
-	const max = 160_000;
-	const lx = (m: number) =>
-		40 + ((Math.log10(Math.max(m, 100)) - 2) / (Math.log10(max) - 2)) * 540;
-	const pick = (levels: { z: number; maxDistance: number }[]) => {
-		let i = levels.findIndex((l) => d <= l.maxDistance);
-		if (i < 0) i = levels.length - 1;
-		return i;
-	};
-	const row = (
-		name: string,
-		levels: { z: number; maxDistance: number }[],
-		tile: number,
-		y: number,
-		col: string,
-	) => {
-		const sel = pick(levels);
-		return (
-			<g key={name}>
-				<HandLabel x={0} y={y - 7} size={LADDER_LABEL + 1} color={col}>
-					{name}
-				</HandLabel>
-				{levels.map((l, i) => {
-					const x0 = i === 0 ? lx(100) : lx(levels[i - 1].maxDistance);
-					const x1 = lx(l.maxDistance);
-					return (
-						<g key={l.z}>
-							{i === sel ? (
-								<Hachure
-									d={rectPath(x0 + 1, y, Math.max(1, x1 - x0 - 2), 26)}
-									seed={`dem-ladder-lit-${name}-${l.z}`}
-									color={col}
-									gap={2.4}
-									width={1.3}
-									opacity={0.9}
-								/>
-							) : (
-								<Wash
-									d={rectPath(x0 + 1, y, Math.max(1, x1 - x0 - 2), 26)}
-									seed={`dem-ladder-wash-${name}-${l.z}`}
-									color={col}
-								/>
-							)}
-							<SketchPath
-								d={rectPath(x0 + 1, y, Math.max(1, x1 - x0 - 2), 26)}
-								seed={`dem-ladder-edge-${name}-${l.z}`}
-								color={col}
-								width={i === sel ? 1.6 : 0.9}
-								opacity={i === sel ? 1 : 0.55}
-								passes={1}
-								tolerance={0.6}
-							/>
-							<HandLabel
-								x={(x0 + x1) / 2}
-								y={y + 16}
-								anchor="middle"
-								size={LADDER_LABEL}
-								color="var(--gb-ink)"
-								weight={i === sel ? 700 : 400}
-							>
-								z{l.z}
-							</HandLabel>
-							<HandLabel
-								x={(x0 + x1) / 2}
-								y={y + 40}
-								anchor="middle"
-								size={LADDER_LABEL}
-								color="var(--gb-secondary)"
-							>
-								{mPerPx(l.z, tile).toFixed(1)} m
-							</HandLabel>
-						</g>
-					);
-				})}
-			</g>
-		);
-	};
-	return (
-		<Figure
-			label="Fig. 3"
-			caption="Slide the probe: the lit band is the zoom each map uses at that distance. Small numbers: metres per pixel."
-		>
-			<svg
-				viewBox="0 0 600 150"
-				className="block h-auto w-full"
-				role="img"
-				aria-label="Distance bands of the Terrarium and Mapterhorn tile ladders"
-			>
-				{row("Terrarium, 3 bands", TERRAIN_LEVELS, 256, 22, TERRA)}
-				{row("Mapterhorn, 6 bands", MAPTERHORN.levels, 512, 88, MAP)}
-				{[1000, 4000, 15000, 40000, 150000].map((m) => (
-					<g key={m}>
-						<PenLine
-							seed={`dem-ladder-grid-${m}`}
-							data
-							from={[lx(m), 12]}
-							to={[lx(m), 136]}
-							color="faint"
-							width={0.6}
-						/>
-						<HandLabel
-							x={lx(m)}
-							y={148}
-							anchor="middle"
-							size={LADDER_LABEL}
-							color="var(--gb-secondary)"
-						>
-							{m >= 1000 ? `${m / 1000} km` : `${m} m`}
-						</HandLabel>
-					</g>
-				))}
-				<PenLine
-					seed="dem-ladder-probe"
-					data
-					from={[lx(d), 4]}
-					to={[lx(d), 138]}
-					color="ink"
-					width={1.7}
-				/>
-				<HandText
-					x={lx(d) + (lx(d) > 300 ? -20 : 20)}
-					y={75}
-					anchor={lx(d) > 300 ? "end" : "start"}
-					size={8}
-					rotate={-1.5}
-				>
-					probe: Mapterhorn z{MAPTERHORN.levels[pick(MAPTERHORN.levels)].z},
-					Terrarium z{TERRAIN_LEVELS[pick(TERRAIN_LEVELS)].z}
-				</HandText>
-				<PenArrow
-					seed="dem-ladder-probe-arrow"
-					from={[lx(d) + (lx(d) > 300 ? -17 : 17), 72]}
-					to={[lx(d) + (lx(d) > 300 ? -2 : 2), 70]}
-					color="ink"
-					width={1}
-					head={4}
-				/>
-			</svg>
-			<div className="mt-2 flex items-center gap-3 font-mono text-[11px] gb-secondary">
-				distance
-				<div className="flex-1">
-					<HandRange
-						min={200}
-						max={Math.log10(max) * 100}
-						step={1}
-						value={Math.log10(d) * 100}
-						onChange={(v) => setD(Math.round(10 ** (v / 100)))}
-						label="Sample distance from camera"
-						readout={d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${d} m`}
-					/>
-				</div>
-			</div>
-
-			{data && (
-				<p className="mt-1 font-mono text-[11px] gb-secondary">
-					At the Niederhorn camera this band is{" "}
-					{data.levels.mapterhorn[pick(MAPTERHORN.levels)].tiles} Mapterhorn
-					tiles of {data.levels.mapterhorn[pick(MAPTERHORN.levels)].tileKm} km,
-					or {data.levels.terrarium[pick(TERRAIN_LEVELS)].tiles} Terrarium tiles
-					of {data.levels.terrarium[pick(TERRAIN_LEVELS)].tileKm} km.
-				</p>
-			)}
-		</Figure>
-	);
-}
-
 /* ---------- Fig 4: the encoding of a real pixel ---------- */
 /** The decode equation with the real Mapterhorn pixel under the camera substituted. */
 function DecodeEquation({ d }: { d: TerrainData | null }) {
@@ -917,72 +780,928 @@ function DecodeEquation({ d }: { d: TerrainData | null }) {
 		</Eq>
 	);
 }
+// ======================================================================================
+// Fig. 3 — which tile level answers, by distance
+// ======================================================================================
+const R = 150;
+const CX = 170;
+const CY = 170;
+const D_MAX = 150_000;
+const rOf = (d: number) =>
+	(R * Math.log(1 + d / 200)) / Math.log(1 + D_MAX / 200);
+const dOf = (r: number) =>
+	200 * (Math.exp((r / R) * Math.log(1 + D_MAX / 200)) - 1);
 
-function Encoding({ d }: { d: TerrainData | null }) {
+function LevelRings({ data }: { data: TerrainData | null }) {
+	const TILES = data ? data.levels.mapterhorn.map((l) => l.tiles) : TILES0;
+	const TOTAL_TILES = TILES.reduce((a, b) => a + b, 0);
+	// the still frame (reduced motion, harness) probes 14 km: the z11 case
+	const [ref, tRaw] = useTime<HTMLDivElement>(4.4);
+	const t = Math.min(tRaw, 4.4); // one pass out from the camera, then it rests on the 14 km case
+	const [missing, setMissing] = useState<boolean[]>(LEVELS.map(() => false));
+	const [manual, setManual] = useState<{ d: number; a: number } | null>(null);
+
+	const auto = {
+		d: Math.exp(
+			Math.log(60) +
+				((Math.log(D_MAX * 0.97) - Math.log(60)) * (1 - Math.cos(t * 0.45))) /
+					2,
+		),
+		a: -0.9 + t * 0.35,
+	};
+	const p = manual ?? auto;
+	const { start, hit } = answer(p.d, missing);
+	const pr = rOf(p.d);
+	const px = CX + pr * Math.cos(p.a);
+	const py = CY + pr * Math.sin(p.a);
+	const toggle = (i: number) =>
+		setMissing((m) => m.map((v, k) => (k === i ? !v : v)));
+
+	function onMove(e: React.PointerEvent<SVGSVGElement>) {
+		const b = e.currentTarget.getBoundingClientRect();
+		const x = ((e.clientX - b.left) / b.width) * 340 - CX;
+		const y = ((e.clientY - b.top) / b.height) * 340 - CY;
+		const r = Math.min(R, Math.hypot(x, y));
+		setManual({ d: Math.max(20, dOf(r)), a: Math.atan2(y, x) });
+	}
+
+	const fellBack = hit !== start;
 	return (
 		<Figure
-			label="D1"
-			caption={<>The tile pixel under the camera in each source.</>}
+			label="Fig. 3"
+			bleed
+			caption={
+				<>
+					Near ground is read at {fmtRes(mpp(15))} m a pixel, a far ridge at{" "}
+					{fmtRes(mpp(9))} m. <Measured data={data} />
+				</>
+			}
 		>
-			<div className="grid gap-3 sm:grid-cols-2">
-				{(d?.rgb ?? []).map((p) => {
-					const [r, g, b] = p.rgb;
-					const col = p.source === "terrarium" ? TERRA : MAP;
-					return (
-						<div key={p.source} className="bg-[var(--gb-paper-deep)] p-4">
-							<div className="flex items-center gap-3">
-								<span
-									className="size-10 shrink-0"
-									style={{ background: `rgb(${r} ${g} ${b})` }}
+			<div
+				ref={ref}
+				className="grid items-center gap-x-12 gap-y-6 lg:grid-cols-[340px_minmax(0,1fr)]"
+			>
+				<svg
+					viewBox="0 0 340 340"
+					className="mx-auto block h-auto w-full max-w-[340px] touch-pan-y"
+					role="img"
+					aria-label="Concentric tile-level rings around the camera with a probe showing which level answered"
+					onPointerMove={onMove}
+					onPointerLeave={() => setManual(null)}
+				>
+					{[...LEVELS].reverse().map((l, ri) => {
+						const i = LEVELS.length - 1 - ri;
+						const on = i === hit;
+						const rOuter = rOf(l.maxDistance);
+						const rInner = i === 0 ? 0 : rOf(LEVELS[i - 1].maxDistance);
+						const band =
+							rInner > 0
+								? `${circleD(CX, CY, rOuter)}${circleD(CX, CY, rInner)}`
+								: circleD(CX, CY, rOuter);
+						return (
+							<g key={l.z}>
+								{/* R2: hatch density is graded by level (finest densest); the answering band is denser still */}
+								<Hachure
+									d={band}
+									seed={`ts-ring-${l.z}`}
+									color={on ? "forest" : "brown"}
+									gap={on ? 3.2 : 5 + 1.6 * i}
+									width={on ? 1.1 : 0.8}
+									opacity={on ? 0.75 : 0.4}
 								/>
-								<div className="font-mono text-[11px] gb-secondary">
-									<div style={{ color: col }}>{p.source}</div>
-									tile {p.tile}, pixel ({p.px}, {p.py})
-								</div>
-							</div>
-							<div className="mt-3 font-mono text-[13px] leading-relaxed whitespace-nowrap gb-ink">
-								R {r} &middot; G {g} &middot; B {b}
-								<br />
-								{r}&times;256 + {g} + {b}/256 &minus; 32768
-								<br />
-								<span className="text-[var(--accent)]">
-									= {p.height.toFixed(2)} m
-								</span>
-							</div>
+								<SketchPath
+									d={circleD(CX, CY, rOuter)}
+									seed={`ts-ringline-${l.z}`}
+									color={on ? "forest" : "pencil"}
+									width={on ? 2.2 : 0.9}
+									passes={on ? 2 : 1}
+								/>
+								{missing[i] && (
+									<Hachure
+										d={band}
+										seed={`ts-miss-${l.z}`}
+										color="red"
+										angle={45}
+										gap={5}
+										opacity={0.8}
+									/>
+								)}
+							</g>
+						);
+					})}
+					{LEVELS.map((l, i) => (
+						<HandLabel
+							key={l.z}
+							x={CX}
+							y={CY - rOf(l.maxDistance) + 11}
+							anchor="middle"
+							size={11}
+							weight={i === hit ? 700 : 400}
+							color={i === hit ? "var(--gb-ink)" : "var(--gb-secondary)"}
+						>
+							{`z${l.z}`}
+						</HandLabel>
+					))}
+					<KrokiTitle
+						x={8}
+						y={22}
+						title="Which height map answers?"
+						size={18}
+						seed="ts-rings-title"
+					/>
+					<NorthArrow x={318} y={48} seed="ts-rings-north" />
+					<HandText x={170} y={336} size={14} anchor="middle" color="brown">
+						log scale: far rings are compressed
+					</HandText>
+					<PencilLayer>
+						<PenLine
+							from={[CX - R, CY]}
+							to={[CX + R, CY]}
+							seed="ts-guide-h"
+							width={0.8}
+						/>
+						<PenLine
+							from={[CX, CY - R]}
+							to={[CX, CY + R]}
+							seed="ts-guide-v"
+							width={0.8}
+						/>
+					</PencilLayer>
+					{/* probe ray */}
+					<PenLine
+						seed="ts-probe-ray"
+						data
+						from={[CX, CY]}
+						to={[px, py]}
+						color="pencil"
+						width={1}
+						dash="3 3"
+					/>
+					<HandDot
+						x={CX}
+						y={CY}
+						r={3.8}
+						seed="ts-camera"
+						data
+						color="ink"
+						opacity={1}
+					/>
+					<PenCircle
+						seed="ts-probe-ring"
+						data
+						center={[px, py]}
+						radiusX={8}
+						color="pencil"
+						width={1.1}
+					/>
+					{hit < 0 ? (
+						<PenCross
+							seed="ts-probe-nan"
+							center={[px, py]}
+							size={5}
+							color="red"
+							width={1.8}
+						/>
+					) : (
+						<HandDot
+							x={px}
+							y={py}
+							r={4}
+							seed="ts-probe"
+							data
+							color="red"
+							opacity={1}
+						/>
+					)}
+					<HandLabel x={CX + 8} y={CY + 17} size={11}>
+						camera
+					</HandLabel>
+					<CircledKey x={CX - 22} y={CY + 22} value="1" seed="ts-rings-key" />
+				</svg>
+
+				<div className={`min-w-[250px] flex-1 font-mono ${TYPE.micro}`}>
+					<div className="mb-3 bg-[var(--gb-paper-deep)] p-3">
+						<div className="flex items-baseline justify-between gb-secondary">
+							<span>distance</span>
+							<span className="gb-ink">{fmtM(p.d)}</span>
 						</div>
-					);
-				})}
+						<div className="mt-1 flex items-baseline justify-between gb-secondary">
+							<span>chosen level</span>
+							<span className="gb-ink">z{LEVELS[start].z}</span>
+						</div>
+						<div className="mt-1 flex items-baseline justify-between gb-secondary">
+							<span>answered by</span>
+							<span
+								className={
+									hit < 0 ? "text-[var(--rigi-trap)]" : "text-[var(--gb-water)]"
+								}
+							>
+								{hit < 0
+									? "no height (nothing loaded)"
+									: `z${LEVELS[hit].z} · ${fmtRes(mpp(LEVELS[hit].z))} m/px`}
+							</span>
+						</div>
+						{fellBack && (
+							<div className={`mt-1 gb-secondary ${TYPE.micro}`}>
+								z{LEVELS[start].z} {missing[start] ? "missing" : "n/a"}
+								{hit >= 0
+									? ` → fell back ${hit - start} level${hit - start > 1 ? "s" : ""}`
+									: " → no level left"}
+							</div>
+						)}
+					</div>
+					<div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-3 gap-y-1.5 gb-secondary">
+						<span className="gb-secondary">level</span>
+						<span className="gb-secondary">band</span>
+						<span className="gb-secondary">m/px</span>
+						<span className="gb-secondary">tiles</span>
+						{LEVELS.map((l, i) => (
+							<button
+								key={l.z}
+								type="button"
+								onClick={() => toggle(i)}
+								aria-pressed={missing[i]}
+								className="col-span-4 grid grid-cols-subgrid items-center px-2 py-1.5 text-left transition hover:bg-[var(--gb-paper-deep)]"
+								style={{
+									background: i === hit ? "var(--gb-paper-deep)" : undefined,
+									boxShadow:
+										i === hit ? "inset 3px 0 0 var(--gb-red)" : undefined,
+									textDecoration: missing[i] ? "line-through" : undefined,
+									color: i === hit ? "var(--gb-ink)" : undefined,
+								}}
+								title="Toggle: this level's tile is missing"
+							>
+								<span>z{l.z}</span>
+								<span>
+									{i === 0 ? "0" : fmtM(LEVELS[i - 1].maxDistance)}–
+									{fmtM(l.maxDistance)}
+								</span>
+								<span>{fmtRes(mpp(l.z))}</span>
+								<span>{TILES[i]}</span>
+							</button>
+						))}
+					</div>
+					<p className={`mt-2 gb-secondary ${TYPE.micro}`}>
+						{TOTAL_TILES} tiles for a full load here. Click a row to remove that
+						level's tile and watch the probe fall back.
+					</p>
+				</div>
 			</div>
 		</Figure>
 	);
 }
 
+// ======================================================================================
+// Fig. 4 — one bilinear sample, with a tile seam
+// ======================================================================================
+const GW = 6;
+const GH = 5;
+const SEAM = 3; // pixels with gx >= SEAM live in tile B
+const CELL = 52;
+const OX = 12;
+const OY = 12;
+const GRID_RULES =
+	Array.from(
+		{ length: GW + 1 },
+		(_, i) => `M${OX + i * CELL} ${OY}V${OY + GH * CELL}`,
+	).join("") +
+	Array.from(
+		{ length: GH + 1 },
+		(_, i) => `M${OX} ${OY + i * CELL}H${OX + GW * CELL}`,
+	).join("");
+
+function BilinearProbe({ data }: { data: TerrainData | null }) {
+	const GRID =
+		data?.seam.heights ??
+		Array.from({ length: GH }, () => Array.from({ length: GW }, () => 0));
+	const HMIN = Math.min(...GRID.flat());
+	const HMAX = Math.max(...GRID.flat());
+	const [ref, t] = useTime<HTMLDivElement>(14);
+	const [manual, setManual] = useState<{ u: number; v: number } | null>(null);
+	const [bGone, setBGone] = useState(false);
+
+	// wanders across the seam for 10 s, then eases to rest fully inside tile A (u = 2 is left of the seam)
+	const tw = Math.min(t, 10);
+	const rest = Math.min(1, Math.max(0, (t - 10) / 3));
+	const e = rest * rest * (3 - 2 * rest);
+	const auto = {
+		u: (1 - e) * (3 + 2.3 * Math.sin(0.5 * tw + 1)) + e * 2,
+		v: (1 - e) * (2.5 + 1.7 * Math.sin(0.37 * tw)) + e * 2.5,
+	};
+	const pr = manual ?? auto;
+	const u = Math.max(0.02, Math.min(GW - 0.02, pr.u));
+	const v = Math.max(0.02, Math.min(GH - 0.02, pr.v));
+	// px = tileCoord * size - 0.5: pixel centres sit at i + 0.5 in cell space
+	const px = u - 0.5;
+	const py = v - 0.5;
+	const x0 = Math.floor(px);
+	const y0 = Math.floor(py);
+	const fx = px - x0;
+	const fy = py - y0;
+	const hAt = (gx: number, gy: number) => {
+		if (gx < 0 || gy < 0 || gx >= GW || gy >= GH) return Number.NaN; // outside the drawn window
+		if (bGone && gx >= SEAM) return Number.NaN;
+		return GRID[gy][gx];
+	};
+	const h00 = hAt(x0, y0);
+	const h10 = hAt(x0 + 1, y0);
+	const h01 = hAt(x0, y0 + 1);
+	const h11 = hAt(x0 + 1, y0 + 1);
+	const top = h00 * (1 - fx) + h10 * fx;
+	const bot = h01 * (1 - fx) + h11 * fx;
+	const res = top * (1 - fy) + bot * fy;
+	const nearest = hAt(Math.floor(u), Math.floor(v));
+	const bad = Number.isNaN(res);
+
+	const cx = (gx: number) => OX + (gx + 0.5) * CELL; // pixel centre in svg
+	const cy = (gy: number) => OY + (gy + 0.5) * CELL;
+	const sx = OX + u * CELL;
+	const sy = OY + v * CELL;
+	const corner = [
+		{ gx: x0, gy: y0, w: (1 - fx) * (1 - fy), h: h00 },
+		{ gx: x0 + 1, gy: y0, w: fx * (1 - fy), h: h10 },
+		{ gx: x0, gy: y0 + 1, w: (1 - fx) * fy, h: h01 },
+		{ gx: x0 + 1, gy: y0 + 1, w: fx * fy, h: h11 },
+	];
+
+	function onMove(e: React.PointerEvent<SVGSVGElement>) {
+		const b = e.currentTarget.getBoundingClientRect();
+		setManual({
+			u: (((e.clientX - b.left) / b.width) * (GW * CELL + 2 * OX) - OX) / CELL,
+			v:
+				(((e.clientY - b.top) / b.height) * (GH * CELL + 2 * OY + 14) - OY) /
+				CELL,
+		});
+	}
+
+	return (
+		<Figure
+			label="Fig. 4"
+			bleed
+			caption={
+				<>
+					Blend the four nearest pixels, each weighted by the area opposite it.
+					One missing corner leaves no answer.
+				</>
+			}
+		>
+			<div
+				ref={ref}
+				className="grid items-center gap-x-12 gap-y-6 lg:grid-cols-[360px_minmax(0,1fr)]"
+			>
+				<svg
+					viewBox={`0 0 ${GW * CELL + 2 * OX} ${GH * CELL + 2 * OY + 14}`}
+					className="mx-auto block h-auto w-full max-w-[360px] touch-pan-y"
+					role="img"
+					aria-label="A height grid with a probe and the four pixels a bilinear sample blends"
+					onPointerMove={onMove}
+					onPointerLeave={() => setManual(null)}
+				>
+					{GRID.flatMap((row, gy) =>
+						row.map((h, gx) => ({ h, gx, gy, id: `cell${gx}x${gy}` })),
+					).map(({ h, gx, gy, id }) => {
+						const k = HMAX > HMIN ? (h - HMIN) / (HMAX - HMIN) : 0;
+						const gone = bGone && gx >= SEAM;
+						const cell = rectD(
+							OX + gx * CELL,
+							OY + gy * CELL,
+							OX + (gx + 1) * CELL,
+							OY + (gy + 1) * CELL,
+						);
+						return (
+							<g key={id}>
+								{gone ? (
+									<Hachure
+										d={cell}
+										seed={`ts-gone-${id}`}
+										color="red"
+										angle={45}
+										gap={6}
+										opacity={0.7}
+									/>
+								) : (
+									<Hachure
+										d={cell}
+										seed={`ts-cell-${id}`}
+										color="brown"
+										gap={14 - 9 * k}
+										width={0.9}
+										opacity={0.28 + 0.3 * k}
+									/>
+								)}
+								<HandLabel x={cx(gx)} y={cy(gy) + 14} anchor="middle" size={11}>
+									{gone ? "no data" : h.toFixed(1)}
+								</HandLabel>
+							</g>
+						);
+					})}
+					{/* the pencil-ruled grid over the shading */}
+					<SketchPath
+						d={GRID_RULES}
+						seed="ts-grid"
+						color="pencil"
+						width={0.7}
+						passes={1}
+					/>
+					{/* area weights: each corner owns the rectangle opposite the probe; one fixed stipple, clipped */}
+					{corner.map((c) => {
+						const ox = c.gx === x0 ? cx(x0 + 1) : cx(x0);
+						const oy = c.gy === y0 ? cy(y0 + 1) : cy(y0);
+						return (
+							<g key={`w${c.gx}-${c.gy}`}>
+								<Wash
+									d={rectD(
+										Math.min(sx, ox),
+										Math.min(sy, oy),
+										Math.max(sx, ox),
+										Math.max(sy, oy),
+									)}
+									seed={`ts-w-${c.gx - x0}-${c.gy - y0}`}
+									color="forest"
+									layers={6}
+									opacity={0.012 + 0.07 * c.w}
+									offset={[0, 0]}
+								/>
+								<SketchRect
+									x={Math.min(sx, ox)}
+									y={Math.min(sy, oy)}
+									width={Math.abs(sx - ox)}
+									height={Math.abs(sy - oy)}
+									seed={`ts-wr-${c.gx - x0}-${c.gy - y0}`}
+									color="forest"
+									opacity={0.6}
+									penWidth={0.8}
+									dash="3 3"
+									passes={1}
+								/>
+							</g>
+						);
+					})}
+					{/* tile seam */}
+					<PenLine
+						seed="ts-seam"
+						data
+						from={[OX + SEAM * CELL, OY - 6]}
+						to={[OX + SEAM * CELL, OY + GH * CELL + 6]}
+						color="ink"
+						width={1.5}
+						dash="5 3"
+					/>
+					<HandLabel
+						x={OX + SEAM * CELL - 5}
+						y={OY + GH * CELL + 14}
+						anchor="end"
+						size={12}
+					>
+						tile A
+					</HandLabel>
+					<HandLabel x={OX + SEAM * CELL + 5} y={OY + GH * CELL + 14} size={12}>
+						tile B
+					</HandLabel>
+					{/* the four pixel centres and the probe */}
+					{corner.map((c, n) => (
+						<HandLabel
+							key={`n${c.gx}-${c.gy}`}
+							x={cx(c.gx) - 8}
+							y={cy(c.gy) - 6}
+							anchor="end"
+							size={13}
+							color="var(--gb-forest)"
+						>
+							{n + 1}
+						</HandLabel>
+					))}
+					{corner.map((c) => (
+						<HandDot
+							key={`c${c.gx}-${c.gy}`}
+							x={cx(c.gx)}
+							y={cy(c.gy)}
+							r={3.4}
+							seed={`ts-corner-${c.gx}-${c.gy}`}
+							data
+							color="ink"
+							opacity={1}
+						/>
+					))}
+					<PenCircle
+						seed="ts-probe-ring"
+						data
+						center={[sx, sy]}
+						radiusX={8}
+						color="pencil"
+						width={1.2}
+					/>
+					{bad ? (
+						<PenCross
+							seed="ts-probe-bad"
+							center={[sx, sy]}
+							size={5}
+							color="red"
+							width={1.8}
+						/>
+					) : (
+						<HandDot
+							x={sx}
+							y={sy}
+							r={3.8}
+							seed="ts-probe"
+							data
+							color="red"
+							opacity={1}
+						/>
+					)}
+				</svg>
+
+				<div
+					className={`min-w-[240px] flex-1 font-mono gb-secondary ${TYPE.micro}`}
+				>
+					<div className="bg-[var(--gb-paper-deep)] p-3">
+						<div className="flex justify-between">
+							<span>pixel position</span>
+							<span className="gb-ink">
+								{px.toFixed(2)}, {py.toFixed(2)}
+							</span>
+						</div>
+						<div className="mt-1 flex justify-between">
+							<span>offset within pixel</span>
+							<span className="gb-ink">
+								{fx.toFixed(2)}, {fy.toFixed(2)}
+							</span>
+						</div>
+						<div className="mt-1 flex justify-between">
+							<span>top / bottom blend</span>
+							<span className="gb-ink">
+								{Number.isNaN(top) ? "no data" : top.toFixed(1)} /{" "}
+								{Number.isNaN(bot) ? "no data" : bot.toFixed(1)}
+							</span>
+						</div>
+						<div className="mt-1 flex justify-between">
+							<span>bilinear</span>
+							<span
+								className={
+									bad ? "text-[var(--rigi-trap)]" : "text-[var(--gb-water)]"
+								}
+							>
+								{bad
+									? "no height, try the coarser level"
+									: `${res.toFixed(1)} m`}
+							</span>
+						</div>
+						<div className="mt-1 flex justify-between gb-secondary">
+							<span>nearest pixel would say</span>
+							<span>{Number.isNaN(nearest) ? "no data" : `${nearest} m`}</span>
+						</div>
+						{data && (
+							<div className="mt-2 flex justify-between pt-1 gb-secondary">
+								<span>
+									TerrainSampler.sample at (
+									{(data.seam.seamAtCol - 1 + data.seam.fx + 0.5).toFixed(1)},{" "}
+									{(2 + data.seam.fy + 0.5).toFixed(1)})
+								</span>
+								<span className="gb-ink">{data.seam.sampled.toFixed(2)} m</span>
+							</div>
+						)}
+					</div>
+					<div className="mt-3 flex items-center gap-2">
+						<button
+							type="button"
+							aria-pressed={bGone}
+							onClick={() => setBGone((v) => !v)}
+							className={`border-b-2 bg-[var(--gb-paper-deep)] px-2.5 py-1 transition ${TYPE.micro}`}
+							style={{
+								borderColor: bGone ? "var(--rigi-trap)" : "transparent",
+								color: "var(--gb-ink)",
+							}}
+						>
+							{bGone ? "tile B not loaded" : "tile B loaded"}
+						</button>
+						<span className={`gb-secondary ${TYPE.micro}`}>
+							cross the seam to see it
+						</span>
+						{data && (
+							<button
+								type="button"
+								onClick={() =>
+									setManual({
+										u: data.seam.seamAtCol - 1 + data.seam.fx + 0.5,
+										v: 2 + data.seam.fy + 0.5,
+									})
+								}
+								className={`bg-[var(--gb-paper-deep)] px-2.5 py-1 transition ${TYPE.micro}`}
+							>
+								measured point
+							</button>
+						)}
+					</div>
+					<div className="mt-3 grid grid-cols-4 gap-3">
+						{corner.map((c, n) => (
+							<div key={`wb${c.gx}-${c.gy}`}>
+								<div className="flex justify-between">
+									<span style={{ color: "var(--gb-forest)" }}>{n + 1}</span>
+									<span className="gb-ink">{c.w.toFixed(2)}</span>
+								</div>
+								<div className="mt-1 h-3 bg-[var(--gb-paper-deep)]">
+									<div
+										className="h-full"
+										style={{
+											width: `${(c.w * 100).toFixed(1)}%`,
+											background: "var(--gb-forest)",
+										}}
+									/>
+								</div>
+							</div>
+						))}
+					</div>
+					<p className={`mt-1 gb-secondary ${TYPE.micro}`}>
+						the four weights, numbered as the dots, summing to 1
+					</p>
+				</div>
+			</div>
+			<Eq
+				className="mb-0"
+				where={[
+					{
+						sym: "top, bottom",
+						text: "blend of the two pixels in each row: (1 − fx)·left + fx·right",
+					},
+					{
+						sym: "fx, fy",
+						text: "how far right of and below the top-left pixel centre, 0 to 1",
+					},
+					{
+						sym: "h",
+						c: ANSWER,
+						text: "the four numbered dots are the pixel heights; weights are the shaded rectangles and bars",
+					},
+				]}
+			>
+				<Sym c={ANSWER}>h</Sym> = (1 − <Sym>fy</Sym>)·<Sym>top</Sym> +{" "}
+				<Sym>fy</Sym>·<Sym>bottom</Sym>
+				{!bad && (
+					<>
+						<br />= (1 − {fy.toFixed(2)})·{top.toFixed(1)} + {fy.toFixed(2)}·
+						{bot.toFixed(1)} = <Sym c={ANSWER}>{res.toFixed(1)}</Sym> m
+					</>
+				)}
+			</Eq>
+		</Figure>
+	);
+}
+
+// ======================================================================================
+// Fig. 6 — what a coarser level costs, measured along a real line
+// ======================================================================================
+function LevelCost({ data }: { data: TerrainData | null }) {
+	const tr = data?.transect;
+	if (!data || !tr)
+		return (
+			<Figure bleed caption="Loading the measured transect.">
+				<div className="aspect-[2/1] animate-pulse bg-[var(--gb-paper-deep)]" />
+			</Figure>
+		);
+	const zs = Object.keys(tr.mapterhorn).map(Number);
+	const ref = tr.mapterhorn["15"];
+	const idx = tr.d.map((_, i) => i).filter((i) => tr.d[i] <= 12000);
+	const km = tr.d.map((m) => m / 1000);
+	const colors: Record<number, string> = {
+		15: "var(--gb-forest)",
+		14: "var(--gb-relief)",
+		12: "var(--gb-relief)",
+		11: "var(--gb-relief)",
+		10: "var(--gb-relief)",
+		9: "var(--gb-contour)",
+	};
+	const err = (z: number) =>
+		idx.map((i) => tr.mapterhorn[String(z)][i] - ref[i]);
+	const worst = (z: number) => Math.max(...err(z).map(Math.abs));
+	const picked = idx.map((i) => tr.mapterhornAt[i] - ref[i]);
+	return (
+		<Figure
+			label="Fig. 6"
+			bleed
+			caption={
+				<>
+					Black: the sampler's answer along a real 12 km line, as height minus
+					the finest map&rsquo;s. Orange: the coarsest map used everywhere.
+				</>
+			}
+		>
+			<Plot
+				x={[0, 12]}
+				y={[-60, 60]}
+				width={620}
+				height={260}
+				xLabel="distance from camera (km)"
+				yLabel="height minus finest map (m)"
+				fmtX={(v) => v.toFixed(0)}
+				fmtY={(v) => v.toFixed(0)}
+			>
+				{(s) => (
+					<>
+						{LEVELS.slice(0, 3).map((l) => (
+							<PenLine
+								key={l.z}
+								seed={`ts-band-${l.z}`}
+								data
+								from={[s.x(l.maxDistance / 1000), s.box.y0]}
+								to={[s.x(l.maxDistance / 1000), s.box.y1]}
+								color="pencil"
+								width={0.9}
+								dash="3 3"
+							/>
+						))}
+						{zs
+							.filter((z) => z === 9)
+							.map((z) => (
+								<PlotSeries
+									key={z}
+									d={s.line(
+										idx.map((i) => [
+											km[i],
+											tr.mapterhorn[String(z)][i] - ref[i],
+										]),
+									)}
+									seed={`ts-coarse-z${z}`}
+									color={colors[z]}
+									width={1.4}
+								/>
+							))}
+						<PlotSeries
+							d={s.line(idx.map((i, k) => [km[i], picked[k]]))}
+							seed="ts-answer"
+							color="ink"
+							width={2}
+						/>
+						<HandText
+							x={s.x(3.2)}
+							y={s.y(-44)}
+							size={16}
+							rotate={-2}
+							color="red"
+						>
+							{`band rule stays within ${Math.max(...picked.map(Math.abs)).toFixed(0)} m`}
+						</HandText>
+						<PenArrow
+							from={[s.x(3.1), s.y(-40)]}
+							to={[
+								s.x(2.2),
+								s.y(picked[idx.findIndex((i) => km[i] >= 2.2)] ?? 0),
+							]}
+							seed="ts-answer-arrow"
+							color="red"
+							width={1.2}
+						/>
+					</>
+				)}
+			</Plot>
+			<div
+				className={`mt-3 flex flex-wrap gap-x-4 gap-y-1 font-mono gb-secondary ${TYPE.micro}`}
+			>
+				{zs
+					.filter((z) => z !== 15)
+					.sort((a, b) => b - a)
+					.map((z, k, all) => (
+						<span key={z} className="inline-flex items-center gap-1.5">
+							<span
+								className="inline-block size-2.5"
+								style={{
+									background: `color-mix(in srgb, var(--gb-contour) ${25 + (75 * k) / Math.max(1, all.length - 1)}%, var(--gb-paper))`,
+								}}
+							/>
+							<span className="gb-ink">z{z}</span> worst {worst(z).toFixed(0)} m
+						</span>
+					))}
+			</div>
+			<p className={`mt-2 gb-secondary ${TYPE.caption}`}>
+				<Key color="var(--gb-ink)">answer (black)</Key>{" "}
+				<Key color="var(--gb-contour)">coarsest everywhere (orange)</Key>.
+				Dashed lines: band edges at 1, 2.5 and 6 km.
+			</p>
+		</Figure>
+	);
+}
+
+/** Worst error of the coarsest map vs the finest within 12 km, and of the band rule. */
+function costNumbers(d: TerrainData | null) {
+	const tr = d?.transect;
+	if (!tr) return null;
+	const ref = tr.mapterhorn["15"];
+	const idx = tr.d.map((_, i) => i).filter((i) => tr.d[i] <= 12000);
+	const coarse = Math.max(
+		...idx.map((i) => Math.abs(tr.mapterhorn["9"][i] - ref[i])),
+	);
+	const picked = Math.max(
+		...idx.map((i) => Math.abs(tr.mapterhornAt[i] - ref[i])),
+	);
+	return { coarse, picked };
+}
+/** Bilinear in small: the real 2 x 2 pixels around the measured seam probe. */
+function BlendMini({ d }: { d: TerrainData | null }) {
+	const s = d?.seam;
+	if (!s)
+		return (
+			<div className="aspect-[4/3] animate-pulse bg-[var(--gb-paper-deep)]" />
+		);
+	const c = s.seamAtCol - 1;
+	const r = 2;
+	const h = [
+		[s.heights[r][c], s.heights[r][c + 1]],
+		[s.heights[r + 1][c], s.heights[r + 1][c + 1]],
+	];
+	const C = 70;
+	const O = 40;
+	const px = O + C / 2 + s.fx * C;
+	const py = 15 + C / 2 + s.fy * C;
+	return (
+		<svg
+			viewBox="0 0 300 180"
+			className="block h-auto w-full"
+			role="img"
+			aria-label="Four height pixels and the point between them"
+		>
+			{h.map((row, j) =>
+				row.map((v, i) => (
+					// biome-ignore lint/suspicious/noArrayIndexKey: the grid position is the identity
+					<g key={`${i}-${j}`}>
+						<Hachure
+							d={rectD(
+								O + i * C,
+								15 + j * C,
+								O + (i + 1) * C,
+								15 + (j + 1) * C,
+							)}
+							seed={`mini-blend-${i}-${j}`}
+							color="brown"
+							gap={10 - 2.5 * (i + j)}
+							width={0.9}
+							opacity={0.65}
+						/>
+						<HandLabel x={O + i * C + 5} y={15 + j * C + 13} size={13}>
+							{v.toFixed(1)}
+						</HandLabel>
+					</g>
+				)),
+			)}
+			<SketchPath
+				d={`M${O} 15H${O + 2 * C}M${O} ${15 + C}H${O + 2 * C}M${O} ${15 + 2 * C}H${O + 2 * C}M${O} 15V${15 + 2 * C}M${O + C} 15V${15 + 2 * C}M${O + 2 * C} 15V${15 + 2 * C}`}
+				seed="mini-blend-grid"
+				color="pencil"
+				width={0.8}
+				passes={1}
+			/>
+			<PenCircle
+				seed="mini-blend-ring"
+				center={[px, py]}
+				radiusX={8}
+				color="pencil"
+				width={1.2}
+			/>
+			<HandDot
+				x={px}
+				y={py}
+				r={4.2}
+				seed="mini-blend-probe"
+				color="red"
+				opacity={1}
+			/>
+			<HandLabel x={O + 2 * C + 16} y={75} size={14}>
+				answer
+			</HandLabel>
+			<HandLabel x={O + 2 * C + 16} y={94} size={14} color={ANSWER}>
+				{`${s.sampled.toFixed(2)} m`}
+			</HandLabel>
+		</svg>
+	);
+}
 export default function Page(_: { node: GipfelbuchNode }) {
 	const d = useTerrainData();
+	const cost = costNumbers(d);
+	const lv = d?.levels.mapterhorn;
 	const gaps = d?.eyes.map((e) => e.groundMapterhorn - e.groundTerrarium) ?? [];
 	const gMin = gaps.length ? Math.min(...gaps) : null;
 	const gMax = gaps.length ? Math.max(...gaps) : null;
-	const tr = d?.transect;
-	let worst = Number.NaN;
-	if (tr) {
-		const T = tr.terrarium["15"];
-		const Mh = tr.mapterhorn["15"];
-		worst = Math.max(...T.map((v, i) => Math.abs(v - Mh[i])));
-	}
 	return (
 		<>
 			<Hero d={d} />
 
 			<Beat
 				kicker="The idea"
-				title="Two free height maps. Mapterhorn keeps the summit height; Terrarium rounds it low."
+				title="A tile is an image whose pixel colours encode heights."
 			>
 				<p>
-					Both are pictures where each pixel&rsquo;s colour is a height.
+					Red, green and blue decode to metres.{" "}
 					<HandMark type="highlight">Mapterhorn is the map Rigi uses</HandMark>:
 					global 30 m data, plus national surveys such as Swiss lidar. Terrarium
 					is the older map we compare against.
 				</p>
+			</Beat>
+
+			<DecodeEquation d={d} />
+
+			<Beat
+				kicker="Two maps"
+				title="Mapterhorn keeps the summit height; Terrarium rounds it low."
+			>
 				{d && (
 					<p>
 						At their finest, a pixel is {d.box.mapterhorn.nativeMPerPx} m in
@@ -992,9 +1711,7 @@ export default function Page(_: { node: GipfelbuchNode }) {
 							pixels are finer than its real detail
 						</HandMark>
 						<MarginNote mark="a">
-							{d
-								? `Same box, ${(d.box.mapterhorn.max - d.box.terrarium.max).toFixed(0)} m apart at the top. Why?`
-								: "Same box, different summit. Why?"}
+							{`Same box, ${(d.box.mapterhorn.max - d.box.terrarium.max).toFixed(0)} m apart at the top. Why?`}
 						</MarginNote>
 						. The widest gap on the 12 km line is marked{" "}
 						<CircledNumber value={1} /> in Fig. 2.
@@ -1006,32 +1723,106 @@ export default function Page(_: { node: GipfelbuchNode }) {
 
 			<Beat
 				kicker="How it works"
-				title="A tile is an image whose pixel colours encode heights."
+				title="One function answers: how high is the ground here?"
 			>
+				<p>
+					Given a location and its distance from the camera, it returns the
+					height in metres.{" "}
+					<HandMark type="highlight">
+						Near spots read a sharp height map, far spots a coarse one.
+					</HandMark>{" "}
+					In the rings below, the camera is{" "}
+					<CircledNumber value={1} seed="ts-prose-1" />.
+					{lv && (
+						<MarginNote mark="b">
+							{`The nearest map is ${lv[0].mPerPx.toFixed(1)} m a pixel, the farthest ${Math.round(lv[lv.length - 1].mPerPx)} m.`}
+						</MarginNote>
+					)}
+				</p>
 				<Trio
 					steps={[
 						{
-							title: "Colour encodes height",
-							body: "Red, green and blue decode to metres.",
-							visual: <PixelCard d={d} />,
-						},
-						{
-							title: "Distance picks the zoom",
-							body: "Sharp tiles near the camera, coarse tiles for far ridges.",
+							title: "Pick the map",
+							body: "Distance chooses one of six maps, sharpest first.",
 							visual: <BandsMini d={d} />,
 						},
 						{
-							title: "Missing tiles fall back",
-							body: "If there is no fine tile, the next coarser one is used.",
+							title: "Blend four pixels",
+							body: "Weight each by how close the spot is to it.",
+							visual: <BlendMini d={d} />,
+						},
+						{
+							title: "Missing tile: use a coarser map",
+							body: "A missing tile gives no value, so the next coarser map is used.",
 							visual: <FallbackMini />,
 						},
 					]}
 				/>
 			</Beat>
 
-			<DecodeEquation d={d} />
+			<LevelRings data={d} />
 
-			<Ladder d={d} />
+			<Beat kicker="Blend" title="Each answer blends the four nearest pixels.">
+				<p>
+					A spot rarely sits on a pixel centre. Each neighbour counts in
+					proportion to{" "}
+					<HandMark type="underline">the area opposite it</HandMark>.
+					<MarginNote mark="c">
+						Cross the seam with tile B unloaded and there is no answer.
+					</MarginNote>
+				</p>
+			</Beat>
+
+			<BilinearProbe data={d} />
+
+			<Beat
+				kicker="Same ground"
+				title="The 3D view loads the same tiles with the same fallback."
+			>
+				<p>
+					Both see the same ground, so a drawn line sits on the drawn terrain.
+				</p>
+			</Beat>
+
+			{/* The shell Tafel spills this sheet's one photo: the plate keeps its frame, no surround or line art. */}
+			<LiveDrape
+				number="Fig. 5"
+				title="Heights across the photo"
+				notes={[
+					{
+						text: "every height here is one sampler answer",
+						at: [0.4, 0.5],
+						side: "left",
+					},
+					{
+						text: "near ground is sharp, far ridges come from coarser tiles",
+						at: [0.75, 0.25],
+						side: "right",
+					},
+				]}
+			/>
+
+			<Beat
+				kicker="Where it errs"
+				title={
+					cost
+						? `The coarsest map alone differs from the finest by up to ${cost.coarse.toFixed(0)} m. The band rule keeps it to ${cost.picked.toFixed(0)} m.`
+						: "Coarse maps are cheap but can be off by tens of metres."
+				}
+			>
+				<p>
+					Sharp tiles near the camera, coarse tiles far away.{" "}
+					<HandMark type="double">
+						This limits the error without loading every tile at full detail.
+					</HandMark>
+				</p>
+				<p>
+					At sea the map reads 0 m, so{" "}
+					<HandMark type="wavy">a coast looks like sea level</HandMark>.
+				</p>
+			</Beat>
+
+			<LevelCost data={d} />
 
 			<Beat
 				kicker="Where it fails"
@@ -1045,13 +1836,12 @@ export default function Page(_: { node: GipfelbuchNode }) {
 					Heights feed the horizon we match to the photo. On 100 test photos,
 					drawing on the wrong map moved the horizon by{" "}
 					<HandMark type="double">1 to 27% of image height</HandMark>.
-					<MarginNote mark="b">
+					<MarginNote mark="d">
 						My first check used Terrarium. It was wrong.
 					</MarginNote>
 				</p>
 				<p>
-					Fine tiles exist only where surveys do; elsewhere we fall back to
-					coarser ones. Result: <HandMark type="strike">14</HandMark>{" "}
+					Result: <HandMark type="strike">14</HandMark>{" "}
 					<span className="nb-hand" style={{ color: "var(--gb-red)" }}>
 						25
 					</span>{" "}
@@ -1060,24 +1850,6 @@ export default function Page(_: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<GroundGap d={d} />
-
-			{/* A photo figure of its own, so the plate spills its line art too (README, concept spill). */}
-			<LiveDrape
-				number="Fig. 5"
-				title="The ground under each photo"
-				notes={[
-					{
-						text: "each photo sits on the map's slope, not the phone's altitude",
-						at: [0.35, 0.45],
-						side: "left",
-					},
-					{
-						text: "a smoother map would round these summits off",
-						at: [0.7, 0.3],
-						side: "right",
-					},
-				]}
-			/>
 
 			<Numbers
 				items={[
@@ -1092,15 +1864,15 @@ export default function Page(_: { node: GipfelbuchNode }) {
 						label: "Niederhorn summit lower in Terrarium",
 					},
 					{
-						value: Number.isNaN(worst) ? "…" : `${worst.toFixed(0)} m`,
-						label: "largest gap on a 12 km line",
-					},
-					{
 						value:
 							gMin == null || gMax == null
 								? "…"
 								: `${gMin.toFixed(0)}–${gMax.toFixed(0)} m`,
 						label: "ground gap across the 12 demo cameras",
+					},
+					{
+						value: cost ? `${cost.picked.toFixed(0)} m` : "…",
+						label: "worst gap to the finest map with the band rule, 12 km line",
 					},
 				]}
 				source="First figure: 100-photo benchmark. Others: measured at the Niederhorn camera."
@@ -1122,18 +1894,17 @@ export default function Page(_: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					Each source carries its own{" "}
-					<A id="dem-lod-levels">distance-banded ladder</A>. The sampler asks
-					for height at (lon, lat, distance from camera), picks the first band
-					whose <code>maxDistance</code> covers it, and walks to coarser bands
-					if that tile is missing. Mapterhorn&rsquo;s ladder is one zoom coarser
-					per band than Terrarium&rsquo;s (its tiles are twice as wide) plus two
-					finer near-field levels.
+					<A id="dem-lod-levels">distance-banded ladder</A>. Mapterhorn&rsquo;s
+					ladder is one zoom coarser per band than Terrarium&rsquo;s (its tiles
+					are twice as wide) plus two finer near-field levels.{" "}
+					<code>TerrainSampler</code> loads nothing itself, so it runs the same
+					in the page and in scripts.
 				</p>
 				<Flow
 					nodes={[
 						{ label: "DemSource", sub: "url + levels", color: MAP },
 						{ label: "tilesAround", sub: "per band" },
-						{ label: "loadTile", sub: "cache, decode" },
+						{ label: "loadTile", sub: "16 at a time, size-checked" },
 						{ label: "TerrainSampler", sub: "sampleAt" },
 					]}
 				/>
@@ -1144,17 +1915,19 @@ export default function Page(_: { node: GipfelbuchNode }) {
 							body: "VITE_MAPTERHORN_URL (browser) or MAPTERHORN_URL (Node) overrides the public service, so a self-hosted pmtiles endpoint is a one-line change.",
 						},
 						{
-							title: "Choose a band",
-							body: "findIndex(l => distance <= l.maxDistance); beyond the last band, the coarsest one is used.",
+							title: "Plan the tiles",
+							body: "For every level, list the tiles inside that level's distance band, skipping any already loaded.",
 						},
 						{
-							title: "Fall back on a miss",
-							body: "Missing fine tiles (outside national lidar) return NaN, and sampleAt tries the next coarser level. ground() is just sampleAt(lon, lat, 0).",
+							title: "Load in batches, check the size",
+							body: "Tiles load 16 at a time. A tile of the wrong size is rejected with an error, because it would give wrong heights. A tile that fails to load leaves a hole.",
+						},
+						{
+							title: "Where a tile does not exist",
+							body: "A 404 or empty reply is remembered for the session, and the request walks up to the nearest tile that exists and enlarges its quadrant. Missing corners return NaN and sampleAt tries the next coarser level; ground() is just sampleAt(lon, lat, 0).",
 						},
 					]}
 				/>
-				<h3>Pixel decode, measured</h3>
-				<Encoding d={d} />
 				{d && (
 					<>
 						<h3>Coverage depends on place</h3>
@@ -1185,22 +1958,13 @@ export default function Page(_: { node: GipfelbuchNode }) {
 					elsewhere. Figures are from the swisstopo and Copernicus product
 					descriptions, not re-measured.
 				</p>
-				<h3>Why it matters in Rigi</h3>
-				<p>
-					Georeferencing depends on skyline notches and ridgelines matching the
-					photo to a few hundredths of a degree. A DEM that rounds off summits
-					moves exactly those features. Swapping Terrarium for Mapterhorn took
-					the solver from 14 to 25 correct poses on the 100-photo{" "}
-					<A id="wild-benchmark">benchmark</A>, with no algorithm change. See
-					also the <A id="licence-register">licence register</A>.
-				</p>
 				<h3>Gotchas and lessons</h3>
 				<ul>
 					<li>
-						<strong>Check against the map the method used.</strong> The first
-						benchmark check drew overlays on Terrarium while the methods solved
-						on Mapterhorn; ground differed by up to 114 m and the drawn skyline
-						moved 1 to 27% of image height.
+						<strong>Check against the map the method used.</strong> The first{" "}
+						<A id="wild-benchmark">benchmark</A> check drew overlays on
+						Terrarium while the methods solved on Mapterhorn; ground differed by
+						up to 114 m.
 					</li>
 					<li>
 						The 12-photo ground truth was fitted against Terrarium notches, so
@@ -1210,22 +1974,20 @@ export default function Page(_: { node: GipfelbuchNode }) {
 						Self-hosted tiles must be the same 512 px Terrarium WebP, and
 						missing tiles must return 404 or 204 so the ancestor fallback works.
 					</li>
+					<li>
+						Sea is set to 0 when tiles are decoded. Licences: the{" "}
+						<A id="licence-register">licence register</A>.
+					</li>
 				</ul>
-				<Callout tone="negative" title="Terrarium costs accuracy">
-					14 correct poses against 25 on Mapterhorn: Terrarium is not a drop-in
-					replacement.
-				</Callout>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">
-					<CodeRef path="src/lib/dem/sources.ts">
-						DemSource, MAPTERHORN, TERRAIN_LEVELS
-					</CodeRef>
 					<CodeRef path="src/lib/geo/terrain.ts">
 						TerrainSampler.sampleAt
 					</CodeRef>
-					<CodeRef path="src/lib/dem/index.ts">dem barrel</CodeRef>
-					<CodeRef path="reports/bench-wild.md" />
-					<CodeRef path="reports/licences.md" />
+					<CodeRef path="src/lib/dem/tiles.ts" />
+					<CodeRef path="src/lib/dem/load.ts" />
+					<CodeRef path="src/lib/dem/decode.ts" />
+					<CodeRef path="src/lib/deck-webgpu/terrain.ts" />
 				</div>
 			</Details>
 		</>

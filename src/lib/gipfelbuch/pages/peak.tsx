@@ -24,7 +24,6 @@ import {
 import type { Point } from "#/components/gipfelbuch/notebook/sketch";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import {
-	Callout,
 	CodeRef,
 	CrispLine,
 	DemPatch,
@@ -1744,8 +1743,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					For each summit we check its height, its direction, whether it is
-					hidden, and whether it is worth the space. Each summit is first{" "}
-					{link("terrain-snapping", "snapped")} onto the real ridge.
+					hidden, and whether it is worth the space. Each OSM peak is first
+					moved onto its DEM summit, the highest ground near the node.
 					<MarginNote mark="a">
 						{movedMedian
 							? `Compass ${Math.abs(d1?.solved.delta.yaw ?? 0).toFixed(1)}° off: the median summit slid ${movedMedian.toFixed(0)} px.`
@@ -1934,30 +1933,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			/>
 
 			<Details>
-				<Section title="A summit must pass four checks" kicker="Mechanism">
-					<p>
-						An OSM node says only that a mountain exists somewhere near a point.
-						To become a label in the photo it needs an answer to each of these:
-						how high it is, in which direction and at what angle it lies from
-						this eye, whether the eye can see it, and whether it is worth the
-						space.
-						<MarginNote mark="b">
-							Four checks, four steps below. The third (visibility) removes the
-							most summits.
-						</MarginNote>{" "}
-						The {link("terrain-snapping", "snapping sheet")} covers the first
-						half of the first check (moving the node onto the DEM summit).
-					</p>
-				</Section>
-				<Section title="The mechanism, in isolation" kicker="Schematic">
-					<p>
-						Invented summits: move the eye and watch one ray march pass or fail.
-					</p>
-				</Section>
-
 				<RayMarch />
 
-				<Section title="How it works" kicker="Step by step">
+				<Section title="From OSM node to label" kicker="Step by step">
 					<Steps
 						steps={[
 							{
@@ -1982,10 +1960,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 										<code>
 											height = max(DEM local max near the node, OSM ele)
 										</code>
-										. The local-max search is the one described on the snapping
-										page: OSM nodes sit a little off the summit and the DEM
-										knows the ridge. Taking the larger of the two means a good
-										tagged <code>ele</code> still wins when the DEM is smoothed.
+										. OSM nodes sit a little off the summit and the DEM knows
+										the ridge. Taking the larger of the two means a good tagged{" "}
+										<code>ele</code> still wins when the DEM is smoothed.
 									</>
 								),
 							},
@@ -2007,8 +1984,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 								body: (
 									<>
 										Fig. D1. From 20 m outward, sample the{" "}
-										{link("terrain-sampler", "terrain")} along the bearing; if
-										any sample appears more than 0.05° above the summit, it is
+										{link("dem-source", "terrain")} along the bearing; if any
+										sample appears more than 0.05° above the summit, it is
 										hidden. The last <code>max(150 m, 2 % of d)</code> is
 										ignored, because the summit's own flank is allowed to look
 										higher than its top.
@@ -2057,29 +2034,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					</p>
 				</Section>
 
-				<Section title="Where it fits" kicker="Context">
-					<p>
-						Visibility depends on the eye height, so the{" "}
-						{link("eye-rule", "eye rule")} feeds it directly, and the pose that
-						places labels comes from{" "}
-						{link("viewport-inference", "viewport inference")}. A peak is also
-						the thing a person taps in {link("tap-a-peak", "tap-a-peak")} to pin
-						the pose, and the labels themselves are drawn in the{" "}
-						{link("photo-workspace", "photo workspace")}.
-					</p>
-				</Section>
-
-				<Callout tone="lesson" title="Lesson">
-					Each label states that a named summit is visible in the photo. The app
-					filters labels with the same ray-and-angle model that built the
-					horizon, so it does not label a mountain that the terrain model puts
-					behind another.
-				</Callout>
 				<div className="mt-10 flex flex-wrap gap-2">
-					<CodeRef path="src/lib/geo/peaks.ts" />
-					<CodeRef path="src/lib/photos.ts" />
 					<CodeRef path="src/lib/picker/candidates.ts" />
-					<CodeRef path="reports/ontology.md" />
 				</div>
 				<dl className="mt-4 grid gap-x-6 gap-y-1 font-mono text-[11px] gb-secondary sm:grid-cols-2">
 					<div>

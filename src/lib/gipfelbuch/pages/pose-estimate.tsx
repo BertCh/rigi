@@ -35,10 +35,7 @@ import {
 	LAYER_STYLE,
 	MarginNote,
 	Measured,
-	type PhotoLayer,
 	PhotoPicker,
-	PhotoStory,
-	Plot,
 	RealPhoto,
 	Section,
 	Stat,
@@ -56,7 +53,6 @@ import {
 	MarkList,
 	Numbers,
 	skylineBand,
-	Trio,
 } from "#/components/gipfelbuch/viz/explain";
 import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
 import {
@@ -73,7 +69,7 @@ import {
 	SCENE,
 	summitOnSkyline,
 } from "#/components/gipfelbuch/viz/scene";
-import { byId, gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
+import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Pose estimate: four angles plus an eye, in one convention shared by every solver.
@@ -257,7 +253,7 @@ function Slider(props: {
 // ======================================================================================
 
 // ======================================================================================
-// Fig. D3 — one pose, two views. Plan (yaw + FOV wedge) and the image it produces, on demo-09's real
+// Fig. D2 — one pose, two views. Plan (yaw + FOV wedge) and the image it produces, on demo-09's real
 // horizon. The story turns the phone's guess into the solved pose one number per beat.
 // ======================================================================================
 const PE = {
@@ -433,7 +429,7 @@ function PoseExplorer() {
 
 	return (
 		<Figure
-			label="Fig. D3"
+			label="Fig. D2"
 			bleed
 			pinned={SCENE.id}
 			source="Skizze"
@@ -695,7 +691,7 @@ function PoseExplorer() {
 }
 
 // ======================================================================================
-// Fig. 2 — the DOF ladder: how many correspondences unlock which parts of the pose
+// Fig. D3 — the DOF ladder: how many correspondences unlock which parts of the pose
 // ======================================================================================
 type Corrs = { point: number; dir: number; level: number; azimuth: number };
 const KINDS: {
@@ -778,7 +774,7 @@ function DofLadder() {
 		setC({ ...c, [k]: Math.max(0, Math.min(8, c[k] + d)) });
 	return (
 		<Figure
-			label="Fig. D4"
+			label="Fig. D3"
 			source="Skizze"
 			caption="Synthetic evidence. The solver only fits what the evidence can pin down: unlocked rows are fitted, locked rows stay at the phone’s reading. Peak pins and far directions count 1; level and bearing count 0.5."
 		>
@@ -900,7 +896,7 @@ function DofLadder() {
 }
 
 // ======================================================================================
-// Fig. 3 — provenance: what a pose is wrapped in, and how the app chooses one to show
+// Fig. 2 — provenance: what a pose is wrapped in, and how the app chooses one to show
 // ======================================================================================
 function ProvenanceCard() {
 	const [conf, setConf] = useState(0.62);
@@ -914,7 +910,7 @@ function ProvenanceCard() {
 	const SRC = ["saved", "hand-fitted", "solved", "phone guess"];
 	return (
 		<Figure
-			label="Fig. D5"
+			label="Fig. 2"
 			caption="A pose never travels bare. Left: the record stored per photo. Right: the three-way rule that picks which pose to show when a photo opens. Drag the confidence across 0.2 and the state flips. On the 12 demo photos, saved confidences run 0.63 to 1.00, so each opens as auto."
 		>
 			<div className="grid gap-4 md:grid-cols-2">
@@ -1144,215 +1140,6 @@ function RealPose({
 	);
 }
 
-function PoseResiduals({
-	sel,
-	onPick,
-}: {
-	sel: GipfelbuchPhotoId;
-	onPick: (i: GipfelbuchPhotoId) => void;
-}) {
-	const idx = useGipfelbuchIndex();
-	if (!idx)
-		return <div className="h-64 animate-pulse bg-[var(--gb-paper-deep)]" />;
-	const P = idx.photos;
-	const worstAt = P.reduce(
-		(best, p, i) =>
-			p.residual.prior.median > P[best].residual.prior.median ? i : best,
-		0,
-	);
-	const meds = P.filter((p) => p.accepted)
-		.map((p) => p.residual.solved.median)
-		.sort((a, b) => a - b);
-	return (
-		<Figure
-			label="Fig. D2"
-			caption={
-				<>
-					Median gap between detected skyline and terrain horizon, over
-					confident columns. Red: phone’s pose. Navy: solved pose (hollow: solve
-					rejected). Click a point to load it in Fig. D1.
-				</>
-			}
-		>
-			<Plot
-				x={[0.4, 12.6]}
-				y={[0, 50]}
-				xLabel="demo photo"
-				yLabel="median skyline error, px"
-				xTicks={12}
-				yTicks={5}
-				fmtX={(v) => (Number.isInteger(v) && v >= 1 && v <= 12 ? `${v}` : "")}
-				fmtY={(v) => `${v}`}
-			>
-				{(s) => (
-					<g>
-						<g>
-							<HandDot
-								x={s.box.x1 - 150}
-								y={s.box.y0 + 12}
-								r={4.5}
-								seed="pe-leg-prior"
-								color="red"
-								opacity={1}
-							/>
-							<HandLabel
-								x={s.box.x1 - 140}
-								y={s.box.y0 + 16}
-								size={11}
-								color="var(--gb-ink)"
-							>
-								phone’s pose
-							</HandLabel>
-							<HandDot
-								x={s.box.x1 - 150}
-								y={s.box.y0 + 30}
-								r={4.5}
-								seed="pe-leg-solved"
-								color="navy"
-								opacity={1}
-							/>
-							<HandLabel
-								x={s.box.x1 - 140}
-								y={s.box.y0 + 34}
-								size={11}
-								color="var(--gb-ink)"
-							>
-								solved (hollow: rejected)
-							</HandLabel>
-						</g>
-						{P.map((p, i) => {
-							const x = s.x(i + 1);
-							const on = p.id === sel;
-							return (
-								// biome-ignore lint/a11y/useSemanticElements: SVG marker group
-								<g
-									key={p.id}
-									role="button"
-									tabIndex={0}
-									aria-label={p.id}
-									onClick={() => onPick(p.id)}
-									onKeyDown={(e) => e.key === "Enter" && onPick(p.id)}
-									className="cursor-pointer"
-								>
-									{on && (
-										<Wash
-											d={`M${x - 13} ${s.box.y0}H${x + 13}V${s.box.y1}H${x - 13}Z`}
-											color="red"
-											seed={`pe-res-sel-${p.id}`}
-											layers={5}
-										/>
-									)}
-									{/* transparent hit area for the whole column */}
-									<rect
-										x={x - 13}
-										y={s.box.y0}
-										width={26}
-										height={s.box.y1 - s.box.y0}
-										fill="transparent"
-									/>
-									<PenLine
-										seed={`pe-res-link-${p.id}`}
-										from={[x, s.y(p.residual.prior.median)]}
-										to={[x, s.y(p.residual.solved.median)]}
-										color="faint"
-										width={1.2}
-									/>
-									<HandDot
-										x={x}
-										y={s.y(p.residual.prior.median)}
-										r={6}
-										seed={`pe-res-prior-${p.id}`}
-										data
-										color="red"
-										opacity={1}
-									/>
-									{p.accepted ? (
-										<HandDot
-											x={x}
-											y={s.y(p.residual.solved.median)}
-											r={6}
-											seed={`pe-res-solved-${p.id}`}
-											data
-											color="navy"
-											opacity={1}
-										/>
-									) : (
-										<PenCircle
-											seed={`pe-res-rej-${p.id}`}
-											data
-											center={[x, s.y(p.residual.solved.median)]}
-											radiusX={5.5}
-											color="navy"
-											width={2.2}
-										/>
-									)}
-								</g>
-							);
-						})}
-						<HandText
-							x={s.x(worstAt + 1) + 22}
-							y={s.y(P[worstAt].residual.prior.median) + 4}
-							size={16}
-							color="ink"
-							rotate={-2}
-						>
-							photo {String(worstAt + 1).padStart(2, "0")}:{" "}
-							{P[worstAt].residual.prior.median.toFixed(0)} px off, then{" "}
-							{P[worstAt].residual.solved.median.toFixed(1)} px
-						</HandText>
-						<PenArrow
-							seed="pe-res-note-arrow"
-							from={[
-								s.x(worstAt + 1) + 18,
-								s.y(P[worstAt].residual.prior.median) + 8,
-							]}
-							to={[
-								s.x(worstAt + 1) + 8,
-								s.y(P[worstAt].residual.prior.median) + 3,
-							]}
-							color="ink"
-							width={1}
-							head={4}
-						/>
-					</g>
-				)}
-			</Plot>
-			<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-				<Stat
-					value={`${P.filter((p) => p.accepted).length} / 12`}
-					label="poses accepted"
-				/>
-				<Stat
-					value={`${meds[0].toFixed(1)}–${meds[meds.length - 1].toFixed(1)} px`}
-					label="median miss at the solved pose"
-				/>
-				<Stat
-					value={`${Math.min(...P.map((p) => p.residual.prior.median)).toFixed(0)}–${Math.max(...P.map((p) => p.residual.prior.median)).toFixed(0)} px`}
-					label="median miss at the phone’s pose"
-				/>
-				<Stat
-					value={`${P.map((p) => p.confidence)
-						.sort((a, b) => a - b)[0]
-						.toFixed(2)}–${Math.max(...P.map((p) => p.confidence)).toFixed(2)}`}
-					label="solve confidence range"
-				/>
-			</div>
-		</Figure>
-	);
-}
-
-function link(id: string, label: string) {
-	if (!byId.has(id)) return <>{label}</>;
-	return (
-		<Link
-			to={gipfelbuchHref(id)}
-			className="underline decoration-[var(--gb-red)]"
-		>
-			{label}
-		</Link>
-	);
-}
-
 function Legacy() {
 	const [id, setId] = useNotebookPhoto();
 	return (
@@ -1362,18 +1149,11 @@ function Legacy() {
 					A pose is small: yaw, pitch, roll and field of view, in degrees, plus
 					a camera position. Yaw is the heading, clockwise from north. Pitch is
 					positive looking up. Roll is positive when the right side of the image
-					goes down. Field of view is vertical. Together these describe the
-					camera.
-				</p>
-				<p>
-					All of these use <HandMark type="underline">one convention</HandMark>.
-					The skyline matcher, pin solver, renderer and position solver all read
-					and write it, so a pose from any one can be dropped into any other.
+					goes down. Field of view is vertical.
 				</p>
 			</Section>
 
 			<RealPose id={id} setId={setId} />
-			<PoseResiduals sel={id} onPick={setId} />
 
 			<PoseExplorer />
 
@@ -1396,19 +1176,7 @@ function Legacy() {
 								<>
 									A point in the world lands in the image by simple pinhole
 									geometry. Points behind the camera are not drawn. This gives
-									the dashed horizon and skyline in Fig. D3.
-								</>
-							),
-						},
-						{
-							title: "Phones supply a first guess",
-							body: (
-								<>
-									The phone&rsquo;s accelerometer gives pitch and roll, the
-									compass gives yaw, and the lens data gives focal length. That
-									is the starting point described in{" "}
-									{link("camera-prior", "Camera Prior")}, where{" "}
-									{link("viewport-inference", "viewport inference")} begins.
+									the dashed horizon and skyline in Fig. D2.
 								</>
 							),
 						},
@@ -1417,17 +1185,7 @@ function Legacy() {
 							body: (
 								<>
 									When a person pins points, the solver fits as many parameters
-									as the pins support (Fig. D4).
-								</>
-							),
-						},
-						{
-							title: "Record the provenance",
-							body: (
-								<>
-									The numbers are stored with who made them, a confidence and a
-									time (Fig. D5), so the app can tell a hand-fitted pose from a
-									solved one or a bare phone guess.
+									as the pins support (Fig. D3).
 								</>
 							),
 						},
@@ -1445,14 +1203,6 @@ function Legacy() {
 				</p>
 				<div className="grid gap-4 py-2 sm:grid-cols-3">
 					<Stat
-						value="99.3 %"
-						label="of test runs with 6+ pins land within 0.5° (field of view within 1°)"
-					/>
-					<Stat
-						value="0.008°"
-						label="median yaw error, 1,950 synthetic runs (pitch 0.009°, roll 0.017°)"
-					/>
-					<Stat
 						value="1.1 m"
 						label="median position error after solving, against 17 m from GPS"
 					/>
@@ -1462,8 +1212,6 @@ function Legacy() {
 					30 % outliers, 0 to 50 m GPS error.
 				</p>
 			</Section>
-
-			<ProvenanceCard />
 
 			<Section title="In the code" kicker="Where to look">
 				<ul className="!list-none !pl-0 space-y-2">
@@ -1505,24 +1253,12 @@ function Legacy() {
 					))}
 				</ul>
 			</Section>
-
-			<Section title="Where it fits" kicker="Context">
-				<p>
-					{link("viewport-inference", "Viewport inference")} produces the pose
-					by matching the photo skyline to the{" "}
-					{link("dem-horizon", "terrain horizon")};{" "}
-					{link("terrain-snapping", "terrain snapping")} fixes the camera
-					height. The pose then feeds the{" "}
-					{link("photo-workspace", "photo workspace")} and the{" "}
-					{link("camera-roll", "camera roll")}.
-				</p>
-			</Section>
 		</>
 	);
 }
 
 // ======================================================================================
-// Explainer front page (the figures above are folded into Details)
+// Explainer front page (the figures above are folded into Details, except the provenance card)
 // ======================================================================================
 const PRIOR_C = LAYER_STYLE.prior.color;
 const SOLVED_C = LAYER_STYLE.solved.color;
@@ -1851,41 +1587,6 @@ function CompassErrors() {
 	);
 }
 
-function MiniPose({ layers }: { layers: PhotoLayer[] }) {
-	const [id] = useNotebookPhoto();
-	const d = useGipfelbuchPhoto(id);
-	const crop = useMemo(() => (d ? skylineBand(d) : undefined), [d]);
-	return <RealPhoto data={d} layers={layers} crop={crop} />;
-}
-
-function Tag() {
-	const [tagId] = useNotebookPhoto();
-	const d = useGipfelbuchPhoto(tagId);
-	return (
-		<div className="flex aspect-[4/3] flex-col justify-center gap-1 bg-[var(--gb-paper-deep)] p-4 font-mono text-[11px] leading-relaxed gb-secondary">
-			{d ? (
-				<>
-					<div>
-						yaw <span className="gb-ink">{d.solved.yaw.toFixed(1)}°</span> pitch{" "}
-						<span className="gb-ink">{fmt(d.solved.pitch)}°</span>
-					</div>
-					<div>
-						roll <span className="gb-ink">{fmt(d.solved.roll)}°</span> view{" "}
-						<span className="gb-ink">{d.solved.vfov.toFixed(1)}°</span>
-					</div>
-					<div className="mt-2 pt-1">
-						from: <span className="gb-ink">skyline solve</span>
-					</div>
-					<div>
-						confidence:{" "}
-						<span className="gb-ink">{d.solved.confidence.toFixed(2)}</span>
-					</div>
-				</>
-			) : null}
-		</div>
-	);
-}
-
 /** Compass error made visible: the same peak names at the phone's heading and at the solved one. */
 function CompassShift() {
 	const d = useGipfelbuchPhoto("demo-09");
@@ -1949,8 +1650,6 @@ function CompassShift() {
 	);
 }
 
-const REJECTED: GipfelbuchPhotoId[] = ["demo-07", "demo-11"];
-
 function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 	const idx = useGipfelbuchIndex();
 	// accepted photos only: a refused solve's yaw is not trusted (same definition as viewport-inference)
@@ -1977,29 +1676,24 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
-			<Beat kicker="How it works" title="How a pose is estimated.">
-				<Trio
-					steps={[
-						{
-							title: "Sensors give a first pose",
-							body: "The compass, gravity sensor and lens data give a starting pose.",
-							visual: <MiniPose layers={["skyline", "prior"]} />,
-						},
-						{
-							title: "The skyline corrects",
-							body: "A solver turns the camera until the lines meet.",
-							visual: <MiniPose layers={["skyline", "solved"]} />,
-						},
-						{
-							title: "The pose records its source",
-							body: "The pose keeps a record of who made it and how confident it is.",
-							visual: <Tag />,
-						},
-					]}
-				/>
+			<Beat kicker="How it works" title="Every pose records its source.">
+				<p>
+					The phone&rsquo;s sensors give a first pose, and the skyline solve
+					corrects it (see{" "}
+					<Link
+						to={gipfelbuchHref("viewport-inference")}
+						className="underline decoration-[var(--gb-red)]"
+					>
+						viewport inference
+					</Link>
+					).{" "}
+					<HandMark type="underline">
+						The pose keeps a record of who made it and how confident it is.
+					</HandMark>
+				</p>
 			</Beat>
 
-			<PhotoStory number="Fig. 2" title="On a real photo" focus="gaps" />
+			<ProvenanceCard />
 
 			<Beat
 				kicker="Why the source is recorded"
@@ -2021,48 +1715,17 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				title="A weak solve does not replace the phone's pose."
 			>
 				<p>
-					On these two photos the fit was{" "}
-					<HandMark type="wavy">too weak</HandMark>. The pose stays the phone's
-					own, marked unverified.
-					<MarginNote mark="c">
-						Confidence under 0.5: rejected. The other ten pass ✓.
-					</MarginNote>
+					A solve that fails the{" "}
+					<Link
+						to={gipfelbuchHref("accept-rule")}
+						className="underline decoration-[var(--gb-red)]"
+					>
+						accept rule
+					</Link>{" "}
+					is not shown. The pose stays the phone&rsquo;s own,{" "}
+					<HandMark type="wavy">marked unverified</HandMark>.
 				</p>
 			</Beat>
-
-			<Figure
-				label="Fig. 5"
-				pinned="demo-07, demo-11"
-				caption={
-					<>
-						Both rejected (confidence under 0.5). Magenta is the terrain horizon
-						at the phone's pose, the pose we keep.
-					</>
-				}
-			>
-				<Gallery
-					ids={REJECTED}
-					cols={2}
-					tile={(d) => (
-						<RealPhoto
-							data={d}
-							layers={["skyline", "prior"]}
-							crop={skylineBand(d)}
-						/>
-					)}
-					// both refused: the solver's own verdict, its reason in the label
-					tone={(d) => (d.solved.accepted ? "caution" : "failure")}
-					tag={(d) =>
-						d.solved.accepted ? d.solved.confidence.toFixed(2) : undefined
-					}
-					label={(d) => (
-						<>
-							{d.id.slice(-2)} · confidence {d.solved.confidence.toFixed(2)},
-							below 0.5
-						</>
-					)}
-				/>
-			</Figure>
 
 			<Numbers
 				items={[

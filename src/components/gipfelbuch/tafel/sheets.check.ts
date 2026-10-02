@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Tafel sheets check. Run: npx tsx src/components/gipfelbuch/tafel/sheets.check.ts
-// All 19 sheets are present, the chapters cover every node exactly once, every ledger path resolves to
+// All 16 sheets are present, the chapters cover every node exactly once, every ledger path resolves to
 // the formatted number on all 12 photos, and value() and band() never throw or print NaN.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -44,7 +44,6 @@ for (const c of CHAPTERS)
 		if (!nodeIds.includes(id)) err(`chapter ${c.numeral}: unknown id ${id}`);
 const NO_TAFEL = [
 	"dem-source",
-	"terrain-sampler",
 	"eye-rule",
 	"terrain-snapping",
 	"dem-anchoring",

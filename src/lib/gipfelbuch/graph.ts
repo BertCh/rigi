@@ -13,49 +13,29 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		id: "photo",
 		title: "Photo",
 		claim: "A photo is an image plus the phone's sensor readings.",
-		lede: "Along with the image, the phone records its GPS position, compass heading, tilt and lens. Rigi starts every solve from these readings.",
+		lede: "Along with the image, the phone records its GPS position, compass heading, tilt and lens. Together they give a rough first guess of the camera; the compass is often off by several degrees.",
 		group: "capture",
 		kind: "concept",
 		status: "live",
-		tagline: "One image plus what the phone recorded.",
+		tagline:
+			"One image plus what the phone recorded: the first guess of the camera.",
 		summary:
-			"A photo is an image with its size, time, position, heading, tilt and lens. It optionally has a position, one camera prior and a region.",
-		modules: ["src/lib/photos.ts", "src/lib/upload/exif.ts"],
-		reports: ["reports/ontology.md"],
-		visual:
-			"A photo that peels into layers: pixels, EXIF tags, derived prior cone and region footprint on a mini map.",
-		ontologyId: "photo",
-		related: [
-			{
-				id: "camera-prior",
-				rel: "feeds",
-			},
-			{
-				id: "skyline",
-				rel: "feeds",
-			},
-		],
-	},
-	{
-		id: "camera-prior",
-		title: "Camera Prior",
-		claim: "The phone's sensors give a first, rough guess of the camera.",
-		lede: "GPS, compass, tilt and lens together give a rough camera position and direction. Rigi uses it as a starting point, but the compass is often off by several degrees.",
-		group: "capture",
-		kind: "concept",
-		status: "live",
-		tagline: "The first guess of the camera, from the phone's sensors.",
-		summary:
-			"Compass heading, tilt, lens and GPS position form a first guess of the camera that every solve starts from.",
+			"A photo is an image with its size, time, position, heading, tilt and lens. Compass heading, tilt, lens and GPS position form the camera prior that every solve starts from.",
 		modules: [
+			"src/lib/photos.ts",
+			"src/lib/upload/exif.ts",
 			"src/lib/pose6dof/types.ts",
 			"src/lib/geocam/priors/photo-priors.ts",
 		],
 		reports: ["reports/ontology.md", "reports/geometry-first-pose.md"],
 		visual:
-			"A pose cone rising from a map dot with a fuzzy yaw wedge that narrows as compass, gravity and focal evidence are toggled on.",
-		ontologyId: "camera-prior",
+			"A photo that peels into layers: pixels, EXIF tags, derived prior cone and region footprint on a mini map.",
+		ontologyId: "photo",
 		related: [
+			{
+				id: "skyline",
+				rel: "feeds",
+			},
 			{
 				id: "pose-estimate",
 				rel: "feeds",
@@ -84,7 +64,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		ontologyId: "skyline",
 		related: [
 			{
-				id: "baseline-pipeline",
+				id: "viewport-inference",
 				rel: "feeds",
 			},
 			{
@@ -112,7 +92,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		ontologyId: "horizon",
 		related: [
 			{
-				id: "baseline-pipeline",
+				id: "viewport-inference",
 				rel: "feeds",
 			},
 		],
@@ -134,13 +114,21 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 			"src/lib/geo/skyline.ts",
 			"src/lib/geo/horizon.ts",
 			"src/lib/refine/index.ts",
+			"src/lib/geo/pipeline.ts",
+			"src/lib/geo/photo-meta.ts",
+			"src/lib/geo/README.md",
 		],
-		reports: ["reports/status.md"],
+		reports: [
+			"reports/status.md",
+			"reports/Mountain photo georeferencing SoTA.md",
+			"reports/pipeline-ab.md",
+			"reports/leaderboard.md",
+		],
 		visual:
 			"The DEM horizon sliding in yaw over the photo skyline, residual stems lighting up as inliers, above a yaw × pitch cost landscape with LM paths descending into the minimum.",
 		related: [
 			{
-				id: "camera-prior",
+				id: "photo",
 				rel: "seeded-by",
 			},
 			{
@@ -150,10 +138,6 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 			{
 				id: "dem-horizon",
 				rel: "predicts-with",
-			},
-			{
-				id: "baseline-pipeline",
-				rel: "implemented-by",
 			},
 			{
 				id: "accept-rule",
@@ -263,95 +247,39 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		],
 	},
 	{
-		id: "baseline-pipeline",
-		title: "Baseline Pipeline",
-		claim: "The full path from photo to camera pose.",
-		lede: "All steps run in the browser: read the sensors, load the terrain, find the photo skyline, compute the terrain skyline, line them up, then accept or reject.",
-		group: "solve",
-		kind: "subsystem",
-		status: "live",
-		tagline: "From photo to pose, step by step.",
-		summary:
-			"Read the sensors, load the terrain, compute the horizon, detect the skyline, then solve: coarse grid, robust fit, confidence gate, full-circle retry. A rejection escalates to refinement, then to tapping peaks.",
-		modules: [
-			"src/lib/geo/pipeline.ts",
-			"src/lib/geo/solve.ts",
-			"src/lib/geo/photo-meta.ts",
-			"src/lib/geo/README.md",
-		],
-		reports: [
-			"reports/Mountain photo georeferencing SoTA.md",
-			"reports/pipeline-ab.md",
-			"reports/leaderboard.md",
-		],
-		visual:
-			"A flow strip where a photo thumbnail slides through stages showing each artifact and a final green/red gate.",
-		related: [
-			{
-				id: "skyline",
-				rel: "uses",
-			},
-			{
-				id: "dem-horizon",
-				rel: "uses",
-			},
-			{
-				id: "tap-a-peak",
-				rel: "feeds",
-			},
-		],
-	},
-	{
 		id: "dem-source",
-		title: "DEM Source",
+		title: "Terrain Model",
 		claim: "The terrain model is a grid of ground heights.",
-		lede: "The terrain model is a set of map tiles that store ground height instead of colour. Higher-resolution tiles keep summits sharp, which improves matching.",
+		lede: "The terrain model is a set of map tiles that store ground height instead of colour. One function reads them to answer how high the ground is at any point; sharper tiles keep summits sharp, which improves matching.",
 		group: "world",
 		kind: "data",
 		status: "live",
-		tagline: "Height tiles, finer near the camera.",
+		tagline:
+			"Height tiles, finer near the camera, and one lookup for ground height.",
 		summary:
-			"Mapterhorn (512 px tiles to zoom 17, swissALTI3D in Switzerland) is the default; Terrarium (256 px, zoom 15) smooths summits and is kept for comparison. On the test photos, 25 solved correctly on Mapterhorn against 14 on Terrarium.",
-		modules: ["src/lib/dem/sources.ts", "src/lib/dem/index.ts"],
-		reports: ["reports/licences.md", "reports/bench-wild.md"],
+			"Mapterhorn (512 px tiles to zoom 17, swissALTI3D in Switzerland) is the default; Terrarium (256 px, zoom 15) smooths summits and is kept for comparison. On the test photos, 25 solved correctly on Mapterhorn against 14 on Terrarium. Heights are interpolated from the four nearest pixels, falling back to coarser tiles; horizon, peak visibility and the solvers all ask the same lookup.",
+		modules: [
+			"src/lib/dem/sources.ts",
+			"src/lib/dem/index.ts",
+			"src/lib/geo/terrain.ts",
+			"src/lib/dem/load.ts",
+			"src/lib/dem/height-from-tile.ts",
+		],
+		reports: [
+			"reports/licences.md",
+			"reports/bench-wild.md",
+			"reports/Mountain photo georeferencing SoTA.md",
+		],
 		visual:
 			"Split-screen relief of one summit: blurred Terrarium vs razor-sharp Mapterhorn, with a draggable wipe.",
 		ontologyId: "dem-source",
 		related: [
 			{
-				id: "terrain-sampler",
-				rel: "feeds",
-			},
-		],
-	},
-	{
-		id: "terrain-sampler",
-		title: "Terrain Sampler",
-		claim: "One function returns the ground height at any point.",
-		lede: "Every part of Rigi that needs a ground height gets it from this function, which reads the downloaded height tiles.",
-		group: "world",
-		kind: "subsystem",
-		status: "live",
-		tagline: "One lookup returns the ground height at a point.",
-		summary:
-			"Tiles around the GPS fix load at several zooms; heights are interpolated, falling back to coarser tiles. Horizon, peak visibility and the solvers all ask it.",
-		modules: [
-			"src/lib/geo/terrain.ts",
-			"src/lib/dem/load.ts",
-			"src/lib/dem/height-from-tile.ts",
-		],
-		reports: ["reports/Mountain photo georeferencing SoTA.md"],
-		visual:
-			"A height probe over hillshade showing which tile level answered and the bilinear neighbourhood.",
-		ontologyId: "terrain",
-		methodIds: ["dem-sample"],
-		related: [
-			{
 				id: "dem-horizon",
 				rel: "feeds",
 			},
 			{
-				id: "baseline-pipeline",
+				id: "viewport-inference",
 				rel: "feeds",
 			},
 			{
@@ -359,6 +287,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 				rel: "feeds",
 			},
 		],
+		methodIds: ["dem-sample"],
 	},
 	{
 		id: "eye-rule",
@@ -383,7 +312,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		methodIds: ["eye-rule", "alt-contour"],
 		related: [
 			{
-				id: "terrain-sampler",
+				id: "dem-source",
 				rel: "uses",
 			},
 			{
@@ -442,10 +371,6 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 				rel: "uses",
 			},
 			{
-				id: "terrain-sampler",
-				rel: "uses",
-			},
-			{
 				id: "eye-rule",
 				rel: "snaps",
 			},
@@ -483,7 +408,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 			"Scattered depth dots dragged by a rubber-band spline onto DEM range with a trust gauge settling.",
 		related: [
 			{
-				id: "terrain-sampler",
+				id: "dem-source",
 				rel: "uses",
 			},
 		],
@@ -515,10 +440,6 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 			},
 			{
 				id: "terrain-snapping",
-				rel: "uses",
-			},
-			{
-				id: "baseline-pipeline",
 				rel: "uses",
 			},
 			{

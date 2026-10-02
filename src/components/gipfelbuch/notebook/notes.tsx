@@ -177,7 +177,7 @@ export function stepNote(
 			const taken = new Date(data.photo.takenAt);
 			return (
 				<>
-					{data.photo.fullWidth}×{data.photo.fullHeight}, taken{" "}
+					taken{" "}
 					<Value>
 						{taken.toLocaleTimeString("en-GB", {
 							hour: "2-digit",
@@ -186,19 +186,14 @@ export function stepNote(
 						})}
 					</Value>{" "}
 					at <Value>{data.gps.lat.toFixed(4)}</Value>,{" "}
-					<Value>{data.gps.lon.toFixed(4)}</Value>
-				</>
-			);
-		}
-		case "camera-prior":
-			return (
-				<>
-					compass <Value>{degrees(data.sensor.heading)}</Value>, tilt{" "}
+					<Value>{data.gps.lon.toFixed(4)}</Value>; compass{" "}
+					<Value>{degrees(data.sensor.heading)}</Value>, tilt{" "}
 					<Value>{degrees(data.sensor.pitch)}</Value>, roll{" "}
 					<Value>{degrees(data.sensor.roll)}</Value>, lens{" "}
 					<Value>{data.sensor.f35} mm</Value>
 				</>
 			);
+		}
 		case "skyline": {
 			const traced = data.skyline.rows.filter((row) => row != null).length;
 			return (
@@ -209,15 +204,6 @@ export function stepNote(
 				</>
 			);
 		}
-		case "baseline-pipeline":
-			return (
-				<>
-					slide the terrain horizon onto the photo skyline: median miss{" "}
-					<Value>{data.residual.prior.median.toFixed(1)} px</Value> →{" "}
-					<Value>{data.residual.solved.median.toFixed(1)} px</Value>
-					{solved.search === "full" ? " (after a full 360° search)" : ""}
-				</>
-			);
 		case "accept-rule":
 			return solved.accepted ? (
 				<>
@@ -275,12 +261,6 @@ export function stepNote(
 				<>{data.dem} height tiles</>
 			);
 		}
-		case "terrain-sampler":
-			return (
-				<>
-					ground under the camera: <Value>{data.gps.ground.toFixed(1)} m</Value>
-				</>
-			);
 		case "eye-rule":
 			return (
 				<>

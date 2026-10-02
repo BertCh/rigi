@@ -1831,7 +1831,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						},
 						{
 							title: "Keep the steepest",
-							body: `Past 50 km the ground sags ${drop(50_000).toFixed(0)} m, so we lower it.`,
+							body: "The steepest angle on the ray is the horizon at that bearing.",
 							visual: <MiniOutline />,
 						},
 					]}
@@ -1903,14 +1903,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Details>
 				<h3>The mechanism, exactly</h3>
-				<p>
-					The horizon is a 360° curve: for every bearing, the highest elevation
-					angle at which land meets sky. A ray marches outward over the terrain
-					and keeps the steepest angle; everything flatter is hidden behind it.
-					Fig. 3 shows it on a real photo. Below, Fig. D1 marches the real
-					ground under that photo; Fig. D2 sweeps invented terrain with the same
-					method.
-				</p>
 				<Steps
 					steps={[
 						{
@@ -1932,7 +1924,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 									height at the zoom level suited to that distance, with a
 									fallback to coarser levels when a fine tile is missing.
 									Missing data is <code>NaN</code> and the sample is skipped.
-									See the {A("terrain-sampler", "terrain sampler")}.
+									See the {A("dem-source", "terrain model")}.
 								</>
 							),
 						},
@@ -2005,23 +1997,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">
-					<CodeRef path="src/lib/geo/horizon.ts" />
-					<CodeRef path="src/lib/geo/terrain.ts" />
 					<CodeRef path="src/lib/horizon-fast/march.ts" />
 					<CodeRef path="src/lib/geodesy.ts" />
 					<CodeRef path="src/lib/geo/pipeline.ts" />
 					<CodeRef path="src/lib/geo/README.md" />
 				</div>
-				<h3>Where it fits</h3>
-				<p>
-					This is the predicted half of the horizon match in{" "}
-					{A("viewport-inference", "viewport inference")}. Its input is the{" "}
-					{A("terrain-sampler", "terrain sampler")} over the{" "}
-					{A("dem-source", "DEM source")}, seen from the camera height the{" "}
-					{A("eye-rule", "eye rule")} sets; the{" "}
-					{A("baseline-pipeline", "baseline pipeline")} runs it first.{" "}
-					{A("terrain-snapping", "Terrain snapping")} snaps to the same DEM.
-				</p>
 			</Details>
 		</>
 	);

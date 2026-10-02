@@ -24,7 +24,6 @@ import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPh
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
-	CodeRef,
 	Eq,
 	Figure,
 	type GipfelbuchPhotoData,
@@ -1501,14 +1500,6 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					one detector vouches for the chalet, so{" "}
 					<HandMark type="double">cross-checking drops it too</HandMark>.
 				</p>
-				<h3>Code</h3>
-				<div className="flex flex-wrap gap-2">
-					<CodeRef path="src/lib/geo/skyline.ts" />
-					<CodeRef path="src/lib/refine/skyline-clean.ts" />
-					<CodeRef path="src/lib/sky/skyline.ts" />
-					<CodeRef path="src/lib/geo/README.md" />
-					<CodeRef path="reports/leaderboard.md" />
-				</div>
 			</Details>
 		</>
 	);

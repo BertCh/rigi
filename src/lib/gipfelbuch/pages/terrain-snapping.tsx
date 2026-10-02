@@ -11,7 +11,6 @@ import {
 	HandScaleBar,
 	KrokiTitle,
 	NorthArrow,
-	PencilLayer,
 } from "#/components/gipfelbuch/notebook";
 import {
 	Hachure,
@@ -31,29 +30,21 @@ import {
 	Figure,
 	HandLabel,
 	MarginNote,
-	PhotoStory,
 	RealPhoto,
 	Sym,
 	useGipfelbuchPhoto,
 } from "#/components/gipfelbuch/viz";
-import {
-	Beat,
-	Details,
-	Mark,
-	MarkList,
-	Numbers,
-	Trio,
-} from "#/components/gipfelbuch/viz/explain";
+import { Beat, Details, Mark, Trio } from "#/components/gipfelbuch/viz/explain";
 import { byId, gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
-// Terrain snapping hub: where a coordinate meets the DEM (eye height, peaks, near-field depth).
+// Terrain snapping hub (chapter II): snap, bound, hint, with links out to eye-rule, peak and
+// dem-anchoring. The peak snap is drawn here because the peak sheet starts after it.
 // Rules mirrored from the code (kept literal so the page has no engine imports):
 //  eye       eyeAltitude = alt != null ? max(alt, dem + 1.6) : dem + 1.8      (engine.ts, deck/scene.ts)
 //  lake      floor = level + 0.3 m, radius clamp(hAcc, 5, 100) + 30 m, drop <= 3 m; ?geoLakeFloor (geocam/lakes/floor.ts)
 //  peaks     localMax(lat, lon, min(250, 60 + dist * 0.004)) on a 9x9 grid; peaks < 150 m or > 110 km dropped (engine.ts buildPeaks)
 //  anchor    quality = inlierFrac * exp(-(err / 0.2)^2), hide < 0.15, low trust < 0.35 (nearfield/anchor.ts)
-const EYE_ABOVE = 1.6;
 const rectPath = (x: number, y: number, w: number, h: number) =>
 	`M${x} ${y}H${x + w}V${y + h}H${x}Z`;
 
@@ -71,16 +62,6 @@ type PeakRow = {
 type TerrainData = {
 	generated: string;
 	script: string;
-	eyes: {
-		id: string;
-		alt: number;
-		hAcc: number;
-		groundTerrarium: number;
-		groundMapterhorn: number;
-		eye: number;
-		lift: number;
-	}[];
-	lake: { mapterhornMin: number; terrariumMin: number };
 	peakRule: {
 		n: number;
 		nWithEle: number;
@@ -107,10 +88,6 @@ type TerrainData = {
 	};
 };
 let terrainCache: Promise<TerrainData> | null = null;
-// Rendered label sizes (11 and 13 px) for figures whose viewBox is not 1:1 with the screen:
-// fontSize = px * viewBox width / rendered width (~720 px full width, ~340 px per half column).
-const EYE_LABEL = (11 * 560) / 800;
-// solid fills encode the two ground models (Mapterhorn brown, Terrarium pencil grey); a light hatch rides on top as decoration only
 
 function useTerrainData() {
 	const [d, setD] = useState<TerrainData | null>(null);
@@ -151,222 +128,7 @@ function link(id: string, label: string) {
 	);
 }
 
-function RealEye({ d }: { d: TerrainData | null }) {
-	if (!d)
-		return (
-			<div className="aspect-[2/1] animate-pulse bg-[var(--gb-paper-deep)]" />
-		);
-	const rows = d.eyes.map((e) => ({
-		...e,
-		liftT: Math.max(0, e.groundTerrarium + EYE_ABOVE - e.alt),
-		liftM: Math.max(0, e.groundMapterhorn + EYE_ABOVE - e.alt),
-	}));
-	const MAX = 30;
-	const RH = 22;
-	const X0 = 74;
-	const X1 = 330;
-	const bx = (v: number) => X0 + (Math.min(v, MAX) / MAX) * (X1 - X0);
-	const nM = rows.filter((r) => r.liftM > 0).length;
-	const nT = rows.filter((r) => r.liftT > 0).length;
-	const med = (a: number[]) => {
-		const s = [...a].sort((x, y) => x - y);
-		return s[Math.floor(s.length / 2)];
-	};
-	const liftsM = rows
-		.filter((r) => r.liftM > 0 && r.liftT <= MAX)
-		.map((r) => r.liftM);
-	return (
-		<Figure
-			label="Fig. 4"
-			bleed
-			caption={
-				<>
-					The same GPS fix lifts the camera by different amounts on two terrain
-					models.{" "}
-					<Measured d={d} what="the eye rule on the 12 Niederhorn photos." />
-				</>
-			}
-		>
-			<svg
-				viewBox={`0 0 560 ${40 + rows.length * RH + 24}`}
-				className="block h-auto w-full"
-				role="img"
-				aria-label="Metres each demo photo's camera is lifted, Terrarium vs Mapterhorn"
-			>
-				{[0, 10, 20, 30].map((v) => (
-					<g key={v}>
-						<PenLine
-							seed={`eye-grid-${v}`}
-							from={[bx(v), 28]}
-							to={[bx(v), 28 + rows.length * RH]}
-							color="faint"
-							width={0.5}
-						/>
-						<HandLabel
-							x={bx(v)}
-							y={20}
-							anchor="middle"
-							size={EYE_LABEL}
-							color="var(--gb-secondary)"
-							halo={0}
-						>
-							{v} m
-						</HandLabel>
-					</g>
-				))}
-				{rows.map((r, i) => {
-					const y = 32 + i * RH;
-					const big = r.liftT > MAX;
-					return (
-						<g key={r.id}>
-							<HandLabel
-								x={X0 - 8}
-								y={y + 11}
-								anchor="end"
-								size={EYE_LABEL}
-								color="var(--gb-secondary)"
-								halo={0}
-							>
-								{r.id}
-							</HandLabel>
-							{bx(r.liftM) - X0 > 0.5 && (
-								<g>
-									<Hachure
-										d={rectPath(X0, y, bx(r.liftM) - X0, 8)}
-										seed={`eye-m-${r.id}`}
-										color="brown"
-										gap={2.2}
-										width={0.9}
-										opacity={0.85}
-									/>
-									<PenLine
-										data
-										from={[bx(r.liftM), y - 1]}
-										to={[bx(r.liftM), y + 9]}
-										seed={`eye-m-end-${r.id}`}
-										color="brown"
-										width={1.6}
-									/>
-								</g>
-							)}
-							{bx(r.liftT) - X0 > 0.5 && (
-								<g>
-									<Hachure
-										d={rectPath(X0, y + 9, bx(r.liftT) - X0, 8)}
-										seed={`eye-t-${r.id}`}
-										color="forest"
-										angle={45}
-										gap={2.2}
-										width={0.9}
-										opacity={0.85}
-									/>
-									<PenLine
-										data
-										from={[bx(r.liftT), y + 8]}
-										to={[bx(r.liftT), y + 18]}
-										seed={`eye-t-end-${r.id}`}
-										color="forest"
-										width={1.6}
-									/>
-								</g>
-							)}
-							{big && (
-								<HandLabel
-									x={X1 + 10}
-									y={y + 12}
-									size={EYE_LABEL}
-									color="var(--gb-secondary)"
-									halo={0}
-								>
-									+{r.liftT.toFixed(0)} m (GPS {r.alt.toFixed(0)}, ground{" "}
-									{r.groundTerrarium.toFixed(0)})
-								</HandLabel>
-							)}
-							{!big && r.liftM > 0 && (
-								<HandLabel
-									x={bx(r.liftM) + 4}
-									y={y + 7}
-									size={EYE_LABEL}
-									color="var(--gb-secondary)"
-									halo={0}
-								>
-									{r.liftM.toFixed(0)}
-								</HandLabel>
-							)}
-						</g>
-					);
-				})}
-				<g>
-					<Hachure
-						d={rectPath(X0, 40 + rows.length * RH, 9, 9)}
-						seed="eye-key-m"
-						color="brown"
-						gap={2.2}
-						width={0.9}
-						opacity={0.85}
-					/>
-					<HandLabel
-						x={X0 + 14}
-						y={48 + rows.length * RH}
-						size={EYE_LABEL}
-						color="var(--gb-secondary)"
-					>
-						Mapterhorn ground
-					</HandLabel>
-					<Hachure
-						d={rectPath(X0 + 150, 40 + rows.length * RH, 9, 9)}
-						seed="eye-key-t"
-						color="forest"
-						angle={45}
-						gap={2.2}
-						width={0.9}
-						opacity={0.85}
-					/>
-					<HandLabel
-						x={X0 + 164}
-						y={48 + rows.length * RH}
-						size={EYE_LABEL}
-						color="var(--gb-secondary)"
-					>
-						Terrarium ground
-					</HandLabel>
-				</g>
-				<PencilLayer>
-					<PenLine
-						from={[X0, 28 + rows.length * RH]}
-						to={[X1, 28 + rows.length * RH]}
-						seed="eye-base-guide"
-						width={0.8}
-					/>
-				</PencilLayer>
-				<HandText x={X1 + 14} y={36 + 5 * RH} size={14} rotate={-2}>
-					finer model, higher crest: Mapterhorn lifts {nM} of {rows.length}
-				</HandText>
-				<PenArrow
-					from={[X1 + 10, 32 + 5 * RH]}
-					to={[X1 - 60, 28 + 5 * RH]}
-					seed="eye-note-arrow"
-					width={1.2}
-				/>
-			</svg>
-			<p className={`mt-3 ${TYPE.caption}`}>
-				Bar = metres the camera is lifted above the GPS altitude. Mapterhorn
-				lifts {nM} of {rows.length} photos (median {med(liftsM).toFixed(0)} m,
-				up to {Math.max(...liftsM).toFixed(0)} m; photo 09 excluded): the finer
-				model puts the crest higher than the GPS altitude. Terrarium smooths the
-				crest and lifts only {nT}. Photo 09&apos;s GPS altitude is{" "}
-				{rows.find((r) => r.id === "demo-09")?.alt.toFixed(0)} m,{" "}
-				{Math.round(
-					(rows.find((r) => r.id === "demo-09")?.groundTerrarium ?? 0) -
-						(rows.find((r) => r.id === "demo-09")?.alt ?? 0),
-				)}{" "}
-				m below the ground.
-			</p>
-		</Figure>
-	);
-}
-
-/** The shipped radius rule with the measured example substituted; the dashed square in Fig. 3 is this r. */
+/** The shipped radius rule with the measured example substituted; the dashed square in Fig. 2 is this r. */
 function SnapEquation({ d }: { d: TerrainData | null }) {
 	const ex = d?.snapExample;
 	return (
@@ -410,7 +172,7 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 	const snapLabel = (13 * ex.px) / 420;
 	return (
 		<Figure
-			label="Fig. 3"
+			label="Fig. 2"
 			bleed
 			caption={
 				<>
@@ -622,49 +384,42 @@ const LEDGER: {
 	what: string;
 	verb: "snap" | "bound" | "prior" | "calibrate";
 	rule: string;
-	where: string;
 	when: string;
 }[] = [
 	{
 		what: "Eye height",
 		verb: "snap",
 		rule: "higher of GPS altitude and ground + 1.6 m; ground + 1.8 m without altitude",
-		where: "src/lib/deck/scene.ts",
 		when: "always",
 	},
 	{
 		what: "OSM peaks",
 		verb: "snap",
 		rule: "highest of 9×9 samples in a search square",
-		where: "src/lib/deck/engine.ts",
 		when: "always (150 m – 110 km)",
 	},
 	{
 		what: "Eye on a lake",
 		verb: "bound",
 		rule: "never below lake level + 0.3 m; only lifts",
-		where: "src/lib/geocam/lakes/floor.ts",
 		when: "optional",
 	},
 	{
 		what: "GPS altitude",
 		verb: "prior",
 		rule: "soft hint around where ground + 1.6 m matches the altitude; never moves the fix",
-		where: "src/lib/concord/priors/altitude.ts",
 		when: "optional",
 	},
 	{
 		what: "Near-field depth",
 		verb: "calibrate",
 		rule: "curve fitted to terrain distance, 15 m to 3 km, used only when it fits well",
-		where: "src/lib/nearfield/anchor.ts",
 		when: "Step Inside",
 	},
 	{
 		what: "Near-field objects",
 		verb: "snap",
 		rule: "scale each object to the terrain distance at its ground contacts",
-		where: "src/lib/nearfield/ground.ts",
 		when: "Step Inside",
 	},
 ];
@@ -755,22 +510,6 @@ function Hero({ d }: { d: TerrainData | null }) {
 					</g>
 				)}
 			</RealPhoto>
-			<MarkList
-				items={[
-					<>
-						<strong className="gb-ink">The camera</strong> stays above ground.{" "}
-						{link("eye-rule", "Eye rule")}
-					</>,
-					<>
-						<strong className="gb-ink">Peaks</strong> move to the highest nearby
-						terrain point. {link("peak", "Peak")}
-					</>,
-					<>
-						<strong className="gb-ink">Depth</strong> is fitted to distances
-						from the terrain. {link("dem-anchoring", "DEM anchoring")}
-					</>,
-				]}
-			/>
 		</Figure>
 	);
 }
@@ -940,7 +679,6 @@ function MiniPrior() {
 export default function Page({ node }: { node: GipfelbuchNode }) {
 	void node;
 	const d = useTerrainData();
-	const gaps = d?.eyes.map((e) => e.groundMapterhorn - e.groundTerrarium);
 	return (
 		<>
 			<Hero d={d} />
@@ -977,24 +715,40 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					steps={[
 						{
 							title: "Snap",
-							body: "The terrain is clearly more accurate, so the value is moved onto it. Peaks work this way.",
+							body: (
+								<>
+									The terrain is clearly more accurate, so the value is moved
+									onto it. OSM peaks move onto the terrain summit before the
+									visibility test. {link("peak", "Peak")}
+								</>
+							),
 							visual: <MiniSnap />,
 						},
 						{
 							title: "Bound",
-							body: "The terrain only rules out some values, so it sets a limit: the camera stays above the lake.",
+							body: (
+								<>
+									The terrain only rules out some values, so it sets a limit:
+									the camera stays at least standing height above the ground and
+									above a lake. {link("eye-rule", "Eye rule")}
+								</>
+							),
 							visual: <MiniBound />,
 						},
 						{
 							title: "Hint",
-							body: "The sensor value is still informative, so GPS altitude is used only as a hint.",
+							body: (
+								<>
+									Depth from one photo has no scale, so terrain distances
+									suggest one; it is used only when the fit is good.{" "}
+									{link("dem-anchoring", "DEM anchoring")}
+								</>
+							),
 							visual: <MiniPrior />,
 						},
 					]}
 				/>
 			</Beat>
-
-			<PhotoStory number="Fig. 2" title="Peak names move onto their summits" />
 
 			<Beat
 				kicker="Peaks"
@@ -1005,7 +759,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					real top. We search a square around the OSM point, wider for far
 					peaks, and move the peak to the{" "}
 					<HandMark type="underline">highest terrain point</HandMark>. In Fig.
-					3: <CircledNumber value={1} color="ink" seed="ts-p-n1" /> OSM point,{" "}
+					2: <CircledNumber value={1} color="ink" seed="ts-p-n1" /> OSM point,{" "}
 					<CircledNumber value={2} seed="ts-p-n2" /> summit.
 					<MarginNote mark="b">
 						Why 9 by 9? That is enough samples to find the crest inside the
@@ -1022,123 +776,28 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="The result depends on which terrain model is used."
 			>
 				<p>
-					Two terrain models put the same spot at different heights. The camera
-					lift changes with them.{" "}
+					Two terrain models put the same spot at different heights, so every
+					snap moves with the model: see {link("dem-source", "Terrain model")}.{" "}
 					<HandMark type="double">
 						Treating a hint as a snap would discard the sensor measurement.
 					</HandMark>
-					<MarginNote mark="c">
-						Which model is right? Neither gives the true camera height, so we
-						cannot tell which lift is correct.
-					</MarginNote>
 				</p>
-				{gaps && (
-					<p>
-						<HandMark type="strike">
-							Both models give the same ground height.
-						</HandMark>{" "}
-						<span
-							className="nb-hand"
-							style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
-						>
-							{`They differ by ${Math.round(Math.min(...gaps))} to ${Math.round(Math.max(...gaps))} m.`}
-						</span>
-					</p>
-				)}
 			</Beat>
-
-			<RealEye d={d} />
-
-			<Numbers
-				items={[
-					{
-						value: d ? `${d.peakRule.medianMoveMapterhorn} m` : "…",
-						label: `median peak move (${d?.peakRule.n ?? "…"} named peaks within 40 km)`,
-					},
-					{
-						value: d ? `${d.peakRule.p90MoveMapterhorn} m` : "…",
-						label: "90th-percentile peak move",
-					},
-					{
-						value: gaps
-							? `${Math.round(Math.min(...gaps))} to ${Math.round(Math.max(...gaps))} m`
-							: "…",
-						label: "ground height of the two models at the same 12 GPS fixes",
-					},
-					{
-						value: "0.13",
-						label:
-							"median depth error after anchoring, in log units (about 14%), 23 photos; one scale gives 0.34",
-					},
-				]}
-				source="Peaks and ground: Mapterhorn and Terrarium. Depth: 23 test photos."
-			/>
 
 			<Details>
 				<h3>Every place a coordinate is matched to the terrain</h3>
 				<Ledger />
-				<h3>Eye height</h3>
+				<h3>Peak snap in code</h3>
 				<p>
-					The camera keeps the GPS altitude unless it is below standing height
-					over the terrain, then uses ground + 1.6 m; with no altitude it uses
-					ground + 1.8 m. It only ever lifts, so a barometer-aided altitude
-					above the ground survives. Over Lake Thun the terrain&apos;s flat
-					water cells read {d?.lake.terrariumMin ?? "…"} m (Terrarium) and{" "}
-					{d?.lake.mapterhornMin ?? "…"} m (Mapterhorn), so the lake bound is a
-					fixed level + 0.3 m rather than the model value. One metre of camera
-					height moves a ridge 500 m away by about 0.11°, about 6 px in a 4000
-					px frame at 26 mm equivalent. Near a summit the horizontal fix can
-					land up-slope and ground + 1.6 m then puts the camera 5 to 20 m too
-					high; an optional prior treats the altitude as a measurement and never
-					snaps.
-				</p>
-				<p>
-					The frame&apos;s origin matters too: a solver that projects from sea
-					level instead of the camera&apos;s real height is off by about 3° of
-					pitch and roll.
-				</p>
-				<h3>Peaks</h3>
-				<p>
-					<code>buildPeaks</code> moves every peak between 150 m and 110 km to{" "}
-					<code>localMax</code>: the highest of a 9×9 grid of DEM samples
-					spanning ±r around the node, <code>r = min(250, 60 + 0.004·d)</code>{" "}
-					metres. The radius grows 4 m per kilometre, from 60 m near the camera
-					to the 250 m cap at 47.5 km. The search starts at the node's own
-					height, so a sample must be strictly higher to win. Visibility tests
-					against the DEM need the peak on the terrain, not floating.
-				</p>
-				<h3>Near-field depth</h3>
-				<p>
-					{link("dem-anchoring", "DEM anchoring")} fits a monotone log-log curve
-					from model ray length to DEM range over terrain pixels between 15 m
-					and 3 km (sky and people masked), by dynamic programming under a
-					truncated L1 loss. Quality is{" "}
-					<code>inlierFrac · exp(−(err/0.2)²)</code>; below 0.35 the view is low
-					trust, below 0.15 hidden. Neither is a pose check. Each object is then
-					scaled to the DEM range where it touches the terrain.
-				</p>
-				<h3>Curvature</h3>
-				<p>
-					{link("curvature-refraction", "Curvature and refraction")} lower every
-					DEM sample by <code>d² / (2 R_eff)</code>,{" "}
-					<code>R_eff = R / (1 − 0.13)</code>: under a metre at 3 km, about 680
-					m at 100 km.
-				</p>
-				<p>
-					<strong>Rule.</strong> Snap only values the DEM knows better than the
-					sensor does. A lake level only rules out the water below it, so it is
-					a bound. A GPS altitude is still evidence, so it stays a prior.
+					<code>buildPeaks</code> moves every peak between 150 m and 110 km to{" "}
+					<code>localMax</code>. The radius grows 4 m per kilometre, from 60 m
+					near the camera to the 250 m cap at 47.5 km. The search starts at the
+					node&apos;s own height, so a sample must be strictly higher to win.
 				</p>
 				<div className="flex flex-wrap gap-2">
 					<CodeRef path="src/lib/deck/engine.ts" />
-					<CodeRef path="src/lib/deck/scene.ts" />
-					<CodeRef path="src/lib/dem/height-from-tile.ts" />
-					<CodeRef path="src/lib/geo/horizon.ts" />
-					<CodeRef path="src/lib/geocam/lakes/floor.ts" />
 					<CodeRef path="src/lib/concord/priors/altitude.ts" />
-					<CodeRef path="src/lib/nearfield/anchor.ts" />
 					<CodeRef path="src/lib/nearfield/ground.ts" />
-					<CodeRef path="src/lib/nearfield/near-dem.ts" />
 				</div>
 			</Details>
 		</>

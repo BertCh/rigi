@@ -30,14 +30,12 @@ export const CHAPTERS: readonly TafelChapter[] = [
 			"The phone's compass is often off by a few degrees. These sheets measure the skyline in the photo, compute the skyline from the terrain model, and shift one to match the other.",
 		ids: [
 			"photo",
-			"camera-prior",
 			"skyline",
 			"dem-horizon",
 			"viewport-inference",
 			"pose-estimate",
 			"accept-rule",
 			"tap-a-peak",
-			"baseline-pipeline",
 		],
 		fieldNote: (d) =>
 			`compass ${d.sensor.heading.toFixed(1)}° · terrain ${d.solved.yaw.toFixed(1)}° · ${d.solved.accepted ? "accepted at" : "refused at"} ${d.solved.confidence.toFixed(2)}`,
@@ -49,7 +47,6 @@ export const CHAPTERS: readonly TafelChapter[] = [
 			"GPS height and the terrain model often disagree. These sheets tie the camera height, the summits and the depth to the terrain model.",
 		ids: [
 			"dem-source",
-			"terrain-sampler",
 			"eye-rule",
 			"peak",
 			"terrain-snapping",

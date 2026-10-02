@@ -309,6 +309,13 @@ export function groupByRel(
 
 export const gipfelbuchHref = (id: string) => `/gipfelbuch/${id}`;
 
+/** Sheets merged into another (consolidation 2026-10-02): old URLs redirect to the sheet that absorbed them. */
+export const MERGED_SHEETS: Readonly<Record<string, string>> = {
+	"baseline-pipeline": "viewport-inference",
+	"camera-prior": "photo",
+	"terrain-sampler": "dem-source",
+};
+
 /**
  * Transitive lineage of a sheet along the curated edges, in edge direction: `downstream` is every
  * sheet reached by following `related` edges from `id`, `upstream` every sheet that reaches `id`.

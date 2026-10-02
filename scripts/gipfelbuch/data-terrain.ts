@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 /**
- * Real DEM facts for the gipfelbuch pages terrain-snapping, terrain-sampler, dem-source and dem-anchoring.
+ * Real DEM facts for the gipfelbuch pages terrain-snapping, dem-source and dem-anchoring.
  *
  *   npx tsx scripts/gipfelbuch/data-terrain.ts
  *

@@ -40,19 +40,16 @@ export const NOTEBOOK_ENTRIES: NotebookEntry[] = [
 		question: "Which way was the camera pointing?",
 		groups: ["solve", "capture", "evidence"],
 		steps: [
-			{ id: "photo", label: "Photo" },
-			{ id: "camera-prior", label: "Phone's guess" },
+			{ id: "photo", label: "Photo and phone's guess" },
 			{ id: "skyline", label: "Photo skyline" },
 			{
-				id: "baseline-pipeline",
-				label: "Horizon match",
+				id: "pose-estimate",
+				label: "Solved pose",
 				needs: [
-					{ id: "dem-horizon", what: "the modelled horizon" },
-					{ id: "camera-prior", what: "the initial estimate" },
+					{ id: "dem-horizon", what: "the modelled horizon it is matched to" },
 				],
 			},
 			{ id: "accept-rule", label: "Accept or refuse" },
-			{ id: "pose-estimate", label: "Solved pose" },
 			{ id: "tap-a-peak", label: "Tap-a-peak", fallback: true },
 		],
 	},
@@ -63,8 +60,7 @@ export const NOTEBOOK_ENTRIES: NotebookEntry[] = [
 		question: "Where does the camera sit on the terrain?",
 		groups: ["world", "camera", "nearfield"],
 		steps: [
-			{ id: "dem-source", label: "Height tiles" },
-			{ id: "terrain-sampler", label: "Ground height" },
+			{ id: "dem-source", label: "Height tiles and ground height" },
 			{ id: "eye-rule", label: "Camera height" },
 			{
 				id: "dem-horizon",

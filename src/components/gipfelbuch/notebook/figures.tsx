@@ -227,7 +227,7 @@ export function SkylineSketch({ data }: { data: GipfelbuchPhotoData }) {
 		},
 		{
 			rows: data.priorRows,
-			step: "camera-prior",
+			step: "photo",
 			text: "phone's guess",
 			color: "blue" as InkColor,
 		},
@@ -421,7 +421,7 @@ export function MissSketch({ data }: { data: GipfelbuchPhotoData }) {
 		>
 			<Circled
 				at={[16, 22]}
-				step="baseline-pipeline"
+				step="pose-estimate"
 				size={17}
 				seed={`${data.id}-miss-step`}
 			/>

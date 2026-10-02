@@ -4,30 +4,12 @@
 
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CircledKey } from "#/components/gipfelbuch/notebook/carto";
-import {
-	Hachure,
-	HandText,
-	type InkColor,
-	inkColor,
-	PenArrow,
-	PenLine,
-	SketchPath,
-} from "#/components/gipfelbuch/notebook/Ink";
-import {
-	HandMark,
-	PencilLayer,
-	Wash,
-} from "#/components/gipfelbuch/notebook/marks";
+import { HandMark } from "#/components/gipfelbuch/notebook/marks";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
-import { SWISS } from "#/components/gipfelbuch/swiss/inks";
 import {
 	CodeRef,
 	Figure,
 	type GipfelbuchPhotoData,
-	HandLabel,
-	HandRange,
-	LAYER_STYLE,
 	LiveHowItWorks,
 	MarginNote,
 	Measured,
@@ -38,371 +20,20 @@ import {
 } from "#/components/gipfelbuch/viz";
 import {
 	Beat,
-	Compare,
 	Details,
 	Gallery,
 	Numbers,
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
-import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
-import {
-	type BeatSpec,
-	buildTimeline,
-	ease,
-	rampAt,
-	useBeatClock,
-} from "#/components/gipfelbuch/viz/motion";
-import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
-import { horizonEl, SCENE } from "#/components/gipfelbuch/viz/scene";
 import { byId, gipfelbuchHref, groupColor } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Rigi, the whole story on one page: photo in, pose out, what you get.
 // Real data: the 12 Niederhorn photos (scripts/gipfelbuch/build-data.ts). Numbers quoted without measurement come
 // from reports/status.md (eval-app 12/14, 0 false accepts) and reports/test-results.md (17/17 HIGH).
-// The synthetic registration figure and the stage map live in Details.
+// The stage map lives in Details.
 
-/* ───────── Hero: the registration, made visible ───────── */
-
-const W = 800;
-const H = 330;
-// SVG labels land on the type scale at ~720 px rendered width (viewBox W units per rendered px).
-const LABEL_SMALL = (11 * W) / 720;
-const LABEL = (13 * W) / 720;
-
-const BASE = 262;
-const PX_PER_DEG = 13;
-
-/**
- * Vertical exaggeration of the ridge: demo-09's real horizon has 1 to 5° of relief, which at 13 px per degree
- * would be a flat line, so heights are drawn x3 (a pencil note says so). Bearings are true to scale.
- */
-const VEX = 3;
-const SOLVED_YAW = SCENE.solved.yaw;
-/** The bearing at horizontal px `x` of the frame, as the solved pose sees it. */
-const azAt = (x: number) => SOLVED_YAW + (x - W / 2) / PX_PER_DEG;
-/** The real DEM horizon in px above BASE at horizontal px `x`, or null outside the baked bearings. */
-function ridgeAt(x: number): number | null {
-	const el = horizonEl(azAt(x));
-	return el == null ? null : el * PX_PER_DEG * VEX;
-}
-const ridge = (x: number) => ridgeAt(x) ?? 0;
-const REG_RELIEF = (() => {
-	let lo = Infinity;
-	let hi = -Infinity;
-	for (let x = 0; x <= W; x += 4) {
-		const el = horizonEl(azAt(x));
-		if (el == null) continue;
-		lo = Math.min(lo, el);
-		hi = Math.max(hi, el);
-	}
-	return [lo, hi] as const;
-})();
-const REG_START_OFF = 3.4;
-const REG_CAPTION = `Real mountains (demo-09, the landing photo), synthetic camera. The ridge is that photo's DEM horizon, bearings ${azAt(0).toFixed(0)}° to ${azAt(W).toFixed(0)}° at ${PX_PER_DEG} px per degree, relief ${REG_RELIEF[0].toFixed(1)} to ${REG_RELIEF[1].toFixed(1)}° drawn ×${VEX}. The candidate starts ${REG_START_OFF}° off, about ${Math.round(REG_START_OFF * PX_PER_DEG)} px. Within 1° counts as aligned.`;
-
-// The story plays once: a candidate pose 3.4° off, the solve closes the gap, the lines coincide.
-const REG_BEATS: BeatSpec[] = [
-	{ id: "guess", kind: "setup", dwell: 2000, label: "candidate 3.4° off" },
-	{ id: "converge", kind: "change", dwell: 2600, label: "solve" },
-	{ id: "accepted", kind: "result", dwell: 4500, label: "accepted" },
-];
-const REG_TL = buildTimeline(REG_BEATS);
-const REG_SUMMITS = [...SCENE.peaks]
-	.sort((a, b) => b.ele - a.ele)
-	.flatMap((p) => {
-		const x = W / 2 + (p.az - SOLVED_YAW) * PX_PER_DEG;
-		const el = horizonEl(p.az) ?? p.el;
-		return [
-			{
-				u: x / W,
-				row: (BASE - el * PX_PER_DEG * VEX) / H,
-				name: p.name,
-				sub: `${p.ele} m · ${p.km} km`,
-			},
-		];
-	});
-
-function path(offsetPx: number, close = false): string {
-	let d = "";
-	for (let x = 0; x <= W; x += 4) {
-		const y = BASE - ridge(x - offsetPx);
-		d += `${x === 0 ? "M" : "L"}${x},${y.toFixed(1)}`;
-	}
-	return close ? `${d}L${W},${BASE}L0,${BASE}Z` : d;
-}
-
-function Registration() {
-	const clock = useBeatClock<HTMLDivElement>(REG_BEATS);
-	const [manual, setManual] = useState<number | null>(null);
-
-	// once: the candidate holds 3.4° off, then eases to the solved pose
-	const auto =
-		REG_START_OFF *
-		(1 - rampAt(REG_TL, clock.ms, "converge", 0, 2600, ease.out));
-	const off = manual ?? auto;
-	const px = off * PX_PER_DEG;
-	const ok = Math.abs(off) <= 1;
-	const resid = Math.abs(off) * PX_PER_DEG;
-	const tone: InkColor = ok ? "forest" : "red";
-	const photoPath = useMemo(() => path(0), []);
-	const rockPath = useMemo(() => path(0, true), []);
-	const candidatePath = path(px);
-	// Residual: the band between the two skylines, as a filled translucent area.
-	let residual = "";
-	for (let x = 0; x <= W; x += 4)
-		residual += `${x === 0 ? "M" : "L"}${x},${(BASE - ridge(x)).toFixed(1)}`;
-	for (let x = W; x >= 0; x -= 4)
-		residual += `L${x},${(BASE - ridge(x - px)).toFixed(1)}`;
-	residual += "Z";
-
-	return (
-		<div ref={clock.ref}>
-			{/* the same ridge runs on past the frame, and the DEM line slides with it */}
-			<SketchSpill
-				seed="rigi-registration"
-				bearing={(u) => SOLVED_YAW + (u * W - W / 2) / PX_PER_DEG}
-				label={(deg) => `${Math.round(deg)}°`}
-				summits={REG_SUMMITS}
-				reveal={manual !== null && Math.abs(off) > 1 ? 0.3 : 1}
-				ridges={[
-					{
-						at: (u) => {
-							const r = ridgeAt(u * W);
-							return r == null ? null : (BASE - r) / H;
-						},
-						color: SWISS.ink,
-						width: 1.8,
-						depth: true,
-					},
-					{
-						at: (u) => {
-							const r = ridgeAt(u * W - px);
-							return r == null ? null : (BASE - r) / H;
-						},
-						color: LAYER_INKS.solved.paper,
-						width: 1.8,
-						opacity: 0.8,
-					},
-				]}
-			>
-				<div className="relative overflow-hidden">
-					<svg
-						viewBox={`0 0 ${W} ${H}`}
-						className="block h-auto w-full"
-						role="img"
-						aria-label="A photographed skyline and the DEM horizon being aligned"
-					>
-						<g data-layer="ground">
-							{/* pencil construction: the guide lines the ridge was laid out on */}
-							<PencilLayer>
-								<PenLine
-									seed="rigi-guide-top"
-									from={[0, BASE - 150]}
-									to={[W, BASE - 150]}
-									color="pencil"
-									width={0.8}
-								/>
-								<PenLine
-									seed="rigi-guide-mid"
-									from={[0, BASE - 92]}
-									to={[W, BASE - 92]}
-									color="pencil"
-									width={0.8}
-								/>
-								{[1, 3, 5, 7, 9, 11].map((i) => (
-									<PenLine
-										key={`guide-${i}`}
-										seed={`rigi-guide-v${i}`}
-										from={[40 + i * 60, BASE - 150]}
-										to={[40 + i * 60, BASE]}
-										color="pencil"
-										width={0.7}
-									/>
-								))}
-							</PencilLayer>
-							<Hachure
-								d={rockPath}
-								seed="rigi-rock"
-								color="pencil"
-								angle={-45}
-								gap={7}
-								opacity={0.3}
-								width={0.7}
-							/>
-						</g>
-						<g data-layer="derived">
-							{/* the residual band: a wash, red when off, forest when within 1 degree */}
-							<Wash
-								d={residual}
-								seed="rigi-residual"
-								color={tone}
-								opacity={0.12}
-							/>
-							<SketchPath
-								d={candidatePath}
-								seed="rigi-candidate"
-								data
-								color={LAYER_STYLE.solved.color}
-								width={2.8}
-							/>
-						</g>
-						{/* measured lines stay on their pixels: one pen pass each */}
-						<g data-layer="measured">
-							<SketchPath
-								d={photoPath}
-								seed="rigi-photo-skyline"
-								data
-								color="ink"
-								width={2.2}
-							/>
-						</g>
-						<g data-layer="notes">
-							{["Schreckhorn", "Eiger", "Mönch"].map((name) => {
-								const sp = SCENE.peaks.find((q) => q.name === name);
-								if (!sp) return null;
-								const x = W / 2 + (sp.az - SOLVED_YAW) * PX_PER_DEG;
-								return (
-									<HandLabel
-										key={name}
-										x={x}
-										y={BASE - ridge(x) - 8}
-										anchor="middle"
-										size={LABEL_SMALL}
-										color="var(--gb-secondary)"
-									>
-										{name}
-									</HandLabel>
-								);
-							})}
-							<HandText x={16} y={72} size={14} color="pencil">
-								{`vertical ×${VEX}: the real relief is only a few degrees`}
-							</HandText>
-						</g>
-						{/* ground strip: the DEM-side readout */}
-						<PenLine
-							seed="rigi-base"
-							from={[0, BASE]}
-							to={[W, BASE]}
-							color="pencil"
-							width={1.2}
-						/>
-						{/* degree ruler */}
-						{Array.from({ length: 13 }, (_, i) => {
-							const x = 40 + i * 60;
-							return (
-								<g key={x}>
-									<PenLine
-										seed={`rigi-tick-${i}`}
-										from={[x, BASE]}
-										to={[x, BASE + (i % 2 ? 5 : 9)]}
-										color="pencil"
-										width={1}
-									/>
-									{i % 2 === 0 && (
-										<HandLabel
-											x={x}
-											y={BASE + 22}
-											anchor="middle"
-											size={LABEL_SMALL}
-											color={inkColor("faint")}
-										>
-											{`${Math.round(azAt(x))}°`}
-										</HandLabel>
-									)}
-								</g>
-							);
-						})}
-						{/* legend */}
-						<PenLine
-							seed="rigi-key-photo"
-							from={[16, 22]}
-							to={[40, 22]}
-							color="ink"
-							width={2.2}
-						/>
-						<HandLabel x={48} y={27} size={LABEL} color="var(--gb-secondary)">
-							skyline in the photo
-						</HandLabel>
-						<PenLine
-							seed="rigi-key-dem"
-							from={[16, 42]}
-							to={[40, 42]}
-							color={LAYER_STYLE.solved.color}
-							width={2.8}
-						/>
-						<HandLabel x={48} y={47} size={LABEL} color="var(--gb-secondary)">
-							horizon at the tried pose
-						</HandLabel>
-						{/* verdict */}
-						<HandLabel
-							x={W - 16}
-							y={27}
-							size={LABEL}
-							anchor="end"
-							color={tone === "forest" ? "var(--gb-forest)" : "var(--gb-red)"}
-						>
-							{ok ? "within 1°: show the pose" : "off: do not show the pose"}
-						</HandLabel>
-						<HandLabel
-							x={16}
-							y={H - 10}
-							size={LABEL}
-							color="var(--gb-secondary)"
-						>
-							yaw error {off.toFixed(2)}° ≈ {resid.toFixed(0)} px at this field
-							of view
-						</HandLabel>
-						{/* hand notes with leaders */}
-						<HandText x={470} y={92} size={19} color="pencil" rotate={-2}>
-							the gap between the lines is the error
-						</HandText>
-						<PenArrow
-							seed="rigi-note-band"
-							from={[560, 100]}
-							to={[600, BASE - ridge(600) - 6]}
-							color="pencil"
-							width={1.1}
-						/>
-						<HandText x={300} y={H - 12} size={19} color="pencil" rotate={1.5}>
-							{ok ? "lines coincide: accepted ✓" : "a 3° error is a large gap"}
-						</HandText>
-						<CircledKey x={W - 30} y={62} value={1} seed="rigi-key-1" />
-					</svg>
-				</div>
-			</SketchSpill>
-			<div className="mt-4 flex min-w-0 max-w-full flex-wrap items-center gap-3 font-mono text-[13px] gb-secondary">
-				<div className="flex min-w-0 flex-1 items-center gap-3">
-					<span className="shrink-0">yaw error</span>
-					<HandRange
-						value={off}
-						min={-4}
-						max={4}
-						step={0.05}
-						label="Yaw error in degrees"
-						onChange={setManual}
-					/>
-				</div>
-				<button
-					type="button"
-					onClick={() => {
-						setManual(null);
-						clock.play();
-					}}
-					disabled={manual === null && clock.playing}
-					className="bg-[var(--gb-paper-deep)] px-3 py-1 text-[var(--gb-ink)] hover:brightness-95 disabled:opacity-60"
-				>
-					{manual !== null
-						? "resume solve"
-						: clock.playing
-							? "auto-solving"
-							: "replay solve"}
-				</button>
-			</div>
-		</div>
-	);
-}
 /* ───────── Constellation: the subsystems, by stage ───────── */
 
 interface Stage {
@@ -416,19 +47,13 @@ const STAGES: Stage[] = [
 		key: "capture",
 		label: "1 · Capture",
 		blurb: "The photo and the sensor data the phone recorded with it.",
-		ids: ["photo", "camera-prior", "dem-source", "terrain-sampler"],
+		ids: ["photo", "dem-source"],
 	},
 	{
 		key: "solve",
 		label: "2 · Solve",
 		blurb: "Match the skyline in the photo to the horizon from terrain.",
-		ids: [
-			"viewport-inference",
-			"skyline",
-			"dem-horizon",
-			"baseline-pipeline",
-			"pose-estimate",
-		],
+		ids: ["viewport-inference", "skyline", "dem-horizon", "pose-estimate"],
 	},
 	{
 		key: "judge",
@@ -531,43 +156,6 @@ function HeroStages() {
 	);
 }
 
-/** Wipe between the phone's guess and the solved pose, pixel-aligned. */
-function GuessVsSolved() {
-	const d = useGipfelbuchPhoto("demo-03");
-	const crop = useMemo(() => (d ? skylineBand(d, 360) : undefined), [d]);
-	return (
-		<Figure
-			label="Fig. 2"
-			bleed
-			caption={
-				<>
-					{d
-						? `Dragging across, the median gap to the skyline falls from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} pixels.`
-						: "Drag to compare."}{" "}
-					<Measured data={d} />
-				</>
-			}
-		>
-			<Compare
-				beforeLabel="phone's guess"
-				afterLabel="solved"
-				start={0.5}
-				before={
-					<RealPhoto bleed data={d} layers={["skyline", "prior"]} crop={crop} />
-				}
-				after={
-					<RealPhoto
-						bleed
-						data={d}
-						layers={["skyline", "solved"]}
-						crop={crop}
-					/>
-				}
-			/>
-		</Figure>
-	);
-}
-
 /** Crop to the ridge itself so foreground people stay out, except where a head on the skyline is the point. */
 function tightBand(d: GipfelbuchPhotoData): [number, number, number, number] {
 	if (["demo-07", "demo-11", "demo-12"].includes(d.id))
@@ -648,7 +236,7 @@ function Outcomes() {
 function Twelve() {
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 3"
 			bleed
 			caption="The same search on all 12 photos, solved horizon drawn on each. The two with a person in frame are marked ask."
 		>
@@ -704,17 +292,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
-			<GuessVsSolved />
-
-			<Beat kicker="Watch it solve" title="The solve in six steps.">
-				<p>
-					One real photo, shown in six steps. Afterwards, drag the terrain line
-					to see how the match changes.
-				</p>
-			</Beat>
-
 			<LiveHowItWorks
-				number="Fig. 3"
+				number="Fig. 2"
 				caption="The six steps of one real solve. Drag the terrain line."
 			/>
 
@@ -773,25 +352,19 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<h3>How it fits</h3>
 				<p>
 					The <A id="photo">photo</A> arrives with sensor metadata that becomes
-					a <A id="camera-prior">camera prior</A>: an estimate that the solve
-					then corrects. That prior seeds{" "}
-					<A id="viewport-inference">viewport inference</A>, which compares the{" "}
-					<A id="skyline">skyline</A> found in the photo with the{" "}
-					<A id="dem-horizon">horizon</A> predicted from terrain, in the
-					browser, on the GPU where available (
-					<A id="baseline-pipeline">baseline pipeline</A>
-					). Around the solve, <A id="terrain-snapping">terrain snapping</A>{" "}
-					pins the camera position (<A id="eye-rule">eye rule</A>), summits (
-					<A id="peak">peaks</A>) and depth (
-					<A id="dem-anchoring">DEM anchoring</A>) to the ground. The{" "}
+					a camera prior: an estimate that the solve then corrects. That prior
+					seeds <A id="viewport-inference">viewport inference</A>, which
+					compares the <A id="skyline">skyline</A> found in the photo with the{" "}
+					<A id="dem-horizon">horizon</A> predicted from the{" "}
+					<A id="dem-source">terrain model</A>, in the browser, on the GPU where
+					available. Around the solve,{" "}
+					<A id="terrain-snapping">terrain snapping</A> pins the camera position
+					(<A id="eye-rule">eye rule</A>), summits (<A id="peak">peaks</A>) and
+					depth (<A id="dem-anchoring">DEM anchoring</A>) to the ground. The{" "}
 					<A id="accept-rule">accept rule</A> decides what is safe to show;
 					about a fifth of tested photos are accepted automatically.{" "}
 					<A id="tap-a-peak">Tapping a peak</A> is the manual way to set a pose.
 				</p>
-				<h3>Schematic: aligning the lines</h3>
-				<Figure label="Fig. D1" caption={REG_CAPTION} pinned={SCENE.id} bleed>
-					<Registration />
-				</Figure>
 				<h3>Parts, by stage</h3>
 				<Constellation accent={accent} />
 				<h3>Code</h3>

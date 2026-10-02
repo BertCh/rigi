@@ -23,11 +23,9 @@ import {
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
-	Callout,
 	Eq,
 	Figure,
 	Frac,
-	type GipfelbuchIndex,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
 	HandLabel,
@@ -38,7 +36,6 @@ import {
 	RealPhoto,
 	Section,
 	Stat,
-	Steps,
 	Sym,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
@@ -69,7 +66,7 @@ import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 const BAD = "var(--gb-red)";
 
 // ---------------------------------------------------------------------------------------------
-// Fig. 2: twelve real decisions (scripts/gipfelbuch/build-data.ts on the Niederhorn demo photos)
+// Fig. 1: the score factors on the real demo photos (scripts/gipfelbuch/build-data.ts)
 // ---------------------------------------------------------------------------------------------
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 /** The factors of solvePose's confidence (src/lib/geo/solve.ts fineStage), recomputed from the stored fields. */
@@ -102,28 +99,9 @@ function solveFactors(d: GipfelbuchPhotoData) {
 	return { tilt, f, product: tilt * f.reduce((a, b) => a * b.v, 1) };
 }
 
-const PEOPLE_FREE = new Set(["demo-01", "demo-02", "demo-03", "demo-06"]);
-/** Occlusion is the point on the rejected photos; the others are cropped to the skyline band. */
-const FULL_FRAME = new Set(["demo-07", "demo-11", "demo-12"]);
-function bandCrop(d: GipfelbuchPhotoData): [number, number, number, number] {
-	const ys = d.skyline.rows.filter((v): v is number => v != null);
-	const W = d.photo.width;
-	const y0 = Math.max(0, Math.min(...ys) - 60);
-	const y1 = Math.min(d.photo.height, Math.max(...ys) + 60);
-	return [0, y0, W, Math.max(y1, y0 + W * 0.4)];
-}
-
 /** Pill-less hand button: selected is a paper tint with a wavy red underline (state only). */
 const handButton = (on: boolean) =>
 	`nb-hand ${TYPE.body} px-3 py-0.5 transition ${on ? "bg-[var(--gb-paper-deep)] text-[var(--gb-ink)] underline decoration-[var(--gb-red)] decoration-wavy underline-offset-4" : "gb-secondary hover:text-[var(--gb-ink)]"}`;
-
-/** Solid ink fills for value-carrying bars; hatch rides on top as decoration only. */
-const INK_FILL = {
-	forest: "var(--gb-forest)",
-	red: "var(--gb-red)",
-	blue: "var(--gb-water)",
-	brown: "var(--gb-sign)",
-} as const;
 
 /** A solid bar with a light hatch on top. The width is a clip-path transition, so the strokes never re-roll while it animates. */
 function HandBar({
@@ -191,231 +169,8 @@ function HandBar({
 	);
 }
 
-function Bar({
-	p,
-	sel,
-	onPick,
-}: {
-	p: GipfelbuchIndex["photos"][number];
-	sel: boolean;
-	onPick: () => void;
-}) {
-	const refine = p.stage === "refine";
-	const inkName = !p.accepted ? "red" : refine ? "brown" : "blue";
-	const col = INK_FILL[inkName];
-	return (
-		<button
-			type="button"
-			onClick={onPick}
-			aria-pressed={sel}
-			aria-label={`${p.id}: confidence ${p.confidence}`}
-			className="group flex min-w-0 flex-col items-stretch gap-1"
-		>
-			<div className="relative h-[110px]">
-				<svg
-					className="absolute inset-x-[12%] bottom-0 block w-[76%] transition-opacity"
-					style={{ height: `${p.confidence * 100}%`, opacity: sel ? 1 : 0.55 }}
-					viewBox="0 0 40 100"
-					preserveAspectRatio="none"
-					aria-hidden="true"
-					role="presentation"
-				>
-					<Wash
-						d="M1 2H39V100H1Z"
-						color={inkName}
-						seed={`ar-bar-wash-${p.id}`}
-						layers={9}
-						opacity={0.1}
-						spread={1.5}
-						offset={[0, 0]}
-					/>
-					<Hachure
-						d="M1 2H39V100H1Z"
-						seed={`ar-bar-${p.id}`}
-						color="ink"
-						gap={4}
-						opacity={0.14}
-					/>
-				</svg>
-				<div
-					className={`absolute inset-x-0 -top-4 text-center font-mono ${TYPE.micro} gb-secondary`}
-				>
-					{p.confidence.toFixed(2)}
-				</div>
-			</div>
-			<div
-				className="overflow-hidden transition"
-				style={{
-					boxShadow: sel ? `0 0 0 2px ${col}` : "none",
-					opacity: sel ? 1 : 0.7,
-				}}
-			>
-				<img
-					src={p.thumb}
-					alt=""
-					className="block aspect-[4/3] w-full object-cover"
-				/>
-			</div>
-			<div className={`text-center font-mono ${TYPE.micro} gb-secondary`}>
-				{p.id.slice(5)}
-			</div>
-		</button>
-	);
-}
-
-function RealDecisions() {
-	const index = useGipfelbuchIndex();
-	const [id, setId] = useState<GipfelbuchPhotoId>("demo-11");
-	const d = useGipfelbuchPhoto(id);
-	const fx = d ? solveFactors(d) : null;
-	const crop =
-		d && !PEOPLE_FREE.has(id) && !FULL_FRAME.has(id) ? bandCrop(d) : undefined;
-	return (
-		<Figure
-			label="Fig. 2"
-			caption={
-				<>
-					The accept decision on 12 real photos, bar 0.5. Bars show the
-					confidence of the accepted pose (amber: rescued by the second solver)
-					or of the rejected one (red). Tap one. Photos 07, 11 and 12 are shown
-					whole: the person in the frame is why the skyline fit is weak.{" "}
-					<Measured data={d ?? index} />
-				</>
-			}
-			bleed
-		>
-			<div className="relative mt-5 pl-8">
-				<svg
-					className="pointer-events-none absolute inset-x-0 z-10 block h-2 w-full"
-					style={{ top: `${110 * 0.5 - 4}px` }}
-					viewBox="0 0 400 8"
-					preserveAspectRatio="none"
-					aria-hidden="true"
-					role="presentation"
-				>
-					<PenLine
-						seed="ar-bar-line"
-						from={[0, 4]}
-						to={[400, 4]}
-						color="ink"
-						width={1.2}
-						dash="6 5"
-					/>
-				</svg>
-				<div
-					className={`pointer-events-none absolute left-0 z-10 -translate-y-1/2 font-mono ${TYPE.micro} gb-secondary`}
-					style={{ top: `${110 * 0.5}px` }}
-				>
-					0.5
-				</div>
-				<div className="grid grid-cols-12 gap-1">
-					{index?.photos.map((p) => (
-						<Bar
-							key={p.id}
-							p={p}
-							sel={p.id === id}
-							onPick={() => setId(p.id)}
-						/>
-					))}
-				</div>
-			</div>
-			<div className="mt-6 grid gap-5 sm:grid-cols-[1.35fr_1fr]">
-				{/* the spill keeps off the verdict column on the right */}
-				<div className="min-w-0" data-gb-bleed-bounds="right">
-					<RealPhoto
-						bleed
-						data={d}
-						layers={["skyline", "solved"]}
-						toggles={["skyline", "solved", "prior"]}
-						crop={crop}
-						className={
-							d && d.photo.height > d.photo.width
-								? "mx-auto w-full max-w-[300px]"
-								: undefined
-						}
-						key={id}
-					/>
-				</div>
-				{d && fx && (
-					<div className={`min-w-0 ${TYPE.caption}`}>
-						<div className="flex items-baseline gap-2">
-							<span
-								className="font-semibold text-2xl"
-								style={{ color: d.solved.accepted ? "var(--nb-forest)" : BAD }}
-							>
-								{d.solved.accepted
-									? d.solved.stage === "refine"
-										? "accepted by second solver"
-										: "accepted"
-									: "rejected"}
-							</span>
-							<span className={`font-mono ${TYPE.micro} gb-secondary`}>
-								{d.id}
-							</span>
-						</div>
-						<div className="mt-3 space-y-1.5">
-							{fx.f.map((x) => (
-								<div key={x.k}>
-									<div
-										className={`flex justify-between font-mono ${TYPE.micro} gb-secondary`}
-									>
-										<span>{x.k}</span>
-										<span>{x.v.toFixed(2)}</span>
-									</div>
-									<HandBar
-										fraction={x.v}
-										color={x.v < 1 ? "red" : "forest"}
-										seed={`ar-factor-${x.k}`}
-										opacity={x.v < 1 ? 0.85 : 0.55}
-										className="h-2"
-									/>
-								</div>
-							))}
-						</div>
-						<p className={`mt-3 ${TYPE.caption} gb-secondary`}>
-							{id === "demo-12" ? (
-								<>
-									The first solver multiplies these to {fx.product.toFixed(2)}:
-									only {(100 * d.solved.inlierFraction).toFixed(0)}% of the
-									skyline columns fit, because hair crosses the ridge. It
-									rejects. The second solver scores the same skyline{" "}
-									{d.solved.confidence.toFixed(3)} and accepts. The verdict
-									flips with the weighting, so this evidence alone is not enough
-									to call the pose certain.
-								</>
-							) : d.solved.accepted ? (
-								<>
-									Score {fx.product.toFixed(2)} clears 0.5. Median skyline gap{" "}
-									falls from {d.residual.prior.median.toFixed(1)} px (phone
-									sensors) to {d.residual.solved.median.toFixed(1)} px (solved).
-								</>
-							) : (
-								<>
-									Score {fx.product.toFixed(2)}, under 0.5. The shortfall is the
-									fit: {(100 * d.solved.inlierFraction).toFixed(0)}% of columns
-									within 4 px. A head and hair are not terrain. The pose stays
-									unconfirmed and the user is asked.
-									{d.app && (
-										<>
-											{" "}
-											A rejected pose is not necessarily wrong: the app's saved
-											yaw is {d.app.yaw.toFixed(1)}°, here{" "}
-											{d.solved.yaw.toFixed(1)}°. The rule only declines to mark
-											it certain.
-										</>
-									)}
-								</>
-							)}
-						</p>
-					</div>
-				)}
-			</div>
-		</Figure>
-	);
-}
-
 // ---------------------------------------------------------------------------------------------
-// Fig. 3: why a bar at all: confidence against the real yaw error on hand-registered photos
+// Fig. 2: why a bar at all: confidence against the real yaw error on hand-registered photos
 // ---------------------------------------------------------------------------------------------
 type GtRow = {
 	name: string;
@@ -446,7 +201,7 @@ function ConfidenceVsError() {
 		)[0];
 	return (
 		<Figure
-			label="Fig. 3"
+			label="Fig. 2"
 			caption={
 				<>
 					{best
@@ -603,7 +358,7 @@ function ConfidenceVsError() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Fig. 6: the precision ladder
+// Fig. 5: the precision ladder
 // ---------------------------------------------------------------------------------------------
 type Rule = {
 	id: string;
@@ -725,7 +480,7 @@ function PrecisionLadder() {
 	const p = Number(r.precision);
 	return (
 		<Figure
-			label="Fig. 6"
+			label="Fig. 5"
 			bleed
 			caption="Five accept rules on the same 100 checked photos. Each dot is an accepted pose: green correct, red confidently wrong, grey unsure. Stricter rules remove the red dots, and fewer dots remain."
 		>
@@ -1335,77 +1090,6 @@ const GATES: [string, string][] = [
 function Legacy() {
 	return (
 		<>
-			<Section title="How it works" kicker="Mechanism">
-				<Steps
-					steps={[
-						{
-							title: "Six factors and fixed thresholds",
-							body: (
-								<>
-									The second solver’s confidence is six ramps multiplied
-									together (yaw peak, runner-up ratio, columns that fit,
-									uncertainty, skyline slope, residual). One low factor lowers
-									it. Accept needs a score of 0.5, at least 30% of columns
-									fitting, and a skyline slope of 0.015.
-								</>
-							),
-						},
-						{
-							title: "A higher bar when less is known",
-							body: (
-								<>
-									With a trusted compass the search is ±25° and 0.5 suffices.
-									With heading or focal unknown the search covers every heading,
-									wrong matches are likelier, and the bar becomes 0.75. On 100
-									checked photos that took the solver from 25 correct and 2
-									wrong accepts to 22 and 0 (Fig. 6).
-								</>
-							),
-						},
-						{
-							title: "Two solvers cross-check each other",
-							body: (
-								<>
-									After first draw, a second solver re-solves on its own.
-									Agreement within 1° keeps the pose (“verified”); a confident
-									solver that disagrees wins (“refined”). The app aligner alone
-									made one confident wrong accept on the reference set; the
-									second solver made none.
-								</>
-							),
-						},
-						{
-							title: "A second look, then independent evidence",
-							body: (
-								<>
-									If the skyline is weak, the photo goes to render-and-match.
-									Even a HIGH match is applied only with a trusted GPS fix or
-									when the full solve lands within 0.5°. A match that stands
-									alone is “unverified”, and the user is asked.
-								</>
-							),
-						},
-						{
-							title: "Suggestions are not accepts",
-							body: (
-								<>
-									The top-3 picker and tapped peaks give candidates, never
-									acceptance. Only an automatic, verified accept is HIGH; a pose
-									the user picks or pins never is. Re-solving from taps is the{" "}
-									<Link
-										to={gipfelbuchHref("tap-a-peak")}
-										className="underline decoration-[var(--gb-red)]"
-									>
-										tap-a-peak
-									</Link>{" "}
-									fallback.
-								</>
-							),
-						},
-					]}
-				/>
-			</Section>
-
 			<VerdictTree />
 
 			<Section title="The bars" kicker="Gates">
@@ -1432,17 +1116,26 @@ function Legacy() {
 						</div>
 					))}
 				</div>
-				<Callout tone="lesson">
-					Favouring precision lowers recall. The rule skips 10 correct poses to
-					avoid one wrong one; they go to “please confirm”.
-				</Callout>
+				<p>
+					Suggestions are not accepts. The top-3 picker and tapped peaks give
+					candidates, never acceptance. Only an automatic, verified accept is
+					HIGH; a pose the user picks or pins never is. Re-solving from taps is
+					the{" "}
+					<Link
+						to={gipfelbuchHref("tap-a-peak")}
+						className="underline decoration-[var(--gb-red)]"
+					>
+						tap-a-peak
+					</Link>{" "}
+					fallback.
+				</p>
 			</Section>
 		</>
 	);
 }
 
 // ======================================================================================
-// Explainer front page (the figures above are folded into Details, except the precision ladder)
+// Explainer front page (only the verdict tree is folded into Details)
 // ======================================================================================
 /** Tone fills for accepted (forest) and rejected (red) chips. */
 const ACCEPT_C = "var(--gb-forest)";
@@ -1465,7 +1158,7 @@ function RejectedStory() {
 	return (
 		<PhotoStory
 			photoId="demo-07"
-			number="5"
+			number="4"
 			title="A solve the rule refuses"
 			caption={
 				d
@@ -1481,7 +1174,7 @@ function Verdicts() {
 	const nOk = idx?.photos.filter((p) => p.accepted).length;
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 3"
 			caption={
 				<>
 					{nOk == null
@@ -1855,8 +1548,6 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<ScoreFit />
-
-			<RealDecisions />
 
 			<Beat
 				kicker="Two more checks"

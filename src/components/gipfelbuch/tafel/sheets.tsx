@@ -42,12 +42,10 @@ export type BandCtx = {
 export const PAGE_HERO: ReadonlySet<string> = new Set([
 	"rigi",
 	"photo",
-	"camera-prior",
 	"viewport-inference",
 	"skyline",
 	"dem-horizon",
 	"pose-estimate",
-	"baseline-pipeline",
 	"terrain-snapping",
 	"tap-a-peak",
 	"peak",
@@ -55,7 +53,7 @@ export const PAGE_HERO: ReadonlySet<string> = new Set([
 	"dem-anchoring",
 	"photo-workspace",
 	"step-inside",
-	// Shell Tafel kept: accept-rule (spec §2.1), and dem-source, terrain-sampler and camera-roll,
+	// Shell Tafel kept: accept-rule (spec §2.1), and dem-source and camera-roll,
 	// whose heroes are maps on a plate, so the Tafel is the sheet's one spilled photo.
 ]);
 
@@ -655,60 +653,6 @@ const bandPhoto = ({ d, w, h }: BandCtx) => {
 	);
 };
 
-const bandCameraPrior = ({ d, w, h }: BandCtx) => {
-	const cx = 110;
-	const cy = h / 2;
-	const R = 52;
-	const arm = (deg: number, color: string, dash?: string) => (
-		<PenLine
-			from={[cx, cy]}
-			to={[
-				cx + Math.sin((deg * Math.PI) / 180) * R,
-				cy - Math.cos((deg * Math.PI) / 180) * R,
-			]}
-			data
-			seed={`band-cp-arm-${color}`}
-			color={color}
-			width={2}
-			dash={dash}
-		/>
-	);
-	return (
-		<>
-			<Ground w={w} h={h} />
-			<PenCircle
-				center={[cx, cy]}
-				radiusX={R}
-				seed="band-cp-ring"
-				color={HAIRLINE}
-				width={1}
-			/>
-			{["N", "E", "S", "W"].map((c, i) => (
-				<Txt
-					key={c}
-					x={cx + Math.sin((i * Math.PI) / 2) * (R + 9)}
-					y={cy - Math.cos((i * Math.PI) / 2) * (R + 9) + 4}
-					anchor="middle"
-					fill={c === "N" ? ROUTE : SECONDARY}
-				>
-					{c}
-				</Txt>
-			))}
-			{arm(d.sensor.heading, ROUTE, "5 4")}
-			{arm(d.solved.yaw, MEASURE)}
-			<Txt x={200} y={56} fill={ROUTE}>
-				{`compass ${f1(d.sensor.heading)}°`}
-			</Txt>
-			<Txt x={200} y={76} fill={MEASURE}>
-				{`terrain ${f1(d.solved.yaw)}°`}
-			</Txt>
-			<Txt x={200} y={108} kind="stat">
-				{`${signed(d.solved.delta.yaw)}°`}
-			</Txt>
-		</>
-	);
-};
-
 const bandDemHorizon = ({ d, w, h }: BandCtx) => {
 	const yaw = d.solved.yaw;
 	const rel = (az: number) => ((az - yaw + 540) % 360) - 180;
@@ -1009,54 +953,6 @@ const bandTap = ({ d, w, h }: BandCtx) => {
 	);
 };
 
-const bandPipeline = ({ d, w, h }: BandCtx) => {
-	// a terrain time of 0 means the bake's tile cache was warm, not a measurement: leave it out
-	const stages = (
-		[
-			["terrain", d.ms.terrain, TERRAIN],
-			["horizon", d.ms.horizon, TERRAIN],
-			["skyline", d.ms.skyline, MEASURE],
-			["solve", d.ms.solve, RESULT],
-		] as [string, number, string][]
-	).filter((s) => s[1] > 0);
-	const total = stages.reduce((a, s) => a + s[1], 0);
-	const max = Math.max(...stages.map((s) => s[1]), 1);
-	const x0 = 56;
-	const span = w - x0 - 64;
-	return (
-		<>
-			<Ground w={w} h={h} />
-			<Txt x={0} y={14} fill={SECONDARY}>
-				{`${total} ms in total`}
-			</Txt>
-			{stages.map(([name, ms, color], i) => {
-				const y = 34 + i * 27;
-				const len = Math.max(2, (ms / max) * span);
-				return (
-					<g key={name}>
-						<Txt x={0} y={y + 10} fill={INK}>
-							{name}
-						</Txt>
-						<rect x={x0} y={y} width={len} height={14} fill={color} />
-						<SketchRect
-							x={x0}
-							y={y}
-							width={len}
-							height={14}
-							seed={`band-pipe-${name}`}
-							color={color}
-							penWidth={1.2}
-						/>
-						<Txt x={x0 + len + 6} y={y + 10} fill={INK}>
-							{`${ms} ms`}
-						</Txt>
-					</g>
-				);
-			})}
-		</>
-	);
-};
-
 /** Square hillshade patch, north up, camera at the centre. */
 function DemPatchImage({
 	d,
@@ -1124,48 +1020,6 @@ const bandDemSource = ({ d, w, h }: BandCtx) => {
 				color="#fff"
 				opacity={1}
 			/>
-		</>
-	);
-};
-
-const bandSampler = ({ d, w, h }: BandCtx) => {
-	const cx = w / 2;
-	const cy = h / 2;
-	const zoom = 10; // working band px per patch cell
-	const side = d.demPatch.px * zoom;
-	const cellM = Math.round((2 * d.demPatch.halfKm * 1000) / d.demPatch.px);
-	return (
-		<>
-			<image
-				href={d.demPatch.src}
-				x={cx - side / 2}
-				y={cy - side / 2}
-				width={side}
-				height={side}
-				preserveAspectRatio="none"
-				style={{ imageRendering: "pixelated" }}
-			/>
-			<SketchRect
-				x={cx - zoom / 2}
-				y={cy - zoom / 2}
-				width={zoom}
-				height={zoom}
-				seed="band-sampler-cell"
-				color="#fff"
-				penWidth={1.4}
-			/>
-			<SketchPath
-				d={`M${cx - 28} ${cy}h18M${cx + 10} ${cy}h18M${cx} ${cy - 28}v18M${cx} ${cy + 10}v18`}
-				seed="band-sampler-cross"
-				color="#fff"
-				width={1.4}
-			/>
-			<Txt x={cx + 34} y={cy - 4} onPhoto>
-				{`ground ${f1(d.gps.ground)} m`}
-			</Txt>
-			<Txt x={cx + 34} y={cy + 10} onPhoto>
-				{`one ${cellM} m cell`}
-			</Txt>
 		</>
 	);
 };
@@ -1578,26 +1432,15 @@ export const SHEETS: Record<string, SheetFigures> = {
 				dec: 1,
 				unit: "°",
 			}),
-			stat(d, "gps.hAccuracy", "GPS accuracy", { unit: "m" }),
-			stat(d, "sensor.f35", "focal length (35 mm equiv.)", { unit: "mm" }),
-		],
-		value: (d) =>
-			`${d.gps.lat.toFixed(3)}, ${d.gps.lon.toFixed(3)} · ±${Math.round(d.gps.hAccuracy)} m`,
-	},
-	"camera-prior": {
-		tafel: ({ d, s }) => priorVsSolved(d, s, false),
-		band: bandCameraPrior,
-		ledger: (d) => [
-			stat(d, "sensor.heading", "compass", { dec: 1, unit: "°" }),
-			stat(d, "solved.yaw", "direction from terrain", { dec: 1, unit: "°" }),
 			stat(d, "solved.delta.yaw", "compass error", {
 				dec: 1,
 				unit: "°",
 				sign: true,
 			}),
+			stat(d, "gps.hAccuracy", "GPS accuracy", { unit: "m" }),
 		],
 		value: (d) =>
-			`compass ${f1(d.sensor.heading)}° · solved ${f1(d.solved.yaw)}°`,
+			`${d.gps.lat.toFixed(3)}, ${d.gps.lon.toFixed(3)} · ±${Math.round(d.gps.hAccuracy)} m`,
 	},
 	skyline: {
 		tafel: tafelSkyline,
@@ -1687,47 +1530,19 @@ export const SHEETS: Record<string, SheetFigures> = {
 		value: (d) =>
 			`${d.peaks.filter((p) => p.labelled).length} named summits in view`,
 	},
-	"baseline-pipeline": {
-		tafel: tafelSolvedOnly,
-		band: bandPipeline,
-		ledger: (d) => [
-			stat(d, "ms.horizon", "horizon", { unit: "ms" }),
-			stat(d, "ms.skyline", "skyline", { unit: "ms" }),
-			stat(d, "ms.solve", "solve", { unit: "ms" }),
-		],
-		value: (d) =>
-			`${d.ms.terrain + d.ms.horizon + d.ms.skyline + d.ms.solve} ms in total`,
-	},
 	"dem-source": {
 		tafel: null,
 		band: bandDemSource,
 		ledger: (d) => [
-			stat(d, "demPatch.halfKm", "patch half-width", {
-				unit: "km",
-				scale: 1,
+			stat(d, "gps.ground", "ground height under the camera", {
+				dec: 1,
+				unit: "m",
 			}),
 			stat(d, "demPatch.min", "lowest point", { unit: "m" }),
 			stat(d, "demPatch.max", "highest point", { unit: "m" }),
 		],
 		value: (d) =>
 			`±${d.demPatch.halfKm} km · ${d.demPatch.min}–${d.demPatch.max} m`,
-	},
-	"terrain-sampler": {
-		tafel: null,
-		band: bandSampler,
-		ledger: (d) => [
-			stat(d, "gps.ground", "ground height under the camera", {
-				dec: 1,
-				unit: "m",
-			}),
-			stat(d, "demPatch.px", "cells across the patch"),
-			// not ms.terrain: it is 0 on photos whose tiles were cached in the bake, which is not a measurement
-			stat(d, "demPatch.halfKm", "patch half-width", {
-				unit: "km",
-				scale: 1,
-			}),
-		],
-		value: (d) => `ground ${f1(d.gps.ground)} m under the camera`,
 	},
 	"eye-rule": {
 		tafel: null,

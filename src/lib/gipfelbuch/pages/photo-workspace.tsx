@@ -24,7 +24,6 @@ import {
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import {
 	AlignmentStoryProvider,
-	Callout,
 	CodeRef,
 	Eq,
 	Figure,
@@ -37,8 +36,6 @@ import {
 	MarginNote,
 	RealPhoto,
 	Section,
-	Stat,
-	Steps,
 	StoryMap,
 	Sym,
 	useGipfelbuchPhoto,
@@ -290,7 +287,7 @@ function PoseJourney() {
 
 	return (
 		<Figure
-			label="D2"
+			label="D1"
 			bleed
 			source="Skizze"
 			caption="One photo's pose from page load to export. Pick a scenario or scrub the timeline. Durations are schematic; the +2.98° and −0.02° offsets are measured."
@@ -868,7 +865,7 @@ function PinSolve() {
 
 	return (
 		<Figure
-			label="D3"
+			label="D2"
 			bleed
 			source="Skizze"
 			caption="A simplified camera model. The photo's skyline is fixed; the overlay starts at the phone's guess (yaw +2.4°, pitch −0.9°, roll +1.6°, focal +8%). Click a ring to pin that peak. One pin frees yaw and pitch, two add roll, three or more add focal length."
@@ -1096,7 +1093,7 @@ const PARTS: {
 function AnnotatedWorkspace() {
 	return (
 		<Figure
-			label="D4"
+			label="D3"
 			bleed
 			caption="The exported overlay for one photo. Every numbered part is placed with the same camera pose, so a wrong pose moves all of them."
 		>
@@ -1156,77 +1153,6 @@ function AnnotatedWorkspace() {
 					</>
 				))}
 			/>
-		</Figure>
-	);
-}
-
-function MeasuredWorkspace() {
-	const [photo] = useNotebookPhoto();
-	const d = useGipfelbuchPhoto(photo);
-	return (
-		<Figure
-			label="D1"
-			bleed
-			caption={
-				<>
-					The same photo, three lines. Yellow: skyline detected in the photo.
-					Magenta (dashed): terrain horizon at the phone's pose. Cyan: terrain
-					horizon at the solved pose. Toggle them to see the compass error
-					corrected.
-				</>
-			}
-		>
-			<RealPhoto
-				bleed
-				data={d}
-				layers={["skyline", "prior", "solved"]}
-				toggles={["skyline", "prior", "solved"]}
-				crop={[0, 60, 800, 360]}
-			/>
-			{d && (
-				<dl className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3 font-mono text-[11px] gb-secondary sm:grid-cols-4">
-					<div>
-						<dt className="gb-secondary">compass error</dt>
-						<dd className="text-[18px] sm:text-[20px] gb-ink">
-							{d.solved.delta.yaw.toFixed(1)}°
-						</dd>
-					</div>
-					<div>
-						<dt className="gb-secondary">median skyline miss</dt>
-						<dd className="text-[18px] sm:text-[20px] gb-ink">
-							{d.residual.prior.median} → {d.residual.solved.median} px
-						</dd>
-					</div>
-					<div>
-						<dt className="gb-secondary">solve confidence</dt>
-						<dd className="text-[18px] sm:text-[20px] gb-ink">
-							{d.solved.confidence.toFixed(2)}
-							<span className="gb-secondary">
-								{" "}
-								({d.solved.accepted ? "accepted" : "rejected"})
-							</span>
-						</dd>
-					</div>
-					<div>
-						<dt className="gb-secondary">compute time: horizon / solve</dt>
-						<dd className="text-[18px] sm:text-[20px] gb-ink">
-							{(d.ms.horizon / 1000).toFixed(1)} s / {d.ms.solve} ms
-						</dd>
-					</div>
-				</dl>
-			)}
-			{d?.app && (
-				<p className="mt-3 text-[13px] gb-secondary">
-					The live app saved yaw {d.app.yaw.toFixed(2)}° for this photo; this
-					run gives {d.solved.yaw.toFixed(2)}°. The two differ by{" "}
-					{Math.abs(((d.app.yaw - d.solved.yaw + 540) % 360) - 180).toFixed(2)}
-					°,{" "}
-					{Math.abs(((d.app.yaw - d.solved.yaw + 540) % 360) - 180) <= 1
-						? "inside"
-						: "outside"}{" "}
-					the 1° that counts as verified.
-				</p>
-			)}
 		</Figure>
 	);
 }
@@ -1669,38 +1595,21 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			/>
 
 			<Details>
-				<MeasuredWorkspace />
-
 				<PoseJourney />
 
-				<Section
-					kicker="How it works"
-					title="From first paint to a trusted pose"
-				>
-					<Steps
-						steps={[
-							{
-								title: "Pick the source",
-								body: "In order: a pose you set, a saved or sample pose, then, if compass, gravity or lens is missing, a full search, otherwise a fast auto-align. A pose you chose is never replaced by a solver.",
-							},
-							{
-								title: "Preview fast",
-								body: "Show the auto-align result if confidence is above 0.2. Otherwise show a match within 4° yaw and 1.5° pitch of the compass, or the phone’s own pose. The page paints without waiting for the slow check.",
-							},
-							{
-								title: "A second check, after first paint",
-								body: "A second solver re-solves from the phone’s guess in the background (20 s limit). The result is one of: verified (agrees within 1°), refined (replaces the preview), kept, unverified, or matched (map match, used only if it passes the accept rule).",
-							},
-							{
-								title: "Lock export until the pose is final",
-								body: "Export is locked while loading or while the check is pending, so a file never contains a pose that is about to move.",
-							},
-						]}
-					/>
+				<Section kicker="Sources" title="Where the first pose comes from">
 					<p>
-						The solvers are explained in{" "}
-						{A("viewport-inference", "Viewport Inference")} and{" "}
-						{A("terrain-snapping", "Terrain Snapping")}.
+						In order: a pose you set, a saved or sample pose, then, if compass,
+						gravity or lens is missing, a full search, otherwise a fast
+						auto-align. A pose you chose is never replaced by a solver.
+					</p>
+					<p>
+						If the auto-align is too weak to preview, the workspace shows a
+						match within 4° yaw and 1.5° pitch of the compass, or the phone’s
+						own pose. The second check ends as verified, refined, kept,
+						unverified or matched; a map match is used only if it passes the{" "}
+						{A("accept-rule", "accept rule")}. The solvers themselves are on{" "}
+						{A("viewport-inference", "Viewport Inference")}.
 					</p>
 				</Section>
 
@@ -1722,19 +1631,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 				<AnnotatedWorkspace />
 
-				<Section kicker="Result" title="Why the second check is worth the wait">
-					<div className="!mt-5 grid grid-cols-2 gap-5 sm:grid-cols-4">
-						<Stat value="> 0.2" label="confidence needed for a preview" />
-						<Stat value="≤ 1°" label="agreement needed for “verified”" />
-						<Stat value="20 s" label="longest export wait" />
-						<Stat value="0" label="false accepts on 12 test photos" />
-					</div>
-					<Callout tone="lesson" title="Shown first, checked later">
-						The preview appears at once and is checked afterwards. No unchecked
-						pose reaches an export.
-					</Callout>
-				</Section>
-
 				<Section kicker="In the code" title="Where to look">
 					<div className="flex flex-wrap gap-2">
 						<CodeRef path="src/components/PhotoWorkspace.tsx" />
@@ -1747,18 +1643,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<CodeRef path="src/components/controls.tsx" />
 						<CodeRef path="reports/leaderboard.md" />
 					</div>
-				</Section>
-
-				<Section kicker="Where it fits" title="Related">
-					<p>
-						The workspace shows the pose that{" "}
-						{A("viewport-inference", "viewport inference")} produces and the
-						corrections of {A("terrain-snapping", "terrain snapping")}, gated by
-						the {A("accept-rule", "accept rule")} and seeded from the{" "}
-						{A("camera-prior", "camera prior")}. Pins come from{" "}
-						{A("tap-a-peak", "Tap a Peak")}, and the same pose can be taken into{" "}
-						{A("step-inside", "Step Inside")}.
-					</p>
 				</Section>
 			</Details>
 		</>

@@ -75,7 +75,7 @@ describe("wegnetz routes", () => {
 		const lineage = trailLineage("accept-rule");
 		expect(lineage.has("photo>skyline")).toBe(true);
 		expect(lineage.has("pose-estimate>photo-workspace")).toBe(true);
-		expect(lineage.has("dem-source>terrain-sampler")).toBe(true);
+		expect(lineage.has("dem-source>eye-rule")).toBe(true);
 		expect(trailLineage("dem-source").has("photo>skyline")).toBe(false);
 	});
 	it("stops trails short of both stations", () => {

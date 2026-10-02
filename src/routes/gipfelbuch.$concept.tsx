@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { ConceptPage } from "#/components/gipfelbuch/ConceptPage";
 import { SketchDefs } from "#/components/gipfelbuch/notebook/Ink";
 import { SheetFrame } from "#/components/gipfelbuch/swiss";
@@ -10,12 +10,25 @@ import { ListArrow, MarkerUnderline } from "#/components/gipfelbuch/swiss/hand";
 import { GB_THEME } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import { SiteNav } from "#/components/site/SiteNav";
-import { byId, closestSheetIds } from "#/lib/gipfelbuch/graph-utils";
+import {
+	byId,
+	closestSheetIds,
+	MERGED_SHEETS,
+} from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // One page per concept: /gipfelbuch/<id>. The body is a bespoke page in src/lib/gipfelbuch/pages/<id>.tsx when present.
 export const Route = createFileRoute("/gipfelbuch/$concept")({
 	ssr: false,
+	beforeLoad: ({ params }) => {
+		const merged = MERGED_SHEETS[params.concept];
+		if (merged)
+			throw redirect({
+				to: "/gipfelbuch/$concept",
+				params: { concept: merged },
+				replace: true,
+			});
+	},
 	head: ({ params }) => ({
 		meta: [
 			{

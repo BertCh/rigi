@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 /**
- * Yaw-search data for the gipfelbuch pose pages (/gipfelbuch/baseline-pipeline, /gipfelbuch/accept-rule): the real
+ * Yaw-search data for the gipfelbuch pose pages (/gipfelbuch/viewport-inference, /gipfelbuch/accept-rule): the real
  * coarse-stage cost of solvePose (src/lib/geo/solve.ts planCoarse + coarseCost, truncated L1 + priors, best pitch
  * per yaw) on the 12 bundled Niederhorn photos, local search (±25° of the compass) and full circle (±180°).
  * Also the ambiguity, the winning and runner-up minima and the DEM skyline rows at the runner-up pose.
