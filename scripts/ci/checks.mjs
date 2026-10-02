@@ -1363,6 +1363,19 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "people-gpu",
+		tier: "fast",
+		group: "nn",
+		cmd: tsx("src/lib/segment/__tests__/people-gpu.check.ts"),
+		needs: [
+			"public/models/deeplab-v3-nn.70580c5b.safetensors",
+			"public/models/selfie-multiclass-nn.c64d6152.safetensors",
+			"public/demo/photos-1024/demo-05.jpg",
+		],
+		note: "people mask in ONE nn forward on the GPU (texture resample, nets, upsample, smoothstep, dilation, blur) vs the old CPU resample + post-process from the same RGBA bytes on demo-05 and a synthetic image: byte mask max abs <= 8 and <= 0.1% of pixels differ > 8 (SKIP without DAWN_DIR)",
+		timeoutS: 300,
+	},
+	{
 		id: "people-parity",
 		tier: "fast",
 		group: "nn",
