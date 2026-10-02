@@ -192,6 +192,7 @@ async function main() {
 					accepted: r.accepted,
 					stage: r.stage,
 					ms: r.ms,
+					seeds: r.seeds,
 					horizonOn: r.horizonOn,
 					solveOn: r.solveOn,
 					candidates: r.candidates.map((c) => ({

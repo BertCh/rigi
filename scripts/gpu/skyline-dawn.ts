@@ -173,7 +173,7 @@ async function main() {
 		};
 		rows.push(rec);
 		console.log(
-			`${e.id} ${w}x${h} feat max rgb ${feat.rgb.max.toExponential(1)} tex ${feat.tex.max.toExponential(1)} edge ${feat.edge.max.toExponential(1)} prior ${feat.prior.max.toExponential(1)} sky ${skyDiff?.max.toExponential(1)} | rows finite ${stats.finiteCpu}/${stats.cols} mismatch ${stats.finiteMismatch} max ${stats.maxRow.toFixed(2)} med ${stats.medianRow.toFixed(3)} dW ${stats.maxWeight.toFixed(3)} | ${rec.ms.cpu}/${rec.ms.gpu} ms`,
+			`${e.id} ${w}x${h} feat max rgb ${feat.rgb.max.toExponential(1)} tex ${feat.tex.max.toExponential(1)} edge ${feat.edge.max.toExponential(1)} prior ${feat.prior.max.toExponential(1)} sky ${skyDiff?.max.toExponential(1)} | rows finite ${stats.finiteCpu}/${stats.cols} mismatch ${stats.finiteMismatch} max ${stats.maxRow.toExponential(2)} med ${stats.medianRow.toExponential(2)} dW ${stats.maxWeight.toExponential(2)} | ${rec.ms.cpu}/${rec.ms.gpu} ms`,
 		);
 	}
 	if (out) {
