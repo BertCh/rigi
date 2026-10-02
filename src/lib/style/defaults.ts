@@ -147,7 +147,7 @@ export const CLASSIC: ViewStyle = {
 	},
 	labels: {
 		layout: "classic",
-		fontFamily: "Manrope, system-ui, sans-serif", // engine.ts:1175 (DOM inherits styles.css:121 --font-sans)
+		fontFamily: "Fira Sans, system-ui, sans-serif", // engine.ts:1175 (DOM inherits styles.css:121 --font-sans)
 		name: { px: 12, weight: 600, color: "#ffffff" }, // PhotoWorkspace.tsx:483 text-[12px] font-semibold text-white
 		sub: { px: 10, weight: 400, color: [1, 1, 1, 0.75], show: "ele+dist" }, // PhotoWorkspace.tsx:484–487 text-[10px] text-white/75
 		halo: {

@@ -108,7 +108,7 @@ export async function composeAnnotatedPng(
 		ctx.fillStyle = "#111418";
 		ctx.fillRect(0, H, W, fh);
 		const fs = Math.round(fh * 0.5);
-		ctx.font = `500 ${fs}px Manrope, system-ui, -apple-system, Segoe UI, sans-serif`;
+		ctx.font = `500 ${fs}px Fira Sans, system-ui, -apple-system, Segoe UI, sans-serif`;
 		ctx.textBaseline = "middle";
 		const pad = Math.round(fh * 0.5);
 		let titleWidth = 0;

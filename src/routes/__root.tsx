@@ -15,9 +15,6 @@ import { ThemeSync } from "#/lib/theme/react";
 
 import appCss from "../styles.css?url";
 
-const FONTS_HREF =
-	"https://fonts.googleapis.com/css2?family=Fira+Sans+Condensed:wght@500;600&family=Fira+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap";
-
 export const Route = createRootRoute({
 	// the app's flags (?renderer, ?gpu, ?tiles3d, …; src/lib/flags) are validated here and carried
 	// across in-app navigation, so a switch set on one page stays on for the next
@@ -47,14 +44,14 @@ export const Route = createRootRoute({
 			},
 		],
 		links: [
-			// fonts load from the head, not an @import in the stylesheet (which chains and blocks render)
-			{ rel: "preconnect", href: "https://fonts.googleapis.com" },
+			// fonts are self-hosted (src/styles/fonts.css); preload the body face so first text paints in it
 			{
-				rel: "preconnect",
-				href: "https://fonts.gstatic.com",
+				rel: "preload",
+				href: "/fonts/gipfelbuch/fira-sans-normal-400-latin.woff2",
+				as: "font",
+				type: "font/woff2",
 				crossOrigin: "anonymous",
 			},
-			{ rel: "stylesheet", href: FONTS_HREF },
 			{
 				rel: "stylesheet",
 				href: appCss,

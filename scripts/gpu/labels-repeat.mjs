@@ -9,13 +9,13 @@
 // Contours), waits until the canvas and label layer are stable, then records:
 //   - every DOM label block (text + rect, rounded to 0.01 px) and a hash of them
 //   - a hash of the export JPEG (engine.exportImage(true), the canvas-drawn labels)
-//   - the Manrope font faces' load status at capture time
+//   - the Fira Sans font faces' load status at capture time
 // and prints how many distinct DOM / export placements the runs produced (1 = deterministic).
 //
 // Usage (run through the render lock):
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/labels-repeat.mjs \
 //     --url http://localhost:3156 --photo IMG_7068 --runs 5 --out out/gpu/followups/labels/after.json
-// Stress: --font-delay 0,6000 (ms, cycled over runs) holds the Manrope files back; --cpu 1,4 slows
+// Stress: --font-delay 0,6000 (ms, cycled over runs) holds the Fira Sans files back; --cpu 1,4 slows
 // the page (CDP CPU throttling), so label updates and readbacks interleave differently.
 // --save-exports <dir> writes one export JPEG per distinct hash (to diff them).
 // --wire 1 serves PhotoWorkspace with the proposed font-epoch memo deps (test-only injection).
@@ -199,10 +199,10 @@ async function once(run) {
 					],
 				};
 			});
-			// Manrope faces per weight: loaded / declared (Google Fonts declares one face per subset)
+			// Fira Sans faces per weight: loaded / declared (one face per subset)
 			const fw = {};
 			for (const f of document.fonts)
-				if (/Manrope/.test(f.family)) {
+				if (/Fira Sans/.test(f.family)) {
 					fw[f.weight] ??= [0, 0];
 					fw[f.weight][1]++;
 					if (f.status === "loaded") fw[f.weight][0]++;

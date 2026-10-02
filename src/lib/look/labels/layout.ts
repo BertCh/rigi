@@ -42,7 +42,7 @@ export type LayoutOptions = {
 	height: number;
 	/** base font size (tier 1 name), px */
 	fontPx: number;
-	/** text width in px for a CSS font string; defaults to an approximation for Manrope */
+	/** text width in px for a CSS font string; defaults to an approximation for the label font */
 	measure?: (text: string, font: string) => number;
 	maxLabels?: number;
 	topMarginPx?: number;
@@ -83,7 +83,7 @@ export type PlacedLabel = LabelCandidate & {
 };
 
 export const LABEL_FONT_FAMILY =
-	"Manrope, ui-sans-serif, system-ui, sans-serif";
+	"Fira Sans, ui-sans-serif, system-ui, sans-serif";
 
 /** Typography per tier: name size/weight, elevation size/weight (px, relative to fontPx). */
 export function tierFonts(
@@ -116,7 +116,8 @@ export function eleSuffix(c: { name: string; ele: number | null }) {
 	return e && c.name.trim() !== e ? e : "";
 }
 
-// Rough Manrope advance widths (em) when no measure function is given.
+// Rough advance widths (em) when no measure function is given. Tuned for Manrope and not regenerated
+// for Fira Sans (no in-repo measuring path); only a no-canvas fallback, canvasMeasure is the real path.
 function approxMeasure(text: string, font: string) {
 	const m = font.match(/([\d.]+)px/);
 	const px = m ? Number(m[1]) : 14;
@@ -138,7 +139,7 @@ let measureCanvas: {
 	cache: Map<string, number>;
 } | null = null;
 
-// Web-font state. Manrope comes from Google Fonts (display=swap), so a label laid out before its
+// Web-font state. Fira Sans is self-hosted (display=swap), so a label laid out before its
 // face arrives is measured with the fallback font. Those widths used to be cached for good, and the
 // layout was not redone when the face arrived: the final placement then depended on whether the
 // font or the first label layout came first (the style-baseline peak-label flake, 2026-09-30).

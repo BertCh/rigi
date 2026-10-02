@@ -221,7 +221,7 @@ Samples in `out/lead/export/`, using the IMG_7131 prior pose:
 - **FOV wedge:** it is the horizontal FOV about the yaw bearing and ignores roll and pitch. The footprint is a per-column near/far outline, so it can be ragged across occluded valleys. It is not a true viewshed.
 - **Hidden peaks:** only peaks the caller marks visible are exported, unless `includeHiddenPeaks` is set.
 - **ZIP limits:** the writer is store-only with no ZIP64, so it handles up to 65535 entries and 4 GiB. That is fine for KMZ.
-- **Timestamps:** `composeAnnotatedPng` uses the system font stack (Manrope if it is loaded). ZIP entries use local-time DOS timestamps.
+- **Timestamps:** `composeAnnotatedPng` uses the system font stack (Fira Sans if it is loaded). ZIP entries use local-time DOS timestamps.
 - **Footprint test path:** the test's footprint uses a synthetic flat plane. `engine.sampleAt` (the geoRT buffer, with its internal `1 − v` flip) needs WebGL, so it is not exercised headlessly. Check it in-app once the Export menu is wired: the footprint should sit in front of the camera, not mirrored behind it.
 - **Lens distortion:** the pinhole model assumes square pixels, a centred principal point and no distortion. That matches the engine.
 

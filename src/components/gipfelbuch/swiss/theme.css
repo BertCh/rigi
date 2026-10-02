@@ -60,7 +60,7 @@
 	-webkit-font-smoothing: auto;
 }
 
-/* `@theme inline` bakes Manrope into font-sans, so override the utilities here. */
+/* `@theme inline` bakes the site font into font-sans, so override the utilities here. */
 .gb-swiss .font-sans {
 	font-family: var(--gb-font-sans);
 }

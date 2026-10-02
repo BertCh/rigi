@@ -301,7 +301,7 @@ export type LabelGlow = {
 export type LabelStyle = {
 	/** 'panorama' / 'inline': look/labels/layout.ts */
 	layout: "classic" | "panorama" | "inline";
-	/** Canvas export font. The DOM labels inherit the app's --font-sans (same Manrope face). */
+	/** Canvas export font. The DOM labels inherit the app's --font-sans (same Fira Sans face). */
 	fontFamily: string;
 	name: { px: number; weight: number; color: Hex };
 	sub: {
