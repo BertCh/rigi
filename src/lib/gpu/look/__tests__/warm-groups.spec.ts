@@ -27,10 +27,16 @@ describe("look warm-up groups", () => {
 		expect(new Set(labels).size).toBe(labels.length);
 	});
 
+	it("defines each look kernel id once (textures.ts shares the array-path specs)", () => {
+		const ids = definedKernels()
+			.filter((s) => s.label.startsWith("look-"))
+			.map((s) => s.id);
+		expect(new Set(ids).size).toBe(ids.length);
+	});
+
 	it("keeps texture subgroup kernels out of the texture group", () => {
 		const tex = definedKernels("look-tex");
 		expect(tex.length).toBeGreaterThan(0);
 		expect(tex.some((s) => /-sg$/.test(s.label))).toBe(false);
-		expect(definedKernels("look-tex-subgroups").length).toBeGreaterThan(0);
 	});
 });

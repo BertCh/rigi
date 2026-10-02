@@ -161,7 +161,7 @@ export const ISLANDS: readonly Island[] = [
 	{
 		id: "I6",
 		name: "Sky model",
-		contents: "ORT U²-Net + sky refine",
+		contents: "U²-Net-P on the nn runtime + sky refine",
 		cadence: ["per photo"],
 		realms: ["worker:sky"],
 		graph: true,
@@ -210,7 +210,8 @@ export const ISLANDS: readonly Island[] = [
 	{
 		id: "I12",
 		name: "Roll",
-		contents: "range maps, drape atlas, cull, gains, panorama (WebGL2 only)",
+		contents:
+			"range maps, drape atlas, cull, gains, panorama (WebGPU backend by default via renderer auto; WebGL2 fallback)",
 		cadence: ["per photo", "per frame"],
 		realms: ["page", "worker:ridgelines"],
 		graph: true,
@@ -562,11 +563,13 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		groups: [],
 		realms: ["worker:sky"],
 		cadence: "per photo",
-		resources: ["ORT WebGPU session (ORT's device, attached to luma)"],
+		resources: [
+			"U²-Net-P fp16 weights on the compute device (src/lib/sky/model.ts, u2netp.ts)",
+		],
 		readbacks: [],
-		status: "external",
+		status: "default",
 		notes:
-			"ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU",
+			"Rigi's nn runtime (src/lib/nn: WGSL kernels on one core ComputeGraph per forward, getNn registry, cachedGraph groups nn/<consumer>) on the sky worker's compute device; the nn CPU reference backend without WebGPU. No ONNX Runtime. The probability buffer feeds sky-refine without leaving the GPU",
 	},
 	{
 		id: "sky-prep",
@@ -583,7 +586,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"ImageBitmap → rgba8unorm texture (per photo)",
 			"tmp (transient)",
 			"axis taps, constants, LUT (pooled imports)",
-			"rgba, rgbLo, ORT input (handed to the model and sky-refine)",
+			"rgba, rgbLo, normalised model input (handed to the model and sky-refine)",
 		],
 		readbacks: [
 			"opacity flag (4 B)",
@@ -591,7 +594,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; the GPU prep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)",
+			"cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; the GPU prep (default on since 2026-10-01; off / ?gpu=off / CPU nn backend: the CPU prep)",
 	},
 	{
 		id: "sky-refine",
@@ -601,7 +604,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		realms: ["worker:sky"],
 		cadence: "per photo",
 		resources: [
-			"ORT P(sky) buffer (wrapped per run)",
+			"nn P(sky) buffer (wrapped per run)",
 			"guide, rgba, axis taps, LUT (pooled imports)",
 		],
 		readbacks: ["read: byte mask (+ float mask when asked)"],
@@ -846,14 +849,17 @@ export const GPU_MODULES: readonly GpuModule[] = [
 	{
 		id: "roll-webgl",
 		island: "I12",
-		paths: ["src/lib/roll"],
+		paths: ["src/lib/roll", "src/lib/roll/map/backend-webgpu.ts"],
 		groups: [],
 		realms: ["page"],
 		cadence: "per frame",
-		resources: ["deck WebGL2 + raw GL2 programs"],
+		resources: [
+			"WebGPU backend: luma-direct host + deck-webgpu cores (backend-webgpu.ts); WebGL2 fallback: deck + raw GL2 programs",
+		],
 		readbacks: ["range maps"],
 		status: "cpu",
-		notes: "WebGL2 only; needs a WebGPU port before it can join a graph",
+		notes:
+			"src/lib/roll/map/backend-webgpu.ts is the default via ?renderer=auto (backend-select.ts); it draws with deck-webgpu render cores, not yet as a ComputeGraph island (range maps and cull are still outside the graph), so the status stays cpu until they join one",
 	},
 ];
 

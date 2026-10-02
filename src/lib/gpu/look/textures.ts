@@ -70,6 +70,8 @@ import {
 	type BindKind,
 	defineKernel,
 	type KernelSpec,
+	kernel,
+	kernelAsync,
 	storage,
 	uniform,
 	warmKernels,
@@ -80,10 +82,12 @@ import { acquire, withLease } from "../core/pool";
 import { stageReads } from "../core/readback";
 import {
 	finalizeBands,
+	K_BAND_STATS,
+	K_BAND_STATS_SG,
 	statsParamWords,
 	statsSubgroupsOn,
 } from "./color-stats";
-import { BAND_STATS, BAND_STATS_SG, STATS_VALUES } from "./color-stats.wgsl";
+import { STATS_VALUES } from "./color-stats.wgsl";
 import {
 	buildFoldGraph,
 	markFoldFailed,
@@ -101,19 +105,20 @@ import {
 	TEX_STATS,
 	ZERO_U32,
 } from "./gather-tex.wgsl";
-import { GF_FINISH, GF_PREP, GF_SOLVE } from "./guided-filter.wgsl";
-import { addGuidedFilter, guidedOnesLength } from "./guided-filter-graph";
 import {
-	BUCKETS,
-	HZ_BIN,
-	HZ_HIST,
-	HZ_PREP,
-	HZ_SCAN,
-	HZ_SCAN_SG,
-	HZ_SEL_INIT,
-	planeWords,
-	SEL,
-} from "./haze.wgsl";
+	addGuidedFilter,
+	GUIDED_KERNELS,
+	guidedOnesLength,
+} from "./guided-filter-graph";
+import {
+	K_HZ_BIN,
+	K_HZ_HIST,
+	K_HZ_PREP,
+	K_HZ_SCAN,
+	K_HZ_SCAN_SG,
+	K_HZ_SEL_INIT,
+} from "./haze";
+import { BUCKETS, planeWords, SEL } from "./haze.wgsl";
 import { addHazeDilations } from "./raster-dilate";
 import {
 	GUIDED_PARAMS,
@@ -135,25 +140,7 @@ const GROUP = "look-tex";
 const buf = (id: string, source: string, layout: [string, BindKind][]) =>
 	defineKernel(id, source, layout, { group: GROUP, label: `look-tex-${id}` });
 
-const GF_KERNELS = {
-	prep: buf("gf-prep", GF_PREP, [
-		["prm", "uniform"],
-		["gI", "read-only-storage"],
-		["gp", "read-only-storage"],
-		["s1", "storage"],
-	]),
-	solve: buf("gf-solve", GF_SOLVE, [
-		["prm", "uniform"],
-		["s3", "read-only-storage"],
-		["ab", "storage"],
-	]),
-	finish: buf("gf-finish", GF_FINISH, [
-		["prm", "uniform"],
-		["ab3", "read-only-storage"],
-		["gI", "read-only-storage"],
-		["q", "storage"],
-	]),
-};
+const GF_KERNELS = GUIDED_KERNELS;
 const K_PACK = buf("pack-masks", PACK_MASKS, [
 	["prm", "uniform"],
 	["qc", "read-only-storage"],
@@ -161,68 +148,23 @@ const K_PACK = buf("pack-masks", PACK_MASKS, [
 	["qf", "read-only-storage"],
 	["outp", "storage"],
 ]);
-const STATS_LAYOUT: [string, BindKind][] = [
-	["prm", "uniform"],
-	["photo", "read-only-storage"],
-	["layer", "read-only-storage"],
-	["range", "read-only-storage"],
-	["fg", "read-only-storage"],
-	["lut", "read-only-storage"],
-	["partial", "storage"],
+
+/**
+ * The look kernels this pass shares with the array-path modules (one spec each, so one pipeline per
+ * device): the "look" / "look-subgroups" warm groups build them; warmTextureKernels adds the ones
+ * the sync graph compile looks up so "warm" still means every pipeline is built.
+ */
+const SHARED_KERNELS: KernelSpec[] = [
+	...Object.values(GUIDED_KERNELS),
+	K_BAND_STATS,
+	K_HZ_PREP,
+	K_HZ_BIN,
+	K_HZ_SEL_INIT,
+	K_HZ_HIST,
+	K_HZ_SCAN,
 ];
-const K_BAND_STATS = buf("band-stats", BAND_STATS, STATS_LAYOUT);
-// needs the "subgroups" feature: its own warm-up group
-const K_BAND_STATS_SG = defineKernel(
-	"band-stats-sg",
-	BAND_STATS_SG,
-	STATS_LAYOUT,
-	{
-		group: `${GROUP}-subgroups`,
-		label: "look-tex-band-stats-sg",
-	},
-);
-const K_HZ_PREP = buf("hz-prep", HZ_PREP, [
-	["prm", "uniform"],
-	["photo", "read-only-storage"],
-	["xb", "read-only-storage"],
-	["yb", "read-only-storage"],
-	["lut", "read-only-storage"],
-	["range", "read-only-storage"],
-	["fgm", "read-only-storage"],
-	["lin", "storage"],
-	["masks", "storage"],
-]);
-const K_HZ_BIN = buf("hz-bin", HZ_BIN, [
-	["prm", "uniform"],
-	["near", "read-only-storage"],
-	["range", "read-only-storage"],
-	["psky", "read-only-storage"],
-	["bins", "storage"],
-	["counts", "storage"],
-]);
-const K_HZ_SEL_INIT = buf("hz-sel-init", HZ_SEL_INIT, [
-	["counts", "read-only-storage"],
-	["state", "storage"],
-]);
+
 const K_ZERO = buf("zero-u32", ZERO_U32, [["buf", "storage"]]);
-const K_HZ_HIST = buf("hz-hist", HZ_HIST, [
-	["prm", "uniform"],
-	["bins", "read-only-storage"],
-	["lin", "read-only-storage"],
-	["state", "read-only-storage"],
-	["hist", "storage"],
-]);
-const HZ_SCAN_LAYOUT: [string, BindKind][] = [
-	["prm", "uniform"],
-	["hist", "read-only-storage"],
-	["state", "storage"],
-];
-const K_HZ_SCAN = buf("hz-scan", HZ_SCAN, HZ_SCAN_LAYOUT);
-// HZ_SCAN by subgroupInclusiveAdd (same bits); needs the "subgroups" feature: its own warm-up group
-const K_HZ_SCAN_SG = defineKernel("hz-scan-sg", HZ_SCAN_SG, HZ_SCAN_LAYOUT, {
-	group: `${GROUP}-subgroups`,
-	label: "look-tex-hz-scan-sg",
-});
 
 // Kernels that read textures: the same core defineKernel with "texture" layout entries (the WGSL's
 // auto layout makes the textureLoad-only textures 'unfilterable-float', which accepts rgba32float
@@ -277,17 +219,32 @@ const K_TEX_FGBITS = texSpec("fgbits", TEX_FGBITS, [
 
 /** Compile every texture-look pipeline now (core warmKernelsAsync(d, "look-tex") does the same in parallel). */
 export function warmTextureKernels(device: Device): number {
-	return warmKernels(device, GROUP);
+	return warmKernels(device, GROUP) + warmSharedKernels(device);
 }
+
+const warmSharedKernels = (device: Device) => {
+	let failed = 0;
+	for (const spec of SHARED_KERNELS)
+		try {
+			kernel(device, spec);
+		} catch (e) {
+			failed++;
+			console.warn(`[gpu] ${spec.label} compile failed`, e);
+		}
+	return failed;
+};
 
 /** Devices whose texture-look pipelines are all built (a sync graph compile then only looks them up). */
 const warmDevices = new WeakSet<Device>();
 
 /** warmTextureKernels without blocking the thread: call it when the render device is adopted. */
 export function warmTextureKernelsAsync(device: Device): Promise<number> {
-	return warmKernelsAsync(device, GROUP).then((n) => {
+	return Promise.all([
+		warmKernelsAsync(device, GROUP),
+		Promise.allSettled(SHARED_KERNELS.map((s) => kernelAsync(device, s))),
+	]).then(([n, shared]) => {
 		warmDevices.add(device);
-		return n;
+		return n + shared.filter((r) => r.status === "rejected").length;
 	});
 }
 

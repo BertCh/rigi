@@ -10,8 +10,8 @@
 // - GPUCommandGraph.add(node) takes any GPUNode (an op with getCommandNodes(graph), a raw node, or a
 //   group). core/graph.ts GraphOp = GPUNode.
 // - gpu/device.ts creates the sidecar with webgpuAdapter.create (optionalFeatures + RAISED_LIMITS as
-//   requiredLimits); sky/model.ts attaches ORT's device with attachWebGPUDevice below, and ORT gets
-//   native objects through nativeWebGPUDevice / nativeWebGPUBuffer.
+//   requiredLimits); attachWebGPUDevice below wraps an app-created GPUDevice (node/Dawn scripts),
+//   and nativeWebGPUDevice / nativeWebGPUBuffer hand native objects to code that needs them.
 // - rigi.3 re-audit (LF7, vs luma master 7289d961 + #3313 #3302 #3287 #3328 #3333 #3334 #3330):
 //   retired nothing, each item below was re-read in node_modules/@luma.gl/*/dist.
 //   - Buffer.readAsync on a non-MAP_READ buffer: #3330 stages only the requested range, but it still
@@ -48,7 +48,7 @@ import { getShaderLayoutFromWGSL, webgpuAdapter } from "@luma.gl/webgpu";
 /**
  * Wraps an app-created GPUDevice as a luma Device (WebGPUAdapter.attach, luma #3313). Call the
  * adapter directly, not luma.attachDevice. `ownsHandle` makes Device.destroy() also destroy the
- * GPUDevice (releaseWhenIdle relies on it); false leaves it alive, for ORT's device. We do this
+ * GPUDevice (releaseWhenIdle relies on it); false leaves it alive, for a device the caller owns. We do this
  * ourselves because #3313 dropped its `_ownsHandle` prop (b1728918): attached devices always
  * belong to the app upstream, so passing the prop would silently leak on the npm release.
  */
@@ -72,12 +72,12 @@ export const attachWebGPUDevice = async (
 
 /**
  * The native GPUDevice behind a luma WebGPU device (WebGPUDevice.handle, public), for libraries that
- * take native objects (onnxruntime-web). With attachWebGPUDevice, the app's one WebGPU interop point.
+ * take native objects (the Dawn scripts, the sky prep). With attachWebGPUDevice, the app's one WebGPU interop point.
  */
 export const nativeWebGPUDevice = (device: Device): GPUDevice =>
 	(device as WebGPUDevice).handle;
 
-/** The native GPUBuffer behind a luma WebGPU buffer (WebGPUBuffer.handle, public), for ORT tensors. */
+/** The native GPUBuffer behind a luma WebGPU buffer (WebGPUBuffer.handle, public), for kernels that bind native buffers. */
 export const nativeWebGPUBuffer = (buffer: Buffer): GPUBuffer =>
 	(buffer as WebGPUBuffer).handle;
 

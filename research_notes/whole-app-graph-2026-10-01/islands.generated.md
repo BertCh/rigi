@@ -44,9 +44,9 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | basin-grid | I5 | default | page | per photo | `basin-grid` | skyline score map S, node horizon dirs, candidate rotations, uniforms (pooled imports); scores nodes × cands (transient); best nodes × 3 (transient) | winners: nodes × 3 × (score f32, index u32) |
 | skyglobal | I5 | opt-in | page, bench | per photo | `skyglobal` | score maps, profile (pooled imports); cells, red (transients); rescore "gpu": candidate scores, per-yaw best key / arg (transients) | candidate list: count + head slots, rare second exact read; rescore "gpu": count + per-yaw best key and arg, 4 + 8·nYaw B |
 | skyline | I5 | opt-in | worker:unknown-pose, worker:eye (remote) | per photo | `skyline` | photo planes (rgba, pooled import); features, prior, sky-model cost images (transients) | cost images for the CPU Viterbi + sky-model refit |
-| sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
-| sky-prep | I6 | default | worker:sky (remote) | per photo | `sky-prep` | ImageBitmap → rgba8unorm texture (per photo); tmp (transient); axis taps, constants, LUT (pooled imports); rgba, rgbLo, ORT input (handed to the model and sky-refine) | opacity flag (4 B); first 3 photos per device: rgba + rgbLo + input (verification) |
-| sky-refine | I6 | default | worker:sky (remote) | per photo | `sky-refine` | ORT P(sky) buffer (wrapped per run); guide, rgba, axis taps, LUT (pooled imports) | read: byte mask (+ float mask when asked) |
+| sky-model | I6 | default | worker:sky (remote) | per photo | – | U²-Net-P fp16 weights on the compute device (src/lib/sky/model.ts, u2netp.ts) | – |
+| sky-prep | I6 | default | worker:sky (remote) | per photo | `sky-prep` | ImageBitmap → rgba8unorm texture (per photo); tmp (transient); axis taps, constants, LUT (pooled imports); rgba, rgbLo, normalised model input (handed to the model and sky-refine) | opacity flag (4 B); first 3 photos per device: rgba + rgbLo + input (verification) |
+| sky-refine | I6 | default | worker:sky (remote) | per photo | `sky-refine` | nn P(sky) buffer (wrapped per run); guide, rgba, axis taps, LUT (pooled imports) | read: byte mask (+ float mask when asked) |
 | deck-webgpu-frame | I7 | default | page | per frame | – | geometry / colour / photo targets; TextureArrayAtlas height + imagery arrays | matcher only (renderPoseView, offline): xyzr rgba32f + colour rgba16f per pose view |
 | terrain-gpu-cull | I7 | default | page | per frame | `terrain-cull-*` (uncached) | tile spheres + rows (import, per tile set); per-pass uniform, instance rows and indexed indirect records (imports, encoder ring); vis flags (transient) | – |
 | geo-query-gpu | I8 | default | page | per settle | `geo-query` | geometry target rgba32float (render device; import bound per run); uniforms, inputs, outputs: persistent core pool slots geo-query/<kernel><job>/* (imports bound with exact ranges; written + submitted in one sync block via runNow) | read: verdicts 4 B per peak + skyline 4 B per column (one graph run); read: gather 20 B per pixel (nonce + 4 raw words), only for undecided samples; read: unpack range plane 4 B per pixel and / or xyz plane 12 B per pixel (+ 8 B tag), on demand (ensureRange / ensureFull), instead of the 16 B texel + CPU loop |
@@ -60,7 +60,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | labels | I10 | cpu | page | per emit | – | – | – |
 | splat-sort | I11 | default | page | per view | `splat-sort` | splat storage buffer, order buffer (render device; imports bound per encode); params, depth, mm, keys, rank, tmp (imports, owned by each GpuSplatSorter) | – |
 | horizon-ridges | I12 | default | worker:ridgelines (remote) | per photo | `horizon-ridges` | mosaic pages (imports); u, params | read: ridge tops outBytes |
-| roll-webgl | I12 | cpu | page | per frame | – | deck WebGL2 + raw GL2 programs | range maps |
+| roll-webgl | I12 | cpu | page | per frame | – | WebGPU backend: luma-direct host + deck-webgpu cores (backend-webgpu.ts); WebGL2 fallback: deck + raw GL2 programs | range maps |
 
 ## Notes
 
@@ -81,8 +81,8 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **basin-grid**: basin-gap grid coarse rotation search (rotSearchGpu): SCORE (one workgroup per candidate × node, workgroup atomicMin column table) → TOP3 (1° NMS, per node); throws on a GPU failure and the caller takes rotSearchCpu
 - **skyglobal**: T6 skyline global search; the in-browser matcher's policy t6 (?matcherPolicy=t6, src/lib/matcher/t6.ts) runs it with the candidate re-score on the graph (RESCORE → PICK)
 - **skyline**: detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default on: 0 of 77 unknown-pose decisions changed in the 2026-10-02 node A/B)
-- **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU
-- **sky-prep**: cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; the GPU prep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)
+- **sky-model**: Rigi's nn runtime (src/lib/nn: WGSL kernels on one core ComputeGraph per forward, getNn registry, cachedGraph groups nn/<consumer>) on the sky worker's compute device; the nn CPU reference backend without WebGPU. No ONNX Runtime. The probability buffer feeds sky-refine without leaving the GPU
+- **sky-prep**: cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; the GPU prep (default on since 2026-10-01; off / ?gpu=off / CPU nn backend: the CPU prep)
 - **deck-webgpu-frame**: deck.gl layers in one encoder; not a ComputeGraph
 - **terrain-gpu-cull**: WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; the GPU terrain cull (default on, WebGPU only; ?the GPU terrain cull=off, off / ?gpu=off / WebGL: the CPU twin visibleRows)
 - **geo-query-gpu**: verdicts + skyline share one graph run (one submit, was two); gather runs after it; keyed by kernels and target shape
@@ -94,6 +94,6 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **roll-look**: group-by-look: luma GPUKMeans + GPUSimilaritySearch (centroids as queries) in one graph; similarLooks is a cosine GPUSimilaritySearch
 - **labels**: CPU / DOM by nature; fed by I8's small readbacks
 - **splat-sort**: deck-webgpu splats sortBackend "gpu"; clear + depth + keys kernel nodes + one luma GPUSort in one compute pass, encoded and submitted synchronously on the sorter's encoder (no lease); keyed by buffer sizes
-- **roll-webgl**: WebGL2 only; needs a WebGPU port before it can join a graph
+- **roll-webgl**: src/lib/roll/map/backend-webgpu.ts is the default via ?renderer=auto (backend-select.ts); it draws with deck-webgpu render cores, not yet as a ComputeGraph island (range maps and cull are still outside the graph), so the status stays cpu until they join one
 
 Test and bench groups (not islands): `selftest-cache`, `look-haze-lint`.

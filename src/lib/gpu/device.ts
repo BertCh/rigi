@@ -10,7 +10,7 @@
 //   (one queue, buffers shareable with the renderer). A WebGL device or null is a no-op; losing
 //   the adopted device falls back to the sidecar.
 // - The sidecar requests the adapter's maximum storage / buffer / workgroup limits, so large
-//   kernels (and ORT-sized buffers) fit. Numerics are unaffected: limits only gate validation.
+//   kernels (and model-sized buffers) fit. Numerics are unaffected: limits only gate validation.
 // - hasFeature(device, name) for the optional features kernels may branch on.
 //
 // Device loss: work in flight on a lost device rejects (core/lifecycle.ts untilLost, core/queue.ts
@@ -23,8 +23,7 @@
 // Devices per realm on a typical /photo load (2026-09-30, out/gpu/followups/core/devices-*.json):
 // the page's sidecar, one in the horizon-fast-app worker (terminated after its march) and one in
 // the unknown-pose worker (the second-opinion solve; terminated after it). The eye worker
-// (?eyesearch) adds one while a search runs; ONNX Runtime's webgpu EP in the sky worker creates its
-// own (outside this registry) when sky segmentation runs.
+// (?eyesearch) adds one while a search runs.
 //
 // Every caller keeps its CPU twin: null means take the CPU path.
 
@@ -198,8 +197,8 @@ async function create(): Promise<Device | null> {
  * `requiredLimits` at the adapter's maximum. luma's featureLevel "max" would also request every
  * feature, so the limits are passed explicitly. The adapter's maxima come from a peek adapter
  * (gpu/adapter-peek.ts, same options as luma's own request). A luma-created Device owns
- * its GPUDevice: destroying it (idle release, reset) destroys the GPUDevice. (sky/model.ts still
- * uses attach for ORT's device, which ORT creates and owns.)
+ * its GPUDevice: destroying it (idle release, reset) destroys the GPUDevice. (attachWebGPUDevice is for callers
+ * that bring their own GPUDevice, e.g. the Dawn scripts.)
  */
 async function createSidecar(maxLimits: boolean): Promise<Device> {
 	const requiredLimits: Partial<Record<keyof DeviceLimits, number>> = {};
