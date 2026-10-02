@@ -13,14 +13,9 @@ import type {
 	NameStatus,
 	TerroirName,
 } from "../../../src/lib/terroir/types";
+import { lonLatToLv95, lv95ToLonLat } from "../../lib/lv95";
 import type { Dem } from "./dem";
-import {
-	haversineM,
-	lv95ToWgs84,
-	ringAreaM2,
-	simplify,
-	wgs84ToLv95,
-} from "./geo";
+import { haversineM, ringAreaM2, simplify } from "./geo";
 import { groupRings, readDbf, readShp } from "./shp";
 
 type Row = {
@@ -332,10 +327,10 @@ export async function buildNames(opts: {
 }): Promise<{ names: TerroirName[]; stats: Record<string, number> }> {
 	const { bbox, cacheDir, dem, osmPeaks } = opts;
 	const corners = [
-		wgs84ToLv95(bbox[1], bbox[0]),
-		wgs84ToLv95(bbox[1], bbox[2]),
-		wgs84ToLv95(bbox[3], bbox[0]),
-		wgs84ToLv95(bbox[3], bbox[2]),
+		lonLatToLv95(bbox[0], bbox[1]),
+		lonLatToLv95(bbox[2], bbox[1]),
+		lonLatToLv95(bbox[0], bbox[3]),
+		lonLatToLv95(bbox[2], bbox[3]),
 	];
 	const lv: [number, number, number, number] = [
 		Math.min(...corners.map((c) => c[0])) - 20000,
@@ -403,7 +398,7 @@ export async function buildNames(opts: {
 		if (isHutUse(r)) cls = "hut";
 		if (!cls) continue;
 		const parts = geom.get(r.uuid);
-		let [lon, lat] = lv95ToWgs84(r.E, r.N);
+		let [lon, lat] = lv95ToLonLat(r.E, r.N);
 		let areaKm2: number | undefined;
 		let line: LonLat[] | undefined;
 		let len = 0;
@@ -418,7 +413,7 @@ export async function buildNames(opts: {
 			areaKm2 = Math.max(0, a) / 1e6;
 			if (rings.length) {
 				const lp = labelPoint(polys.length ? polys.map((p) => p[0]) : rings);
-				[lon, lat] = lv95ToWgs84(lp[0], lp[1]);
+				[lon, lat] = lv95ToLonLat(lp[0], lp[1]);
 				if (cls === "ridge" || cls === "valley") {
 					const ax = axisLine(
 						polys.length
@@ -433,7 +428,7 @@ export async function buildNames(opts: {
 					if (ax)
 						line = ax.map(
 							([x, y]) =>
-								lv95ToWgs84(x, y).map(
+								lv95ToLonLat(x, y).map(
 									(v) => Math.round(v * 1e5) / 1e5,
 								) as LonLat,
 						);
@@ -450,7 +445,7 @@ export async function buildNames(opts: {
 					(_, i) => i % Math.ceil(s.length / 60) === 0 || i === s.length - 1,
 				);
 			// anchor: along-line midpoint inside the bbox
-			const geo = s.map(([x, y]) => lv95ToWgs84(x, y));
+			const geo = s.map(([x, y]) => lv95ToLonLat(x, y));
 			const inside = geo.filter((p) => inBox(p[0], p[1]));
 			line = (inside.length >= 2 ? inside : geo).map(
 				(p) => p.map((v) => Math.round(v * 1e5) / 1e5) as LonLat,

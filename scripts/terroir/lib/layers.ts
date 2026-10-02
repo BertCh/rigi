@@ -11,9 +11,10 @@ import type {
 	LithologyUnit,
 	LonLat,
 } from "../../../src/lib/terroir/types";
+import { lonLatToLv95, lv95ToLonLat } from "../../lib/lv95";
 import type { Dem } from "./dem";
 import { cached, cachedZip, getBuf } from "./fetch";
-import { lv95ToWgs84, simplify, wgs84ToLv95 } from "./geo";
+import { simplify } from "./geo";
 import { decodePng } from "./png";
 import { clipRing, fillRings, type Grid, joinWays } from "./raster";
 import { groupRings, readDbf, readShp } from "./shp";
@@ -22,10 +23,10 @@ const r5 = (v: number) => Math.round(v * 1e5) / 1e5;
 
 export const lvBox = (bbox: BBox): [number, number, number, number] => {
 	const c = [
-		wgs84ToLv95(bbox[1], bbox[0]),
-		wgs84ToLv95(bbox[1], bbox[2]),
-		wgs84ToLv95(bbox[3], bbox[0]),
-		wgs84ToLv95(bbox[3], bbox[2]),
+		lonLatToLv95(bbox[0], bbox[1]),
+		lonLatToLv95(bbox[2], bbox[1]),
+		lonLatToLv95(bbox[0], bbox[3]),
+		lonLatToLv95(bbox[2], bbox[3]),
 	];
 	return [
 		Math.min(...c.map((p) => p[0])) - 2000,
@@ -126,7 +127,7 @@ export async function buildGlaciers(
 						([x, y]) => [x + off * 2e6, y + off * 1e6] as [number, number],
 					);
 					pts = simplify(pts, g.tol, true);
-					let ll = pts.map(([x, y]) => lv95ToWgs84(x, y) as [number, number]);
+					let ll = pts.map(([x, y]) => lv95ToLonLat(x, y) as [number, number]);
 					ll = clipRing(ll, bbox);
 					if (ll.length >= 4)
 						rings.push(ll.map(([x, y]) => [r5(x), r5(y)] as LonLat));
@@ -206,7 +207,7 @@ export async function buildLithology(
 					120,
 					true,
 				);
-				let ll = pts.map(([x, y]) => lv95ToWgs84(x, y) as [number, number]);
+				let ll = pts.map(([x, y]) => lv95ToLonLat(x, y) as [number, number]);
 				ll = clipRing(ll, bbox);
 				if (ll.length >= 4)
 					rings.push(

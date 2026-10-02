@@ -23,6 +23,7 @@ import path from "node:path";
 import { createCanvas, ImageData } from "@napi-rs/canvas";
 import { contours } from "d3-contour";
 import { DEM_SOURCES } from "../../src/lib/dem";
+import { lonLatToLv95 } from "../lib/lv95";
 import { demTileLoaderNode, ROOT } from "../lib/node-io";
 import {
 	addContourRing,
@@ -58,24 +59,10 @@ const toSheet = (lon: number, lat: number): [number, number] => [
 	Math.round((Y1 - mercY(lat)) * SCALE),
 ];
 
-/** swisstopo's approximate WGS84 -> LV95 formulas (about 1 m). */
+/** Rigorous WGS84 -> LV95, rounded to whole metres for the sheet metadata. */
 function toLv95(lon: number, lat: number) {
-	const p = (lat * 3600 - 169028.66) / 10000;
-	const l = (lon * 3600 - 26782.5) / 10000;
-	const E =
-		2600072.37 +
-		211455.93 * l -
-		10938.51 * l * p -
-		0.36 * l * p * p -
-		44.54 * l * l * l;
-	const N =
-		1200147.07 +
-		308807.95 * p +
-		3745.25 * l * l +
-		76.63 * p * p -
-		194.56 * l * l * p +
-		119.79 * p * p * p;
-	return [Math.round(E), Math.round(N)];
+	const [easting, northing] = lonLatToLv95(lon, lat);
+	return [Math.round(easting), Math.round(northing)];
 }
 
 // ---------- 1. DEM mosaic (Mapterhorn z13, 512 px tiles) ----------

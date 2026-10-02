@@ -2,45 +2,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// swisstopo approximate WGS84 <-> LV95 formulas (accuracy ~1 m) and small geometry helpers. No deps.
+// Small geometry helpers. LV95 conversion lives in scripts/lib/lv95.ts.
 export type LonLat = [number, number];
-
-export function wgs84ToLv95(lat: number, lon: number): [number, number] {
-	const phi = (lat * 3600 - 169028.66) / 10000;
-	const lam = (lon * 3600 - 26782.5) / 10000;
-	const E =
-		2600072.37 +
-		211455.93 * lam -
-		10938.51 * lam * phi -
-		0.36 * lam * phi ** 2 -
-		44.54 * lam ** 3;
-	const N =
-		1200147.07 +
-		308807.95 * phi +
-		3745.25 * lam ** 2 +
-		76.63 * phi ** 2 -
-		194.56 * lam ** 2 * phi +
-		119.79 * phi ** 3;
-	return [E, N];
-}
-export function lv95ToWgs84(E: number, N: number): LonLat {
-	const y = (E - 2600000) / 1e6;
-	const x = (N - 1200000) / 1e6;
-	const lam =
-		2.6779094 +
-		4.728982 * y +
-		0.791484 * y * x +
-		0.1306 * y * x ** 2 -
-		0.0436 * y ** 3;
-	const phi =
-		16.9023892 +
-		3.238272 * x -
-		0.270978 * y ** 2 -
-		0.002528 * x ** 2 -
-		0.0447 * y ** 2 * x -
-		0.014 * x ** 3;
-	return [(lam * 100) / 36, (phi * 100) / 36];
-}
 
 /** Douglas-Peucker on a planar ring/line (units of the input; pass tolerance in the same units). */
 export function simplify(
