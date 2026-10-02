@@ -76,6 +76,8 @@ type Entry = {
 	rev: number;
 	/** The fit for `rev` has finished (values may be CLEAR_AIR_OFF). */
 	fitted: boolean;
+	/** Values and exposure came baked (setBaked): never fitted or re-solved here. */
+	baked?: boolean;
 	values: ClearAirValues;
 	samples?: GainSamples;
 	exposure: Vec3;
@@ -165,6 +167,52 @@ export class DrapeClear {
 	/** Does `id` have a range map for the fit? (roll-map skips the readback otherwise.) */
 	hasRange(id: string) {
 		return !!this.entries.get(id)?.range;
+	}
+
+	/**
+	 * Baked values (RollMapOptions.seed, ./roll-seed.ts): the photo's 16 texel floats as texels()
+	 * gave them. The photo counts as fitted: no fit, no range map needed, and it stays out of the
+	 * gain solve (its exposure is part of the bake) until unbake().
+	 */
+	setBaked(id: string, texels: Float32Array) {
+		const t = texels;
+		const e = this.entry(id);
+		e.values = {
+			airlight: [t[0], t[1], t[2]],
+			amount: t[3],
+			betaR: [t[4], t[5], t[6]],
+			betaM: t[7],
+			h: [t[8], t[9]],
+			floor: t[10],
+		};
+		e.exposure = [t[12], t[13], t[14]];
+		e.fitted = true;
+		e.baked = true;
+		this.upload();
+	}
+
+	/** The photo moved (roll-map updateRoll): back to unfitted, fitted again once a range map comes. */
+	unbake(id: string) {
+		const e = this.entries.get(id);
+		if (!e?.baked) return;
+		e.baked = false;
+		e.fitted = false;
+		e.values = CLEAR_AIR_OFF;
+		e.exposure = [1, 1, 1];
+		this.upload();
+		this.schedule(id);
+	}
+
+	/** Was `id` given baked values (setBaked)? Then roll-map hands it no range map. */
+	isBaked(id: string) {
+		return !!this.entries.get(id)?.baked;
+	}
+
+	/** The photo's 16 texel floats as the shader gets them (for the bake), null before init. */
+	texels(id: string): Float32Array | null {
+		const k = this.index.get(id);
+		if (k === undefined || !this.texture) return null;
+		return this.pack().slice(k * 16, k * 16 + 16);
 	}
 
 	private entry(id: string) {
@@ -309,7 +357,7 @@ export class DrapeClear {
 		const ids: string[] = [];
 		const photos: GainPhoto[] = [];
 		for (const [id, e] of this.entries) {
-			if (!e.cam || !e.range || !e.pixels) continue;
+			if (e.baked || !e.cam || !e.range || !e.pixels) continue;
 			e.samples ??= sampleGrid(e.cam, e.range, e.pixels);
 			ids.push(id);
 			photos.push({

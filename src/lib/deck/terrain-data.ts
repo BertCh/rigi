@@ -549,12 +549,19 @@ async function fetchBitmap(
 	return null;
 }
 
-/** Mosaic imagery for every tile (up to 4× finer than the DEM tile's zoom near the camera). */
+/**
+ * Mosaic imagery for every tile (up to 4× finer than the DEM tile's zoom near the camera).
+ * `cpuBitmaps`: mosaic on a CPU-backed canvas (willReadFrequently), so the bitmaps live in memory.
+ * WebGL2 uploads a GPU-backed bitmap into a 2d-array layer (batched-terrain-layer.ts MapPage) by
+ * reading it back first, ~4 ms per 1024² tile on the main thread; a CPU-backed one costs ~1.5 ms
+ * (mosaic + upload). Off by default: WebGPU and texImage2D copy GPU-backed bitmaps on the GPU.
+ */
 export async function loadImagery(
 	tiles: TileMesh[],
 	src: ImagerySource,
 	onTile: (id: string, image: ImageBitmap) => void,
 	signal?: AbortSignal,
+	{ cpuBitmaps = false }: { cpuBitmaps?: boolean } = {},
 ) {
 	await pool(tiles, 8, async (t) => {
 		if (signal?.aborted) return;
@@ -576,7 +583,10 @@ export async function loadImagery(
 		const f = 2 ** extra;
 		const z = t.key.z + extra;
 		const canvas = new OffscreenCanvas(256 * f, 256 * f);
-		const ctx = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D;
+		const ctx = canvas.getContext(
+			"2d",
+			cpuBitmaps ? { willReadFrequently: true } : undefined,
+		) as OffscreenCanvasRenderingContext2D;
 		const jobs: Promise<void>[] = [];
 		for (let dy = 0; dy < f; dy++)
 			for (let dx = 0; dx < f; dx++)

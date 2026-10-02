@@ -40,7 +40,7 @@ import {
 	WorldGizmoLayer,
 	WorldView,
 } from "#/lib/deck/world-view";
-import { tileBounds } from "#/lib/dem";
+import { type DemRaster, tileBounds } from "#/lib/dem";
 import { EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import type { ForegroundMask } from "#/lib/segment";
 import { vpColor } from "../mosaic/style";
@@ -50,6 +50,12 @@ import { DrapeAtlas, MAX_PHOTOS } from "./drape-atlas";
 import { DrapeClear } from "./drape-clear";
 import { type DrapePhoto, MultiDrapeLayer } from "./multi-drape-layer";
 import { RangeGpu } from "./range-gpu";
+import {
+	type ImagerySeed,
+	type PhotoSeed,
+	photoSeedMatches,
+	type RollMapSeed,
+} from "./roll-seed";
 import { loadRollTerrain } from "./roll-terrain";
 
 /** Range map size (long side, px). The drape only needs it for occlusion. */
@@ -116,6 +122,15 @@ export type RollMapOptions = {
 	 * MediaPipe (#/lib/segment). A rejection falls back to live segmentation. Default: none.
 	 */
 	peopleMasks?: () => Promise<ReadonlyMap<string, ForegroundMask | null>>;
+	/**
+	 * Baked terrain, basemap imagery and per-photo range grids + clear-air values for a roll that
+	 * never changes (./roll-seed.ts; the sample trip's bake, #/lib/demo/roll-map-seed). Each part
+	 * replaces the live work it was baked from: DEM tiles in the seed are not fetched, seeded
+	 * imagery is decoded instead of fetched and mosaicked, and a photo whose pose and eye match its
+	 * seed skips both range readbacks and its clear-air fit. A part that fails to load falls back
+	 * to the live path; tiles or photos it lacks take the live path. Default: none.
+	 */
+	seed?: RollMapSeed;
 };
 
 /** Per-path accounting of the range hand-off (debugDrape; EVIDENCE of the GPU path). */
@@ -192,7 +207,15 @@ export class RollMapEngine {
 	/** opts.gpuRange (the test hook may flip it before re-ranging). */
 	private gpuRange: boolean;
 	private rangeGpu: RangeGpu | null = null;
-	private rangeStats = { cpu: noStats(), gpu: noStats() };
+	private rangeStats = { cpu: noStats(), gpu: noStats(), seeded: 0 };
+	/** opts.seed.photos once loaded (only photos whose pose and eye match are used). */
+	private photoSeeds: ReadonlyMap<string, PhotoSeed> | null = null;
+	/** opts.seed.imagery: true while it loads; then the seed (its unused tiles) or null. */
+	private imagerySeedPending = false;
+	private imagerySeed: {
+		source: ImagerySource;
+		tiles: Map<string, Blob>;
+	} | null = null;
 	/** Extra layers added by opt-in features (setExtraLayers), drawn after the drape and frustums. */
 	private extraLayers = new Map<string, unknown[]>();
 	settings = {
@@ -248,6 +271,24 @@ export class RollMapEngine {
 	async init() {
 		const status = this.opts.onStatus;
 		status?.({ stage: "terrain", frac: 0 });
+		const seed = this.opts.seed;
+		const seedPart = <T>(name: string, load?: () => Promise<T>) =>
+			load
+				? load().catch((e) => {
+						console.warn(`[roll-map] baked ${name} unavailable`, e);
+						return null;
+					})
+				: Promise.resolve(null);
+		const terrainSeedP = seedPart("terrain", seed?.terrain);
+		const photoSeedP = seedPart("photos", seed?.photos);
+		if (seed?.imagery) {
+			this.imagerySeedPending = true;
+			void seedPart("imagery", seed.imagery).then((s: ImagerySeed | null) => {
+				this.imagerySeedPending = false;
+				this.imagerySeed = s && { source: s.source, tiles: new Map(s.tiles) };
+				this.updateLayers();
+			});
+		}
 		const photosP = this.loadPhotos();
 		// people masks need only the pixels: segment them while the terrain streams (after any
 		// precomputed masks are in, so those photos are skipped)
@@ -255,9 +296,10 @@ export class RollMapEngine {
 		const masksP = Promise.all([photosP, bakedP]).then(() => this.segmentAll());
 		// the atlas layout needs only the photo sizes: allocate it as soon as the GPU is up
 		void this.ready.then(() => this.makeAtlas());
-		const set = await this.startStreaming();
+		const set = await this.startStreaming(await terrainSeedP);
 		if (!set || this.disposed) return;
 		this.placePhotos(set);
+		this.applyPhotoSeeds(await photoSeedP);
 		this.frameOverview(this.opts.overviewM);
 		await this.ready;
 		if (this.disposed) return;
@@ -311,6 +353,8 @@ export class RollMapEngine {
 			pl.pose = next.pose;
 			pl.eye = next.eye;
 			pl.rev++;
+			// a baked fit was for the old pose
+			this.clear.unbake(pl.id);
 			changed.push(pl);
 		}
 		if (!changed.length) return;
@@ -427,11 +471,12 @@ export class RollMapEngine {
 	}
 
 	/** The roll's terrain, refined around every viewpoint (./roll-terrain.ts). */
-	private async startStreaming() {
+	private async startStreaming(seed: ReadonlyMap<string, DemRaster> | null) {
 		const set = await loadRollTerrain(this.frame, {
 			foci: this.roll.viewpoints,
 			// the roll plus the skyline country around it
 			radiusM: Math.max(40_000, this.roll.radiusM + 30_000),
+			seed: seed ?? undefined,
 			signal: this.loadAbort.signal,
 			onProgress: (d, t) =>
 				this.opts.onStatus?.({
@@ -460,6 +505,27 @@ export class RollMapEngine {
 			pose: { ...p.pose, yaw: p.pose.yaw - (m.lon - this.frame.lon) * sinLat },
 			eye: [e[0], e[1], e[2]] as [number, number, number],
 		};
+	}
+
+	/**
+	 * opts.seed.photos: the photos placed exactly where their seed was made get its clear-air
+	 * values now and its coarse range grid in rangeInto; the rest take the live path.
+	 */
+	private applyPhotoSeeds(seeds: ReadonlyMap<string, PhotoSeed> | null) {
+		if (!seeds || this.disposed) return;
+		const use = new Map<string, PhotoSeed>();
+		for (const p of this.placed) {
+			const s = seeds.get(p.id);
+			if (s && photoSeedMatches(s, p.pose, p.eye)) use.set(p.id, s);
+		}
+		this.photoSeeds = use;
+		for (const [id, s] of use) this.clear.setBaked(id, s.clear);
+	}
+
+	/** A photo's seed, if it still holds for its current pose (updateRoll may have moved it). */
+	private photoSeed(p: Placed) {
+		const s = this.photoSeeds?.get(p.id);
+		return s && photoSeedMatches(s, p.pose, p.eye) ? s : null;
 	}
 
 	private placePhotos(set: TerrainSet) {
@@ -551,20 +617,37 @@ export class RollMapEngine {
 			const t0 = performance.now();
 			if (gpu.ok && src.drawOnly(p.pose)) {
 				const drawSeq = src.drawSeq;
-				const coarse = await gpu.coarse(src.texture, w, h, () => this.disposed);
-				if (this.disposed) return "disposed";
-				if (p.rev !== rev) return "moved";
-				// the target still holds this draw: nothing else renders into a worker's source
-				const t1 = performance.now();
-				if (coarse && atlas.setRangeGpu(k, gpu, src.texture, coarse.grid)) {
-					const s = this.rangeStats.gpu;
-					s.photos++;
-					s.wallMs += performance.now() - t0;
-					s.mainMs += coarse.mainMs + performance.now() - t1;
-					s.bytesDown += coarse.bytes;
+				let landed = false;
+				// a baked coarse grid (opts.seed) for this pose: the target goes into the cell with
+				// no readback at all
+				const seeded = this.photoSeed(p);
+				if (seeded && atlas.setRangeGpu(k, gpu, src.texture, seeded.coarse)) {
+					this.rangeStats.seeded++;
+					landed = true;
+				} else {
+					const coarse = await gpu.coarse(
+						src.texture,
+						w,
+						h,
+						() => this.disposed,
+					);
+					if (this.disposed) return "disposed";
+					if (p.rev !== rev) return "moved";
+					// the target still holds this draw: nothing else renders into a worker's source
+					const t1 = performance.now();
+					if (coarse && atlas.setRangeGpu(k, gpu, src.texture, coarse.grid)) {
+						const s = this.rangeStats.gpu;
+						s.photos++;
+						s.wallMs += performance.now() - t0;
+						s.mainMs += coarse.mainMs + performance.now() - t1;
+						s.bytesDown += coarse.bytes;
+						landed = true;
+					}
+				}
+				if (landed) {
 					// clear air fits the photo on a decimated copy of this range map: one more
 					// readback of the (still intact) target, only while clearAir is on
-					if (this.settings.clearAir && !this.clear.hasRange(p.id)) {
+					if (this.needsClearRange(p)) {
 						const ok = await src.readDrawn(drawSeq, p.pose);
 						if (this.disposed) return "disposed";
 						if (p.rev !== rev) return "moved";
@@ -582,7 +665,8 @@ export class RollMapEngine {
 		const t1 = performance.now();
 		const map = rangeMapFrom(src).data;
 		this.atlas?.setRange(k, map);
-		if (this.settings.clearAir) this.clearRange(p, map, w, h);
+		if (this.settings.clearAir && !this.clear.isBaked(p.id))
+			this.clearRange(p, map, w, h);
 		const s = this.rangeStats.cpu;
 		s.photos++;
 		s.wallMs += performance.now() - t0;
@@ -594,6 +678,15 @@ export class RollMapEngine {
 		s.bytesDown += w * h * 4;
 		s.bytesUp += w * h * 4;
 		return "done";
+	}
+
+	/** Does the clear-air fit still need photo p's range map (on, not given one, not baked)? */
+	private needsClearRange(p: Placed) {
+		return (
+			this.settings.clearAir &&
+			!this.clear.hasRange(p.id) &&
+			!this.clear.isBaked(p.id)
+		);
 	}
 
 	/** Hand photo p's range map (row 0 = top, sky 0 or Infinity) to the clear-air fit. */
@@ -871,7 +964,7 @@ export class RollMapEngine {
 			if (this.settings.clearAir && this.rangesStarted)
 				void this.enqueueRanges(
 					this.placed.filter(
-						(p) => this.slot.has(p.id) && !this.clear.hasRange(p.id),
+						(p) => this.slot.has(p.id) && this.needsClearRange(p),
 					),
 				);
 		}
@@ -899,22 +992,31 @@ export class RollMapEngine {
 			this.imagerySrc = src;
 		}
 		if (!src) return new Map<string, ImageBitmap>();
+		// opts.seed.imagery still loading: wait for it rather than fetch what it may hold
+		if (this.imagerySeedPending) return new Map(this.imagery);
 		const missing = set.tiles.filter((t) => !this.imagery.has(t.id));
 		if (missing.length && !this.imageryAbort) {
 			const ac = new AbortController();
 			this.imageryAbort = ac;
 			missing.sort(this.tileOrder());
 			let n = 0;
-			loadImagery(
-				missing,
-				src,
-				(id, bmp) => {
-					if (ac.signal.aborted) return bmp.close();
-					this.imagery.set(id, bmp);
-					if (n++ % 6 === 0) this.updateLayers();
-				},
-				ac.signal,
-			).finally(() => {
+			const onTile = (id: string, bmp: ImageBitmap) => {
+				if (ac.signal.aborted) return bmp.close();
+				this.imagery.set(id, bmp);
+				if (n++ % 6 === 0) this.updateLayers();
+			};
+			const seed = this.imagerySeed?.source === src ? this.imagerySeed : null;
+			const seeded = seed ? missing.filter((t) => seed.tiles.has(t.id)) : [];
+			const live = seed
+				? missing.filter((t) => !seed.tiles.has(t.id))
+				: missing;
+			Promise.all([
+				seed && decodeSeeded(seeded, seed.tiles, onTile, ac.signal),
+				live.length &&
+					// CPU-backed mosaics: this map always draws through WebGL2, where a GPU-backed
+					// bitmap's texture-array upload is a main-thread readback (loadImagery)
+					loadImagery(live, src, onTile, ac.signal, { cpuBitmaps: true }),
+			]).finally(() => {
 				if (this.imageryAbort === ac) this.imageryAbort = null;
 				if (!ac.signal.aborted) this.updateLayers();
 			});
@@ -1233,6 +1335,7 @@ export class RollMapEngine {
 					ranges: {
 						cpu: { ...this.rangeStats.cpu },
 						gpu: { ...this.rangeStats.gpu },
+						seeded: this.rangeStats.seeded,
 					},
 				}
 			: null;
@@ -1286,4 +1389,28 @@ function scaled(img: HTMLImageElement | ImageBitmap, long: number) {
 		resizeHeight: Math.max(1, Math.round(h * s)),
 		resizeQuality: "high",
 	});
+}
+
+/**
+ * Seeded basemap images (opts.seed.imagery) for `tiles`, in order, a few decodes in flight
+ * (createImageBitmap decodes off the main thread into a CPU-backed bitmap). Each blob is dropped
+ * from the seed once used; a tile whose blob fails to decode gets no image.
+ */
+async function decodeSeeded(
+	tiles: TileMesh[],
+	blobs: Map<string, Blob>,
+	onTile: (id: string, image: ImageBitmap) => void,
+	signal: AbortSignal,
+) {
+	let next = 0;
+	const worker = async () => {
+		while (next < tiles.length && !signal.aborted) {
+			const id = tiles[next++].id;
+			const blob = blobs.get(id);
+			blobs.delete(id);
+			const bmp = blob ? await createImageBitmap(blob).catch(() => null) : null;
+			if (bmp) onTile(id, bmp);
+		}
+	};
+	await Promise.all(Array.from({ length: 4 }, worker));
 }

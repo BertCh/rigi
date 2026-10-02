@@ -22,6 +22,7 @@ import {
 	lonToTileX,
 	type TileKey,
 	tileBounds,
+	tileId,
 } from "#/lib/dem";
 import {
 	distanceM,
@@ -41,6 +42,11 @@ export type RollTerrainOptions = {
 	minZoom?: number;
 	maxZoom?: number;
 	concurrency?: number;
+	/**
+	 * Rasters to use instead of loading (by tile id; RollMapOptions.seed): what loadDemTile and the
+	 * downsample below would give. Tiles missing from it load as usual.
+	 */
+	seed?: ReadonlyMap<string, DemRaster>;
 	onProgress?: (done: number, total: number) => void;
 	signal?: AbortSignal;
 };
@@ -105,14 +111,23 @@ export async function loadRollTerrain(
 	let done = 0;
 	let next = 0;
 	const { grid } = terrainBuild();
+	// seeded tiles build back to back with no fetch in between: yield now and then (no long task)
+	let lastYield = performance.now();
 	const worker = async () => {
 		while (next < want.length && !o.signal?.aborted) {
 			const w = want[next++];
-			let dem: DemRaster | null = await loadDemTile(w.key, {
-				minZoom: (o.minZoom ?? 8) - 2,
-				priority: tilePriority(w.distance, w.key.z),
-				signal: o.signal,
-			}).catch(() => null);
+			const seeded = o.seed?.get(tileId(w.key));
+			if (seeded && performance.now() - lastYield > 8) {
+				await new Promise((r) => setTimeout(r, 0));
+				lastYield = performance.now();
+			}
+			let dem: DemRaster | null =
+				seeded ??
+				(await loadDemTile(w.key, {
+					minZoom: (o.minZoom ?? 8) - 2,
+					priority: tilePriority(w.distance, w.key.z),
+					signal: o.signal,
+				}).catch(() => null));
 			if (dem && !o.signal?.aborted) {
 				while (dem.size > 2 * w.seg && dem.size > 256) dem = downsample2(dem);
 				// the full mesh always (MultiDrapeLayer draws per tile); the batch grid too when

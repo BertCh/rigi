@@ -79,12 +79,17 @@ export function LiveRollMap({
 		let live = true;
 		let engine: RollMapEngine | null = null;
 		(async () => {
-			const [{ loadDemoRoll }, { loadDemoPeopleMasks }, { RollMapEngine }] =
-				await Promise.all([
-					import("#/lib/demo"),
-					import("#/lib/demo/people-masks"),
-					import("#/lib/roll/map/roll-map"),
-				]);
+			const [
+				{ loadDemoRoll },
+				{ loadDemoPeopleMasks },
+				{ demoRollMapSeed },
+				{ RollMapEngine },
+			] = await Promise.all([
+				import("#/lib/demo"),
+				import("#/lib/demo/people-masks"),
+				import("#/lib/demo/roll-map-seed"),
+				import("#/lib/roll/map/roll-map"),
+			]);
 			// the landing's 1024 px copies (the engine works at 1024 px anyway), no trails
 			const roll = await loadDemoRoll({ core: true, smallPhotos: true });
 			if (!live) return;
@@ -92,6 +97,9 @@ export function LiveRollMap({
 				overviewM: OVERVIEW_M,
 				// baked people masks (scripts/demo/bake-people-masks.mjs): no MediaPipe download
 				peopleMasks: loadDemoPeopleMasks,
+				// baked terrain, basemap, range grids and clear-air fits (scripts/demo/bake-roll-map.mjs):
+				// no Mapterhorn / WMTS downloads, no readbacks; any part that fails loads live
+				seed: demoRollMapSeed,
 				onSelect: (id) => id && engine?.flyTo(id),
 				onView: (id) => live && setInPhoto(id),
 				onStatus: (s) => {
