@@ -96,11 +96,11 @@ export function buildTrailSegments(
 				const [plon, plat] = tr.coords[i - 1];
 				const seg = distanceM({ lat: plat, lon: plon }, { lat, lon });
 				const n = Math.max(1, Math.ceil(seg / 40));
-				for (let k = 1; k <= n; k++) {
-					const stepAlong = along + (seg * k) / n;
+				for (let step = 1; step <= n; step++) {
+					const stepAlong = along + (seg * step) / n;
 					const q = place(
-						plon + ((lon - plon) * k) / n,
-						plat + ((lat - plat) * k) / n,
+						plon + ((lon - plon) * step) / n,
+						plat + ((lat - plat) * step) / n,
 					);
 					if (
 						q &&
