@@ -12,8 +12,8 @@ import { readBack } from "../core/readback";
 import { hasFeature } from "../device";
 import type { GpuOut, GridGpuOptions, GridGpuStats } from "./index";
 import {
-	CANDS_WGSL,
 	CELLS_WGSL,
+	FLAGS_WGSL,
 	REDUCE_SG_WGSL,
 	REDUCE_WGSL,
 } from "./skyglobal.wgsl";
@@ -45,11 +45,12 @@ export const K_REDUCE_SG = defineKernel(
 	REDUCE_LAYOUT,
 	{ group: "skyglobal-sg", label: "skyglobal-reduce-sg" },
 );
-export const K_CANDS = spec("cands", CANDS_WGSL, [
+export const K_FLAGS = spec("flags", FLAGS_WGSL, [
 	["u", "uniform"],
 	["cells", "read-only-storage"],
 	["red", "read-only-storage"],
-	["list", "storage"],
+	["vals", "storage"],
+	["flags", "storage"],
 ]);
 
 /** REDUCE with subgroup ops where the device has them (identical output), else the shared-memory tree. */

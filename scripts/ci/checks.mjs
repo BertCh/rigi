@@ -1108,4 +1108,11 @@ export const CHECKS = [
 		cmd: tsx("scripts/gpu/sky-refine-conv-dawn.ts"),
 		timeoutS: 120,
 	},
+	{
+		id: "skyglobal-compaction-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/skyglobal-compaction-dawn.ts"),
+		timeoutS: 120,
+	},
 ];

@@ -17,12 +17,14 @@
 //  - the float32 sum error (GPU sequential and numpy pairwise) is bounded by (na + 8) · 2⁻²³ · Σ|v|.
 // REDUCE: per yaw, the max of `lo` over combos, the argmax of `mid` (first index on ties) and the
 // first combo whose score is a certain exact 0.
-// CANDS: every cell with hi ≥ maxLo(yaw) is appended to a list (of the certain zeros only the first); the CPU re-scores exactly those
-// cells in float64 (cpu.ts cellScore), which yields the CPU grid's per-yaw winner exactly.
+// FLAGS: marks every cell with hi ≥ maxLo(yaw) (of the certain zeros only the first); luma's
+// GPUCompaction (./graph.ts) then compacts the marked cell indices, in ascending order, into the
+// candidate list. The CPU re-scores exactly those cells in float64 (cpu.ts cellScore), which yields
+// the CPU grid's per-yaw winner exactly.
 //
 // @workgroup_size(64) for CELLS: 64 consecutive yaws of one combo per workgroup, so neighbouring
 // invocations read neighbouring profile bins and the same combo constants. REDUCE uses 256
-// invocations per yaw (one workgroup each) striding over the ≤ ~4000 combos. CANDS is 64 × 1.
+// invocations per yaw (one workgroup each) striding over the ≤ ~4000 combos. FLAGS is 256 × 1 over the flat cell index.
 // REDUCE_SG_WGSL is REDUCE with subgroup operations (when the device has "subgroups"): the same
 // max / min / (max mid, first index) results, since each is order-independent.
 
@@ -121,7 +123,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (midCnt >= u.cntReq) { mid = midSum * min(1.0 / nc, 1.0 / f32(midCnt)); }
   var lo = 0.0; var hi = 0.0;
   // w = −1 marks a certain exact 0 (too few samples whatever the ambiguity): only the first one per
-  // yaw can win, so CANDS keeps just that one
+  // yaw can win, so FLAGS keeps just that one
   var tag = f32(nAmb);
   if (cnt + nAmb < u.cntReq) { tag = -1.0; }
   if (cnt + nAmb >= u.cntReq) {
@@ -175,24 +177,34 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
 }
 `;
 
-export const CANDS_WGSL = /* wgsl */ `${HEADER}
+export const FLAGS_WGSL = /* wgsl */ `${HEADER}
 @group(0) @binding(0) var<uniform> u: U;
 @group(0) @binding(1) var<storage, read> cells: array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read> red: array<vec4<f32>>;
-@group(0) @binding(3) var<storage, read_write> list: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> vals: array<u32>;
+@group(0) @binding(4) var<storage, read_write> flags: array<u32>;
 
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let iy = gid.x;
-  let ci = gid.y;
-  if (iy >= u.nYaw || ci >= u.nCombo) { return; }
-  let i = ci * u.nYaw + iy;
-  let e = cells[i];
-  let r = red[iy];
-  if (e.z >= r.x && (e.w >= 0.0 || ci == bitcast<u32>(r.w))) {
-    let slot = atomicAdd(&list[0], 1u);
-    if (slot < u.cap) { atomicStore(&list[slot + 1u], i); }
+// @workgroup_size(256), 1-D over the transients' capacity (2-D when that exceeds the dispatch limit,
+// linearised here): vals[i] = i and flags[i] = 1 for every candidate cell, so luma's GPUCompaction
+// returns the cell indices in ascending order. Both arrays are written in full (past nCells: 0).
+@compute @workgroup_size(256)
+fn main(
+  @builtin(workgroup_id) wid: vec3<u32>,
+  @builtin(num_workgroups) nwg: vec3<u32>,
+  @builtin(local_invocation_index) lid: u32,
+) {
+  let i = (wid.y * nwg.x + wid.x) * 256u + lid;
+  if (i >= arrayLength(&vals)) { return; }
+  var keep = 0u;
+  if (i < u.nYaw * u.nCombo) {
+    let iy = i % u.nYaw;
+    let ci = i / u.nYaw;
+    let e = cells[i];
+    let r = red[iy];
+    if (e.z >= r.x && (e.w >= 0.0 || ci == bitcast<u32>(r.w))) { keep = 1u; }
   }
+  vals[i] = i;
+  flags[i] = keep;
 }
 `;
 

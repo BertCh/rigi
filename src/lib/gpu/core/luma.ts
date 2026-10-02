@@ -132,6 +132,7 @@ export {
 	GPUCommandGraph,
 	GPUCommandGraphEncoding,
 	GPUCommandGraphInspector,
+	GPUCompaction,
 	GPUConditionalOperation,
 	GPUConvolution,
 	GPUFFT1D,

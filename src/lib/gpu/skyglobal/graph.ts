@@ -7,8 +7,9 @@
 // is ./cpu.ts.
 //
 // One encoding per grid, one submit, one read slot:
-//   clear list[0] → CELLS → REDUCE (subgroup or tree) → CANDS → read [list head, red, (debug) cells]
-// The three kernel specs of ./kernels.ts.
+//   CELLS → REDUCE (subgroup or tree) → FLAGS → GPUCompaction (scan + scatter) → copy count to list[0]
+//   → read [list head, red, (debug) cells]
+// The three kernel specs of ./kernels.ts plus luma's GPUCompaction.
 //
 // Buffers:
 // - `cells` (nCells × 16 B, ~24 MB) and `red` (nYaw × 16 B) are graph TRANSIENTS sized to
@@ -18,7 +19,12 @@
 //   otherwise, which stages no copy).
 // - the inputs (u, S, prof, alpha, vfs, combos) are imports: pooled uploads under the "skyglobal"
 //   lease, bound per run.
-// - the candidate `list` is an IMPORT (the pooled "skyglobal/list" slot), not a transient: a list
+// - `vals` / `flags` / `count` (capCells × 4 B, capCells × 4 B, 4 B) are transients of the compaction:
+//   vals[i] = i, flags[i] = candidate?, and the compaction's accepted count, which a copy node moves
+//   into list[0] (count and output must not be one buffer inside one dispatch, WebGPU writable-alias
+//   rules).
+// - the candidate `list` ([count, ascending cell indices…], capCells + 1 words at least: the
+//   compaction needs an output as long as its input) is an IMPORT (the pooled "skyglobal/list" slot), not a transient: a list
 //   longer than the head read needs a second, exact-length read of its tail AFTER the encoding
 //   resolved its count, and a graph transient cannot be read outside its encoding. Kept pooled (and
 //   under the lease until that tail read), it keeps the count-first readback.
@@ -26,13 +32,16 @@
 // Clear audit (transients are never zeroed and alias other transients' bytes): CELLS writes every
 // cells[ci · nYaw + iy] in range (its only return is the range guard) and REDUCE writes red[iy] for
 // every yaw workgroup, and the reads cover only those ranges, so both are "full" writes and need no
-// clear. CANDS appends with atomicAdd on list[0]: the count word is cleared by a clearNode ordered
-// before CANDS (list is an import, so core's lint does not require it; it is the house rule anyway).
+// clear. FLAGS writes vals / flags for the whole capacity (past nCells flags are 0), the compaction
+// writes its scan offsets, the count and output[0..count) (a full write of what is read: list[0] by
+// the copy, the head by readNode, the rest by the tail read, all within [0, count]). Nothing is atomic.
 //
-// Determinism: REDUCE's red[] is order-independent (see skyglobal.wgsl.ts). The list's ORDER is
-// atomicAdd order (not deterministic run to run); its set, the count, red, cells and so the re-scored
-// {best, arg} are. CANDS stays a custom append rather than luma's GPUCompaction: a stable compaction
-// would scan all ~1.5M cells to keep ~800, and the CPU re-score sorts per yaw anyway.
+// Determinism: REDUCE's red[] is order-independent (see skyglobal.wgsl.ts) and the compaction is
+// stable, so the whole list is deterministic run to run: the candidate cell indices (ci · nYaw + iy)
+// in ASCENDING order, then count, red, cells and the re-scored {best, arg}. (The old CANDS appended
+// with atomicAdd: same set, nondeterministic order.) The price is a scan over all capCells cells
+// (~2M, to keep ~800); the scan and scatter are a few bandwidth-bound passes over 8 MB, cheap next to
+// CELLS, and the stable order replaces an atomic hot spot on list[0].
 //
 // Per-call overhead: the compiled graph is cached per
 // (subgroups, input / transient capacities) with core cachedGraph (group "skyglobal", 2 per device),
@@ -44,6 +53,7 @@ import {
 	cachedGraph,
 	releaseCachedGraphs,
 } from "../core/graph";
+import { GPUCompaction } from "../core/luma";
 import {
 	acquire,
 	capacityFor,
@@ -56,8 +66,8 @@ import type { GpuOut, GridGpuOptions, Packed } from "./index";
 import {
 	collect,
 	headFor,
-	K_CANDS,
 	K_CELLS,
+	K_FLAGS,
 	K_REDUCE,
 	K_REDUCE_SG,
 	key,
@@ -95,13 +105,22 @@ function build(
 	const list = imp("list");
 	const cells = g.transientBuffer("cells", cellsBytes);
 	const red = g.transientBuffer("red", redBytes);
-	g.clearNode("clear-count", { buffer: list, size: 4 })
-		.addKernel({
-			id: "cells",
-			spec: K_CELLS,
-			bindings: { u, S, prof, alpha, vfs, combos, cells },
-			workgroups: (p) => [Math.ceil(p.nYaw / 64), p.nCombo],
-		})
+	// the compaction runs over the transient's capacity, so the graph stays keyed on capacities
+	const capCells = cellsBytes / 16;
+	const vals = g.transientBuffer("vals", capCells * 4);
+	const flags = g.transientBuffer("flags", capCells * 4);
+	const count = g.transientBuffer("count", 4);
+	// 256-wide groups over capCells; 2-D (linearised in the shader) past the dispatch limit
+	const nGroups = Math.ceil(capCells / 256);
+	const maxDim = g.device.limits.maxComputeWorkgroupsPerDimension;
+	const groupsX = Math.min(nGroups, maxDim);
+	const groupsY = Math.ceil(nGroups / groupsX);
+	g.addKernel({
+		id: "cells",
+		spec: K_CELLS,
+		bindings: { u, S, prof, alpha, vfs, combos, cells },
+		workgroups: (p) => [Math.ceil(p.nYaw / 64), p.nCombo],
+	})
 		.addKernel({
 			id: "reduce",
 			spec: sub ? K_REDUCE_SG : K_REDUCE,
@@ -109,11 +128,39 @@ function build(
 			workgroups: (p) => [p.nYaw],
 		})
 		.addKernel({
-			id: "cands",
-			spec: K_CANDS,
-			bindings: { u, cells, red, list },
-			workgroups: (p) => [Math.ceil(p.nYaw / 64), p.nCombo],
-			writes: { list: "atomic" },
+			id: "flags",
+			spec: K_FLAGS,
+			bindings: { u, cells, red, vals, flags },
+			workgroups: () => [groupsX, groupsY],
+		})
+		.add(
+			new GPUCompaction({
+				id: "cands",
+				input: g.view(vals, "uint32", capCells),
+				flags: g.view(flags, "uint32", capCells),
+				// list[1 ..]: the head words follow the count word the copy below fills
+				output: g.view(list, "uint32", capCells, 4),
+				count: g.view(count, "uint32", 1),
+			}),
+		)
+		// list = [count, candidates…] as collect() and the head read expect
+		.addCopyPass({
+			id: "cands-count",
+			resources: [
+				{ buffer: count, usage: "copy-source" },
+				{ buffer: list, usage: "copy-destination" },
+			],
+			compile: () => ({
+				encode: ({ commandEncoder, getBuffer }) => {
+					commandEncoder.copyBufferToBuffer({
+						sourceBuffer: getBuffer(count),
+						sourceOffset: 0,
+						destinationBuffer: getBuffer(list),
+						destinationOffset: 0,
+						size: 4,
+					});
+				},
+			}),
 		})
 		// count + the first `head` slots, the reduction, (debug) the whole grid; one staging slot
 		.readNode("read", [
@@ -133,7 +180,7 @@ export function releaseSkyGlobalGraphs(device: Device): Promise<void> {
 	return releaseCachedGraphs(device, SKYGLOBAL_GRAPH_GROUP);
 }
 
-/** gridGpu's GPU phase: upload, CELLS → REDUCE → CANDS, the count-first readback. Call under the "skyglobal" lease. */
+/** gridGpu's GPU phase: upload, CELLS → REDUCE → FLAGS → compaction, the count-first readback. Call under the "skyglobal" lease. */
 export async function gridOnGraph(
 	device: Device,
 	sg: SkyGlobal,
@@ -156,7 +203,13 @@ export async function gridOnGraph(
 		alpha: pooledStorage(device, key("alpha"), P.alpha),
 		vfs: pooledStorage(device, key("vfs"), P.vfs),
 		combos: pooledStorage(device, key("combos"), P.combos),
-		list: acquire(device, key("list"), (cap + 1) * 4, STORAGE),
+		// the compaction's output must hold as many words as its input (capCells), the count word is extra
+		list: acquire(
+			device,
+			key("list"),
+			(Math.max(cap, capacityFor(nCells * 16) / 16) + 1) * 4,
+			STORAGE,
+		),
 	};
 	const cellsBytes = capacityFor(nCells * 16);
 	const redBytes = capacityFor(nYaw * 16);

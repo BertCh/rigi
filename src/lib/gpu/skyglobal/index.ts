@@ -5,8 +5,8 @@
 // GPU path of the T6 skyline global search (tools/matcher/stage1/skyglobal.py; CPU twin ./cpu.ts).
 //
 // Only the exhaustive yaw × pitch × roll × FOV grid runs on the GPU (skyglobal.wgsl.ts: CELLS →
-// REDUCE → CANDS). The GPU returns, per yaw, the few cells whose certified score interval reaches the
-// best lower bound; the CPU re-scores exactly those cells with cpu.ts cellScore (float64, numpy's
+// REDUCE → FLAGS → luma GPUCompaction). The GPU returns, per yaw, the few cells whose certified
+// score interval reaches the best lower bound, as a stable (ascending cell index) list; the CPU re-scores exactly those cells with cpu.ts cellScore (float64, numpy's
 // pairwise float32 sum), so gridGpu's {best, arg} equal gridCpu's bit for bit whenever the interval
 // assumptions hold (see the WGSL header). Pre-steps (sky model, score maps, profile) and the polish
 // (coordinate descent, ~1400 sequential pose scores) stay on the CPU: they are cheap there and the
@@ -14,7 +14,7 @@
 //
 // Not wired into the service: see the parity / timing report (scripts/gpu/skyglobal-bench.mjs).
 //
-// Plumbing (src/lib/gpu/core): one core ComputeGraph encoding (./graph.ts; cells / red are graph
+// Plumbing (src/lib/gpu/core): one core ComputeGraph encoding (./graph.ts; cells / red / compaction scratch are graph
 // transients, cached per capacity; the inputs and the candidate list are pooled imports) under the
 // "skyglobal" lease (one grid on the GPU at a time; the lease covers the GPU phase only, not the CPU
 // re-score). The pooled per-pass path it replaced (bit for bit) was removed on 2026-10-01. Kernel
@@ -33,19 +33,19 @@ import {
 	SkyGlobal,
 } from "./cpu";
 import { gridOnGraph, releaseSkyGlobalGraphs } from "./graph";
-import { K_CANDS, K_CELLS, OWNER, reduceSpec } from "./kernels";
+import { K_CELLS, K_FLAGS, OWNER, reduceSpec } from "./kernels";
 import { COMBO_FLOATS } from "./skyglobal.wgsl";
 import { packSkyGlobalUniform } from "./uniforms";
 
 /** Compile the three pipelines now (so the first search does not pay the WGSL compile). */
 export function warmSkyGlobalGpu(device: Device) {
-	for (const k of [K_CELLS, reduceSpec(device), K_CANDS]) kernel(device, k);
+	for (const k of [K_CELLS, reduceSpec(device), K_FLAGS]) kernel(device, k);
 }
 
 /** warmSkyGlobalGpu without blocking the thread (createComputePipelineAsync). */
 export async function warmSkyGlobalGpuAsync(device: Device) {
 	await Promise.all(
-		[K_CELLS, reduceSpec(device), K_CANDS].map((k) => kernelAsync(device, k)),
+		[K_CELLS, reduceSpec(device), K_FLAGS].map((k) => kernelAsync(device, k)),
 	);
 }
 
