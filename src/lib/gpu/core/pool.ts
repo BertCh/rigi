@@ -11,6 +11,12 @@
 // wrap the whole acquire → encode → submit → read sequence in withLease(owner, fn). Leases are a
 // per-key FIFO mutex; a lease on "look-relief" covers every "look-relief/…" slot.
 //
+// Unleased use is safe only when acquire → write → encode → submit run in one synchronous block
+// (geo-query, height-gather): a slot that grows there retires its old buffer, destroyed at the next
+// submit of the device (legal in WebGPU: destroy after submit keeps the data for queued work).
+// A caller that awaits between acquire and submit must hold a lease, which defers the destroy of
+// every slot it covers until the lease ends.
+//
 // Numerics: a pooled buffer is at least as large as asked (so bind `range(buf, bytes)` if the WGSL
 // uses arrayLength()), and holds the previous call's bytes, so zero it (`zero: true` or clear())
 // when a kernel relies on a fresh buffer being zero, as look/kernel.ts's storage(device, n) did.

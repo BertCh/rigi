@@ -21,7 +21,7 @@ import * as ort from "onnxruntime-web";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 import { ComputeGraph, cachedGraphCount } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
-import { capacityFor, pooledStorage } from "#/lib/gpu/core/pool";
+import { capacityFor, pooledStorage, withLease } from "#/lib/gpu/core/pool";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
 	classicalSky,
@@ -218,9 +218,12 @@ async function clearTest(device: Device) {
 	};
 	const run = async (mode: "clear" | "lie") => {
 		const { g, stats } = build(mode);
-		const out = pooledStorage(device, "sky-graph-test/out", n * 4);
-		const { reads } = await g.run(undefined, { buffers: { out } });
-		const [b] = reads.read;
+		// the pooled slot is held from acquire to readback (core/pool.ts: unleased growth is unsafe)
+		const [b] = await withLease("sky-graph-test", async () => {
+			const out = pooledStorage(device, "sky-graph-test/out", n * 4);
+			const { reads } = await g.run(undefined, { buffers: { out } });
+			return reads.read;
+		});
 		g.destroy();
 		const u = new Uint32Array(b);
 		let oddZero = 0;

@@ -2387,7 +2387,7 @@ export class DeckEngine implements Renderer {
 		}
 		const nonce = silNonce();
 		const words = await this.silMask.run(
-			gs.map((s) => (s.texture as unknown as { handle: WebGLTexture }).handle),
+			gs.map((s) => s.texture),
 			W,
 			H,
 			nonce,

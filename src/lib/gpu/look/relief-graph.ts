@@ -75,8 +75,7 @@ export function reliefScratchBytes(res: number) {
 /**
  * Build the relief graph for `res` (imports sized `hBytes` / `prmBytes`), run with
  * `{ degenerate }`. `unsafeSkipClears` exists only for the bench's lint check (compile must throw).
- * `_degenerate` is ignored (kept for the bench's call signature): the SHADOW node is always added,
- * with a CPU condition on the run's parameters (a graph run with `undefined` parameters, as the
+ * The SHADOW node is always added, with a CPU condition on the run's parameters (a graph run with `undefined` parameters, as the
  * bench's lint graph is typed, counts as a non-degenerate sun).
  */
 export function buildReliefGraph<P extends Params | undefined = Params>(
@@ -84,7 +83,6 @@ export function buildReliefGraph<P extends Params | undefined = Params>(
 	res: number,
 	hBytes: number,
 	prmBytes: number,
-	_degenerate?: boolean,
 	unsafeSkipClears = false,
 	out: "read" | "texture" = "read",
 	/** heights produced earlier in this graph (relief-heights.ts); default: an imported "H" */
@@ -256,7 +254,6 @@ export function reliefGraphToTextures(
 					res,
 					gH.byteLength,
 					prm.byteLength,
-					undefined,
 					false,
 					"texture",
 				),

@@ -317,13 +317,28 @@ export class ReliefController {
 	 * update rebuilds.
 	 */
 	get current(): ReliefField | ResidentReliefField | null {
+		if (this.dropDeadResident()) this.key = "";
+		return this.resident ?? this.field;
+	}
+
+	/**
+	 * Drop a resident field whose textures were destroyed or whose device is lost, freeing whatever
+	 * is left of it (one texture may be alive; a live field is never touched: whoever displays it
+	 * owns it, see ResidentReliefField). True when one was dropped.
+	 */
+	private dropDeadResident(): boolean {
 		const r = this.resident;
 		const t = r?.textures;
-		if (t && (t.field.destroyed || t.gen.destroyed || t.field.device.isLost)) {
-			this.resident = null;
-			this.key = "";
+		if (!r || !t) return false;
+		if (!(t.field.destroyed || t.gen.destroyed || t.field.device.isLost))
+			return false;
+		this.resident = null;
+		try {
+			r.dispose();
+		} catch {
+			// the device is gone: nothing left to free
 		}
-		return this.resident ?? this.field;
+		return true;
 	}
 
 	/** The latest field's bytes: `field`, or the resident field read back (lazily, once). */
@@ -376,6 +391,8 @@ export class ReliefController {
 							return;
 						}
 						if ("textures" in f) {
+							// a dead one (device-loss rebuild) still has its other texture to free
+							this.dropDeadResident();
 							this.resident = f;
 							this.field = null;
 						} else {

@@ -6,7 +6,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 
 *Update (2026-10-01): rows re-checked against `git log` after the three.js `PhotoEngine` was removed (583e2b7). Rows that pointed at `src/lib/engine.ts` (three.js) are marked obsolete; the CR-54–CR-68 fixes are cited by commit. CR-69's `relief-graph.ts` is `src/lib/gpu/look/relief-graph.ts`.*
 
-**Summary (2026-10-02):** 75 rows: 57 fixed, 2 partly fixed (CR-12, CR-26), 3 obsolete, 13 open. Open rows need a browser/GPU (CR-13, 14, 40, 41, 45, 46, 67, W1, W2), a user decision (CR-48, W4) or belong to `src/lib/gpu/**` (CR-39, 69).
+**Summary (2026-10-02):** 75 rows: 59 fixed, 2 partly fixed (CR-12, CR-26), 3 obsolete, 11 open. Open rows need a browser/GPU (CR-13, 14, 40, 41, 45, 46, 67, W1, W2) or a user decision (CR-48, W4).
 
 ## Fix first
 
@@ -60,7 +60,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | CR-36 | `refine/robust.ts:394-456, 802-809` | Covariance mixes the IRLS weights of one pose with the Jacobian of the next | fixed f56d391 (pose bit-identical; σ moves ~1e-9) |
 | CR-37 | `gpu/look/textures.ts` | ~20 kernels redefined under "look-tex" → double compile, synchronous on the render thread; subgroup −1 partials wrap to 4.29e9 (`:1125`) | fixed (already on master: 96a6a6f put textures.ts on one core `defineKernel` set + `kernelAsync` warm-up; the -1e20 sentinel is an f32 negative count, rejected by `subgroupLayoutFailed` / the `v < 0` check before any Uint32 fold; spec in this commit) |
 | CR-38 | `gpu/core/graph.ts:398-401` | A rejected `compileAsync` is never cleared, so the graph can't be retried | fixed fec0515 |
-| CR-39 | `gpu/core/pool.ts:58-61, 225-233` | Unleased growth can destroy a buffer another caller holds (only `sky/bench-graph.ts:186` is unleased) | open |
+| CR-39 | `gpu/core/pool.ts:58-61, 225-233` | Unleased growth can destroy a buffer another caller holds (only `sky/bench-graph.ts:186` is unleased) | fixed (grown-out buffers were already retired to the lease end / next submit, f1b6168, and the remaining unleased callers geo-query / height-gather acquire and submit in one synchronous block; bench-graph now runs under `withLease`; invariant documented, afterSubmit specs) |
 | CR-40 | `deck-webgpu/hosts/deck.ts:169-181` | `requestRender` draws synchronously per input event | open |
 | CR-41 | `deck-webgpu/layers/geometry-source.ts:339-356`; `deck/engine.ts` `autoAlign` | A superseded render can be marked fresh; `autoAlign` and `silhouetteScore` share `silSources[0]` | open |
 | CR-42 | `deck/geometry-pass.ts:187-204` | A fence after context loss re-polls at 1 ms forever | fixed fec0515 |
@@ -110,7 +110,7 @@ Suggested commit split for that work: dev launcher; three.js near-eye cut; RollC
 | CR-66 | `deck-webgpu/silhouette-gpu.ts:110-150` | Hand-built pipeline with a fake empty-layout KernelSpec: sync compile on the render thread, invisible to kernel-layout-check | fixed bffe801 |
 | CR-67 | both engines | `silhouetteScoresGpu`, `drawOnly`/`readDrawn` + 4-field pose compare, `occlusionFresh` duplicated across deck/deck-webgpu | open |
 | CR-68 | `gpu/align/index.ts:93,98,271`; `gpu/align/graph.ts:34`; `pose-bound.ts:100-107` | Test-only `faultDeflate` global ships in prod; `STORAGE` redefined; `PoseBoundRaw.n` unread | fixed ac07d45 (faultDeflate DEV-gated, STORAGE deduped; `PoseBoundRaw.n` not rechecked) |
-| CR-69 | `relief-graph.ts:80-90`; `SilhouetteMaskGL.compile()`; `look/relief/field.ts:369-381` | Dead `_degenerate` param; link failure leaks shaders/program/VAO; `resident` replaced without dispose (device-loss rebuild only) | open |
+| CR-69 | `relief-graph.ts:80-90`; `SilhouetteMaskGL.compile()`; `look/relief/field.ts:369-381` | Dead `_degenerate` param; link failure leaks shaders/program/VAO; `resident` replaced without dispose (device-loss rebuild only) | fixed (`_degenerate` removed; SilhouetteMaskGL is a luma Model since eb149b5 and `Model.createAsync` destroys itself on link failure; ReliefController disposes a dead resident field; engine passes luma textures to SilhouetteMaskGL) |
 
 ## Checked and correct
 

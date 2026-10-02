@@ -6,6 +6,7 @@ import type { Device } from "@luma.gl/core";
 import { describe, expect, it } from "vitest";
 import {
 	acquire,
+	afterSubmit,
 	capacityFor,
 	isPooled,
 	pooledStorage,
@@ -169,5 +170,29 @@ describe("withLease", () => {
 		await expect(withLease("two", () => "ok")).resolves.toBe("ok");
 		release();
 		await held;
+	});
+});
+
+describe("afterSubmit (CR-39: unleased growth)", () => {
+	it("destroys a grown-out buffer of an unleased slot only at the next submit", () => {
+		const { device, created } = fakeDevice();
+		acquire(device, "unleased/x", 16, 1);
+		acquire(device, "unleased/x", 1000, 1);
+		expect(created[0].destroyed).toBe(false);
+		afterSubmit(device);
+		expect(created[0].destroyed).toBe(true);
+		expect(created[1].destroyed).toBe(false);
+	});
+	it("never destroys a slot a lease holds, even at a submit from another caller", async () => {
+		const { device, created } = fakeDevice();
+		await withLease("held", async () => {
+			acquire(device, "held/x", 16, 1);
+			acquire(device, "held/x", 1000, 1);
+			afterSubmit(device);
+			await Promise.resolve();
+			afterSubmit(device);
+			expect(created[0].destroyed).toBe(false);
+		});
+		expect(created[0].destroyed).toBe(true);
 	});
 });

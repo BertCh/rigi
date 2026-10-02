@@ -314,7 +314,7 @@ async function lintTest(device: Device) {
 	const out: Record<string, unknown> = {};
 	for (const skip of [true, false]) {
 		const g = new ComputeGraph<undefined>(device, `relief-lint-${skip}`);
-		buildReliefGraph(g, 64, 64 * 64 * 4, 80, false, skip);
+		buildReliefGraph(g, 64, 64 * 64 * 4, 80, skip);
 		try {
 			await g.compileAsync();
 			out[skip ? "withoutClears" : "withClears"] = "compiled";

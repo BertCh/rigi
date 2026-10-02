@@ -493,7 +493,7 @@ function buildGatherGraph(
 		bindings: { prm, nodes, tiles, th, H },
 		workgroups: [Math.ceil(s.res / 16), Math.ceil(s.res / 16)],
 	});
-	buildReliefGraph(g, s.res, 0, reliefPrmBytes, undefined, false, "texture", H);
+	buildReliefGraph(g, s.res, 0, reliefPrmBytes, false, "texture", H);
 }
 
 /** Last gather run (bench / tests). */
