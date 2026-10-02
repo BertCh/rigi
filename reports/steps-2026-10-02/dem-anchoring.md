@@ -117,6 +117,11 @@ Sources: [Image-adaptive scale fields](https://arxiv.org/pdf/2605.07418), [TanDe
   exact; edgeGuard indexing and default-off; octave floor default bit-identical). Fixes from it, in this commit: the
   fallback spec now checks the ratio is proportional and sane, and an edgeGuard spec at stride 2. Noted, not
   changed: an invalid (sky) model neighbour is not an edge by itself; the DEM-hole rule catches the sky side.
+- **Fast tier** (eval worktree, before landing): 109 pass, 4 fail, 5 skip. None of the failures touch nearfield:
+  biome NEW errors in `src/lib/roll/import/__tests__/save-status.spec.ts` and `src/routes/roll.import.tsx` (peer work
+  already on master), `unit` (python-unit spec and `upload/index.spec.tsx` libheif `?url` denied through the worktree's
+  node_modules symlink), `align-cert`, `roll-propagate` (no `public/photos/photos.json` in the worktree). The
+  machine also hit ENOSPC mid-run. `npx vitest run src/lib/nearfield` 352/352, biome clean on every changed file.
 - **U3 not run** (needs U2's data). The knobs stay opt-in. Side observation on the single wrong-eye view: `cliff`
   raised quality 0.21 → 0.47 and `edge15` 0.21 → 0.24. Masking discontinuities raises quality on a WRONG eye too,
   which is consistent with the recorded negative "anchor fit as a pose verifier"; it is one view, so it is a reason
