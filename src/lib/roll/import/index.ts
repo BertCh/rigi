@@ -39,6 +39,7 @@ export {
 } from "./interpolate";
 export { createPool } from "./pool";
 export { loadProvenance, type PositionProvenance } from "./provenance";
+export { markSavingFailed } from "./save-status";
 export { reuseIfSame } from "./stable";
 
 /** Decodes in flight at once (HEIC decode is heavy: ~100 MB of pixels per 12 MP frame). */

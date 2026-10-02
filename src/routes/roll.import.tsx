@@ -26,6 +26,7 @@ import {
 	type LatLon,
 	type Placement,
 	placeBatch,
+	markSavingFailed,
 	placedMeta,
 	provenanceOf,
 	readFileId,
@@ -382,12 +383,8 @@ function ImportPage() {
 		} catch (e) {
 			if (ctl.signal.aborted || !alive.current) return;
 			console.error("[roll import] save", e);
-			for (const i of ready)
-				if (i.status === "saving")
-					updateItem(i.key, {
-						status: "save-error",
-						error: (e as Error).message,
-					});
+			// `ready` is the click-time snapshot: read the current statuses through the updater
+			setItems((xs) => markSavingFailed(xs, (e as Error).message));
 			setPhase({ kind: "error", message: (e as Error).message });
 		} finally {
 			if (saveCtl.current === ctl) saveCtl.current = null;
