@@ -30,14 +30,15 @@ import { HandFrame, HandLoop, HandSideRule, HandUnderline } from "./hand";
 import { useInView } from "./hooks";
 import { dashFor, inkFor, layerOfColor, type PhotoLayer } from "./inks";
 import { HandLabel } from "./labels";
-import { EASE, MOTION, stagger } from "./motion";
 import {
 	ARM,
 	ARM_SEQUENCE,
 	type BeatKind,
 	type BeatSpec,
 	dwellOf,
+	EASE,
 	MOTION,
+	stagger,
 	useArmedInView,
 	useBeats,
 	useMotionAllowed,
