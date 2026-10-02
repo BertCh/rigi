@@ -6,6 +6,9 @@
 // heuristic sky prior, and the sky-model probability) as two ComputeGraphs (group "skyline"). The sky-model
 // fits (f64 IRLS) and the Viterbi passes stay on the CPU; detectSkylineGpu feeds them through
 // detectSkylineWith. The CPU path is the reference (f32 here vs f64 arithmetic there): ?skylineGpu=off.
+// The five box blurs are luma GPUConvolution nodes (direct strategy, zero boundary, all-ones kernel; a y blur
+// is one conv per plane through byteOffset views) followed by a FIX kernel that adds the clamp-to-edge
+// correction and divides by 2r+1, so the sums agree with the CPU boxBlur to f32 rounding, not bit for bit.
 import type { Device } from "@luma.gl/core";
 import {
 	detectSkylineWith,
@@ -23,6 +26,7 @@ import {
 	storage,
 	uniform,
 } from "#/lib/gpu/core/kernel";
+import { GPUConvolution, type GraphBufferHandle } from "#/lib/gpu/core/luma";
 import { withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
 import { getComputeDevice } from "#/lib/gpu/device";
@@ -32,7 +36,7 @@ import {
 	SKYLINE_MODEL,
 	SKYLINE_PRIOR,
 	SKYLINE_UNPACK,
-	skylineBlurSource,
+	skylineBlurFixSource,
 } from "./skyline.wgsl";
 import { packSkylineParams } from "./uniforms";
 
@@ -41,10 +45,11 @@ const WG = 256;
 const RO = "read-only-storage" as const;
 const def = (id: string, src: string, layout: [string, BindKind][]) =>
 	defineKernel(id, src, layout, { group: GROUP, label: `skyline-${id}` });
-const blur = (axis: "x" | "y", r: number, nc: number) =>
-	def(`blur-${axis}${r}-c${nc}`, skylineBlurSource(axis, r, nc), [
+const blurFix = (axis: "x" | "y", r: number, nc: number) =>
+	def(`blurfix-${axis}${r}-c${nc}`, skylineBlurFixSource(axis, r, nc), [
 		["prm", "uniform"],
 		["src", RO],
+		["tmp", RO],
 		["dst", "storage"],
 	]);
 
@@ -52,12 +57,13 @@ const K_UNPACK = def("unpack", SKYLINE_UNPACK, [
 	["prm", "uniform"],
 	["rgba", RO],
 	["p0", "storage"],
+	["ones", "storage"],
 ]);
-const K_BLUR_X1 = blur("x", 1, 3);
-const K_BLUR_Y1 = blur("y", 1, 3);
-const K_BLUR_X2 = blur("x", 2, 3);
-const K_BLUR_X3 = blur("x", 3, 1);
-const K_BLUR_Y3 = blur("y", 3, 1);
+const K_FIX_X1 = blurFix("x", 1, 3);
+const K_FIX_Y1 = blurFix("y", 1, 3);
+const K_FIX_X2 = blurFix("x", 2, 3);
+const K_FIX_X3 = blurFix("x", 3, 1);
+const K_FIX_Y3 = blurFix("y", 3, 1);
 const K_GRAD = def("grad", SKYLINE_GRAD, [
 	["prm", "uniform"],
 	["rgb", RO],
@@ -104,62 +110,76 @@ function buildFeatureGraph(g: ComputeGraph<Params>, w: number, h: number) {
 	const cs = g.transientBuffer("cs", 3 * n * F4);
 	const grad = g.transientBuffer("grad", n * F4);
 	const gt = g.transientBuffer("gt", n * F4);
+	const ones = g.transientBuffer("ones", 8 * F4);
 	const wg1: [number] = [Math.ceil(n / WG)];
-	const wg3: [number] = [Math.ceil((3 * n) / WG)];
+	/** One clamp-to-edge box blur of `nc` planes of w × h: GPUConvolution window sums, then the edge fix. */
+	const blur = (
+		id: string,
+		axis: "x" | "y",
+		r: number,
+		nc: number,
+		fix: typeof K_FIX_X1,
+		src: GraphBufferHandle,
+		dst: GraphBufferHandle,
+	) => {
+		const taps = g.view(ones, "float32", 2 * r + 1);
+		const sums = g.transientBuffer(`${id}-sums`, nc * n * F4);
+		const kw = axis === "x" ? 2 * r + 1 : 1;
+		const kh = axis === "x" ? 1 : 2 * r + 1;
+		// x: planes stacked vertically never couple along x, so one conv over w × nc·h; y: one per plane
+		for (let c = 0; c < (axis === "x" ? 1 : nc); c++) {
+			const len = axis === "x" ? nc * n : n;
+			const at = axis === "x" ? 0 : c * n * F4;
+			g.add(
+				new GPUConvolution({
+					id: `${id}-conv${c}`,
+					width: w,
+					height: axis === "x" ? nc * h : h,
+					kernelWidth: kw,
+					kernelHeight: kh,
+					strategy: "direct",
+					boundary: "zero",
+					input: g.view(src, "float32", len, at),
+					kernel: taps,
+					output: g.view(sums, "float32", len, at),
+				}),
+			);
+		}
+		g.addKernel({
+			id,
+			spec: fix,
+			bindings: { prm, src, tmp: sums, dst },
+			workgroups: [Math.ceil((nc * n) / WG)],
+		});
+	};
 	g.addKernel({
 		id: "unpack",
 		spec: K_UNPACK,
-		bindings: { prm, rgba, p0 },
+		bindings: { prm, rgba, p0, ones },
 		workgroups: wg1,
-	})
-		.addKernel({
-			id: "bx1",
-			spec: K_BLUR_X1,
-			bindings: { prm, src: p0, dst: t1 },
-			workgroups: wg3,
-		})
-		.addKernel({
-			id: "by1",
-			spec: K_BLUR_Y1,
-			bindings: { prm, src: t1, dst: rgb },
-			workgroups: wg3,
-		})
-		.addKernel({
-			id: "bx2",
-			spec: K_BLUR_X2,
-			bindings: { prm, src: p0, dst: cs },
-			workgroups: wg3,
-		})
-		.addKernel({
-			id: "grad",
-			spec: K_GRAD,
-			bindings: { prm, rgb, grad },
-			workgroups: wg1,
-		})
-		.addKernel({
-			id: "bx3",
-			spec: K_BLUR_X3,
-			bindings: { prm, src: grad, dst: gt },
-			workgroups: wg1,
-		})
-		.addKernel({
-			id: "by3",
-			spec: K_BLUR_Y3,
-			bindings: { prm, src: gt, dst: tex },
-			workgroups: wg1,
-		})
-		.addKernel({
-			id: "edge",
-			spec: K_EDGE,
-			bindings: { prm, cs, edge, stp },
-			workgroups: wg1,
-		})
-		.addKernel({
-			id: "prior",
-			spec: K_PRIOR,
-			bindings: { prm, rgb, tex, prior },
-			workgroups: wg1,
-		});
+	});
+	blur("bx1", "x", 1, 3, K_FIX_X1, p0, t1);
+	blur("by1", "y", 1, 3, K_FIX_Y1, t1, rgb);
+	blur("bx2", "x", 2, 3, K_FIX_X2, p0, cs);
+	g.addKernel({
+		id: "grad",
+		spec: K_GRAD,
+		bindings: { prm, rgb, grad },
+		workgroups: wg1,
+	});
+	blur("bx3", "x", 3, 1, K_FIX_X3, grad, gt);
+	blur("by3", "y", 3, 1, K_FIX_Y3, gt, tex);
+	g.addKernel({
+		id: "edge",
+		spec: K_EDGE,
+		bindings: { prm, cs, edge, stp },
+		workgroups: wg1,
+	}).addKernel({
+		id: "prior",
+		spec: K_PRIOR,
+		bindings: { prm, rgb, tex, prior },
+		workgroups: wg1,
+	});
 }
 
 function buildModelGraph(g: ComputeGraph<Params>, w: number, h: number) {

@@ -5,6 +5,8 @@
 // WGSL for the GPU skyline cost images: the per-pixel stages of src/lib/geo/skyline.ts (computeFeatures,
 // heuristicSky, modelSky) in f32, one pixel (or one pixel-channel) per invocation. The CPU twin is the
 // reference and runs in f64 over f32 images; these differ at f32 rounding level only (see README.md).
+// The five box blurs are luma GPUConvolution (direct, zero boundary, all-ones kernel) plus a FIX kernel
+// per blur here that turns the zero-boundary sum into the CPU's clamp-to-edge mean.
 // Planar layouts: three-channel images are 3·n f32 (R plane, G plane, B plane).
 
 const PARAMS = /* wgsl */ `
@@ -19,13 +21,16 @@ fn sm(a: f32, b: f32, x: f32) -> f32 {
 }
 `;
 
-/** rgba words → p0, the planar r/g/b bytes / 255. */
+/** rgba words → p0, the planar r/g/b bytes / 255; also fills `ones` (8 × 1.0, the blur convolution kernel). */
 export const SKYLINE_UNPACK = /* wgsl */ `${PARAMS}
 @group(0) @binding(1) var<storage, read> rgba: array<u32>;
 @group(0) @binding(2) var<storage, read_write> p0: array<f32>;
+@group(0) @binding(3) var<storage, read_write> ones: array<f32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
+  // the all-ones kernel views of the GPUConvolution nodes (at most 2·3+1 = 7 taps), written by the first threads
+  if (i < 8u) { ones[i] = 1.0; }
   if (i >= prm.n) { return; }
   let v = rgba[i];
   p0[i] = f32(v & 255u) / 255.0;
@@ -34,31 +39,41 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
-/** Box blur of `nc` planes along x or y, radius `r`, clamped edges (CPU boxBlur / boxBlurH). */
-export function skylineBlurSource(axis: "x" | "y", r: number, nc: number) {
-	const tap =
+/**
+ * Clamp-to-edge fix of one box blur: `tmp` is the zero-boundary window sum from GPUConvolution (all-ones
+ * kernel of 2r+1 taps along `axis`), `src` the blur input. The CPU boxBlur clamps x+d into [0, len-1], so
+ * every tap outside the image reads the edge sample: add max(0, r - i) copies of the first sample and
+ * max(0, i + r - (len - 1)) of the last, then divide by 2r+1 (CPU boxBlur / boxBlurH). `nc` planes of
+ * w × h are stacked, so an x blur sees them as one w × (nc·h) field. Workgroup size 256, one element each.
+ */
+export function skylineBlurFixSource(axis: "x" | "y", r: number, nc: number) {
+	const edges =
 		axis === "x"
-			? "let xx = clamp(x + d, 0, w - 1); acc += src[base + u32(y * w + xx)];"
-			: "let yy = clamp(y + d, 0, h - 1); acc += src[base + u32(yy * w + x)];";
+			? `let row = p / prm.w;
+  let i = i32(p % prm.w);
+  let len = i32(prm.w);
+  let first = src[base + row * prm.w];
+  let last = src[base + row * prm.w + prm.w - 1u];`
+			: `let x = p % prm.w;
+  let i = i32(p / prm.w);
+  let len = i32(prm.h);
+  let first = src[base + x];
+  let last = src[base + (prm.h - 1u) * prm.w + x];`;
 	return /* wgsl */ `${PARAMS}
 @group(0) @binding(1) var<storage, read> src: array<f32>;
-@group(0) @binding(2) var<storage, read_write> dst: array<f32>;
+@group(0) @binding(2) var<storage, read> tmp: array<f32>;
+@group(0) @binding(3) var<storage, read_write> dst: array<f32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let idx = gid.x;
   if (idx >= ${nc}u * prm.n) { return; }
   let c = idx / prm.n;
   let p = idx % prm.n;
-  let w = i32(prm.w);
-  let h = i32(prm.h);
-  let x = i32(p % prm.w);
-  let y = i32(p / prm.w);
   let base = c * prm.n;
-  var acc = 0.0;
-  for (var d = -${r}; d <= ${r}; d++) {
-    ${tap}
-  }
-  dst[idx] = acc / ${2 * r + 1}.0;
+  ${edges}
+  let lo = f32(max(0, ${r} - i));
+  let hi = f32(max(0, i + ${r} - (len - 1)));
+  dst[idx] = (tmp[idx] + lo * first + hi * last) / ${2 * r + 1}.0;
 }
 `;
 }
