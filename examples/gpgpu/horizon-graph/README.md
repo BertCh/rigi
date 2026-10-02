@@ -5,6 +5,8 @@ Switzerland) on the GPU with `GPUCommandGraph`, checks it against an f32 CPU twi
 panorama silhouette with a luma.gl `Model`. The Eiger, Mönch and Jungfrau, 23–24 km away at
 130–143°, form the highest part of the southern skyline.
 
+Upstream, luma.gl's roadmaps call the program behind `GPUCommandGraph` Arisia.
+
 The examples resolve `@luma.gl/*` and `@deck.gl/*` from this repository's vendored tarballs (`vendor/`), so run them from this repository (after `npm install` at the root); they are not meant to be copied out on their own.
 
 Run `npm start` in this folder (npm puts the ancestor `node_modules/.bin` on `PATH`), or run
@@ -29,7 +31,7 @@ to fetch terrain tiles. `npm run test:visual` runs `scripts/visual-smoke.mjs` (i
    The application creates the command encoder, submits, and reads back with `Buffer.readAsync`.
    `GPUCommandGraphInspector.observeGraph` records each encoding. When the device has
    `timestamp-query` (the device is created with `featureLevel: 'max'`), the encoder gets a
-   `timeProfilingQuerySet` and the infobox lists GPU milliseconds per node.
+   `timeProfilingQuerySet` and the infobox's "Graph readout" panel lists GPU milliseconds per node.
 3. **Render.** Two `Model`s (a triangle strip and a line strip) read `horizonTangents` and
    `horizonDistances` straight from the graph's storage buffers in the vertex shader. The data
    makes no CPU round trip. Colour fades with skyline distance (aerial perspective). Compass ticks,

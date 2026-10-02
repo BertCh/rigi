@@ -1,0 +1,22 @@
+{
+  "name": "rigi-examples-gpgpu-photo-graph",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "tsc -p . && vite build",
+    "test:visual": "node scripts/visual-smoke.mjs"
+  },
+  "dependencies": {
+    "@luma.gl/core": "10.0.0-alpha.2",
+    "@luma.gl/engine": "10.0.0-alpha.2",
+    "@luma.gl/gpgpu": "10.0.0-alpha.2",
+    "@luma.gl/webgpu": "10.0.0-alpha.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0"
+  }
+}

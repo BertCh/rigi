@@ -20,6 +20,7 @@ import {
 	Suspense,
 	useRef,
 } from "react";
+import { LensGlyph } from "#/brand/LensGlyph";
 import { Compare } from "#/components/site/Compare";
 import { FadeIn } from "#/components/site/FadeIn";
 import { RevealLoop } from "#/components/site/RevealLoop";
@@ -88,7 +89,7 @@ const local = [
 	{
 		icon: Cpu,
 		title: "Local computation",
-		body: "Skyline detection, terrain matching and rendering run in Web Workers and on your GPU, through luma.gl and its arisia.gl compute layer. Bring your own lens.",
+		body: "Skyline detection, terrain matching and rendering run in Web Workers and on your GPU, built on luma.gl and its compute graph (upstream codename: Arisia). Bring your own lens.",
 	},
 	{
 		icon: Database,
@@ -353,6 +354,10 @@ function Home() {
 			<footer className="mx-auto max-w-6xl border-t border-white/8 px-4 pt-6 font-mono text-[10.5px] leading-relaxed text-white/35 sm:px-8">
 				Elevation via Mapterhorn · maps © swisstopo · peaks and trails ©
 				OpenStreetMap contributors · imagery credited in the app.
+				<span className="mt-1.5 flex items-center gap-1.5">
+					<LensGlyph size={11} />
+					Compute graph: luma.gl GPUCommandGraph
+				</span>
 			</footer>
 		</main>
 	);

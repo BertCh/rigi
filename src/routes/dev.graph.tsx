@@ -4,6 +4,8 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { LensGlyph } from "#/brand/LensGlyph";
+import { GraphProvenance } from "#/components/dev/GraphProvenance";
 import {
 	type GpuModule,
 	ISLANDS,
@@ -140,6 +142,10 @@ function GraphPage() {
 
 	return (
 		<main className="min-h-dvh bg-[var(--rigi-ink)] p-8 text-[var(--rigi-paper)]">
+			<p className="mb-2 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--rigi-glow)]">
+				<LensGlyph size={14} />
+				Arisia (luma.gl) · compute graph, observed
+			</p>
 			<h1 className="text-xl font-semibold">Compute graphs</h1>
 			<p className="mt-2 max-w-3xl text-sm text-white/55">
 				The live ComputeGraphs of this page realm, per device: nodes, transient
@@ -170,7 +176,7 @@ function GraphPage() {
 
 			{live && !live.rows.length && (
 				<p className="mt-6 text-sm" data-testid="graph-empty">
-					No live graphs in this realm yet.
+					Clear ether. Open a photo, then come back here.
 				</p>
 			)}
 			{[...devices].map(([id, rows]) => (
@@ -328,6 +334,7 @@ function GraphRow({ row }: { row: GraphInspection }) {
 								{row.preflight.conditionalNodeCount} conditional nodes
 							</p>
 						)}
+						<GraphProvenance nodes={row.nodes} />
 						<table className="w-full">
 							<thead className="text-left text-white/55">
 								<tr>
