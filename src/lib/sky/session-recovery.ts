@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// What the sky worker does after a GPU device loss (CR-12). ORT's WebGPU EP is initialised once per
-// worker on one device, so a session cannot be re-created on the GPU after that device died: the
-// cached sessions are dropped and later loads are pinned to WASM (and the worker's GPU prep/refine
-// is skipped) until the worker is re-created. Pure state, no ORT or GPU imports.
+// What the sky worker does after a GPU device loss (CR-12). The cached models (and the GPU prep and
+// refine) live on the dead device: they are dropped and later loads are pinned to the nn CPU backend
+// until the worker is re-created. Pure state, no GPU imports.
 
-/** True for the errors WebGPU / ORT raise when the device is gone (lost, destroyed, invalid). */
+/** True for the errors WebGPU raises when the device is gone (lost, destroyed, invalid). */
 export function isDeviceLossError(e: unknown): boolean {
 	const text =
 		e instanceof Error
@@ -20,7 +19,7 @@ export function isDeviceLossError(e: unknown): boolean {
 	);
 }
 
-export type Backend = "webgpu" | "wasm";
+export type Backend = "webgpu" | "cpu";
 
 export type SessionRecovery = {
 	/** A device loss was seen: GPU sessions and the worker's GPU compute are off for good. */
@@ -30,7 +29,7 @@ export type SessionRecovery = {
 	 * the first device loss: the caller must drop its cached sessions now.
 	 */
 	noteFailure(e: unknown): boolean;
-	/** The backend to request: after a loss everything runs on WASM, whatever was asked. */
+	/** The backend to request: after a loss everything runs on the CPU, whatever was asked. */
 	backendFor(requested: Backend | undefined): Backend | undefined;
 };
 
@@ -45,6 +44,6 @@ export function createSessionRecovery(): SessionRecovery {
 			lost = true;
 			return true;
 		},
-		backendFor: (requested) => (lost ? "wasm" : requested),
+		backendFor: (requested) => (lost ? "cpu" : requested),
 	};
 }

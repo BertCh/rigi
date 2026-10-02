@@ -63,8 +63,8 @@ function fakePrep(opts: { opaque?: boolean; tamper?: boolean } = {}) {
 }
 
 const mkDevice = () => ({ handle: {} }) as never;
-const modelFor = (device: { handle: unknown }, backend = "webgpu") =>
-	({ backend, sharedDevice: device.handle }) as unknown as SkyModel;
+const modelFor = (device: unknown, backend = "webgpu") =>
+	({ backend, device }) as unknown as SkyModel;
 const bitmap = {} as ImageBitmap;
 
 afterEach(() => {
@@ -73,10 +73,10 @@ afterEach(() => {
 });
 
 describe("prepareGpu", () => {
-	it("is undefined for a wasm model or a model on a different device", async () => {
+	it("is undefined for a cpu model or a model on a different device", async () => {
 		const d = mkDevice();
 		expect(
-			await prepareGpu(d, modelFor(d, "wasm"), bitmap, W, H, LONG, rgba),
+			await prepareGpu(d, modelFor(d, "cpu"), bitmap, W, H, LONG, rgba),
 		).toBeUndefined();
 		expect(
 			await prepareGpu(d, modelFor(mkDevice()), bitmap, W, H, LONG, rgba),

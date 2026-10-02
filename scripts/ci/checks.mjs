@@ -346,14 +346,14 @@ export const CHECKS = [
 		note: "per-pass GPU frame timings (flag gpuFrameTimings): query-set ring (4, drop when all in flight, reuse, discard on failure), 32-pass cap, per-pass sums, rolling mean (browser: not run)",
 		timeoutS: 60,
 	},
-	// model weights (public/models, scripts/models/manifest.json): sha256 per present row + createOrtSession on the sky model in node
+	// model weights (public/models, scripts/models/manifest.json): sha256 per present row + the sky model on src/lib/nn (CPU backend) in node
 	{
 		id: "models",
 		tier: "fast",
 		group: "models",
 		cmd: tsx("src/lib/models/models.check.ts"),
-		needs: ["public/models/skyseg-u2netp.873ea284.onnx"],
-		note: "every manifest row present in public/models matches its size and sha256; createOrtSession runs the sky model on WASM in node (output shape, P in [0,1]); missing rows SKIP (node scripts/models/fetch.mjs)",
+		needs: ["public/models/skyseg-u2netp-nn.884ee489.safetensors"],
+		note: "every manifest row present in public/models matches its size and sha256; the sky model runs on the nn CPU backend in node (output shape, P in [0,1]); missing rows SKIP (node scripts/models/fetch.mjs)",
 		timeoutS: 300,
 	},
 	{

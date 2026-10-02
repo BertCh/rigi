@@ -40,13 +40,13 @@ describe("createSessionRecovery", () => {
 		expect(r.deviceLost).toBe(false);
 	});
 
-	it("the first loss asks for a drop exactly once and pins everything to wasm", () => {
+	it("the first loss asks for a drop exactly once and pins everything to the cpu backend", () => {
 		const r = createSessionRecovery();
 		expect(r.noteFailure(new Error("Device is lost"))).toBe(true);
 		expect(r.noteFailure(new Error("Device is lost"))).toBe(false);
 		expect(r.deviceLost).toBe(true);
-		expect(r.backendFor("webgpu")).toBe("wasm");
-		expect(r.backendFor(undefined)).toBe("wasm");
-		expect(r.backendFor("wasm")).toBe("wasm");
+		expect(r.backendFor("webgpu")).toBe("cpu");
+		expect(r.backendFor(undefined)).toBe("cpu");
+		expect(r.backendFor("cpu")).toBe("cpu");
 	});
 });

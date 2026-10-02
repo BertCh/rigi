@@ -6,7 +6,7 @@
 // device, with no CPU pixels:
 //   dense RGBA words   (the refine's full-res guide, refine.ts `rgba`)
 //   rgbLo              (3·lw·lh f32 planar: the refine's low-res guide, `guideLo`)
-//   input              (the same, ImageNet-normalised: ONNX Runtime's NCHW input tensor buffer)
+//   input              (the same, ImageNet-normalised: the nn model's NCHW input buffer)
 // all BIT-IDENTICAL to the CPU chain in sky/core.ts (rgbPlanes → resamplePlanes → normalise); see
 // prep.wgsl.ts for how (an exact u32 soft-float of the CPU's f64 chain) and prep-ref.ts for its node
 // twin. Nothing here reads back unless the caller verifies (readPrep / readRgba).
@@ -93,8 +93,10 @@ export interface SkyPrepGpu {
 	rgba: GPUBuffer;
 	/** 3·lw·lh f32, planar: resamplePlanes(rgbPlanes(rgba), W, H, 3, lw, lh). */
 	rgbLo: GPUBuffer;
-	/** 3·lw·lh f32 NCHW: normalise(rgbLo), ORT's input. */
+	/** 3·lw·lh f32 NCHW: normalise(rgbLo), the model's input. */
 	input: GPUBuffer;
+	/** The same buffer as a luma Buffer (nn `fromBuffer`). */
+	inputBuffer: Buffer;
 	/** True when every pixel's alpha is 255 (4 bytes read back): the precondition of the bitmap's bytes equalling getImageData's. */
 	isOpaque(): Promise<boolean>;
 	/** The photo's bytes (W·H·4) read back from the GPU: only for a CPU fallback. */
@@ -365,6 +367,7 @@ function runPrep(
 			rgba: nativeWebGPUBuffer(rgba),
 			rgbLo: nativeWebGPUBuffer(rgbLo),
 			input: nativeWebGPUBuffer(input),
+			inputBuffer: input,
 			isOpaque: async () => {
 				const [b] = await readBack(
 					device,

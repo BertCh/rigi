@@ -47,7 +47,7 @@ const res = await page.evaluate(
 		);
 		const sky = await import("/src/lib/sky/index.ts");
 		const tp = performance.now();
-		const pre = sky.preloadSkyModel({ backend: noGpu ? "wasm" : undefined });
+		const pre = sky.preloadSkyModel({ backend: noGpu ? "cpu" : undefined });
 		const returnMs = performance.now() - tp; // must be ~0: non-blocking
 		const ready = await pre;
 		out.push({
@@ -62,7 +62,7 @@ const res = await page.evaluate(
 			const t0 = performance.now();
 			const m = await sky.segmentSky(img, {
 				forceFallback,
-				backend: noGpu ? "wasm" : undefined,
+				backend: noGpu ? "cpu" : undefined,
 			});
 			const t1 = performance.now();
 			const s = sky.skylineFromSky(m);

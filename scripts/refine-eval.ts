@@ -11,8 +11,8 @@
  * Per photo: prior (EXIF + gravity) → detectSkyline (baseline, 800 wide) →
  *   (a) solvePose (baseline)
  *   (b) refinePose (this module)
- *   (c) refinePose on the sky-model skyline (src/lib/sky, U²-Net in node via
- *       onnxruntime-web WASM, 1024 wide), when the model loads
+ *   (c) refinePose on the sky-model skyline (src/lib/sky, U²-Net in node on src/lib/nn:
+ *       Dawn WebGPU with DAWN_DIR, else the slow CPU backend; 1024 wide), when the model loads
  * Errors are vs data/ground-truth.json; skyline px error is the mean |Δrow|
  * of the DEM skyline at 1600 wide (as scripts/eval.ts). Robustness: the prior
  * yaw is perturbed by ±5/±10/±15° and a run counts as converged when its yaw
@@ -144,19 +144,10 @@ async function loadSkyVariant(): Promise<SkyFn | undefined> {
 		const core = await import("../src/lib/sky/core");
 		const model = await import("../src/lib/sky/model");
 		const { skylineFromSky } = await import("../src/lib/sky/skyline");
-		// The model lives next to the sky code (older layout: public/).
-		const file = [
-			path.join(ROOT, "src", "lib", "sky", model.MODEL_FILE),
-			path.join(ROOT, "public", model.MODEL_FILE),
-		].find((f) => fs.existsSync(f));
-		if (!file) return undefined;
-		const ls = model.MODEL_LONG_SIDE as unknown;
-		const longSide =
-			typeof ls === "number" ? ls : (ls as { wasm: number }).wasm;
-		const m = await model.createSkyModel(
-			new Uint8Array(fs.readFileSync(file)),
-			["wasm"],
-		);
+		if (!fs.existsSync(path.join(ROOT, "public", "models", model.MODEL_FILE)))
+			return undefined;
+		const { createSkyModelNode } = await import("./lib/sky-model-node");
+		const { model: m, longSide } = await createSkyModelNode();
 		return async (jpg: string) => {
 			const img = await loadRGBA(jpg, SKY_WIDTH);
 			const rgb = core.rgbPlanes(img);

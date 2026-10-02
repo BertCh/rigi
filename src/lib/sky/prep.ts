@@ -15,8 +15,8 @@
  * compared with the CPU's. A mismatch disables the GPU prep for that device for the life of the
  * worker and that photo continues on its CPU results; repeated GPU errors disable it too.
  *
- * The prep needs ORT on the shared device (the input buffer is an ORT tensor), a hardware WebGPU
- * model session and a shape the kernels support (downsampling; limits). Anything else is the CPU path.
+ * The prep needs the model on this very device (the input buffer is read in place by the nn graph) and
+ * a shape the kernels support (downsampling; limits). Anything else is the CPU path.
  */
 import type { Device } from "@luma.gl/core";
 import {
@@ -142,8 +142,7 @@ export async function prepareGpu(
 	longSide: number,
 	rgba: Uint8Array | undefined,
 ): Promise<SkyPrepGpu | undefined> {
-	if (model.backend !== "webgpu" || model.sharedDevice !== device.handle)
-		return undefined;
+	if (model.backend !== "webgpu" || model.device !== device) return undefined;
 	const st = stateOf(device);
 	if (st.disabled) return undefined;
 	if (st.verified < PREP_VERIFY && !rgba) throw new NeedPixels();

@@ -174,6 +174,81 @@ for (const name of IMAGES) {
 	}
 }
 
+// The worker's GPU path end to end on Dawn: ImageBitmap-less prep (prepSkyGpuFromRows) → model input read
+// in place (nn fromBuffer) → output buffer read in place by the GPU refine, against the CPU chain
+if (device && gpu) {
+	const { createSkyModel, inferSkyModel, inferSkyModelGpu } = await import(
+		"../model"
+	);
+	const { prepSkyGpuFromRows } = await import("#/lib/gpu/sky/prep");
+	const { refineSkyGpu } = await import("#/lib/gpu/sky/refine");
+	const { refineToWorking, toBytes, workingSize } = await import("../core");
+	const model = await createSkyModel({ device, backends: ["webgpu"] });
+	const name = IMAGES[0];
+	const img = await loadImage(join("public/demo/photos-1024", `${name}.jpg`));
+	const { width: W, height: H } = workingSize(img.width, img.height, 512);
+	const c = createCanvas(W, H);
+	const ctx = c.getContext("2d");
+	ctx.drawImage(img, 0, 0, W, H);
+	const rgba = new Uint8Array(ctx.getImageData(0, 0, W, H).data);
+	const { width: lw, height: lh } = modelSize(W, H, LONG);
+	const rowBytes = Math.ceil((W * 4) / 256) * 256;
+	const padded = new Uint8Array(rowBytes * H);
+	for (let y = 0; y < H; y++)
+		padded.set(rgba.subarray(y * W * 4, (y + 1) * W * 4), y * rowBytes);
+	const prep = await prepSkyGpuFromRows(device, padded, W, H, lw, lh);
+	try {
+		const inf = await inferSkyModelGpu(model, prep.inputBuffer, lw, lh);
+		const cpuIn = await inferSkyModel(
+			model,
+			rgbPlanes({ width: W, height: H, data: rgba }),
+			W,
+			H,
+			LONG,
+		);
+		const a = await inf.download();
+		const b = await cpuIn.download();
+		const f = stats(a, b);
+		console.log(
+			`\npipeline ${name} ${W}x${H} -> ${lw}x${lh}: GPU-prep input vs CPU-prep input, mask max abs ${f.max.toExponential(2)}`,
+		);
+		const g = await refineSkyGpu(device, {
+			W,
+			H,
+			rgba: prep.rgba,
+			lw,
+			lh,
+			guideLo: prep.rgbLo,
+			prob: inf.gpuBuffer as GPUBuffer,
+		});
+		const low = { prob: a, width: lw, height: lh };
+		const cb = toBytes(
+			refineToWorking(
+				rgbPlanes({ width: W, height: H, data: rgba }),
+				W,
+				H,
+				low,
+				true,
+			),
+		);
+		let off = 0;
+		for (let i = 0; i < cb.length; i++)
+			off = Math.max(off, Math.abs(cb[i] - g.bytes[i]));
+		console.log(
+			`pipeline refine on the model's buffer vs CPU refine: max byte diff ${off}`,
+		);
+		const ok = f.max <= 1e-6 && off <= 1;
+		console.log(
+			`${ok ? "PASS" : "FAIL"} u2netp pipeline (prep -> model -> refine on one device)`,
+		);
+		if (!ok) failed = true;
+		inf.release();
+		cpuIn.release();
+	} finally {
+		prep.dispose();
+	}
+}
+
 // fp16 weights against the fp32 graph: the mask is a probability, so absolute error is what matters
 const MAX_TOL = 0.03;
 const MEAN_TOL = 0.003;

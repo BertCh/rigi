@@ -9,7 +9,7 @@
  *   const { rows, weight } = skylineFromSky(mask); // per-column skyline
  *
  * The U²-Net sky model (see README.md) is loaded lazily in a module Web
- * Worker (WebGPU if available, else WASM) and refined with a fast colour
+ * Worker (nn WGSL kernels on WebGPU if available, else the nn CPU backend) and refined with a fast colour
  * guided filter using the photo as guide. If the model or worker is
  * unavailable, a classical colour/texture + Viterbi segmenter is used, so the
  * call always resolves with a mask.
@@ -39,13 +39,11 @@ export type SkyMask = {
 	data: Uint8Array;
 	/** Which path produced the mask. */
 	source?: "model" | "fallback";
-	backend?: "webgpu" | "wasm";
+	backend?: "webgpu" | "cpu";
 	/** Timings in ms (worker-side). */
 	ms?: { load: number; infer: number; refine: number };
 	/** Where the guided-filter refine ran (GPU unless ?gpu=off, no WebGPU, or a GPU error). */
 	refineOn?: "gpu" | "cpu";
-	/** ORT WebGPU EP on the shared compute device, or its own; absent on WASM / fallback. */
-	ortDevice?: "shared" | "own";
 	/** Where the model input was prepared: "gpu" (ImageBitmap → WGSL), else the CPU chain. */
 	prepOn?: "gpu" | "cpu";
 };
@@ -57,15 +55,15 @@ export interface SegmentSkyOptions {
 	refine?: boolean;
 	/** Model input long side (default 512, rounded to multiples of 32). */
 	modelLongSide?: number;
-	/** Restrict the ONNX Runtime backend (default: WebGPU if available, else WASM). */
-	backend?: "webgpu" | "wasm";
+	/** Restrict the nn backend (default: WebGPU if available, else the CPU reference backend). */
+	backend?: "webgpu" | "cpu";
 	/** Skip the model and use the classical segmenter. */
 	forceFallback?: boolean;
 	/**
 	 * Prepare the model input on the GPU (default on): the working-size photo goes to the
 	 * worker as an ImageBitmap (no getImageData once the device is verified) and the resample and
 	 * normalise run in WGSL, bit-identical to the CPU chain (gpu/sky/prep.ts, sky/prep.ts). Needs the
-	 * GPU path (gpuEnabled()) and ORT on WebGPU; otherwise, or on any failure, the CPU prep runs.
+	 * GPU path (gpuEnabled()) and the model on WebGPU; otherwise, or on any failure, the CPU prep runs.
 	 */
 	gpuPrep?: boolean;
 }
@@ -83,7 +81,7 @@ const PREP_VERIFY = 3;
 // what the worker last reported about the GPU prep: while unverified the CPU pixels ride along
 let prepVerified = 0;
 let prepDisabled = false;
-// replies where the worker ran the CPU prep although a bitmap was sent (no shared WebGPU device, WASM
+// replies where the worker ran the CPU prep although a bitmap was sent (no WebGPU model,
 // model, unsupported shape): after PREP_MISSES in a row stop building bitmaps
 let prepMisses = 0;
 const PREP_MISSES = 3;
@@ -94,12 +92,12 @@ let workerErrors = 0;
 const MAX_WORKER_ERRORS = 3;
 let nextId = 1;
 /**
- * No reply for this long while requests are pending means the worker is stuck (a hung ORT run, a GPU
+ * No reply for this long while requests are pending means the worker is stuck (a hung forward, a GPU
  * process crash without an error event): it is dropped like a crashed one, and every pending request
  * falls back. Measured from the last reply, not per request, because the worker runs requests one at a
- * time. Before the first reply the cold start (worker module, the 28 MB ORT wasm, the 4.5 MB model;
- * ~10 s in the dev server under load, ~33 MB to download on a slow link) gets a generous allowance;
- * afterwards one WASM inference is ~1.5 s and a reload after a device loss a few seconds more.
+ * time. Before the first reply the cold start (worker module, the 2.3 MB weights, kernel compiles)
+ * gets a generous allowance; afterwards one forward is ~0.2 s on WebGPU and ~25 s on the CPU backend
+ * at its 192 px input (the allowance covers it).
  */
 const STALL_COLD_MS = 180_000;
 const STALL_WARM_MS = 60_000;
@@ -172,11 +170,11 @@ function post(
 	});
 }
 
-let preloadPromise: Promise<{ backend: "webgpu" | "wasm" | null }> | undefined;
+let preloadPromise: Promise<{ backend: "webgpu" | "cpu" | null }> | undefined;
 
 /**
- * Starts the worker and, inside it, the ONNX Runtime wasm + model download and
- * session creation. Returns immediately (nothing heavy runs on the calling
+ * Starts the worker and, inside it, the model weights download and nn model
+ * creation. Returns immediately (nothing heavy runs on the calling
  * thread); the promise resolves once the model is ready, with the backend in
  * use, or `null` when it failed and segmentSky() will use the classical
  * fallback. It never rejects, so it's safe to fire and forget, e.g. alongside
@@ -189,8 +187,8 @@ let preloadPromise: Promise<{ backend: "webgpu" | "wasm" | null }> | undefined;
  * Idempotent: repeated calls share one load, and segmentSky() reuses it.
  */
 export function preloadSkyModel(
-	opts: { backend?: "webgpu" | "wasm" } = {},
-): Promise<{ backend: "webgpu" | "wasm" | null }> {
+	opts: { backend?: "webgpu" | "cpu" } = {},
+): Promise<{ backend: "webgpu" | "cpu" | null }> {
 	if (preloadPromise) return preloadPromise;
 	const wk = getWorker();
 	if (!wk) {
@@ -391,7 +389,6 @@ async function segmentSkyUncached(
 					backend: res.backend,
 					ms: res.ms,
 					refineOn: res.refineOn,
-					ortDevice: res.ortDevice,
 					prepOn: res.prep?.on,
 				};
 			}

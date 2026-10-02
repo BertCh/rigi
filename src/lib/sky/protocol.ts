@@ -24,26 +24,23 @@ export interface SkySegmentRequest {
 	refine: boolean;
 	/** Model input long side (default per backend, see MODEL_LONG_SIDE). */
 	modelLongSide?: number;
-	/** Absolute model URL override (default: the bundled, fingerprinted model). */
-	modelUrl?: string;
-	/** Restrict the ONNX Runtime backend (default: WebGPU if available, else WASM). */
-	backend?: "webgpu" | "wasm";
+	/** Restrict the nn backend (default: WebGPU if available, else the CPU reference backend). */
+	backend?: "webgpu" | "cpu";
 	/** Skip the model (testing the classical path). */
 	forceFallback?: boolean;
 	/**
-	 * The page's gpuEnabled() (?gpu=off → false): the worker has no page URL. When true, ORT's WebGPU
-	 * EP shares the worker's luma compute device and the refine runs on it (src/lib/gpu/sky).
+	 * The page's gpuEnabled() (?gpu=off → false): the worker has no page URL. When true, the model
+	 * (nn WebGPU backend) and the refine run on the worker's luma compute device (src/lib/gpu/sky).
 	 */
 	gpu?: boolean;
 }
 
-/** Start fetching the wasm + model and creating the session; replies when ready. */
+/** Start fetching the model weights and creating the nn model; replies when ready. */
 export interface SkyPreloadRequest {
 	type: "preload";
 	id: number;
-	modelUrl?: string;
-	backend?: "webgpu" | "wasm";
-	/** As SkySegmentRequest.gpu (decides whether ORT shares the compute device). */
+	backend?: "webgpu" | "cpu";
+	/** As SkySegmentRequest.gpu (decides whether the model runs on the compute device). */
 	gpu?: boolean;
 }
 
@@ -58,13 +55,11 @@ export type SkyWorkerResponse =
 			height: number;
 			data: ArrayBuffer;
 			source: "model" | "fallback";
-			backend?: "webgpu" | "wasm";
+			backend?: "webgpu" | "cpu";
 			error?: string;
 			ms: { load: number; infer: number; refine: number };
 			/** Where the refine ran (the GPU path falls back to the CPU on any error). */
 			refineOn?: "gpu" | "cpu";
-			/** ORT's WebGPU device: the compute device ("shared") or its own; absent on WASM. */
-			ortDevice?: "shared" | "own";
 			/** Where the model input was prepared, and the GPU prep's per-device verification state. */
 			prep?: SkyPrepStatus;
 	  }
@@ -73,7 +68,7 @@ export type SkyWorkerResponse =
 			ok: true;
 			type: "preload";
 			/** null when the model could not be loaded (fallback will be used). */
-			backend: "webgpu" | "wasm" | null;
+			backend: "webgpu" | "cpu" | null;
 			error?: string;
 			ms: number;
 	  }

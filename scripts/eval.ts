@@ -65,27 +65,18 @@ type Detect = (img: {
 	data: Uint8ClampedArray;
 }) => Promise<SkylineRows>;
 
-/** ONNX sky-model skyline (argmax), the skyfirst cross-check. */
+/** nn U²-Net sky-model skyline (argmax), the skyfirst cross-check. */
 async function makeModelDetector(): Promise<Detect> {
-	const { createSkyModel, MODEL_FILE, MODEL_LONG_SIDE, runSkyModel } =
-		await import("../src/lib/sky/model");
+	const { runSkyModel } = await import("../src/lib/sky/model");
+	const { createSkyModelNode } = await import("./lib/sky-model-node");
 	const { refineToWorking, rgbPlanes, toBytes } = await import(
 		"../src/lib/sky/core"
 	);
 	const { skylineFromSky } = await import("../src/lib/sky/skyline");
-	const model = await createSkyModel(
-		new Uint8Array(fs.readFileSync(path.join(ROOT, "public", MODEL_FILE))),
-		["wasm"],
-	);
+	const { model, longSide } = await createSkyModelNode();
 	return async (img) => {
 		const rgb = rgbPlanes(img);
-		const low = await runSkyModel(
-			model,
-			rgb,
-			img.width,
-			img.height,
-			MODEL_LONG_SIDE.wasm,
-		);
+		const low = await runSkyModel(model, rgb, img.width, img.height, longSide);
 		const pm = refineToWorking(rgb, img.width, img.height, low, true);
 		const mask = { width: img.width, height: img.height, data: toBytes(pm) };
 		return skylineFromSky(mask);

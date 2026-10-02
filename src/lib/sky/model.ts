@@ -3,71 +3,91 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 /**
- * ONNX Runtime wrapper for the U²-Net sky model. Works with onnxruntime-web
- * in a browser worker (WebGPU → WASM) and in node (the package's node build,
- * CPU/WASM), so the eval script exercises exactly the same code.
+ * The U²-Net sky model on the nn runtime (u2netp.ts): WGSL kernels on one core ComputeGraph per forward
+ * on the page's WebGPU compute device, the nn CPU reference backend otherwise. The same code runs in a
+ * browser worker and in node (the eval scripts), with no ONNX Runtime.
  */
-import type { Device } from "@luma.gl/core";
-import * as ort from "onnxruntime-web";
-import { createOrtSessionFromBytes, shareOrtDevice } from "#/lib/models/ort";
+import type { Buffer, Device } from "@luma.gl/core";
+import { createNn, type Nn, type Tensor, type Weights } from "#/lib/nn";
 import { type ModelRun, modelSize, normalise, resamplePlanes } from "./core";
+import { bindU2netp, runU2netp, U2NETP_WEIGHTS, type U2Netp } from "./u2netp";
 
 /**
- * U²-Net-P sky model (MIT), converted from the upstream ncnn weights (see
- * README.md). Served from the app's public dir; the filename carries the
- * first 8 hex digits of its sha256 so it can be served with immutable
- * long-cache headers. When replacing the model, rename it to the new hash
- * (scripts/sky-eval.ts verifies the name matches the content).
+ * U²-Net-P sky model (MIT), the upstream ncnn weights as fp16 safetensors (skyseg-u2netp-nn.884ee489.safetensors,
+ * scripts/models/u2netp.py, served by src/lib/models fetchModel; the filename carries the first 8 hex digits of its sha256).
  */
-export const MODEL_FILE = "models/skyseg-u2netp.873ea284.onnx";
+export const MODEL_FILE = U2NETP_WEIGHTS;
 /**
- * Model input long side (px) per backend. Trained at 384²; 384 and 512 score
- * the same on our photos, so the slower WASM path uses 384.
+ * Model input long side (px) per backend. Trained at 384²; 384 and 512 score the same on our photos.
+ * The CPU reference backend is about 150 M MAC/s in plain JS (a 160×128 forward is ~8 s in node), so a
+ * browser without WebGPU takes 192 and runs it off the main thread; the classical segmenter is the quick
+ * alternative (`forceFallback`).
  */
 export const MODEL_LONG_SIDE: Record<Backend, number> = {
 	webgpu: 512,
-	wasm: 384,
+	cpu: 192,
 };
 
-export type Backend = "webgpu" | "wasm";
+export type Backend = "webgpu" | "cpu";
 
 export interface SkyModel {
-	session: ort.InferenceSession;
+	net: U2Netp;
+	nn: Nn;
 	backend: Backend;
-	/**
-	 * The GPUDevice ORT's WebGPU EP runs on when it is the caller's device (see shareOrtDevice): the
-	 * session then keeps its output on the GPU (inferSkyModel's `gpuBuffer`).
-	 */
-	sharedDevice?: GPUDevice;
-	/**
-	 * ORT's own device, attached to luma (not owned: ORT keeps ownership), when the shared
-	 * device was not taken because ORT had already initialised on another one. The output then stays
-	 * on this device (inferSkyModel's `gpuBuffer`) and refine runs on it; the compute shim stays primary.
-	 */
-	ortDevice?: Device;
+	/** The luma device the model runs on (webgpu): the refine and the prep share it. */
+	device?: Device;
+	/** Frees the weights (the device stays the caller's). */
+	dispose(): void;
 }
 
-export { shareOrtDevice };
+export interface CreateSkyModelOptions {
+	/** The compute device: a WebGPU device enables the "webgpu" backend. */
+	device?: Device | null;
+	/** Preference order (default: webgpu when `device` is WebGPU, then cpu). */
+	backends?: Backend[];
+	/** The safetensors bytes (default: fetchModel(MODEL_FILE), Cache Storage in the browser). */
+	bytes?: Uint8Array | ArrayBuffer;
+	signal?: AbortSignal;
+	onProgress?: (loaded: number, total: number) => void;
+}
 
-/**
- * Creates the session from model bytes, trying WebGPU first (hardware
- * adapters only, unless `backends` is exactly ["webgpu"]), then WASM
- * (models/ort.ts createOrtSessionFromBytes, outputs kept on the GPU).
- */
+/** Creates the model on the first backend that works. */
 export async function createSkyModel(
-	bytes: Uint8Array,
-	backends: Backend[] = ["webgpu", "wasm"],
-	opts: { device?: GPUDevice } = {},
+	opts: CreateSkyModelOptions = {},
 ): Promise<SkyModel> {
-	return createOrtSessionFromBytes(bytes, {
-		backends,
-		device: opts.device,
-		outputOnGpu: true,
-		tag: "[sky]",
-	});
+	const order = opts.backends ?? ["webgpu", "cpu"];
+	let firstError: unknown;
+	for (const backend of order) {
+		try {
+			if (backend === "webgpu" && opts.device?.type !== "webgpu")
+				throw new Error("sky model: the webgpu backend needs a WebGPU device");
+			const nn = await createNn(
+				backend === "webgpu"
+					? { device: opts.device as Device, backend: "gpu" }
+					: { backend: "cpu" },
+			);
+			const weights: Weights = opts.bytes
+				? nn.weightsFromBytes(opts.bytes)
+				: await nn.loadWeights(MODEL_FILE, {
+						signal: opts.signal,
+						onProgress: opts.onProgress,
+					});
+			return {
+				net: bindU2netp(weights),
+				nn,
+				backend,
+				device: backend === "webgpu" ? (opts.device ?? undefined) : undefined,
+				dispose: () => nn.dispose(weights),
+			};
+		} catch (e) {
+			console.warn(`[sky] ${backend} model backend unavailable:`, e);
+			firstError ??= e;
+		}
+	}
+	throw firstError ?? new Error("sky model: no backend");
 }
 
-/** The model's raw output: on the CPU, or still on the GPU when the session shares the device. */
+/** The model's raw output: on the CPU, or still on the GPU when the model runs on WebGPU. */
 export interface SkyInference {
 	width: number;
 	height: number;
@@ -78,17 +98,25 @@ export interface SkyInference {
 	rgbLo?: Float32Array;
 	/** P(sky) at model resolution, when the output is on the CPU. */
 	prob?: Float32Array;
-	/** The output buffer (width·height f32) on `model.sharedDevice`, valid until `release()`. */
+	/**
+	 * The output buffer (≥ width·height f32) on `model.device`, valid until `release()` and once the
+	 * forward has resolved (it has when this object exists).
+	 */
 	gpuBuffer?: GPUBuffer;
 	/** P(sky) on the CPU (downloads a GPU output; call before `release()`). */
 	download(): Promise<Float32Array>;
-	/** Frees the output tensor (the GPU buffer returns to ORT's pool). */
+	/** Frees the output tensor (the GPU buffer returns to the runtime's free list). */
 	release(): void;
 }
 
+type GpuNnLike = Nn & {
+	fromBuffer(buffer: Buffer, shape: readonly number[]): Tensor;
+	bufferOf(t: Tensor): Buffer;
+};
+
 /**
- * Runs the model on a planar RGB (0..1) image of size W×H. The output stays on the GPU when the
- * session was created on a shared device; otherwise it is P(sky) on the CPU.
+ * Runs the model on a planar RGB (0..1) image of size W×H. The output stays on the GPU on the webgpu
+ * backend; otherwise it is P(sky) on the CPU.
  */
 export async function inferSkyModel(
 	model: SkyModel,
@@ -99,77 +127,64 @@ export async function inferSkyModel(
 ): Promise<SkyInference & { rgbLo: Float32Array }> {
 	const { width, height } = modelSize(W, H, longSide);
 	const rgb = resamplePlanes(rgbWork, W, H, 3, width, height);
-	const input = new ort.Tensor("float32", normalise(rgb, width * height), [
+	const input = model.nn.fromArray(normalise(rgb, width * height), [
 		1,
 		3,
 		height,
 		width,
 	]);
-	return runInput(model, input, width, height, rgb);
+	return run(model, input, width, height, rgb);
 }
 
 /**
  * inferSkyModel with the GPU prep (gpu/sky/prep.ts): `input` is the normalised NCHW float32 buffer
- * (3·width·height) on `model.sharedDevice`, handed to ORT as a GPU-buffer tensor, so the photo never
- * leaves the GPU. The caller owns the buffer (ORT neither frees nor retains it past the run); the
- * result has no `rgbLo` (the refine's guide is the prep's own buffer).
+ * (3·width·height) on `model.device`, read in place, so the photo never leaves the GPU. The caller owns
+ * the buffer (the model neither frees nor retains it past the run); the result has no `rgbLo` (the
+ * refine's guide is the prep's own buffer).
  */
 export async function inferSkyModelGpu(
 	model: SkyModel,
-	input: GPUBuffer,
+	input: Buffer,
 	width: number,
 	height: number,
 ): Promise<SkyInference> {
-	if (!model.sharedDevice)
-		throw new Error(
-			"inferSkyModelGpu: the session is not on the shared device",
-		);
-	const tensor = ort.Tensor.fromGpuBuffer(input, {
-		dataType: "float32",
-		dims: [1, 3, height, width],
-	});
-	return runInput(model, tensor, width, height, undefined, false);
+	if (model.backend !== "webgpu")
+		throw new Error("inferSkyModelGpu: the model is not on the GPU");
+	const x = (model.nn as GpuNnLike).fromBuffer(input, [1, 3, height, width]);
+	return run(model, x, width, height, undefined);
 }
 
-async function runInput<L extends Float32Array | undefined>(
+async function run<L extends Float32Array | undefined>(
 	model: SkyModel,
-	input: ort.Tensor,
+	input: Tensor,
 	width: number,
 	height: number,
 	rgbLo: L,
-	dispose = true,
 ): Promise<SkyInference & { rgbLo: L }> {
-	const s = model.session;
-	let t: ort.Tensor;
+	const { nn } = model;
+	let prob: Tensor;
 	try {
-		const out = await s.run({ [s.inputNames[0]]: input });
-		t = out[s.outputNames[0]];
+		({ prob } = await nn.forward(() => runU2netp(nn, model.net, input)));
 	} finally {
-		if (dispose) input.dispose?.();
+		nn.dispose(input);
 	}
-	if (t.location === "gpu-buffer") {
-		let prob: Float32Array | undefined;
-		return {
-			width,
-			height,
-			rgbLo,
-			gpuBuffer: t.gpuBuffer as GPUBuffer,
-			download: async () => {
-				prob ??= new Float32Array((await t.getData()) as Float32Array);
-				return prob;
-			},
-			release: () => t.dispose?.(),
-		};
+	let host: Float32Array | undefined;
+	let gpuBuffer: GPUBuffer | undefined;
+	if (model.backend === "webgpu") {
+		const { nativeWebGPUBuffer } = await import("#/lib/gpu/core/luma");
+		gpuBuffer = nativeWebGPUBuffer((nn as GpuNnLike).bufferOf(prob));
 	}
-	const prob = new Float32Array(t.data as Float32Array);
-	t.dispose?.();
 	return {
 		width,
 		height,
 		rgbLo,
-		prob,
-		download: async () => prob,
-		release: () => {},
+		gpuBuffer,
+		prob: gpuBuffer ? undefined : await nn.read(prob),
+		download: async () => {
+			host ??= await nn.read(prob);
+			return host;
+		},
+		release: () => nn.dispose(prob),
 	};
 }
 

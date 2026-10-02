@@ -6,7 +6,7 @@
 // one ComputeGraph submission. Ops called outside forward() are recorded too and flushed (all of
 // their results kept) before the next forward, read, or explicit sync().
 
-import type { Device, Texture } from "@luma.gl/core";
+import type { Buffer, Device, Texture } from "@luma.gl/core";
 import {
 	type AttentionParams,
 	BaseNn,
@@ -233,6 +233,36 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			wg: call.wg,
 		});
 		return new GpuTensor([1, C, H, W], "f32", st);
+	}
+
+	/**
+	 * A caller-owned luma buffer (f32, row-major, at least numel(shape)·4 bytes, on this device) as a
+	 * tensor, without a copy: the sky prep's normalised input stays where the prep kernels wrote it. The
+	 * runtime never recycles or destroys it (dispose() is a no-op); the caller keeps it alive until the
+	 * forwards that read it have resolved.
+	 */
+	fromBuffer(buffer: Buffer, shape: readonly number[]): GpuTensor {
+		const bytes = Math.max(4, numel(shape) * 4);
+		if (buffer.byteLength < bytes)
+			throw new Error(
+				`nn: fromBuffer ${buffer.byteLength} B for [${shape.join(",")}]`,
+			);
+		const st = new Storage(bytes, "f32", null);
+		st.buffer = buffer;
+		st.pinned = true;
+		return new GpuTensor([...shape], "f32", st);
+	}
+
+	/**
+	 * The luma buffer behind a ready f32 tensor (numel·4 bytes at offset 0, capacity may be larger), for
+	 * GPU consumers of a forward's output (the sky refine). Valid until `dispose(t)`; read it only after
+	 * the forward that produced it has resolved.
+	 */
+	bufferOf(t: Tensor): Buffer {
+		const g = t as GpuTensor;
+		if (g.st.state !== "ready" || !g.st.buffer)
+			throw new Error(`nn: bufferOf a ${g.st.state} tensor`);
+		return g.st.buffer;
 	}
 
 	async read(t: Tensor): Promise<Float32Array> {

@@ -5,7 +5,7 @@
 // Bench of the sky refine graph (refine-graph.ts, the only GPU refine) against the CPU twin (sky/core.ts
 // refineToWorking + toBytes), run in the page realm by scripts/gpu/sky-graph-bench.mjs. Checks:
 // - CPU parity: float mask max |Δ| and byte mask differences vs the CPU refine (the tolerance of
-//   scripts/gpu/sky-bench.mjs: f32 vs f64 sums, ≤ ~1e-5, a few bytes off by 1), for ORT-buffer
+//   scripts/gpu/sky-bench.mjs: f32 vs f64 sums, ≤ ~1e-5, a few bytes off by 1), for model-buffer
 //   P(sky) (shared device) at several working sizes up to 24 Mpx, plus the uploaded-floats branches
 //   (classical fallback, downsample); and the bytes-only run equal to the floats run bit for bit;
 // - the graph run repeatedly with different data: a shape sequence that hits, misses and evicts the
@@ -17,11 +17,8 @@
 // - timing: bytes-only refines (cache hit) and one cache miss, medians.
 
 import type { Device } from "@luma.gl/core";
-import * as ort from "onnxruntime-web";
-import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 import { ComputeGraph, cachedGraphCount } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
-import { nativeWebGPUDevice } from "#/lib/gpu/core/luma";
 import { capacityFor, pooledStorage, withLease } from "#/lib/gpu/core/pool";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
@@ -32,7 +29,7 @@ import {
 	toBytes,
 	workingSize,
 } from "#/lib/sky/core";
-import { createSkyModel, inferSkyModel, MODEL_FILE } from "#/lib/sky/model";
+import { createSkyModel, inferSkyModel } from "#/lib/sky/model";
 import {
 	axisTable,
 	refineSkyGpu,
@@ -45,10 +42,6 @@ import {
 	SKY_GRAPH_GROUP,
 	skyScratchBytes,
 } from "./refine-graph";
-
-ort.env.wasm.wasmPaths = { wasm: wasmUrl };
-ort.env.wasm.numThreads = 1;
-ort.env.logLevel = "error";
 
 const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
@@ -266,15 +259,9 @@ export async function runSkyGraphBench(opts: {
 	const device = await getComputeDevice();
 	if (!device) return { error: "no compute device" };
 	await warmSkyKernels(device);
-	const handle = nativeWebGPUDevice(device);
-	const res = await fetch(`/${MODEL_FILE}`);
-	const model = await createSkyModel(
-		new Uint8Array(await res.arrayBuffer()),
-		["webgpu"],
-		{ device: handle },
-	);
+	const model = await createSkyModel({ device, backends: ["webgpu"] });
 	const out = {
-		device: { shared: model.sharedDevice === handle },
+		device: { shared: model.device === device },
 		clear: await clearTest(device),
 		cases: [] as unknown[],
 		sequence: [] as unknown[],
@@ -311,7 +298,7 @@ export async function runSkyGraphBench(opts: {
 			try {
 				const par = await parity(device, input, cpuProb);
 				const v = vram(input.lw, input.lh, W, H);
-				// imports (P(sky) is ORT's own buffer when shared)
+				// imports (P(sky) is the model's own buffer)
 				const imports =
 					32 +
 					3 * input.lw * input.lh * 4 +

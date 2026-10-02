@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 /**
- * Evaluates src/lib/sky on public/photos/*.jpg in node (onnxruntime-web, WASM).
+ * Evaluates src/lib/sky on public/photos/*.jpg in node (src/lib/nn: WebGPU over Dawn when DAWN_DIR is set, else the CPU backend).
  *
- *   npx tsx scripts/sky-eval.ts [IMG_xxxx ...] [--out DIR] [--model-long-side 512] [--threads N]
+ *   npx tsx scripts/sky-eval.ts [IMG_xxxx ...] [--out DIR] [--model-long-side 512]
  *
  * For every photo: model mask + skyline, classical fallback mask + skyline,
  * and detectSkyline (geo/skyline.ts) for comparison. Writes overlays
@@ -21,7 +21,6 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import * as ort from "onnxruntime-web";
 import { cameraFromAngles } from "../src/lib/geo/camera";
 import { detectSkyline } from "../src/lib/geo/skyline";
 import { projectSkylineRows } from "../src/lib/geo/solve";
@@ -31,15 +30,11 @@ import {
 	rgbPlanes,
 	toBytes,
 } from "../src/lib/sky/core";
-import {
-	createSkyModel,
-	MODEL_FILE,
-	MODEL_LONG_SIDE,
-	runSkyModel,
-} from "../src/lib/sky/model";
+import { MODEL_FILE, runSkyModel } from "../src/lib/sky/model";
 import { skylineFromSky, skylineFromSkyDP } from "../src/lib/sky/skyline";
 import { IMG_DIR, loadRGBA, ROOT } from "./lib/node-io";
 import { photoContext } from "./lib/pipeline-node";
+import { createSkyModelNode } from "./lib/sky-model-node";
 
 const argv = process.argv.slice(2);
 const flag = (k: string) => {
@@ -54,8 +49,8 @@ const OUT = path.resolve(
 		process.env.SKY_EVAL_OUT ??
 		path.join(ROOT, ".cache", "sky-eval"),
 );
-const MODEL_LS = Number(flag("--model-long-side") ?? MODEL_LONG_SIDE.wasm);
-const THREADS = Number(flag("--threads") ?? 0);
+const MODEL_LS_FLAG = flag("--model-long-side");
+flag("--threads"); // ignored (the ONNX Runtime era flag)
 const MODEL = flag("--model");
 const only = argv;
 const WORK = 1024;
@@ -153,13 +148,12 @@ function drawRows(
 
 async function main() {
 	fs.mkdirSync(OUT, { recursive: true });
-	if (THREADS) ort.env.wasm.numThreads = THREADS;
 	const gtAll: Record<string, GT> = fs.existsSync(GT_FILE)
 		? JSON.parse(fs.readFileSync(GT_FILE, "utf8"))
 		: {};
 	const modelPath = MODEL
 		? path.resolve(MODEL)
-		: path.join(ROOT, "public", MODEL_FILE);
+		: path.join(ROOT, "public", "models", MODEL_FILE);
 	if (!MODEL) {
 		const sha = createHash("sha256")
 			.update(fs.readFileSync(modelPath))
@@ -170,13 +164,13 @@ async function main() {
 			);
 	}
 	const tl = performance.now();
-	const model = await createSkyModel(
-		new Uint8Array(fs.readFileSync(modelPath)),
-		["wasm"],
-	);
+	const { model, longSide } = await createSkyModelNode({
+		bytes: new Uint8Array(fs.readFileSync(modelPath)),
+	});
+	const MODEL_LS = Number(MODEL_LS_FLAG ?? longSide);
 	const loadMs = performance.now() - tl;
 	console.log(
-		`model ${path.basename(modelPath)} (${(fs.statSync(modelPath).size / 1e6).toFixed(1)} MB) loaded in ${loadMs.toFixed(0)} ms, input long side ${MODEL_LS}, threads ${ort.env.wasm.numThreads ?? "default"}`,
+		`model ${path.basename(modelPath)} (${(fs.statSync(modelPath).size / 1e6).toFixed(1)} MB) loaded in ${loadMs.toFixed(0)} ms, input long side ${MODEL_LS}, nn ${model.backend}`,
 	);
 
 	const names = fs
@@ -382,7 +376,7 @@ async function main() {
 	);
 	const withGt = report.filter((r) => r.metrics);
 	const md = [
-		`Model load ${loadMs.toFixed(0)} ms; median model inference ${median(report.map((r) => r.ms.model))} ms, refine ${median(report.map((r) => r.ms.refine))} ms, fallback ${median(report.map((r) => r.ms.fallbackTotal))} ms (node, onnxruntime-web WASM).`,
+		`Model load ${loadMs.toFixed(0)} ms; median model inference ${median(report.map((r) => r.ms.model))} ms, refine ${median(report.map((r) => r.ms.refine))} ms, fallback ${median(report.map((r) => r.ms.fallbackTotal))} ms (node, nn ${model.backend}).`,
 		"",
 		"Cells: median |Δrow| / median |Δrow − bias| (px @1024), weighted outlier mass (share of weight on columns > 10 px from the bias-corrected DEM line), coverage of in-frame DEM columns.",
 		"",

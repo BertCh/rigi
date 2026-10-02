@@ -4,32 +4,18 @@
 
 /// <reference lib="webworker" />
 /**
- * Sky segmentation worker: lazily loads the U²-Net-P sky model (WebGPU →
- * WASM), runs it, refines with the fast guided filter, and falls back to the
+ * Sky segmentation worker: lazily loads the U²-Net-P sky model (src/lib/nn: WGSL kernels on WebGPU, the
+ * CPU reference backend otherwise), runs it, refines with the fast guided filter, and falls back to the
  * classical segmenter if the model can't be loaded or run.
  *
- * GPU (when the page's gpuEnabled() says so, sent as `gpu`): the worker's
- * luma compute device is created first and handed to ORT (shareOrtDevice), so
- * the model and the refine share ONE GPUDevice; the model output stays on the
- * GPU and the refine (src/lib/gpu/sky/refine.ts, the GPU twin of
- * refineToWorking) reads only the final byte mask back. If ORT runs on its
- * own device (it was initialised by a request without `gpu`) or on WASM, the
- * GPU refine takes the downloaded P(sky). The CPU refine is the reference and
- * the fallback: no WebGPU, ?gpu=off, or any GPU error.
- *
- * Assets: "onnxruntime-web" resolves to the JSEP bundle (ort.bundle.min.mjs),
- * whose JS glue is inlined and which serves both the WebGPU and WASM
- * execution providers from ONE wasm binary (ort-wasm-simd-threaded.jsep.wasm).
- * That binary is imported with `?url`, so Vite emits exactly one
- * content-hashed ORT asset (safe for immutable long-cache headers); no other
- * ORT wasm variant is referenced. The model is public/models/ with a
- * content-hashed filename.
+ * GPU (when the page's gpuEnabled() says so, sent as `gpu`): the worker's luma compute device runs the
+ * model (one ComputeGraph per forward), the GPU prep and the refine, so the photo, the model input and
+ * the model output stay on the GPU; only the final byte mask is read back. The CPU refine is the
+ * reference and the fallback: no WebGPU, ?gpu=off, or any GPU error. The weights (fp16 safetensors,
+ * scripts/models/u2netp.py) are fetched through src/lib/models (Cache Storage, content-hashed name).
  */
 
 import type { Device } from "@luma.gl/core";
-import * as ort from "onnxruntime-web";
-import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
-import { nativeWebGPUDevice } from "#/lib/gpu/core/luma";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { releasePrepGraphs, type SkyPrepGpu } from "#/lib/gpu/sky/prep";
 import { refineSkyGpu, warmSkyKernels } from "#/lib/gpu/sky/refine";
@@ -48,7 +34,6 @@ import {
 	createSkyModel,
 	inferSkyModel,
 	inferSkyModelGpu,
-	MODEL_FILE,
 	MODEL_LONG_SIDE,
 	type SkyInference,
 	type SkyModel,
@@ -63,15 +48,8 @@ import type {
 import { createSerialQueue } from "./serial-queue";
 import { createSessionRecovery } from "./session-recovery";
 
-// Explicit wasm URL: needed in dev (Vite pre-bundles ORT, breaking its own
-// import.meta.url lookup) and resolves to the same hashed asset in builds.
-ort.env.wasm.wasmPaths = { wasm: wasmUrl };
-// Single-threaded: ORT's pthread workers would re-load this bundled worker
-// chunk, and the app isn't crossOriginIsolated (no SharedArrayBuffer) anyway.
-ort.env.wasm.numThreads = 1;
-ort.env.logLevel = "error";
-
 const queue = createSerialQueue();
+// one model per backend; a webgpu model is tied to the compute device it was created on
 const models = new Map<string, Promise<SkyModel | null>>();
 let modelError: string | undefined;
 // A failed load is not cached for good: retry after a growing backoff, up to a cap.
@@ -81,12 +59,12 @@ const LOAD_BACKOFF_MS = 2000;
 
 const warmed = new WeakSet<Device>();
 let lastDevice: Device | undefined;
-// devices the GPU refine ran on since the last device loss (ours, or ORT's own): the idle release frees
+// devices the GPU refine ran on since the last device loss: the idle release frees
 // their cached refine graphs
 const refineDevices = new Set<Device>();
 
 // The prep and refine graphs are cached per shape; free them after this long without a request (the
-// device itself stays: ORT shares it). A later request rebuilds the same graphs.
+// device itself stays: the model runs on it). A later request rebuilds the same graphs.
 const SKY_GRAPH_IDLE_MS = 30_000;
 const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
 	// on the request queue: a request that arrives while the imports below are awaited runs after
@@ -94,7 +72,6 @@ const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
 	queue.run(async () => {
 		if (queue.size > 1) return;
 		const device = lastDevice;
-		// the refine may have run on ORT's own device (model.ortDevice) as well as on ours
 		const refineOn = new Set(refineDevices);
 		if (device) refineOn.add(device);
 		if (!refineOn.size) return;
@@ -107,22 +84,21 @@ const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
 	}),
 );
 
-// After a GPU device loss the cached ORT sessions are dropped and loads go to WASM (session-recovery.ts).
+// After a GPU device loss the cached models are dropped and loads go to the CPU backend (session-recovery.ts).
 const recovery = createSessionRecovery();
 
 /** Feed a failure to the recovery state; on the first device loss drop every cached session. */
 function noteFailure(e: unknown) {
 	if (!recovery.noteFailure(e)) return;
 	console.warn(
-		"[sky] GPU device lost: dropping the ORT session, continuing on WASM",
+		"[sky] GPU device lost: dropping the model, continuing on the CPU backend",
 	);
 	const dropped = [...models.values()];
 	models.clear();
 	failures.clear();
 	lastDevice = undefined;
 	refineDevices.clear();
-	for (const p of dropped)
-		void p.then((m) => m?.session.release?.()).catch(() => {});
+	for (const p of dropped) void p.then((m) => m?.dispose()).catch(() => {});
 }
 
 /** The worker's luma compute device when the page allows the GPU (null: CPU refine). */
@@ -138,17 +114,30 @@ async function computeDevice(gpu: boolean | undefined): Promise<Device | null> {
 }
 
 /**
- * The session for (url, backend). The first WebGPU session decides ORT's device for the life of the
- * worker: `device` (shared) when given, else ORT's own.
+ * The model for `backend` (default: webgpu on `device`, else cpu). A cached webgpu model is only reused
+ * on the device it was created on (the compute device is recreated after an idle release or a loss).
  */
 function loadModel(
-	url: string,
 	backend?: Backend,
 	device?: Device | null,
 ): Promise<SkyModel | null> {
 	backend = recovery.backendFor(backend);
-	const key = `${url}|${backend ?? "auto"}`;
+	const key = backend ?? "auto";
 	let p = models.get(key);
+	if (p) {
+		// a model of another device is stale: free it and build a fresh one
+		const cached = p;
+		void cached.then((m) => {
+			if (
+				m?.backend === "webgpu" &&
+				m.device !== device &&
+				models.get(key) === cached
+			) {
+				models.delete(key);
+				m.dispose();
+			}
+		});
+	}
 	const f = failures.get(key);
 	if (
 		!p &&
@@ -160,11 +149,9 @@ function loadModel(
 	if (!p) {
 		p = (async () => {
 			try {
-				const res = await fetch(url);
-				if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-				const bytes = new Uint8Array(await res.arrayBuffer());
-				return await createSkyModel(bytes, backend ? [backend] : undefined, {
-					device: device ? nativeWebGPUDevice(device) : undefined,
+				return await createSkyModel({
+					device,
+					backends: backend ? [backend] : undefined,
 				});
 			} catch (e) {
 				modelError = String(e);
@@ -184,18 +171,12 @@ function loadModel(
 	return p;
 }
 
-// The model lives in public/ (content-hashed filename, see MODEL_FILE); the
-// dev server here only serves a few asset types from src/, so no `?url`.
-const defaultModelUrl = `${import.meta.env.BASE_URL}${MODEL_FILE}`;
-const modelUrlOf = (req: { modelUrl?: string }) =>
-	new URL(req.modelUrl ?? defaultModelUrl, self.location.origin).href;
-
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
 async function preload(req: SkyPreloadRequest) {
 	const t0 = performance.now();
 	const device = await computeDevice(req.gpu);
-	const model = await loadModel(modelUrlOf(req), req.backend, device);
+	const model = await loadModel(req.backend, device);
 	const msg: SkyWorkerResponse = {
 		id: req.id,
 		ok: true,
@@ -206,13 +187,6 @@ async function preload(req: SkyPreloadRequest) {
 	};
 	scope.postMessage(msg);
 }
-
-const ortDeviceOf = (model: SkyModel | null | undefined) =>
-	model?.backend === "webgpu"
-		? model.sharedDevice
-			? ("shared" as const)
-			: ("own" as const)
-		: undefined;
 
 async function segment(req: SkySegmentRequest) {
 	try {
@@ -228,10 +202,8 @@ async function segmentOf(req: SkySegmentRequest) {
 	if (!req.rgba && !req.bitmap) throw new Error("segment: no pixels");
 	const rgba = req.rgba ? new Uint8Array(req.rgba) : undefined;
 	const device = await computeDevice(req.gpu);
-	const model = req.forceFallback
-		? null
-		: await loadModel(modelUrlOf(req), req.backend, device);
-	// GPU prep (src/lib/sky/prep.ts): the photo goes ImageBitmap → GPU buffers (ORT's input, the
+	const model = req.forceFallback ? null : await loadModel(req.backend, device);
+	// GPU prep (src/lib/sky/prep.ts): the photo goes ImageBitmap → GPU buffers (the model's input, the
 	// refine's guides) without visiting the CPU; undefined = the CPU prep below
 	const modelLongSide =
 		req.modelLongSide ?? (model ? MODEL_LONG_SIDE[model.backend] : 0);
@@ -276,7 +248,7 @@ async function segmentWith(
 					H,
 					req.modelLongSide ?? MODEL_LONG_SIDE[model.backend],
 				);
-				inf = await inferSkyModelGpu(model, prep.input, width, height);
+				inf = await inferSkyModelGpu(model, prep.inputBuffer, width, height);
 			} else
 				inf = await inferSkyModel(
 					model,
@@ -301,32 +273,20 @@ async function segmentWith(
 			try {
 				const lw = inf?.width ?? (low as ModelRun).width;
 				const lh = inf?.height ?? (low as ModelRun).height;
-				// the model output stays on the GPU only when ORT runs on this very device; when ORT kept
-				// its own device (model.ortDevice, attached), refine runs there instead of the shim
-				const shared = model?.sharedDevice === device.handle;
-				const refineDev =
-					inf?.gpuBuffer &&
-					!shared &&
-					model?.ortDevice &&
-					// ORT's device may carry default limits: its biggest refine buffer is ~16 B/px
-					model.ortDevice.limits.maxStorageBufferBindingSize >= W * H * 16
-						? model.ortDevice
-						: device;
+				// the model output is a buffer on the compute device when the model runs on it
 				const onDevice =
-					inf?.gpuBuffer && (shared || refineDev !== device)
+					inf?.gpuBuffer && model?.device === device
 						? inf.gpuBuffer
 						: undefined;
-				refineDevices.add(refineDev);
-				const out = await refineSkyGpu(refineDev, {
+				refineDevices.add(device);
+				const out = await refineSkyGpu(device, {
 					W,
 					H,
-					// the prep's buffers live on `device`; refineDev is `device` whenever the prep ran
-					// (the prep needs ORT on the shared device) or the model output is on the CPU
-					rgba: prep && refineDev === device ? prep.rgba : await pixels(),
+					rgba: prep ? prep.rgba : await pixels(),
 					lw,
 					lh,
 					guideLo:
-						prep && refineDev === device && lw === prep.lw && lh === prep.lh
+						prep && lw === prep.lw && lh === prep.lh
 							? prep.rgbLo
 							: (inf?.rgbLo ?? resamplePlanes(await rgbOf(), W, H, 3, lw, lh)),
 					prob:
@@ -350,7 +310,7 @@ async function segmentWith(
 			);
 		}
 	} finally {
-		// after a device loss the session (and its output) may already be gone: never mask the result
+		// after a device loss the model (and its output) may already be gone: never mask the result
 		try {
 			inf?.release();
 		} catch {}
@@ -368,14 +328,13 @@ async function segmentWith(
 		error: source === "fallback" ? modelError : undefined,
 		ms: { load: t1 - t0, infer: t2 - t1, refine: t3 - t2 },
 		refineOn,
-		ortDevice: source === "model" ? ortDeviceOf(model) : undefined,
 		prep: prepStatus(device, prep ? "gpu" : "cpu"),
 	};
 	scope.postMessage(msg, [msg.data]);
 }
 
-// One ORT session can't run concurrent inferences ("Session already started"),
-// so requests (and the idle release) are handled strictly in arrival order.
+// One model runs one forward at a time (the nn runtime records a single graph), so requests (and the
+// idle release) are handled strictly in arrival order.
 
 async function handle(req: SkyWorkerRequest) {
 	idle.begin();

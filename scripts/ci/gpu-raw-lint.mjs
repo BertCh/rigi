@@ -58,14 +58,6 @@ const WHY = [
 	],
 	["src/lib/gpu/core/selftest.ts", "selftest drives the raw device on purpose"],
 	[
-		"src/lib/gpu/sky/model.ts",
-		"ORT (onnxruntime-web) needs the raw GPUDevice attached; stays",
-	],
-	[
-		"src/lib/sky/model.ts",
-		"ORT (onnxruntime-web) needs the raw GPUDevice attached; stays",
-	],
-	[
 		"src/lib/gpu/sky/refine-graph.ts",
 		"ORT output buffer wrapped via the public props.handle (audit-gpu A11)",
 	],

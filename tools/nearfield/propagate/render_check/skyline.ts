@@ -4,7 +4,7 @@
 
 /**
  * Photo skylines for the propagation DEM-render check (METHOD.txt step 1).
- * The app's sky model exactly as scripts/sky-eval.ts runs it (node, onnxruntime-web WASM, CPU).
+ * The app's sky model exactly as scripts/sky-eval.ts runs it (node, src/lib/nn: Dawn WebGPU with DAWN_DIR, else the CPU backend).
  *
  *   npx tsx tools/nearfield/propagate/render_check/skyline.ts
  * Writes render_check/out/skyline_<id>.json {W, H, rows[], weight[]} and a mask PNG.
@@ -13,17 +13,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { loadRGBA, ROOT } from "../../../../scripts/lib/node-io";
+import { createSkyModelNode } from "../../../../scripts/lib/sky-model-node";
 import {
 	refineToWorking,
 	rgbPlanes,
 	toBytes,
 } from "../../../../src/lib/sky/core";
-import {
-	createSkyModel,
-	MODEL_FILE,
-	MODEL_LONG_SIDE,
-	runSkyModel,
-} from "../../../../src/lib/sky/model";
+import { runSkyModel } from "../../../../src/lib/sky/model";
 import { skylineFromSky } from "../../../../src/lib/sky/skyline";
 
 const IDS = ["IMG_7059", "IMG_7063", "IMG_7068"];
@@ -31,10 +27,7 @@ const OUT = path.join(import.meta.dirname, "out");
 
 async function main() {
 	fs.mkdirSync(OUT, { recursive: true });
-	const model = await createSkyModel(
-		new Uint8Array(fs.readFileSync(path.join(ROOT, "public", MODEL_FILE))),
-		["wasm"],
-	);
+	const { model, longSide } = await createSkyModelNode();
 	for (const id of IDS) {
 		const file = path.join(ROOT, "public", "photos", `${id}.jpg`);
 		const im0 = await loadImage(file);
@@ -46,7 +39,7 @@ async function main() {
 		const W = img.width;
 		const H = img.height;
 		const rgb = rgbPlanes(img);
-		const low = await runSkyModel(model, rgb, W, H, MODEL_LONG_SIDE.wasm);
+		const low = await runSkyModel(model, rgb, W, H, longSide);
 		const pm = refineToWorking(rgb, W, H, low, true);
 		const mask = { width: W, height: H, data: toBytes(pm) };
 		const sky = skylineFromSky(mask);

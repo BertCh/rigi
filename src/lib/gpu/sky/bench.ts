@@ -4,14 +4,11 @@
 
 // Parity / speed bench for the GPU sky refine (refine.ts) against the CPU refine (sky/core.ts
 // refineToWorking + toBytes), run in the page realm by scripts/gpu/sky-bench.mjs. It mirrors the sky
-// worker: the luma compute device is handed to ORT (shareOrtDevice), U²-Net-P runs on it with its
+// worker: U²-Net-P runs on the luma compute device (nn graph) with its
 // output left on the GPU, and the GPU refine reads that buffer; the CPU refine gets the same P(sky)
 // downloaded. Extra cases exercise the other resample branches: the classical fallback's low-res
 // P(sky) (640 px, uploaded floats) and a 512 px working image under a 640 px model (area-average
 // downsample instead of bilinear upsample).
-import * as ort from "onnxruntime-web";
-import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
-import { nativeWebGPUDevice } from "#/lib/gpu/core/luma";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
 	classicalSky,
@@ -22,12 +19,8 @@ import {
 	toBytes,
 	workingSize,
 } from "#/lib/sky/core";
-import { createSkyModel, inferSkyModel, MODEL_FILE } from "#/lib/sky/model";
+import { createSkyModel, inferSkyModel } from "#/lib/sky/model";
 import { refineSkyGpu, type SkyProb, warmSkyKernels } from "./refine";
-
-ort.env.wasm.wasmPaths = { wasm: wasmUrl };
-ort.env.wasm.numThreads = 1;
-ort.env.logLevel = "error";
 
 type Diff = {
 	maxAbs: number;
@@ -92,23 +85,17 @@ export async function runSkyBench(names: string[], reps = 3) {
 	const device = await getComputeDevice();
 	if (!device) return { error: "no compute device" };
 	await warmSkyKernels(device);
-	const handle = nativeWebGPUDevice(device);
-	const res = await fetch(`/${MODEL_FILE}`);
-	const model = await createSkyModel(
-		new Uint8Array(await res.arrayBuffer()),
-		["webgpu"],
-		{ device: handle },
-	);
+	const model = await createSkyModel({ device, backends: ["webgpu"] });
 	const out = {
 		device: {
-			shared: model.sharedDevice === handle,
+			shared: model.device === device,
 			features: [...device.features].filter((f) => !f.includes("-texture-")),
 		},
 		photos: [] as unknown[],
 		extra: [] as unknown[],
 	};
 
-	// GPU and CPU refine of one low-res P(sky); gpuProb is what the GPU reads (ORT buffer or floats)
+	// GPU and CPU refine of one low-res P(sky); gpuProb is what the GPU reads (the model's buffer or floats)
 	const compare = async (
 		W: number,
 		H: number,
@@ -175,7 +162,7 @@ export async function runSkyBench(names: string[], reps = 3) {
 				const cb = toBytes(cq);
 				ms.cpuRefine.push(performance.now() - t);
 				d = diff(gf.q as Float32Array, cq, g.bytes, cb);
-				// the same P(sky) uploaded from the CPU gives the same bytes as ORT's buffer
+				// the same P(sky) uploaded from the CPU gives the same bytes as the model's buffer
 				const gu = await refineSkyGpu(device, { ...input, prob });
 				for (let i = 0; i < gu.bytes.length; i++)
 					if (gu.bytes[i] !== g.bytes[i]) {

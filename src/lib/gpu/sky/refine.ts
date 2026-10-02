@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // GPU twin of sky/core.ts refineToWorking(rgbWork, W, H, low, true, opts) followed by toBytes: the
-// sky worker's guided-filter refine. The low-res P(sky) may be a Float32Array or, when ONNX Runtime
-// runs on this same device (sky/model.ts shareOrtDevice), the model's output GPUBuffer itself, so
+// sky worker's guided-filter refine. The low-res P(sky) may be a Float32Array or, when the sky model
+// (nn, sky/model.ts) runs on this same device, the model's output GPUBuffer itself, so
 // the model output never leaves the GPU and only the final byte mask is read back.
 // Parity with the CPU refine: scripts/gpu/sky-refine-conv-dawn.ts (tolerances: float mask 1e-4,
 // bytes within 1; see refine.wgsl.ts for what is exact and what is f32-vs-f64). The box means are
@@ -73,7 +73,7 @@ export const K_PACK = def("pack", PACK, [
 export const warmSkyKernels = (device: Device) =>
 	warmKernelsAsync(device, GROUP);
 
-/** Low-res P(sky): CPU floats, or a GPUBuffer on `device.handle` holding lw·lh f32 (ORT's output). */
+/** Low-res P(sky): CPU floats, or a GPUBuffer on `device.handle` holding lw·lh f32 (the nn model's output). */
 export type SkyProb = Float32Array | GPUBuffer;
 
 export interface SkyRefineInput {
