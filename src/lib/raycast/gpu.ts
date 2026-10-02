@@ -164,6 +164,8 @@ export interface GpuRayScene {
 	frame(cam: RayCamera, stride?: number): Promise<Float32Array>;
 	/** Wall ms from submit to onSubmittedWorkDone of one frame dispatch (no readback, no upload). */
 	timeFrame(cam: RayCamera, stride?: number): Promise<number>;
+	/** The dispatch's GPU timestamp (ms) when the device has timestamp-query, else null. */
+	timestampFrame(cam: RayCamera, stride?: number): Promise<number | null>;
 	/** Horizon elevations in degrees at azimuths i * step; -90 = no terrain. */
 	columns(step?: number): Promise<Float64Array>;
 	destroy(): void;
@@ -291,6 +293,18 @@ export async function createGpuRayScene(
 			fence.destroy();
 			release(u);
 			return ms;
+		},
+		async timestampFrame(cam, stride = 1) {
+			if (!device.features.has("timestamp-query")) return null;
+			const { W, H } = dims(cam, stride);
+			const { g, out } = await graphFor(W * H * 16);
+			const u = frameU(cam, stride);
+			const res = await g.run(
+				{ wx: Math.ceil(W / 8), wy: Math.ceil(H / 8) },
+				{ buffers: bindings(u, out), timings: true },
+			);
+			release(u);
+			return res.timings?.gpuTimeMilliseconds ?? null;
 		},
 		async columns(step = columnStep) {
 			if (step !== columnStep)

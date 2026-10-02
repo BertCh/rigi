@@ -12,6 +12,7 @@
 // Per-eye outputs go to out/e5/ (gitignored), the pooled results to tools/research/fund/e5_raycast/results.json.
 // Exit 2 without a WebGPU adapter (gpu stage).
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Device } from "@luma.gl/core";
@@ -70,7 +71,7 @@ function buildEyes(): EyeRec[] {
 	const gt = JSON.parse(
 		fs.readFileSync(path.join(ROOT, "data/ground-truth.json"), "utf8"),
 	);
-	for (const [id, v] of Object.entries<Record<string, any>>(gt)) {
+	for (const [id, v] of Object.entries<Record<string, number>>(gt)) {
 		const hfov = v.f ? (2 * Math.atan(v.width / (2 * v.f))) / DEG : 60;
 		let pose = null;
 		if (v.yaw !== null && v.f) {
@@ -92,7 +93,7 @@ function buildEyes(): EyeRec[] {
 	const dev: string[] = JSON.parse(
 		fs.readFileSync(path.join(OUT, "dev_ids.json"), "utf8"),
 	);
-	const manifest: Record<string, any>[] = JSON.parse(
+	const manifest: { id: string; width: number; height: number }[] = JSON.parse(
 		fs.readFileSync(path.join(MAIN, "tools/bench/data/manifest.json"), "utf8"),
 	);
 	for (const id of dev) {
@@ -207,6 +208,33 @@ async function cpuStage() {
 		console.log(
 			`${e.id} z=${mosaics.map((m) => m.z).join("/")} hf ${hf.stats.ms.toFixed(0)} ms, oracle ${(msOracle / 1000).toFixed(1)} s, dpx p95 ${quantile(d, 0.95).toFixed(3)} max ${Math.max(...d).toFixed(2)}`,
 		);
+	}
+}
+
+// 100 km runs of horizon-fast and the CPU oracle (the cap dem.py has), GT eyes only; eyes.json for dempy_horizon.py
+async function cap100Stage() {
+	const all = buildEyes();
+	fs.writeFileSync(
+		path.join(OUT, "eyes.json"),
+		JSON.stringify(all.filter((e) => e.set === "gt")),
+	);
+	for (const e of selected(all.filter((x) => x.set === "gt"))) {
+		const file = `c100-${e.id}.json`;
+		if (fs.existsSync(path.join(OUT, file)) && !opt("force")) continue;
+		const mosaics = await mosaicsFor(e);
+		const eye = { lat: e.lat, lon: e.lon, h: e.h };
+		const hf = computeHorizonFast(mosaics, eye, {
+			step: STEP,
+			maxDistance: 100_000,
+			noRidges: true,
+		});
+		const S = makeRayScene(mosaics, eye, { maxDistance: 100_000 });
+		writeJson(file, {
+			id: e.id,
+			hf: Array.from(hf.elevation),
+			oracle: Array.from(columnProfile(S, STEP).elevation),
+		});
+		console.log(`${e.id} 100 km done`);
 	}
 }
 
@@ -354,7 +382,7 @@ async function gpuStage() {
 		const mosaics = await mosaicsFor(e);
 		const eye = { lat: e.lat, lon: e.lon, h: e.h };
 		const S = makeRayScene(mosaics, eye, { maxDistance: MAX_D });
-		const rec: Record<string, unknown> = { id: e.id };
+		const rec: Record<string, unknown> = { id: e.id, loadavg: os.loadavg() };
 		// GPU horizon (src/lib/gpu/horizon) on the same mosaics
 		const th = performance.now();
 		const [gh] = await computeHorizonGpu(device, mosaics, [eye], {
@@ -378,6 +406,12 @@ async function gpuStage() {
 			for (let i = 0; i < 15; i++) times.push(await rc.timeFrame(cam));
 			rec.frameMs = times;
 			rec.frameMedianMs = median(times);
+			const ts: number[] = [];
+			for (let i = 0; i < 5; i++) {
+				const t = await rc.timestampFrame(cam);
+				if (t !== null) ts.push(t);
+			}
+			if (ts.length) rec.timestampMs = ts;
 			// full frame readback: sky fraction, and (depth subset) agreement on the 128 x 96 grid
 			const frame = await rc.frame(cam);
 			let sky = 0;
@@ -467,6 +501,11 @@ function aggregate() {
 		marchVsDenseOracle: [] as number[],
 		denseMarchVsDenseOracle: [] as number[],
 	};
+	const demPy = {
+		vsMarch100: [] as number[],
+		vsOracle100: [] as number[],
+		marchVsOracle100: [] as number[],
+	};
 	const perEye: Record<string, unknown>[] = [];
 	const frameTimes: number[] = [];
 	for (const e of have) {
@@ -483,6 +522,23 @@ function aggregate() {
 			oracleCpuMs: c.oracleMs,
 			hfVsOracle: stats(dHO),
 		};
+		const dm = path.join(OUT, `dempy-${e.id}.json`);
+		const c1 = path.join(OUT, `c100-${e.id}.json`);
+		if (fs.existsSync(dm) && fs.existsSync(c1)) {
+			const dpy = readJson(`dempy-${e.id}.json`);
+			const k = readJson(`c100-${e.id}.json`);
+			const a = dpx(dpy.el, k.hf, e.hfov);
+			const b = dpx(dpy.el, k.oracle, e.hfov);
+			const c2 = dpx(k.hf, k.oracle, e.hfov);
+			for (const v of a) demPy.vsMarch100.push(v);
+			for (const v of b) demPy.vsOracle100.push(v);
+			for (const v of c2) demPy.marchVsOracle100.push(v);
+			row.demPy = {
+				vsMarch100: stats(a),
+				vsOracle100: stats(b),
+				marchVsOracle100: stats(c2),
+			};
+		}
 		const dp = path.join(OUT, `dense-${e.id}.json`);
 		if (fs.existsSync(dp)) {
 			const d = readJson(`dense-${e.id}.json`);
@@ -526,6 +582,7 @@ function aggregate() {
 				for (const t of g.frameMs) frameTimes.push(t);
 				row.frame = {
 					medianMs: g.frameMedianMs,
+					timestampMedianMs: g.timestampMs ? median(g.timestampMs) : null,
 					maxMs: Math.max(...g.frameMs),
 					skyFraction: g.skyFraction,
 					depth: g.depth,
@@ -566,6 +623,9 @@ function aggregate() {
 					? "INCOMPLETE"
 					: "KILL",
 		pooledPxStats: pooledStats,
+		demPy: Object.fromEntries(
+			Object.entries(demPy).map(([k, v]) => [k, v.length ? stats(v) : null]),
+		),
 		posthocDense: Object.fromEntries(
 			Object.entries(posthoc).map(([k, v]) => [k, v.length ? stats(v) : null]),
 		),
@@ -596,6 +656,7 @@ if (stage === "eyes") {
 		);
 } else if (stage === "cpu") await cpuStage();
 else if (stage === "dense") await denseStage();
+else if (stage === "cap100") await cap100Stage();
 else if (stage === "gpu") await gpuStage();
 else if (stage === "aggregate") aggregate();
 else {
