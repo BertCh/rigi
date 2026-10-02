@@ -1035,6 +1035,7 @@ export function DemPatch({
 	aspect = 1,
 	id,
 	imprint: imprintProp,
+	furniture = true,
 	className,
 	children,
 }: {
@@ -1049,6 +1050,8 @@ export function DemPatch({
 	id?: string;
 	/** One micro provenance line under the patch; false hides it. */
 	imprint?: boolean;
+	/** The "N↑ · km · min–max m" scale line; false leaves it out (default true). */
+	furniture?: boolean;
 	className?: string;
 	children?: (
 		d: GipfelbuchPhotoData,
@@ -1084,7 +1087,11 @@ export function DemPatch({
 				role="img"
 				aria-label={`Relief map around ${data.id} with the camera's view cone`}
 			>
-				<rect width={S} height={S} fill="var(--gb-paper, #ece6da)" />
+				<rect
+					width={S}
+					height={S}
+					fill="var(--fig-wash, var(--gb-paper, #ece6da))"
+				/>
 				<defs>
 					<ImhofRampFilter
 						id={`${data.id}-imhof`}
@@ -1148,20 +1155,19 @@ export function DemPatch({
 										color="var(--gb-ink, #131313)"
 										opacity={1}
 									/>
-									<text
+									<HandLabel
 										x={flip ? x - 6 : x + 6}
 										y={y + 2}
-										textAnchor={flip ? "end" : "start"}
-										fontSize={11.5}
-										className="nb-label"
-										stroke={HALO}
-										strokeWidth={2.8}
-										strokeLinejoin="round"
-										paintOrder="stroke"
-										style={{ fill: PHOTO_INK, fontFamily: CAPS_STACK }}
+										anchor={flip ? "end" : "start"}
+										size={11.5}
+										caps
+										condensed
+										color={PHOTO_INK}
+										haloColor={HALO}
+										halo={2.8}
 									>
 										{p.name}
-									</text>
+									</HandLabel>
 								</g>
 							);
 						})}
@@ -1178,25 +1184,25 @@ export function DemPatch({
 					y={S / 2}
 					r={4.6}
 					seed={`${data.id}-camera`}
-					color="var(--gb-red, var(--accent))"
+					color="var(--gb-ink, #131313)"
 					opacity={1}
 				/>
 				{children?.(data, toPx)}
-				<text
-					x={S - 8}
-					y={17}
-					textAnchor="end"
-					fontSize={12}
-					className="nb-num"
-					stroke={HALO}
-					strokeWidth={2.6}
-					strokeLinejoin="round"
-					paintOrder="stroke"
-					style={{ fill: PHOTO_INK, fontFamily: FIGURE_STACK }}
-				>
-					N↑ · {2 * data.demPatch.halfKm} km · {data.demPatch.min}–
-					{data.demPatch.max} m
-				</text>
+				{furniture && (
+					<HandLabel
+						x={S - 8}
+						y={17}
+						anchor="end"
+						size={12}
+						italic
+						color={PHOTO_INK}
+						haloColor={HALO}
+						halo={2.6}
+					>
+						N↑ · {2 * data.demPatch.halfKm} km · {data.demPatch.min}–
+						{data.demPatch.max} m
+					</HandLabel>
+				)}
 			</svg>
 			{imprint && <ImprintLine imprint={imprintFor(data, "dem")} />}
 		</div>
