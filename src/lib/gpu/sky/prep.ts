@@ -29,6 +29,7 @@ import {
 	storage,
 	uniform,
 } from "#/lib/gpu/core/kernel";
+import { nativeWebGPUBuffer } from "#/lib/gpu/core/luma";
 import { pooledStorage, withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
 import {
@@ -157,8 +158,6 @@ function tables(W: number, H: number, lw: number, lh: number) {
 	}
 	return t;
 }
-
-const handleOf = (b: Buffer) => (b as unknown as { handle: GPUBuffer }).handle;
 
 type Params = Record<string, never>;
 
@@ -363,9 +362,9 @@ function runPrep(
 			H,
 			lw,
 			lh,
-			rgba: handleOf(rgba),
-			rgbLo: handleOf(rgbLo),
-			input: handleOf(input),
+			rgba: nativeWebGPUBuffer(rgba),
+			rgbLo: nativeWebGPUBuffer(rgbLo),
+			input: nativeWebGPUBuffer(input),
 			isOpaque: async () => {
 				const [b] = await readBack(
 					device,

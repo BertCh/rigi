@@ -9,8 +9,9 @@
 // luma 10 notes:
 // - GPUCommandGraph.add(node) takes any GPUNode (an op with getCommandNodes(graph), a raw node, or a
 //   group). core/graph.ts GraphOp = GPUNode.
-// - gpu/device.ts requests the device itself (features + RAISED_LIMITS, props.requiredLimits) and
-//   wraps it with attachWebGPUDevice below; sky/model.ts attaches ORT's device the same way.
+// - gpu/device.ts creates the sidecar with webgpuAdapter.create (optionalFeatures + RAISED_LIMITS as
+//   requiredLimits); sky/model.ts attaches ORT's device with attachWebGPUDevice below, and ORT gets
+//   native objects through nativeWebGPUDevice / nativeWebGPUBuffer.
 // - rigi.3 re-audit (LF7, vs luma master 7289d961 + #3313 #3302 #3287 #3328 #3333 #3334 #3330):
 //   retired nothing, each item below was re-read in node_modules/@luma.gl/*/dist.
 //   - Buffer.readAsync on a non-MAP_READ buffer: #3330 stages only the requested range, but it still
@@ -21,8 +22,9 @@
 //     (the ring is re-exported here for callers with a fixed readback size).
 //   - (retired on rigi.4, see below) core/queue.ts submitWithDefault called the private
 //     WebGPUDevice._finalizeDefaultCommandEncoderForSubmit. deck/device-lost.ts still
-//     reads WebGLDevice._resolveContextLost/_isLost/_lossWasRequested/extensions, gl.lumaState and
-//     the default PipelineFactory's _sharedRenderPipelineCache (unchanged by #3287).
+//     writes WebGLDevice._resolveContextLost/_isLost/_lossWasRequested/_moduleData and reads the
+//     default PipelineFactory's _sharedRenderPipelineCache (unchanged by #3287); the state tracker
+//     comes from the public WebGLStateTracker.get(gl).
 //   - setGPUComputeDispatchWorkgroups is still not exported from @luma.gl/gpgpu/gpu-core, so
 //     core/graph.ts applies its validation by hand.
 // - rigi.4 adoption (luma patches in vendor/luma/patches): CommandEncoder.clearBuffer replaces the raw
@@ -39,7 +41,8 @@
 // - GPUCommandGraphInspector (bounded per-node CPU / GPU timing samples over compiled graphs) is used
 //   only by core/inspector.ts (one inspector per device, opt-in; see core/inspect.ts).
 
-import type { Device, DeviceProps } from "@luma.gl/core";
+import type { Buffer, Device, DeviceProps } from "@luma.gl/core";
+import type { WebGPUBuffer, WebGPUDevice } from "@luma.gl/webgpu";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 
 /**
@@ -66,6 +69,17 @@ export const attachWebGPUDevice = async (
 	}
 	return device;
 };
+
+/**
+ * The native GPUDevice behind a luma WebGPU device (WebGPUDevice.handle, public), for libraries that
+ * take native objects (onnxruntime-web). With attachWebGPUDevice, the app's one WebGPU interop point.
+ */
+export const nativeWebGPUDevice = (device: Device): GPUDevice =>
+	(device as WebGPUDevice).handle;
+
+/** The native GPUBuffer behind a luma WebGPU buffer (WebGPUBuffer.handle, public), for ORT tensors. */
+export const nativeWebGPUBuffer = (buffer: Buffer): GPUBuffer =>
+	(buffer as WebGPUBuffer).handle;
 
 export type {
 	GPUCommandGraphComputeExecutable,

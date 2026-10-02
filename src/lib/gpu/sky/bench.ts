@@ -11,6 +11,7 @@
 // downsample instead of bilinear upsample).
 import * as ort from "onnxruntime-web";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
+import { nativeWebGPUDevice } from "#/lib/gpu/core/luma";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
 	classicalSky,
@@ -91,7 +92,7 @@ export async function runSkyBench(names: string[], reps = 3) {
 	const device = await getComputeDevice();
 	if (!device) return { error: "no compute device" };
 	await warmSkyKernels(device);
-	const handle = device.handle as GPUDevice;
+	const handle = nativeWebGPUDevice(device);
 	const res = await fetch(`/${MODEL_FILE}`);
 	const model = await createSkyModel(
 		new Uint8Array(await res.arrayBuffer()),

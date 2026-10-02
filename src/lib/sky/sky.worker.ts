@@ -29,6 +29,7 @@
 import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
+import { nativeWebGPUDevice } from "#/lib/gpu/core/luma";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { releasePrepGraphs, type SkyPrepGpu } from "#/lib/gpu/sky/prep";
 import { refineSkyGpu, warmSkyKernels } from "#/lib/gpu/sky/refine";
@@ -163,7 +164,7 @@ function loadModel(
 				if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
 				const bytes = new Uint8Array(await res.arrayBuffer());
 				return await createSkyModel(bytes, backend ? [backend] : undefined, {
-					device: (device?.handle as GPUDevice | undefined) ?? undefined,
+					device: device ? nativeWebGPUDevice(device) : undefined,
 				});
 			} catch (e) {
 				modelError = String(e);

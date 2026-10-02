@@ -21,6 +21,7 @@ import * as ort from "onnxruntime-web";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 import { ComputeGraph, cachedGraphCount } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
+import { nativeWebGPUDevice } from "#/lib/gpu/core/luma";
 import { capacityFor, pooledStorage, withLease } from "#/lib/gpu/core/pool";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
@@ -265,7 +266,7 @@ export async function runSkyGraphBench(opts: {
 	const device = await getComputeDevice();
 	if (!device) return { error: "no compute device" };
 	await warmSkyKernels(device);
-	const handle = device.handle as GPUDevice;
+	const handle = nativeWebGPUDevice(device);
 	const res = await fetch(`/${MODEL_FILE}`);
 	const model = await createSkyModel(
 		new Uint8Array(await res.arrayBuffer()),

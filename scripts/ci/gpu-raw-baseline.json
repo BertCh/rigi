@@ -23,7 +23,7 @@
 	},
 	"src/lib/gpu/core/luma.ts": {
 		"handle": 1,
-		"why": "WebGPUAdapter.attach(handle: GPUDevice) wrapper for ORT / ownsHandle; the one sanctioned attach point"
+		"why": "WebGPUAdapter.attach(handle: GPUDevice) wrapper for ORT / ownsHandle; the one sanctioned attach point (nativeWebGPUDevice / nativeWebGPUBuffer next to it hand ORT native objects)"
 	},
 	"src/lib/gpu/core/queue.ts": {
 		"handle": 1,
@@ -36,18 +36,6 @@
 	"src/lib/gpu/device.ts": {
 		"rawWebGpu": 1,
 		"why": "sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)"
-	},
-	"src/lib/gpu/sky/bench-graph.ts": {
-		"handle": 1,
-		"why": "bench harness, raw device access on purpose"
-	},
-	"src/lib/gpu/sky/bench.ts": {
-		"handle": 1,
-		"why": "bench harness, raw device access on purpose"
-	},
-	"src/lib/gpu/sky/prep.ts": {
-		"handle": 1,
-		"why": "bitmap upload on device.handle; replaceable with Texture.copyExternalImage (audit-gpu A1)"
 	},
 	"src/lib/nearfield/deck-splat-layer.ts": {
 		"rawGl": 40,
@@ -64,9 +52,5 @@
 	"src/lib/sky/model.ts": {
 		"rawWebGpu": 2,
 		"why": "ORT (onnxruntime-web) needs the raw GPUDevice attached; stays"
-	},
-	"src/lib/sky/sky.worker.ts": {
-		"handle": 1,
-		"why": "worker-side ORT WebGPU device handoff; stays with sky/model.ts"
 	}
 }
