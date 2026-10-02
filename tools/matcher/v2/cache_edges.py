@@ -1,5 +1,5 @@
 """Cache the worker's pose-free photo edge maps (+ the manifest-eye horizonDirs) per photo → .cache/edges/<id>.npz.
-Usage: cache_edges.py id [id ...]   (dev ids only unless V2_ALLOW_TEST=1; v3 ids via V2_MANIFEST)"""
+Usage: cache_edges.py id [id ...]   (dev ids only unless V2_ALLOW_TEST=1; v3 ids only via STAGE1_MANIFEST + V3_ALLOW=1, see stage1/manifest_guard.py)"""
 import os, sys, json
 from pathlib import Path
 HERE = Path(__file__).resolve().parent

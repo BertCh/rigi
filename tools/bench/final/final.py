@@ -30,6 +30,7 @@ import traceback
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 ROOT = HERE.parents[2]
 MATCHER = ROOT / "tools/matcher"
 STAGE1 = MATCHER / "stage1"
@@ -41,30 +42,13 @@ MAX_INFRA_RERUNS = 2
 
 # ---------------------------------------------------------------- stamps
 
-ARM_FILES = {
-    "common": [HERE / "final.py", HERE / "run_arm.sh", MATCHER / "match.py", MATCHER / "common.py", MATCHER / "fusion.py"],
-    "A": [STAGE1 / f for f in ("pipeline.py", "s1.py", "skyglobal.py")] + [MATCHER / "pose6.py", MATCHER / "dem.py"],
-    "B": [STAGE1 / f for f in ("pipeline.py", "s1.py", "skyglobal.py", "rule.py", "policy.py", "finalize.py")] + [MATCHER / "pose6.py", MATCHER / "dem.py"],
-    "C": [MATCHER / f for f in ("pose6.py", "pose6_inputs.py", "dem.py", "worker_client.py")] + [STAGE1 / "vendor_v03" / "render_worker.mjs"],
-}
-ENV_KEYS = ["MATCHER_LG_DEVICE", "MATCHER_SWEEP_KP", "MATCHER_BASIN_GAP_MIN", "STAGE1_LG_PRUNE", "FINAL_WALL_S", "FINAL_C_LG"]
+import stamps as _stamps  # noqa: E402  single source of the stamp algorithm (stamps.py)
+
+ARM_FILES, ENV_KEYS = _stamps.ARM_FILES, _stamps.ENV_KEYS
 
 
 def code_stamp(arm: str) -> dict:
-    files = ARM_FILES["common"] + ARM_FILES[arm]
-    if arm in ("A", "B"):
-        files += sorted(p for p in (STAGE1 / "vendor").iterdir() if p.suffix in (".py", ".mjs", ".sha1"))
-    h = hashlib.sha1()
-    per = {}
-    for f in files:
-        b = f.read_bytes()
-        per[str(f.relative_to(ROOT))] = hashlib.sha1(b).hexdigest()[:12]
-        h.update(str(f.relative_to(ROOT)).encode())
-        h.update(b)
-    env = {k: os.environ.get(k) for k in ENV_KEYS}
-    env["FINAL_WALL_S"] = str(WALL_S)
-    h.update(json.dumps(env, sort_keys=True).encode())
-    return {"sha1": h.hexdigest()[:16], "env": env, "files": per}
+    return _stamps.arm_stamp(arm, wall_s=WALL_S)
 
 
 def t5_rule_ok() -> dict:

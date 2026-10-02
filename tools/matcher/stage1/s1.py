@@ -26,10 +26,11 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 VENDOR = HERE / "vendor"
 sys.dont_write_bytecode = True
-for p in (str(VENDOR), str(HERE.parent)):
+for p in (str(VENDOR), str(HERE.parent), str(HERE)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import manifest_guard as _manifest_guard  # noqa: E402  stdlib-only (this directory)
 import core  # noqa: E402  vendor/core.py
 import fuse  # noqa: E402  vendor/fuse.py
 import app_snapshot as APP  # noqa: E402  vendor/app_snapshot.py (assemble, constants)
@@ -52,7 +53,8 @@ if os.environ.get("STAGE1_LG_PRUNE") != "1":
         return _M._models[kind]
     _M.models = _models_noprune
 
-MANIFEST = ROOT / "tools/bench/data/manifest.json"
+# STAGE1_MANIFEST=<path> switches the manifest; v3 manifests are refused unless V3_ALLOW=1 and FROZEN.sha1 matches (manifest_guard.py)
+MANIFEST = _manifest_guard.resolve_manifest(ROOT, os.environ)
 SPLIT = ROOT / "tools/bench/split.json"
 WORKER_PORT = int(os.environ.get("STAGE1_PORT", 8768))
 TMP_ROOT = Path(os.environ.get("STAGE1_TMP", tempfile.gettempdir()))

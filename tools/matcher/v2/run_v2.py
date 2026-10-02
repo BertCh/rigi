@@ -31,31 +31,14 @@ sys.path.insert(0, str(HERE))
 import s1  # noqa: E402
 import pipeline as PL  # noqa: E402
 import rule as R  # noqa: E402
+import finalize_v2 as F  # noqa: E402
+
+sys.path.insert(0, str(HERE.parents[1] / "bench/final"))
+import stamps as ST  # noqa: E402  arm code stamps (arm "V2": run_v2 + finalize_v2 + viewpoints + stage-1 code)
+from finalize_v2 import AMBIG_DEG, EYE_MARGIN, EYE_MIN_INL, EYE_RATIO, EYE_TOP, rec_eye, summarize  # noqa: E402,F401
 import viewpoints as VP  # noqa: E402
 
-EYE_MIN_INL = 100
-EYE_RATIO = 3.0
-EYE_TOP = 2
-EYE_MARGIN = 1.5
-AMBIG_DEG = R.AMBIG_DEG
-
-
-def summarize(rec: dict) -> dict:
-    c = R.select(rec)
-    if c is None:
-        return {"pose": None, "level": "LOW", "source": None}
-    lvl, checks = R.confidence(rec, c)
-    return {"pose": c["fused"]["pose"], "level": lvl, "source": c.get("source"), "checks": checks,
-            "support": R._sup(c), "inliers": R._inl(c), "eye": rec_eye(rec)}
-
-
-def rec_eye(rec: dict) -> dict | None:
-    """The exact eye every render of this record used: the record's lat/lon + the worker's eye height (ENU z)."""
-    e = rec.get("eye")
-    if not e:
-        return None
-    return {"lat": rec["lat"], "lon": rec["lon"], "h": float(e[2])}
-
+# EYE_* constants, summarize/rec_eye and the cross-eye decision live in finalize_v2 (pure, replayable without the worker)
 
 STATED_DIR = os.environ.get("V2_STATED_DIR")
 MATCHER = os.environ.get("V2_MATCHER", "aliked")  # aliked (T6 default) | loma (LoMa-B 4096, MPS fp32; loma/REPORT.md)
@@ -146,6 +129,16 @@ def _probe(w, pid, entry, cands, out):
     return out
 
 
+_ARM = {}
+
+
+def arm_stamp() -> dict:
+    """Arm stamp (stamps.py, arm V2), computed once per process and embedded in every output record."""
+    if "s" not in _ARM:
+        _ARM["s"] = ST.full_stamp("V2")
+    return _ARM["s"]
+
+
 def run_photo_v2(w, pid: str, entry: dict | None = None) -> dict:
     e = entry or s1.manifest()[pid]
     t0 = time.time()
@@ -154,7 +147,7 @@ def run_photo_v2(w, pid: str, entry: dict | None = None) -> dict:
         _ph = s1.Photo(pid, e)
         _CUR["fk"] = _ph.focal_known
         _ph.cleanup()
-    out = {"id": pid, "matcher": MATCHER, "priors": PRIORS, "positionSource": e.get("positionSource"), "codeStamp": s1.code_stamp(), "ruleSha1": R.rule_sha1()}
+    out = {"id": pid, "matcher": MATCHER, "priors": PRIORS, "positionSource": e.get("positionSource"), "codeStamp": s1.code_stamp(), "armStamp": arm_stamp(), "ruleSha1": R.rule_sha1()}
     rec0 = stated_record(w, pid, e)
     out["stated"] = {"reused": rec0.get("reused"), "summary": summarize(rec0), "sweepBest": stated_sweep_best(rec0), "timingMs": rec0.get("timingMs"),
                      "error": rec0.get("error")}
@@ -175,36 +168,10 @@ def run_photo_v2(w, pid: str, entry: dict | None = None) -> dict:
             rk = run_t6(w, pid, ent)
             out["recs"][f"eye:{p['why']}:{round(p['e'])},{round(p['n'])}"] = rk
             eye_results.append((p, rk, summarize(rk)))
-        # cross-eye decision
-        strong_poses = [(("stated", 0.0, 0.0), c["fused"]["pose"]) for c in R.verified(rec0) if R.strong(c)]
-        for p, rk, _ in eye_results:
-            strong_poses += [((p["why"], p["e"], p["n"]), c["fused"]["pose"]) for c in R.verified(rk) if R.strong(c)]
-        best = None
-        for p, rk, sm in eye_results:
-            if sm["level"] != "HIGH":
-                continue
-            others = [q for q in probes if q is not p]
-            runner = max([base] + [q["best"] for q in others])
-            margin_ok = p["best"] >= EYE_MARGIN * max(1, runner)
-            amb = [k for k, pose in strong_poses if (k[1], k[2]) != (p["e"], p["n"]) and R._dist(pose, sm["pose"]) > AMBIG_DEG]
-            if margin_ok and not amb:
-                best = (p, sm)
-                break
-            sm["vetoed"] = {"marginOk": margin_ok, "ambiguousWith": amb}
-        if best and not SUGGEST_ONLY:
-            p, sm = best
-            final = {**sm, "eyeMoved": True, "moveM": round(math.hypot(p["e"], p["n"]), 1), "eyeWhy": p["why"],
-                     "eyeLatLon": [p["lat"], p["lon"]]}
-        elif eye_results:
-            # no accepted moved eye: report the stated result and expose a moved-eye pose as a LOW suggestion
-            # (the gated HIGH one if any — V2_SUGGEST_ONLY — else the best-supported eye)
-            p, rk, sm = next(((q, r, m) for q, r, m in eye_results if best and q is best[0]), eye_results[0])
-            final["suggestion"] = {"pose": sm["pose"], "level": "LOW", "levelAtEye": sm["level"], "eye": sm.get("eye"),
-                                   "eyeLatLon": [p["lat"], p["lon"]],
-                                   "moveM": round(math.hypot(p["e"], p["n"]), 1), "sweepBest": p["best"]}
+        final = F.decide_moved_eye(rec0, base, probes, eye_results, final, SUGGEST_ONLY)
         out["eyeResults"] = [{"eye": {k: p[k] for k in ("why", "e", "n", "lat", "lon", "best")}, "summary": sm} for p, _, sm in eye_results]
     out["final"] = final
-    out["positionTrusted"] = (e.get("positionSource") == "exif-gps") and not final.get("eyeMoved")
+    out["positionTrusted"] = F.position_trusted(e, final)
     out["timingMs"] = round((time.time() - t0) * 1000)
     return out
 
@@ -214,6 +181,10 @@ def main():
     od.mkdir(parents=True, exist_ok=True)
     (od / "raw").mkdir(exist_ok=True)
     ids = sys.argv[2:]
+    header = ST.header_line(arm_stamp(), os.environ.get("PREREG_SHA1"))
+    print(header, flush=True)
+    with open(od / "run.log", "a") as lg:
+        lg.write(header + "\n")
     if os.environ.get("V2_ALLOW_TEST") != "1":
         assert not (set(ids) & s1.test_ids()), "test ids refused"
     if MATCHER == "loma":
