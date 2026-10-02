@@ -135,10 +135,6 @@ export const range = (buffer: Buffer, bytes: number, offset = 0) => ({
 	size: Math.ceil(bytes / 4) * 4,
 });
 
-type RawEncoder = {
-	clearBuffer: (b: unknown, offset?: number, size?: number) => void;
-};
-
 /** Record a zero-fill of `buffer` (whole, or `size` bytes at `offset`; both 4-byte multiples). */
 export function clear(
 	enc: CommandEncoder,
@@ -146,13 +142,7 @@ export function clear(
 	offset = 0,
 	size?: number,
 ): void {
-	// luma 9.4 has no CommandEncoder.clearBuffer; this is WebGPU-only code anyway
-	const raw = (enc as unknown as { handle: RawEncoder }).handle;
-	raw.clearBuffer(
-		(buffer as unknown as { handle: unknown }).handle,
-		offset,
-		size ?? buffer.byteLength - offset,
-	);
+	enc.clearBuffer(buffer, offset, size ?? buffer.byteLength - offset);
 }
 
 /** Whether `buffer` belongs to a pool (core/kernel.ts's release() skips those). */

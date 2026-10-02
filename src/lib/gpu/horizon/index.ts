@@ -26,7 +26,7 @@
  * and params are pooled slots under "horizon/…", rewritten per chunk (WebGPU orders a chunk's
  * writeBuffer after the previous chunk's dispatch and read copy). Chunk c+1 is packed and submitted
  * before chunk c is collected, so the CPU packing overlaps the GPU march (core/readback maps with the
- * raw mapAsync, so collecting chunk c waits only for chunk c's work). A call holds the "horizon" lease
+ * no-wait mapAndReadAsync, so collecting chunk c waits only for chunk c's work). A call holds the "horizon" lease
  * from upload to its last read, so overlapping callers (several eye heights in the worker, the eye
  * search) run one after another, and releaseHorizonGpu destroys pages only after in-flight calls
  * finish. The graph is the only GPU path since 2026-10-01 (the pooled single dispatch it replaced

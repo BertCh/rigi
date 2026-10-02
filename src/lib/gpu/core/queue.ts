@@ -16,7 +16,7 @@
 // ComputeGraph.run uses too) then REJECT with GpuValidationError, and callers take their CPU path.
 // Cost: two push/pop pairs per submit; the pops settle on the device timeline, in parallel with the
 // map, so the readback does not wait longer (core-selftest "error-checks-cost").
-import type { CommandEncoder, Device } from "@luma.gl/core";
+import type { CommandBuffer, CommandEncoder, Device } from "@luma.gl/core";
 import { GpuDeviceLostError, touch } from "./lifecycle";
 import { afterSubmit as poolAfterSubmit } from "./pool";
 
@@ -112,21 +112,6 @@ function finishAndSubmit(device: Device, enc: CommandEncoder) {
 export const submitted = (enc: CommandEncoder): Promise<void> =>
 	checks.get(enc) ?? OK;
 
-/** luma's WebGPU device internals that Device.submit() itself uses (vendored 10.0.0-alpha.2-rigi.3, re-checked LF7; see luma.ts). */
-type LumaSubmitInternals = {
-	_finalizeDefaultCommandEncoderForSubmit?: () => {
-		submittedCommandEncoder: {
-			resolveTimeProfilingQuerySet?: () => Promise<unknown>;
-			_gpuTimeMs?: number;
-		};
-		commandBuffer: { handle: unknown; destroy: () => void };
-	};
-	commandEncoder: { _gpuTimeMs?: number };
-	pushErrorScope: (scope: "validation") => void;
-	popErrorScope: (handler: (error: { message: string }) => void) => unknown;
-	handle: RawDevice & { queue: { submit: (buffers: unknown[]) => void } };
-};
-
 /**
  * The device's default encoder (what device.submit() would submit: a render's passes and luma's
  * uniform uploads) followed by `extra`, in ONE queue.submit, in that order (WAG W1.2: a render plus
@@ -138,7 +123,8 @@ type LumaSubmitInternals = {
  *   is dropped (staged reads cancelled) and the default encoder is submitted alone, exactly as
  *   device.submit() would: returns false. A throw while recording `extra` is the caller's to catch
  *   (drop the encoder); nothing here can make the default encoder's work invalid.
- * - Not a luma WebGPU device (no default-encoder finaliser): device.submit(), then submit() per
+ * - Implemented with luma's public Device.submit(undefined, extras) (rigi.4); no private API.
+ * - Not a WebGPU device: device.submit(), then submit() per
  *   extra (separate submits, same order); returns true.
  * - A lost device: extras' reads cancelled, GpuDeviceLostError thrown (nothing submitted).
  * Note: an extra that finishes but is INVALID (a validation error, not a throw) fails the whole
@@ -153,14 +139,13 @@ export function submitWithDefault(
 		for (const e of extra) failed(e);
 		throw new GpuDeviceLostError("submit");
 	}
-	const d = device as unknown as LumaSubmitInternals;
-	if (device.type !== "webgpu" || !d._finalizeDefaultCommandEncoderForSubmit) {
+	if (device.type !== "webgpu") {
 		device.submit();
 		for (const e of extra) submit(device, e);
 		return true;
 	}
 	touch();
-	const finished: { handle: unknown; destroy: () => void }[] = [];
+	const finished: CommandBuffer[] = [];
 	try {
 		for (const e of extra) finished.push(e.finish());
 	} catch (err) {
@@ -173,25 +158,21 @@ export function submitWithDefault(
 		device.submit();
 		return false;
 	}
-	const { submittedCommandEncoder, commandBuffer } =
-		d._finalizeDefaultCommandEncoderForSubmit();
-	const raw = errorChecks() ? d.handle : null;
+	const raw = errorChecks()
+		? (device as unknown as { handle: RawDevice }).handle
+		: null;
 	if (raw) {
 		raw.pushErrorScope("out-of-memory");
 		raw.pushErrorScope("validation");
 	}
-	d.pushErrorScope("validation");
 	let sent = false;
 	try {
-		d.handle.queue.submit([commandBuffer, ...finished].map((c) => c.handle));
+		// luma's Device.submit(undefined, extras): finalises the default encoder (time-profiling
+		// resolve, scheduled GPU-time readout), queue.submit([default, ...extras]) in that order
+		// inside luma's own validation scope, and destroys every buffer it was given.
+		device.submit(undefined, finished);
 		sent = true;
 	} finally {
-		d.popErrorScope((error) => {
-			device.reportError(
-				new Error(`${device} command submission: ${error.message}`),
-				device,
-			)();
-		});
 		if (raw) {
 			const v = raw.popErrorScope();
 			const m = raw.popErrorScope();
@@ -203,21 +184,9 @@ export function submitWithDefault(
 			p.catch(() => {});
 			for (const e of extra) checks.set(e, p);
 		}
-		// as Device.submit: buffers used by submitted work are freed by WebGPU once it completes
-		commandBuffer.destroy();
-		for (const c of finished) c.destroy();
 		if (!sent) for (const e of extra) failed(e);
 	}
 	for (const e of extra) staged.delete(e);
-	// Device.submit's GPU-time resolve of the default encoder (luma debugGPUTime)
-	queueMicrotask(() => {
-		submittedCommandEncoder
-			.resolveTimeProfilingQuerySet?.()
-			.then(() => {
-				d.commandEncoder._gpuTimeMs = submittedCommandEncoder._gpuTimeMs;
-			})
-			.catch(() => {});
-	});
 	poolAfterSubmit(device);
 	return true;
 }

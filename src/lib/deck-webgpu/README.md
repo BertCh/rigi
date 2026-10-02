@@ -14,7 +14,7 @@ Layers are host-agnostic `GpuLayerCore`s on plain luma.gl 10 (`Model`, WGSL). Th
 also run under a luma-direct host with no deck at all (`hosts/direct.ts`). That host is the
 fallback when deck's full build isn't bundled, and it is also the A/B reference.
 
-What the spike showed with Chrome and Metal (first on deck 9.4.0 / luma 9.4.2; re-run on
+What the spike showed with Chrome and Metal (first on deck 9.4.0 / luma 9.4.2, history; re-run on
 luma 10.0.0-alpha.2 + the vendored deck PR #10752, `vendor/deck/README.md`, with the same results):
 
 | Check | Result |
@@ -23,7 +23,7 @@ luma 10.0.0-alpha.2 + the vendored deck PR #10752, `vendor/deck/README.md`, with
 | custom WGSL layer through deck's `project32` (`COORDINATE_SYSTEM.CARTESIAN`) | works |
 | custom WGSL layer on our own camera module (camera-relative, reversed-Z) | works when the layer's `props.parameters` carry the depth / blend state |
 | `_LayersPass` into our rgba32float + depth32float target, readback | works only with the optional `float32-blendable` feature and a pass-through blend override |
-| `_LayersPass` into a 4× MSAA rgba16float target + a separate resolve pass | works (`sampleCount` must be set on the model by hand) |
+| `_LayersPass` into a 4× MSAA rgba16float target + a separate resolve pass | works (`sampleCount` must be set on the model by hand; render bundles take `sampleCount > 1` natively since luma rigi.4) |
 | View `clear: true` on WebGPU | **broken**: it begins a render pass inside the open one, so the command buffer is invalid |
 | reversed-Z in deck's canvas pass | not possible: `LayersPass` hard-codes `clearDepth: 1` |
 | `WEBGPU_DEFAULT_DRAW_PARAMETERS` | premultiplied blending + `less-equal` are merged **over** the model's parameters; `blend: false` cannot remove the blend state |
@@ -258,7 +258,7 @@ interface GpuLayerCore {
     - its screenshots match the WebGL deck renderer on the same photo and pose
       (`/photo/<id>?renderer=deck`);
     - geometry-pass ports keep `checkGeometry().maxErrPx ≤ 0.1`.
-11. **Never create a mipmapped texture inside `draw()`.** luma 9.4.2's `generateMipmapsWebGPU`
+11. **Never create a mipmapped texture inside `draw()`.** luma 9.4.2's `generateMipmapsWebGPU` (found on 9.4.2; rule unchanged on luma 10 rigi.4)
     encodes its own render passes and submits, which invalidates the open pass ("CommandEncoder
     locked while RenderPassEncoder … is open" / "Parent encoder already finished"). Upload in a
     setter (pass the device to the factory: composite, gizmo), or draw one frame with
@@ -435,7 +435,7 @@ selection (a glacier, a picked object mask from Step Inside) ever needs an outli
 
 ## Per-pass GPU timings (`frame-timings.ts`, `?gpuFrameTimings=on`)
 
-Opt-in, WebGPU only, needs `timestamp-query`. `hosts/passes.ts` and the direct host's screen pass spread `passTimestamps(device, name)` into `beginRenderPass`; it is an empty object unless a frame is open on a timer attached for the device (`attachFrameTimings`, called by both hosts when the flag is on), so the off path is unchanged. A frame leases one 64-slot query set from a ring of 4 (`frame-timings-core.ts`, pure and node-checked); one `readResults` after `queue.onSubmittedWorkDone` yields the samples. All sets in flight, more than 32 passes, or a readback error drops the frame (an error also disables the timer, one warning). Results: `engine.onFrameTimings(cb)`, `engine.frameTimingsMean`, and the table on `/dev/graph`. The deck host times its offscreen geometry and colour passes (from the effect's preRender); deck's own canvas pass is not ours to time. Design after deck.gl PR #10778 (FrameTimer); not browser-verified.
+Opt-in, WebGPU only, needs `timestamp-query`. `hosts/passes.ts` and the direct host's screen pass spread `passTimestamps(device, name)` into `beginRenderPass`; it is an empty object unless a frame is open on a timer attached for the device (`attachFrameTimings`, called by both hosts when the flag is on), so the off path is unchanged. A frame leases one 64-slot query set from a ring of 4 (`frame-timings-core.ts`, pure and node-checked); one `readResults` after `queue.onSubmittedWorkDone` yields the samples. All sets in flight, more than 32 passes, or a readback error drops the frame (an error also disables the timer, one warning). Results: `engine.onFrameTimings(cb)`, `engine.frameTimingsMean`, and the table on `/dev/graph`. The deck host times its offscreen geometry and colour passes (from the effect's preRender); deck's own canvas pass is not ours to time. Design after deck.gl PR #10778 (FrameTimer); not browser-verified. Deck's own `_onFrameTimings` (vendored deck rigi.2) times only deck's layers pass, so it cannot replace this path (it would miss the geometry and colour passes) and is not used.
 
 ## Measured (2026-09-30, `scripts/deck-webgpu/bench.mjs`, Chrome / Apple Metal, 1080×810)
 
@@ -561,7 +561,7 @@ if (wantWebGpu) {
 
 ## Upstream: luma.gl / deck.gl issues and PR ideas
 
-Found on deck.gl 9.4.0 / luma.gl 9.4.2, Chrome, Apple Metal; re-checked against luma
+Found on deck.gl 9.4.0 / luma.gl 9.4.2 (history), Chrome, Apple Metal; re-checked against luma
 10.0.0-alpha.2 (= luma master `7d1d11e9` in core / webgpu / engine), again on
 `10.0.0-alpha.2-rigi.3` (LF7, master `7289d961` + #3313 #3302 #3287 #3328 #3333 #3334 #3330; items 7–12
 are all unchanged, see each) and deck PR #10752 (what we vendor). Each open one has a local workaround.

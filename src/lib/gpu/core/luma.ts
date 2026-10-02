@@ -26,13 +26,20 @@
 //   - GPUReadbackRing has fixed-size slots (byteLength per ring) and its tickets go through
 //     Buffer.readAsync; core/readback.ts implements the same ticket pattern with grow-on-demand slots
 //     (the ring is re-exported here for callers with a fixed readback size).
-//   - core/queue.ts submitWithDefault still calls WebGPUDevice._finalizeDefaultCommandEncoderForSubmit
-//     and reads CommandEncoder._gpuTimeMs (both unchanged in rigi.3; Device.submit's transient upload
-//     buffers are freed by commandBuffer.destroy(), which we also call). deck/device-lost.ts still
+//   - (retired on rigi.4, see below) core/queue.ts submitWithDefault called the private
+//     WebGPUDevice._finalizeDefaultCommandEncoderForSubmit. deck/device-lost.ts still
 //     reads WebGLDevice._resolveContextLost/_isLost/_lossWasRequested/extensions, gl.lumaState and
 //     the default PipelineFactory's _sharedRenderPipelineCache (unchanged by #3287).
 //   - setGPUComputeDispatchWorkgroups is still not exported from @luma.gl/gpgpu/gpu-core, so
 //     core/graph.ts applies its validation by hand.
+// - rigi.4 adoption (luma patches in vendor/luma/patches): CommandEncoder.clearBuffer replaces the raw
+//   handle clear in core/pool.ts clear(); Device.submit(undefined, extras) replaces the private
+//   _finalizeDefaultCommandEncoderForSubmit + raw queue.submit in core/queue.ts submitWithDefault
+//   (luma also resolves the default encoder's GPU time and defers freeing transient upload buffers of
+//   every submitted buffer until the work completes); Buffer.mapAndReadAsync(cb, off, len,
+//   {waitForSubmittedWork: false}) replaces the raw mapAsync in core/readback.ts (MAP_READ slots are
+//   mapped in place, no staging copy); RenderBundleEncoder sampleCount > 1 replaces the native
+//   bundle encoder in deck-webgpu/render-bundle.ts.
 // - GPUProgram / GPUProgramCompiler (semantic scalar ops, literals baked at compile, GPU predicates
 //   lowered to indirect-dispatch gates) are used by look/haze-argmin.ts, with our kernels lowered
 //   into the program's graph through a registered lowering (core/graph.ts ComputeGraph adopts it).

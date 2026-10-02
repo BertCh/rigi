@@ -4,7 +4,7 @@
 
 // Per-render-pass GPU frame timings for the WebGPU engine (opt-in: `?gpuFrameTimings=on`).
 //
-// Why here and not in vendored deck.gl (PR #10778, `_onFrameTimings`): deck times only its own
+// Why here and not in vendored deck.gl (PR #10778, `_onFrameTimings`, in the rigi.2 vendor but unused): deck times only its own
 // layers pass, while Rigi's geometry and colour passes run from an effect's preRender (hosts/deck.ts)
 // and are invisible to it. Here every pass the hosts open through hosts/passes.ts asks
 // `passProps(name)` for timestamp writes; the ring / cap / aggregation logic is in

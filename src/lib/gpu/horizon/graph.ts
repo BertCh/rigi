@@ -18,7 +18,7 @@
 //
 // Chunk overlap is kept: index.ts packs and submits chunk c+1 before collecting chunk c. Chunks share
 // the graph's transients and the pooled u / params; WebGPU queue order puts chunk c's read copy before
-// chunk c+1's writeBuffer / clear. core/readback maps with the raw mapAsync, so collecting c waits for
+// chunk c+1's writeBuffer / clear. core/readback maps with waitForSubmittedWork:false (no onSubmittedWorkDone wait), so collecting c waits for
 // c only. The graph's lease is held for the whole call (inside the "horizon" lease).
 //
 // Per-call overhead: the u slot is only sized here (not written twice), and the run parameters and

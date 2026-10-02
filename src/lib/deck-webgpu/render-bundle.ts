@@ -37,7 +37,7 @@ export type RenderBundleTarget = {
 	colorFormats: (TextureFormatColor | null)[];
 	/** `false` when the pass has no depth/stencil attachment. */
 	depthFormat: TextureFormatDepthStencil | false;
-	/** 1, or 4 for the MSAA path (see the native-handle note on createEncoder). */
+	/** 1, or 4 for the MSAA path (luma RenderBundleEncoder sampleCount, rigi.4). */
 	sampleCount: number;
 	depthReadOnly?: boolean;
 	stencilReadOnly?: boolean;
@@ -228,39 +228,21 @@ function keysEqual(
 }
 
 /**
- * luma's RenderBundleEncoder rejects sampleCount !== 1 in its props validation, but the native
- * encoder supports it. For sampleCount > 1 we create the native encoder ourselves and hand it over
- * as `props.handle`, with luma's own sampleCount left at 1 (the luma-side field is only used for
- * validation; the pipeline's multisample count comes from the Model's `parameters.sampleCount`).
- * Format strings are passed through as WebGPU names (luma's names match for the formats we use).
+ * luma's RenderBundleEncoder takes sampleCount > 1 since rigi.4 (luma patch render-bundle-msaa), so
+ * MSAA bundles use the public API; the pipeline's multisample count still comes from the Model's
+ * `parameters.sampleCount` and must match the bundle's.
  */
 function createEncoder(
 	device: Device,
 	id: string,
 	target: RenderBundleTarget,
 ): RenderBundleEncoder {
-	const props: Record<string, unknown> = {
+	return device.createRenderBundleEncoder({
 		id,
 		colorAttachmentFormats: target.colorFormats,
 		depthStencilAttachmentFormat: target.depthFormat,
+		sampleCount: target.sampleCount,
 		depthReadOnly: target.depthReadOnly ?? false,
 		stencilReadOnly: target.stencilReadOnly ?? false,
-	};
-	if (target.sampleCount !== 1) {
-		const native = (device as unknown as { handle: GPUDevice }).handle;
-		const descriptor: GPURenderBundleEncoderDescriptor = {
-			label: id,
-			colorFormats: target.colorFormats.map(
-				(format) => format as GPUTextureFormat | null,
-			) as GPUTextureFormat[],
-			sampleCount: target.sampleCount,
-			depthReadOnly: target.depthReadOnly,
-			stencilReadOnly: target.stencilReadOnly,
-		};
-		if (target.depthFormat !== false) {
-			descriptor.depthStencilFormat = target.depthFormat as GPUTextureFormat;
-		}
-		props.handle = native.createRenderBundleEncoder(descriptor);
-	}
-	return device.createRenderBundleEncoder(props as never);
+	});
 }
