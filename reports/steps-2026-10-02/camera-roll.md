@@ -99,7 +99,7 @@ data. These numbers are design evidence and must not be quoted as results.
 - Negative or not done: a heading-dependent deviation curve as a bias model (unstable; §2.2). A session-wide bias across viewpoints (camera-prior U9) is **not proposed**, because the demo data say the correlation lasts about a minute, not a session.
 
 ## 6. Proposals for files this step does not own
-- **P-1 (pod B, `roll/propagate/plan.ts:106-110`).** Replace the copied prior block with `priorPose(t.meta)` from `roll.ts`, so the compass-overlap gate uses the same true-north heading. This is bit-identical with `geoDecl` off. `propagate.check.ts:53` should follow.
+- **P-1 (landed after b0 handed over R5).** Was: (pod B, `roll/propagate/plan.ts:106-110`). Replace the copied prior block with `priorPose(t.meta)` from `roll.ts`, so the compass-overlap gate uses the same true-north heading. This is bit-identical with `geoDecl` off. `propagate.check.ts:53` should follow.
 - **P-2 (map peer, `roll/map/roll-map.ts:416-419`).** Expose `drapedCount` / `MAX_PHOTOS` to `RollMap.tsx` and show a "draping N of M photos" chip instead of only a console warning.
 - **P-3 (map peer).** Consume `RollPhoto.yawKnown` (U4) to draw no wedge, or the fan, for photos without a compass.
 - **P-5 (Gipfelbuch owner, `scripts/gipfelbuch/data-camera-roll.ts:79,108`).** The page bake reads the raw `m.heading` and the default window. That is fine while `geoDecl` is off. To match the app, switch it to `priorPose` / `compassHeading`.
@@ -115,8 +115,10 @@ data. These numbers are design evidence and must not be quoted as results.
 1. U5: whether to change the 45-minute bias window default once a roll bench has run (a browser batch).
 2. L-3: whether to split rolls by time gaps (this changes roll ids).
 
-## 9. Batch-ledger row (pending: reports/batch-ledger.md had a conflicting peer edit at landing time)
+## 9. Batch-ledger row (copied into reports/batch-ledger.md with the P-1 commit)
 
 | Batch | Commit | Change | Check | Risk |
 |---|---|---|---|---|
 | step camera-roll U3 | "roll/mosaic: viewpointTerrain takes an AbortSignal" (roll/mosaic/{viewpointTerrain,PanoramaStrip}) | Panorama strip aborts its terrain request on viewpoint change/unmount; a queued ridge trace with no caller left is skipped (no tiles, no worker); started traces finish and stay memoised | `/roll/<id>` panorama: flip quickly through 4+ viewpoints, the last one traces and shows ridgelines, no error chip; leave and return, a finished viewpoint shows without a new trace (devtools: one ridgelines worker per traced eye) | low |
+
+P-1 as landed: `plan.ts` calls `priorHeading` directly, the same rule as `priorPose`. It does not import `roll.ts`, because that file's `import.meta.glob` would break the tsx checks that load `plan.ts` (`propagate.check.ts`, `ontology.check.ts`). Bit-identical with `geoDecl` off. Spec: `plan.spec.ts`, "candidatesFor compass heading". The invariants spec (`acceptSuggestion` refuses saved, GT and solved photos; undo only clears the accepted record) stays green.

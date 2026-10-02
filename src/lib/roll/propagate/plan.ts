@@ -13,6 +13,7 @@
 //    suggestion: kind "suggestion", provenance "propagated-suggestion", confidence never set.
 
 import { hfovFromAspect, type Pose } from "../../camera";
+import { priorHeading } from "../../geocam/priors/heading";
 import { distanceM, wrap180 } from "../../geodesy";
 import {
 	type Mat3,
@@ -103,10 +104,12 @@ export function candidatesFor(
 		);
 		let compassOverlap: number | null = null;
 		let compassDeltaDeg: number | null = null;
-		if (t.meta.heading != null) {
-			// the EXIF prior, as roll.ts priorPose
+		const heading = priorHeading(t.meta);
+		if (heading != null) {
+			// the EXIF prior, as roll.ts priorPose (true north: declination under ?geoDecl=on). Not
+			// imported from roll.ts, whose import.meta.glob would break the tsx checks that load this file.
 			const prior: Pose = {
-				yaw: t.meta.heading,
+				yaw: heading,
 				pitch: t.meta.pitch,
 				roll: t.meta.roll,
 				vfov: t.meta.vfov,

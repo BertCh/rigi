@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { describe, expect, it } from "vitest";
+import { setFlagOverride } from "#/lib/flags";
+import { headingDeclination } from "#/lib/geocam/priors/heading";
 import type { Pose } from "../../../camera";
 import { destination } from "../../../geodesy";
 import { relRFromPoses } from "../../../nearfield/propagate";
@@ -187,6 +189,32 @@ describe("candidatesFor", () => {
 				.slice(MAX_NEIGHBOURS)
 				.every((x) => /beyond the 8 nearest/.test(x.skip ?? "")),
 		).toBe(true);
+	});
+});
+
+describe("candidatesFor compass heading", () => {
+	it("uses the true-north prior heading (priorPose's rule): declination only under geoDecl", () => {
+		const anchor = rp(meta("anchor", { heading: 90 }), "saved", pose(90));
+		const target = rp(
+			meta("m", {
+				heading: 100,
+				local: { headingRef: "M" },
+			} as Partial<PhotoMeta>),
+			"prior",
+		);
+		const roll = rollOf([anchor, target]);
+		const d = headingDeclination(target.meta) as number;
+		expect(Math.abs(d)).toBeGreaterThan(0.5);
+		const delta = () =>
+			candidatesFor(roll, anchor, "on").find((c) => c.target.meta.id === "m")
+				?.compassDeltaDeg;
+		try {
+			expect(delta()).toBeCloseTo(10, 9); // flag off: the stored heading, bit-identical
+			setFlagOverride("geoDecl", "on");
+			expect(delta()).toBeCloseTo(10 + d, 9);
+		} finally {
+			setFlagOverride("geoDecl", undefined);
+		}
 	});
 });
 
