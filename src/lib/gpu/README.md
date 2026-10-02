@@ -38,6 +38,20 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
 - **`device.ts`** is the compute device registry (`getComputeDevice`, `adoptRenderDevice`, …), imported by every
   caller (the app workers, the look controller, deck-webgpu).
 
+## luma gpgpu primitives in the kernel modules (2026-10-02)
+
+Default GPU paths, each inside the module's `ComputeGraph` (`g.add(new GPUXxx(…))`), with a Dawn-in-node gate (`scripts/gpu/*-dawn.ts`, fast tier, SKIP without `DAWN_DIR`) that measures the tolerance against the CPU twin instead of bit identity:
+
+| Module | Primitive | Gate |
+|---|---|---|
+| `ingest/` tile stats | `GPUReduction` (sum, extent, masked extent) | `terrarium-stats-dawn` |
+| `sky/` refine box means | `GPUConvolution` (direct, zero boundary, analytic counts) | `sky-refine-conv-dawn` |
+| `skyglobal/` candidate list | `GPUCompaction` (stable: ascending cell order) | `skyglobal-compaction-dawn` |
+| `skyline/` feature blurs (`?skylineGpu`) | `GPUConvolution` + clamp-to-edge fix kernel | `skyline-conv-dawn` |
+| `refine/` yaw correlation | `GPUFFT1D` (four-step for M > 2048, spot-checked per device) | `refine-fft-dawn` |
+
+Kept on purpose: `solve/` COARSE row minimum and `align/` pose-grid / pose-bound sums (workgroup reductions fused with the per-cell / per-pose evaluation; no materialised grid to reduce, and every score is needed on the CPU), `horizon/` mosaic mips (a pyramid, not a single reduction), `sky/` prep (exact soft-float resample, no luma equivalent). There is no sky colour histogram in these modules (photoprep's is another owner's).
+
 ## Rules
 
 - **Every kernel has a CPU twin, and the CPU twin is the reference.** Callers use
