@@ -30,6 +30,7 @@ import type { Pose } from "../camera";
 import { getCpuHeights } from "../dem/cpu-heights";
 import { poseBasis } from "../pose";
 import { BASE_MAX, gridMesh } from "./batched-terrain-grid";
+import { SlotAllocator } from "./slot-allocator";
 import type { TileMesh } from "./terrain-data";
 import {
 	currentTerrainPass,
@@ -235,15 +236,17 @@ type Slot = { row: number; layer: number; big: boolean };
 class LayerPool {
 	tex: Texture;
 	cap: number;
-	private free: number[] = [];
-	private next = 0;
+	private slots: SlotAllocator;
 	constructor(
 		private device: Device,
 		private id: string,
 		private format: "r32float" | "rgba32float",
 		private size: number,
 		cap: number,
+		/** The device's array layer limit: alloc() is -1 past it (the pool can never hold more). */
+		limit = Number.POSITIVE_INFINITY,
 	) {
+		this.slots = new SlotAllocator(limit);
 		this.cap = cap;
 		this.tex = this.create(cap);
 	}
@@ -259,13 +262,14 @@ class LayerPool {
 		});
 	}
 	get used() {
-		return this.next - this.free.length;
+		return this.slots.used;
 	}
+	/** A free layer index, or -1 at the layer limit. */
 	alloc(): number {
-		return this.free.pop() ?? this.next++;
+		return this.slots.alloc();
 	}
 	release(i: number) {
-		this.free.push(i);
+		this.slots.release(i);
 	}
 	/** Make room for layer indices < `need`; true = the texture was re-created (contents lost). */
 	reserve(need: number, max: number): boolean {
@@ -434,14 +438,29 @@ class TileStore {
 
 	constructor(private device: Device) {
 		this.maxLayers = device.limits.maxTextureArrayLayers || 256;
-		this.small = new LayerPool(device, "terrain-h256", "r32float", SMALL, 128);
-		this.big = new LayerPool(device, "terrain-h512", "r32float", BIG, 16);
+		this.small = new LayerPool(
+			device,
+			"terrain-h256",
+			"r32float",
+			SMALL,
+			128,
+			this.maxLayers,
+		);
+		this.big = new LayerPool(
+			device,
+			"terrain-h512",
+			"r32float",
+			BIG,
+			16,
+			this.maxLayers,
+		);
 		this.base = new LayerPool(
 			device,
 			"terrain-base",
 			"rgba32float",
 			BASE_MAX + 1,
 			128,
+			this.maxLayers,
 		);
 		this.rowsCap = this.base.cap;
 		this.tableData = new Float32Array(this.rowsCap * TABLE_W * 4);
@@ -480,11 +499,16 @@ class TileStore {
 		if (!fresh.length) return;
 		for (const m of fresh) {
 			const big = m.size > SMALL;
-			this.slots.set(m, {
-				row: this.base.alloc(),
-				layer: (big ? this.big : this.small).alloc(),
-				big,
-			});
+			const pool = big ? this.big : this.small;
+			const row = this.base.alloc();
+			const layer = pool.alloc();
+			if (row < 0 || layer < 0) {
+				// at the device's array layer limit: not drawn, and nothing taken stays held (CR-45)
+				if (row >= 0) this.base.release(row);
+				if (layer >= 0) pool.release(layer);
+				continue;
+			}
+			this.slots.set(m, { row, layer, big });
 		}
 		// grow (re-upload everything already in a re-created pool)
 		const maxOf = (sel: (s: Slot) => number, f?: (s: Slot) => boolean) =>
@@ -522,8 +546,10 @@ class TileStore {
 			const isFresh = fresh.includes(m);
 			const pool = s.big ? this.big : this.small;
 			if (s.layer >= pool.cap || s.row >= this.base.cap) {
-				// past the device's array layer limit: not drawn
+				// unreachable while alloc() is limited to maxLayers; keeps the index accounting honest
 				this.slots.delete(m);
+				this.base.release(s.row);
+				pool.release(s.layer);
 				continue;
 			}
 			if (isFresh || (s.big ? reBig : reSmall))
