@@ -1,0 +1,57 @@
+n = 787  labels: NB-con 93, NB-dec 597, NB-inh 3, NE-dec 56, NE-inh 5, POS 33
+
+GATING
+  POS accepted by CUR (kill if > 0)     2/19    10.5%  [1.3, 33.1]   abstain 12/19 (63%)
+  NE-dec (kill if < 30%)               21/56    37.5%  [24.9, 51.5]   abstain 17/56 (30%)
+  NE-dec & e1AC1 (kill if < 5/10)       3/10    30.0%  [6.7, 65.2]   abstain 6/10 (60%)
+
+VERDICT: KILL  [CUR positives rejected 2; NE-dec 21/56; AC1 NE-dec 3/10]
+
+REPORTED (not gating)
+  all POS                               6/33    18.2%  [7.0, 35.5]   abstain 19/33 (58%)
+  NB-con                               39/93    41.9%  [31.8, 52.6]   abstain 38/93 (41%)
+  NE-dec 150 m                         10/29    34.5%  [17.9, 54.3]   abstain 10/29 (34%)
+  NE-dec 400 m                         11/27    40.7%  [22.4, 61.2]   abstain 7/27 (26%)
+  NB-dec                              309/597   51.8%  [47.7, 55.8]   abstain 145/597 (24%)
+  NE-inh                                1/5     20.0%  [0.5, 71.6]   abstain 0/5 (0%)
+  NB-inh                                2/3     66.7%  [9.4, 99.2]   abstain 1/3 (33%)
+
+abstention overall 220/787; by reason: {'no-depth-diversity': 220}
+AUROC chi2_eye NE-dec vs POS (abstained = 0): 0.610
+POS: non-abstained 14; median chi2_eye 2403.6; median |delta| 44 m; median |resid| after fit 1.75 px
+NE-dec: non-abstained 39; median chi2_eye 950.6; median |delta| 55 m; median |resid| after fit 8.98 px
+
+POS detail (pid id chi2 |delta| nValid scale abstain CUR rej)
+  wc_0002_refC       chi2        n/a d     n/a n 1020 sc   n/a no-depth-diversity   CUR 0 rej 0
+  wc_0004_k000       chi2        n/a d     n/a n  925 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0004_refCMT     chi2        n/a d     n/a n  925 sc   n/a no-depth-diversity   CUR 0 rej 0
+  wc_0006_k000       chi2     3788.8 d       7 n  994 sc  0.70 -                    CUR 0 rej 0
+  wc_0006_refB       chi2     2403.6 d      10 n  994 sc  1.72 -                    CUR 0 rej 0
+  wc_0009_k000       chi2        n/a d     n/a n  997 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0011_k000       chi2        n/a d     n/a n  981 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0014_k000       chi2        n/a d     n/a n  977 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0017_k000       chi2        n/a d     n/a n  736 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0019_k000       chi2        n/a d     n/a n 1022 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0020_k000       chi2        n/a d     n/a n  677 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0027_k000       chi2        n/a d     n/a n  956 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0028_refB       chi2        n/a d     n/a n  987 sc   n/a no-depth-diversity   CUR 0 rej 0
+  wc_0034_k000       chi2        n/a d     n/a n 1008 sc   n/a no-depth-diversity   CUR 0 rej 0
+  wc_0046_k000       chi2        n/a d     n/a n  961 sc   n/a no-depth-diversity   CUR 0 rej 0
+  wc_0047_k000       chi2     2978.9 d      74 n  973 sc  3.87 -                    CUR 1 rej 1
+  wc_0048_k000       chi2      277.7 d      40 n 1007 sc  2.60 -                    CUR 1 rej 0
+  wc_0052_k000       chi2     1331.5 d      73 n  755 sc  4.44 -                    CUR 0 rej 1
+  wc_0054_k000       chi2      319.8 d      87 n 1005 sc  3.43 -                    CUR 1 rej 1
+  wc_0055_k005       chi2     2389.5 d     121 n  832 sc  5.72 -                    CUR 0 rej 1
+  wc_0059_k000       chi2     1558.4 d       8 n  988 sc  1.06 -                    CUR 1 rej 0
+  wc_0063_k000       chi2    75542.3 d      19 n  985 sc  2.45 -                    CUR 0 rej 0
+  wc_0067_k000       chi2        n/a d     n/a n  946 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0071_k000       chi2     2109.3 d      54 n  871 sc  3.53 -                    CUR 0 rej 1
+  wc_0072_k000       chi2        n/a d     n/a n  567 sc   n/a no-depth-diversity   CUR 0 rej 0
+  wc_0074_k006       chi2        n/a d     n/a n  707 sc   n/a no-depth-diversity   CUR 0 rej 0
+  wc_0076_k017       chi2     4706.6 d     109 n  967 sc  3.12 -                    CUR 0 rej 1
+  wc_0077_k000       chi2    11270.8 d       4 n  998 sc  1.47 -                    CUR 1 rej 0
+  wc_0082_k000       chi2      120.1 d      10 n 1024 sc  0.79 -                    CUR 1 rej 0
+  wc_0085_k000       chi2        n/a d     n/a n  967 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0088_k000       chi2        n/a d     n/a n 1006 sc   n/a no-depth-diversity   CUR 1 rej 0
+  wc_0094_k000       chi2     6457.9 d      44 n  930 sc  0.74 -                    CUR 1 rej 0
+  wc_0099_k000       chi2        n/a d     n/a n  760 sc   n/a no-depth-diversity   CUR 1 rej 0

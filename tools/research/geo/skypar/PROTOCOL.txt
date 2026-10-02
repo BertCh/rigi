@@ -63,3 +63,10 @@ OUTPUTS
 src/lib/geocam/integrity/skyline-parallax.ts (pure TS, not wired, no flag) + specs; scripts/geocam/skypar-eval.ts;
 tools/research/geo/skypar/{PROTOCOL.txt, REPORT.txt, results.json}; research_notes/skyline-parallax-2026-10-02/README.md.
 Dev numbers are never quoted as results: "dev, n = ..., not a result". No seeds (deterministic).
+
+AMENDMENT 0 (2026-10-02, still before any score; implementation clarification, no constant changed)
+- Predicted-curve slope s is the central difference of the predicted row over +-2 columns (one-sided at the ends of
+  the predicted run); a column without a defined s is not valid. This is the implementation of "slope s = dy/dx".
+- Eye parametrisation: t = (true eye - hypothesis eye) in ENU metres is what the fit returns (r = g.t where g_k is
+  the change of the predicted row per metre of hypothesis-eye motion along k, from v = X - eye with X fixed, exact
+  pinhole derivative). delta-hat = -t. chi2 and |delta-hat| are sign independent.
