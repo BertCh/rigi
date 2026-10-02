@@ -13,7 +13,7 @@ Browser photo upload for Rigi. `/upload` takes a JPEG, HEIC, PNG, WebP or AVIF (
 | `src/lib/upload/heic.worker.ts` | libheif decode worker. It loads libheif from `LIBHEIF_URL` at runtime; libheif is not bundled into it |
 | `src/lib/upload/licenses.ts` | LGPL notice data (`THIRD_PARTY`, `LGPL_TEXT` taken raw from the package, `LIBHEIF_FILE_URL`), shown in the `/upload` "Credits and licences" footer |
 | `src/lib/upload/region.ts` | Overpass queries (same as ingest.mjs), timeouts, mirrors, the bundled-region reuse and the cache |
-| `src/lib/upload/store.ts` | IndexedDB `mt-image-uploads` with stores `photos` {id, meta, blob, thumb} and `regions` (RegionData) |
+| `src/lib/upload/store.ts` | IndexedDB `rigi-uploads` with stores `photos` {id, meta, blob, thumb} and `regions` (RegionData) |
 | `src/lib/upload/index.ts` | Public API (below) |
 | `src/lib/upload/SlippyMap.tsx` | Dependency-free OSM raster map: click to pin, drag to pan, wheel or double-click to zoom. Draws an accuracy circle and a heading wedge |
 | `src/lib/upload/libheif.d.ts` | Typings for `libheif-js/libheif-wasm/libheif-bundle.mjs` |

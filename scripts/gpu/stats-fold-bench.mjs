@@ -66,7 +66,7 @@ async function runOne(browser, id, renderer) {
 						localStorage.setItem(k, v);
 					} catch {}
 				},
-				[`mt-image:pose:${id}`, JSON.stringify(pose)],
+				[`rigi.pose.${id}`, JSON.stringify(pose)],
 			);
 		await ctx.routeWebSocket(
 			(u) => u.origin === new URL(URL0).origin.replace(/^http/, "ws"),

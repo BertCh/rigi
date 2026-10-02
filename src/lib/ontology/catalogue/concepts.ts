@@ -632,7 +632,7 @@ export const CONCEPTS = {
 		domain: "interchange",
 		is: "export-format",
 		definition:
-			"Self-describing pose JSON (schema summit-lens/pose v1): position with both datums, orientation, K, R|t.",
+			"Self-describing pose JSON (schema rigi/pose v1): position with both datums, orientation, K, R|t.",
 		realizedBy: ["lib/export/pose-json.ts#PoseJson"],
 		storage: ["poseJson"],
 	},

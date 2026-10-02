@@ -99,14 +99,6 @@ export const ID_SCHEMES = [
 	},
 	{
 		concept: "roll",
-		kind: "local-legacy",
-		pattern: /^local-roll-\d{1,4}$/,
-		example: "local-roll-2",
-		mintedBy: "roll/roll.ts (old cluster index ids, still resolved)",
-		stable: false,
-	},
-	{
-		concept: "roll",
 		kind: "local",
 		pattern: /^local-roll-[0-9a-f]{10}$/,
 		example: "local-roll-3fa9c1d2e4",

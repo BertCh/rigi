@@ -95,7 +95,6 @@ describe("id schemes", () => {
 			"local-region-46.55_7.95",
 			"local-region-empty-local-3fa9c1d2e4",
 			"local-roll-3fa9c1d2e4",
-			"local-roll-2",
 		]) {
 			expect(classifyId("photo", id), id).toBeNull();
 			expect(photoKind(id), id).toBeNull();
@@ -108,7 +107,6 @@ describe("id schemes", () => {
 		expect(classifyId("photo", "wc_0042")).toBe("bench");
 		expect(classifyId("region", "local-region--12.30_-100.05")).toBe("local");
 		expect(classifyId("region", "demo-region")).toBe("demo");
-		expect(classifyId("roll", "local-roll-12")).toBe("local-legacy");
 		expect(classifyId("roll", "local-roll-3fa9c1d2e4")).toBe("local");
 		expect(classifyId("dem-tile", "12/2138/1447")).toBe("slippy");
 		expect(classifyId("peak", "node/1")).toBe("osm");
@@ -263,16 +261,16 @@ describe("bbox converters", () => {
 describe("storage", () => {
 	const ids = Object.keys(STORAGE) as StorageId[];
 	it("builds concrete keys and matches them back", () => {
-		expect(storageKey("savedPose", "IMG_1")).toBe("mt-image:pose:IMG_1");
-		expect(storageEntryOf("mt-image:pose:IMG_1")).toBe("savedPose");
-		expect(storageEntryOf("mt-image:rollpose:IMG_1")).toBe("solvedPose");
+		expect(storageKey("savedPose", "IMG_1")).toBe("rigi.pose.IMG_1");
+		expect(storageEntryOf("rigi.pose.IMG_1")).toBe("savedPose");
+		expect(storageEntryOf("rigi.rollpose.IMG_1")).toBe("solvedPose");
 		expect(storageEntryOf("unregistered:key")).toBeNull();
 	});
 	it("a key pattern is anchored and escapes regex characters", () => {
 		const re = storageKeyPattern("savedPose");
-		expect(re.test("xmt-image:pose:a")).toBe(false);
-		expect(re.test("mt-image:pose:")).toBe(false);
-		expect(re.test("mt-imageXpose:a")).toBe(false);
+		expect(re.test("xrigi.pose.a")).toBe(false);
+		expect(re.test("rigi.pose.")).toBe(false);
+		expect(re.test("rigiXpose.a")).toBe(false);
 	});
 	it("every entry's own key resolves to a registered entry (no unreachable rows)", () => {
 		for (const id of ids) {

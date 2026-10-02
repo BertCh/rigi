@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Per-user view style persistence (styling.md §2.4). localStorage key `mt-image.viewStyle.v1`
+// Per-user view style persistence (styling.md §2.4). localStorage key `rigi.viewStyle.v1`
 // holds { v: 1, preset, overrides } with diff-only overrides. Every read/write is try/catch'd;
 // corrupt or unknown data falls back to classic. `?style=<preset>` wins over storage and is never
 // saved (headless screenshots); while it is active, edits stay in memory for that tab only.

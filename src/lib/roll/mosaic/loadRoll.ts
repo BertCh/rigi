@@ -8,7 +8,6 @@
 import { storageKey } from "../../ontology/core/storage";
 import {
 	getBuiltinRoll,
-	legacyUploadRollIndex,
 	saveSolvedPose,
 	UPLOAD_ROLL_PREFIX,
 	uploadRolls,
@@ -38,13 +37,11 @@ export async function listUploadRolls(): Promise<{
 
 /**
  * Pick a local roll by id: the stable `local-roll-<hash>` (else the roll now holding photo
- * `local-<hash>`, e.g. after an earlier photo joined it), or a legacy `local-roll-<n>` index.
+ * `local-<hash>`, e.g. after an earlier photo joined it).
  */
 function findUploadRoll(rolls: Roll[], id: string): Roll | null {
 	const exact = rolls.find((r) => r.id === id);
 	if (exact) return exact;
-	const n = legacyUploadRollIndex(id);
-	if (n != null) return rolls[n] ?? null;
 	const photoId = `local-${id.slice(LOCAL_ROLL_PREFIX.length)}`;
 	return rolls.find((r) => r.photos.some((p) => p.meta.id === photoId)) ?? null;
 }

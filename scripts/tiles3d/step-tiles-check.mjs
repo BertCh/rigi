@@ -57,7 +57,7 @@ for (const id of ids) {
 				localStorage.setItem(k, v);
 			} catch {}
 		},
-		[`mt-image:pose:${id}`, JSON.stringify(fixedPose(id))],
+		[`rigi.pose.${id}`, JSON.stringify(fixedPose(id))],
 	);
 	await ctx.routeWebSocket(
 		(u) => u.origin === new URL(BASE).origin.replace(/^http/, "ws"),

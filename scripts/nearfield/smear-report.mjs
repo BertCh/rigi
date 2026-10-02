@@ -16,7 +16,7 @@ import {
 import { join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 
-// grids are stored gzipped (grid-*.json.gz); plain .json still read
+// grids are stored gzipped (grid-*.json.gz); smear-measure writes plain .json, read as well
 const readGrid = (f) =>
 	_ex(f)
 		? JSON.parse(_rd(f, "utf8"))

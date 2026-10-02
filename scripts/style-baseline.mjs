@@ -276,7 +276,7 @@ async function runPhoto(id, sink) {
 					localStorage.setItem(key, val);
 				} catch {}
 			},
-			[`mt-image:pose:${id}`, JSON.stringify(pose)],
+			[`rigi.pose.${id}`, JSON.stringify(pose)],
 		);
 		// no HMR: this shared tree may be edited concurrently, and a hot update mid-run would re-render or
 		// remount the workspace. The HMR socket is answered by a silent mock instead of vite.

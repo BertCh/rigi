@@ -69,7 +69,7 @@ async function runOne(browser, id) {
 						localStorage.setItem(k, v);
 					} catch {}
 				},
-				[`mt-image:pose:${id}`, JSON.stringify(pose)],
+				[`rigi.pose.${id}`, JSON.stringify(pose)],
 			);
 		// no HMR: the tree is edited concurrently; a hot update mid-run would remount the workspace
 		await ctx.routeWebSocket(

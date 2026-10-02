@@ -145,13 +145,6 @@ describe("loadRoll", () => {
 		const r = await loadRoll("local-roll-b"); // `local-b` lives in the a+b roll
 		expect(r?.photos.map((p) => p.meta.id)).toContain("local-b");
 	});
-
-	it("resolves a legacy numeric index, null when out of range", async () => {
-		uploads();
-		expect((await loadRoll("local-roll-0"))?.photos).toHaveLength(2);
-		expect((await loadRoll("local-roll-1"))?.photos).toHaveLength(1);
-		expect(await loadRoll("local-roll-7")).toBeNull();
-	});
 });
 
 describe("deleteUploadRoll", () => {

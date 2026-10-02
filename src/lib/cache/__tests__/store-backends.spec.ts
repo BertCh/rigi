@@ -51,7 +51,7 @@ describe("Cache API backend", () => {
 			await s.put("tile/1 2?x", { body: body(1, 2, 3), type: "image/png" }),
 		).toBe(true);
 		expect([...map.keys()][0]).toBe(
-			`https://summit-lens-tile-cache.invalid/${encodeURIComponent("tile/1 2?x")}`,
+			`https://rigi-tile-cache.invalid/${encodeURIComponent("tile/1 2?x")}`,
 		);
 		const got = await s.get("tile/1 2?x");
 		expect(got?.type).toBe("image/png");

@@ -277,8 +277,8 @@ const readJson = (p: string) =>
 		handBuilt.join("; "),
 	);
 	ok(
-		storageKey("savedPose", "IMG_1") === "mt-image:pose:IMG_1" &&
-			storageKey("propagate") === "mt-image:propagate:v1",
+		storageKey("savedPose", "IMG_1") === "rigi.pose.IMG_1" &&
+			storageKey("propagate") === "rigi.propagate.v1",
 		"storage: storageKey fills holes",
 	);
 	const prefixed = (Object.keys(STORAGE) as StorageId[]).filter((id) =>

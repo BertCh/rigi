@@ -25,7 +25,7 @@ export interface ByteStore {
 
 /** Synthetic same-scheme URL so arbitrary keys (and Vary-less requests) work with Cache API. */
 const cacheUrl = (key: string) =>
-	`https://summit-lens-tile-cache.invalid/${encodeURIComponent(key)}`;
+	`https://rigi-tile-cache.invalid/${encodeURIComponent(key)}`;
 const META_KEY = "__meta__";
 
 class CacheApiStore implements ByteStore {

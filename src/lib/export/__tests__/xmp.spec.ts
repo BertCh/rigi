@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { buildCameraModel } from "../camera";
-import { buildXmp, SLENS_NS, xmpGpsCoord } from "../xmp";
+import { buildXmp, RIGI_NS, xmpGpsCoord } from "../xmp";
 import { FIXTURE, parseXml, SOUTH } from "./fixtures";
 
 /** Parse an EXIF-XMP "DDD,MM.mmmmmmR" coordinate back to signed degrees. */
@@ -43,7 +43,7 @@ describe("buildXmp", () => {
 		expect(root).toBe("x:xmpmeta");
 		expect(d["xmlns:exif"]).toBe("http://ns.adobe.com/exif/1.0/");
 		expect(d["xmlns:GPano"]).toBe("http://ns.google.com/photos/1.0/panorama/");
-		expect(d["xmlns:slens"]).toBe(SLENS_NS);
+		expect(d["xmlns:rigi"]).toBe(RIGI_NS);
 	});
 	it("round-trips GPS lat/lon", () => {
 		expect(parseGps(d["exif:GPSLatitude"])).toBeCloseTo(m.lat, 6);
@@ -64,13 +64,13 @@ describe("buildXmp", () => {
 		expect(d["GPano:UsePanoramaViewer"]).toBe("False");
 	});
 	it("serialises the full model numerically", () => {
-		expect(Number(d["slens:VerticalFOV"])).toBeCloseTo(53.06, 5);
-		expect(Number(d["slens:FocalLengthPixels"])).toBeCloseTo(m.f, 3);
-		expect(d["slens:ImageWidth"]).toBe("4032");
-		expect(d["slens:CameraCenterECEF"].split(" ").map(Number)).toEqual(
+		expect(Number(d["rigi:VerticalFOV"])).toBeCloseTo(53.06, 5);
+		expect(Number(d["rigi:FocalLengthPixels"])).toBeCloseTo(m.f, 3);
+		expect(d["rigi:ImageWidth"]).toBe("4032");
+		expect(d["rigi:CameraCenterECEF"].split(" ").map(Number)).toEqual(
 			m.C_ecef.map((v) => Number(v.toFixed(4))),
 		);
-		const R = d["slens:RotationCameraToECEF"].split(" ").map(Number);
+		const R = d["rigi:RotationCameraToECEF"].split(" ").map(Number);
 		expect(R).toHaveLength(9);
 		for (let i = 0; i < 9; i++) expect(R[i]).toBeCloseTo(m.R_cam2ecef[i], 11);
 	});

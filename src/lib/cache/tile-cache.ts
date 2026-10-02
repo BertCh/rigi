@@ -5,6 +5,7 @@
 // TileCache: memory hot tier → persistent store (Cache API / IndexedDB) → network, with
 // a byte-capped LRU over the persistent store and a priority fetch queue in front of the
 // network. See ./index.ts for the public API.
+import { storageKey } from "../ontology/core/storage";
 import { LruIndex } from "./lru";
 import { abortError, PriorityQueue, type QueueStats } from "./queue";
 import {
@@ -137,7 +138,7 @@ export class TileCache {
 			concurrency: 24,
 			fetchTimeoutMs: 30_000,
 			backend: "auto",
-			name: "summit-lens-tiles-v1",
+			name: storageKey("tileCache"),
 			metaDebounceMs: 2000,
 			writeConcurrency: 2,
 			readOnly: false,

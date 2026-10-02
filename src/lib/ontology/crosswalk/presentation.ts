@@ -30,7 +30,7 @@ export const BLEND_METHOD = {
 	brush: { label: "Brush" },
 } as const satisfies Record<BlendMethod, { label: string }>;
 
-/** Every export the app can write, one row per kind (pose and XMP keep the legacy summit-lens ids). */
+/** Every export the app can write, one row per kind. */
 export const EXPORT_KIND = {
 	png: { concept: "export-format", versioned: false },
 	kmz: { concept: "export-format", versioned: false },

@@ -28,70 +28,70 @@ export type StorageEntry = {
 export const STORAGE = {
 	savedPose: {
 		medium: "localStorage",
-		key: "mt-image:pose:<photoId>",
+		key: "rigi.pose.<photoId>",
 		holds: "pose (endorsed by the user)",
 		version: null,
 		module: "lib/photos.ts saveSavedPose/loadSavedPose",
 	},
 	solvedPose: {
 		medium: "localStorage",
-		key: "mt-image:rollpose:<photoId>",
+		key: "rigi.rollpose.<photoId>",
 		holds: "SolvedPose (roll aligner or accepted suggestion)",
 		version: null,
 		module: "lib/roll/roll.ts",
 	},
 	importPosition: {
 		medium: "localStorage",
-		key: "mt-image:import:pos:<photoId>",
+		key: "rigi.import.pos.<photoId>",
 		holds: "PositionProvenance",
 		version: null,
 		module: "lib/roll/import/provenance.ts",
 	},
 	propagate: {
 		medium: "localStorage",
-		key: "mt-image:propagate:v1",
+		key: "rigi.propagate.v1",
 		holds: "StoredSuggestion map keyed anchor>target",
 		version: 1,
 		module: "lib/roll/propagate/store.ts",
 	},
 	rollBasemap: {
 		medium: "localStorage",
-		key: "mt-image:rollBasemap",
+		key: "rigi.roll.basemap",
 		holds: "UI toggle",
 		version: null,
 		module: "lib/roll/map/RollMap.tsx",
 	},
 	panoTerrain: {
 		medium: "localStorage",
-		key: "mt-image:roll:pano-terrain",
+		key: "rigi.roll.pano-terrain",
 		holds: "UI toggle",
 		version: null,
 		module: "lib/roll/mosaic/PanoramaStrip.tsx",
 	},
 	panoHeight: {
 		medium: "localStorage",
-		key: "mt-image:roll:pano-height",
+		key: "rigi.roll.pano-height",
 		holds: "UI size (px)",
 		version: null,
 		module: "lib/roll/mosaic/PanoramaStrip.tsx",
 	},
 	viewStyle: {
 		medium: "localStorage",
-		key: "mt-image.viewStyle.v1",
+		key: "rigi.viewStyle.v1",
 		holds: "StyleState {v, preset, overrides}",
 		version: 1,
 		module: "lib/style/store.ts",
 	},
 	lookLayer: {
 		medium: "localStorage",
-		key: "mt-image.look.layer.<id>",
+		key: "rigi.look.layer.<id>",
 		holds: "UI toggle per look layer",
 		version: null,
 		module: "components/StylePanel.tsx",
 	},
 	lookLinesMore: {
 		medium: "localStorage",
-		key: "mt-image.look.lines-more",
+		key: "rigi.look.lines-more",
 		holds: "UI toggle",
 		version: null,
 		module: "components/StylePanel.tsx",
@@ -133,26 +133,24 @@ export const STORAGE = {
 	},
 	topoSharp: {
 		medium: "localStorage",
-		key: "rigi:topoSharp",
+		key: "rigi.topoSharp",
 		holds: "landing topo board sharp/soft toggle",
 		version: null,
 		module: "components/site/TopoBoard.tsx",
-		note: "colon separator predates the rigi. convention; kept so the saved toggle survives",
 	},
 	uploads: {
 		medium: "indexedDB",
-		key: "mt-image-uploads",
+		key: "rigi-uploads",
 		holds: "PhotoRecord (photos store) + LocalRegion (regions store)",
 		version: 1,
 		module: "lib/upload/store.ts",
 	},
 	tileCache: {
 		medium: "cacheStorage",
-		key: "summit-lens-tiles-v1",
+		key: "rigi-tiles-v1",
 		holds: "DEM / imagery tile bytes (IndexedDB fallback of the same name)",
 		version: 1,
 		module: "lib/cache/tile-cache.ts",
-		note: "legacy brand kept: renaming would orphan every user's cache",
 	},
 	flags: {
 		medium: "url",
@@ -163,31 +161,23 @@ export const STORAGE = {
 	},
 	poseJson: {
 		medium: "file",
-		key: "<photoId>.pose.json (schema summit-lens/pose)",
+		key: "<photoId>.pose.json (schema rigi/pose)",
 		holds: "PoseJson",
 		version: 1,
 		module: "lib/export/pose-json.ts",
-		note: "legacy brand kept so exported files still load",
 	},
 	xmp: {
 		medium: "file",
-		key: "<photoId>.xmp (ns https://summit-lens.app/ns/pose/1.0/)",
+		key: "<photoId>.xmp (ns https://rigi.app/ns/pose/1.0/)",
 		holds: "XMP sidecar",
 		version: 1,
 		module: "lib/export/xmp.ts",
-		note: "legacy brand kept so exported files still load",
 	},
 } as const satisfies Record<string, StorageEntry>;
 export type StorageId = keyof typeof STORAGE;
 
-/** Key prefixes the storage lint scans for. The `mt-image` prefixes predate the Rigi rename and are kept for saved-data compatibility. */
-export const STORAGE_PREFIXES = [
-	"mt-image:",
-	"mt-image.",
-	"mt-image-",
-	"rigi.",
-	"rigi:",
-];
+/** Key prefixes the storage lint scans for. */
+export const STORAGE_PREFIXES = ["rigi.", "rigi-"];
 
 /** RegExp matching concrete keys of an entry (`<x>` → one or more chars). */
 export function storageKeyPattern(id: StorageId): RegExp {
@@ -211,7 +201,7 @@ type KeyParts<K extends string> = K extends `${string}<${string}>${infer R}`
 	: [];
 
 /**
- * The concrete key of a registered entry: `storageKey("savedPose", id)` → "mt-image:pose:<id>". The
+ * The concrete key of a registered entry: `storageKey("savedPose", id)` → "rigi.pose.<id>". The
  * argument count is checked against the `<x>` holes in the registered key.
  */
 export function storageKey<I extends StorageId>(

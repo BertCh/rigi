@@ -206,7 +206,7 @@ export async function restoreLocalPhoto(
 		...emptyRegion(rec.meta),
 		id: rec.meta.region,
 	};
-	const { warnings: _w, partial: _p, ...clean } = region as LocalRegion;
+	const { warnings: _w, ...clean } = region as LocalRegion;
 	return { meta: { ...rec.meta, src: blobUrl }, region: clean, blobUrl };
 }
 
@@ -241,14 +241,11 @@ export async function deleteLocalPhoto(id: string) {
 }
 
 /**
- * Drop stored regions no stored photo references, plus any bundled-region copies an older
- * version of this module wrote (bundled regions are now referenced, not copied).
+ * Drop stored regions no stored photo references.
  */
 export async function gcRegions() {
 	const used = new Set((await allPhotoRecords()).map((r) => r.meta.region));
-	const stale = (await regionIds()).filter(
-		(rid) => !isLocalRegionId(rid) || !used.has(rid),
-	);
+	const stale = (await regionIds()).filter((rid) => !used.has(rid));
 	for (const rid of stale) await deleteRegion(rid);
 	return stale;
 }

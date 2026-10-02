@@ -201,7 +201,7 @@ describe("exportFromEngine", () => {
 		expect(r.filename).toBe("IMG_7131.pose.json");
 		expect(r.blob.type).toBe("application/json");
 		const j = JSON.parse(await r.blob.text());
-		expect(j.schema).toBe("summit-lens/pose");
+		expect(j.schema).toBe("rigi/pose");
 		expect(j.position.geoidUndulation).toBe(49);
 		expect(j.photo.takenAt).toBe("2023-07-01T10:20:30Z");
 	});

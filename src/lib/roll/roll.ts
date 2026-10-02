@@ -284,12 +284,6 @@ export function uploadRollId(ms: PhotoMeta[]): string {
 	return `${UPLOAD_ROLL_PREFIX}${first.id.replace(/^local-/, "")}`;
 }
 
-/** Legacy `local-roll-<n>` ids (cluster order, largest first): the n, else null. */
-export function legacyUploadRollIndex(id: string): number | null {
-	const m = id.match(/^local-roll-(\d{1,4})$/);
-	return m ? Number(m[1]) : null;
-}
-
 /** Rolls from uploaded photos (ids from uploadRollId), in cluster order: largest first. */
 export function uploadRolls(ms: PhotoMeta[]): Roll[] {
 	return clusterPhotos(ms).map((g) => {

@@ -370,7 +370,7 @@ export type StepInside = import("#/lib/nearfield/types").NearFieldScene;
 export type ExportFormat = import("#/lib/export/engine-export").ExportFormat;
 
 /**
- * Pose file: Self-describing pose JSON (schema summit-lens/pose v1): position with both datums,
+ * Pose file: Self-describing pose JSON (schema rigi/pose v1): position with both datums,
  * orientation, K, R|t.
  * Is a {@link ExportFormat}.
  * Canonical: `lib/export/pose-json.ts#PoseJson`.

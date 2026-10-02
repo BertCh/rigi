@@ -102,7 +102,7 @@ _files and formats that leave the app_
 | concept | definition | UI words | code words | avoid |
 |---|---|---|---|---|
 | **Export format** `export-format` | A file Rigi writes for a solved photo (annotated PNG, KMZ, GeoJSON, pose JSON, COLMAP, XMP, splats). |  | `ExportKind`, `ExportFormat`, `SplatExportKind` |  |
-| **Pose file** `pose-file` (is export-format) | Self-describing pose JSON (schema summit-lens/pose v1): position with both datums, orientation, K, R\|t. |  |  |  |
+| **Pose file** `pose-file` (is export-format) | Self-describing pose JSON (schema rigi/pose v1): position with both datums, orientation, K, R\|t. |  |  |  |
 
 ### System
 
@@ -679,7 +679,6 @@ A reference is `Ref<C> = {concept, id}`, and its string form is the URN `rigi:<c
 | region | local | `^local-region--?\d+\.\d{2}_-?\d+\.\d{2}$` | `local-region-46.55_7.95` | yes | upload/region.ts (0.05° grid cell) |
 | region | demo | `^demo-region$` | `demo-region` | yes | public/demo/manifest.json |
 | roll | demo | `^demo$` | `demo` | yes | demo/index.ts DEMO_ROLL_ID |
-| roll | local-legacy | `^local-roll-\d{1,4}$` | `local-roll-2` | no | roll/roll.ts (old cluster index ids, still resolved) |
 | roll | local | `^local-roll-[0-9a-f]{10}$` | `local-roll-3fa9c1d2e4` | no | roll/roll.ts uploadRollId (earliest photo's hash) (changes when an earlier photo joins the cluster) |
 | roll | bundled | `^region-\d+$` | `region-3` | yes | roll/roll.ts (one roll per bundled region) (a bundled roll's id IS its region id) |
 | roll | preview | `^preview-\d+$` | `preview-0` | no | routes/roll.import.tsx (unsaved import preview) |
@@ -689,31 +688,31 @@ A reference is `Ref<C> = {concept, id}`, and its string form is the URN `rigi:<c
 
 ## Storage
 
-Every key Rigi persists. The check fails on any `mt-image:` / `mt-image.` / `mt-image-` / `rigi.` literal in `src/` that is not registered here.
+Every key Rigi persists. The check fails on any `rigi.` / `rigi-` literal in `src/` that is not registered here.
 
 | id | medium | key | holds | version | module |
 |---|---|---|---|---|---|
-| `savedPose` | localStorage | `mt-image:pose:<photoId>` | pose (endorsed by the user) | none | lib/photos.ts saveSavedPose/loadSavedPose |
-| `solvedPose` | localStorage | `mt-image:rollpose:<photoId>` | SolvedPose (roll aligner or accepted suggestion) | none | lib/roll/roll.ts |
-| `importPosition` | localStorage | `mt-image:import:pos:<photoId>` | PositionProvenance | none | lib/roll/import/provenance.ts |
-| `propagate` | localStorage | `mt-image:propagate:v1` | StoredSuggestion map keyed anchor>target | v1 | lib/roll/propagate/store.ts |
-| `rollBasemap` | localStorage | `mt-image:rollBasemap` | UI toggle | none | lib/roll/map/RollMap.tsx |
-| `panoTerrain` | localStorage | `mt-image:roll:pano-terrain` | UI toggle | none | lib/roll/mosaic/PanoramaStrip.tsx |
-| `panoHeight` | localStorage | `mt-image:roll:pano-height` | UI size (px) | none | lib/roll/mosaic/PanoramaStrip.tsx |
-| `viewStyle` | localStorage | `mt-image.viewStyle.v1` | StyleState {v, preset, overrides} | v1 | lib/style/store.ts |
-| `lookLayer` | localStorage | `mt-image.look.layer.<id>` | UI toggle per look layer | none | components/StylePanel.tsx |
-| `lookLinesMore` | localStorage | `mt-image.look.lines-more` | UI toggle | none | components/StylePanel.tsx |
+| `savedPose` | localStorage | `rigi.pose.<photoId>` | pose (endorsed by the user) | none | lib/photos.ts saveSavedPose/loadSavedPose |
+| `solvedPose` | localStorage | `rigi.rollpose.<photoId>` | SolvedPose (roll aligner or accepted suggestion) | none | lib/roll/roll.ts |
+| `importPosition` | localStorage | `rigi.import.pos.<photoId>` | PositionProvenance | none | lib/roll/import/provenance.ts |
+| `propagate` | localStorage | `rigi.propagate.v1` | StoredSuggestion map keyed anchor>target | v1 | lib/roll/propagate/store.ts |
+| `rollBasemap` | localStorage | `rigi.roll.basemap` | UI toggle | none | lib/roll/map/RollMap.tsx |
+| `panoTerrain` | localStorage | `rigi.roll.pano-terrain` | UI toggle | none | lib/roll/mosaic/PanoramaStrip.tsx |
+| `panoHeight` | localStorage | `rigi.roll.pano-height` | UI size (px) | none | lib/roll/mosaic/PanoramaStrip.tsx |
+| `viewStyle` | localStorage | `rigi.viewStyle.v1` | StyleState {v, preset, overrides} | v1 | lib/style/store.ts |
+| `lookLayer` | localStorage | `rigi.look.layer.<id>` | UI toggle per look layer | none | components/StylePanel.tsx |
+| `lookLinesMore` | localStorage | `rigi.look.lines-more` | UI toggle | none | components/StylePanel.tsx |
 | `reveal` | localStorage | `rigi.reveal.v1` | RevealConfig | v1 | lib/reveal/config.ts |
 | `theme` | localStorage | `rigi.theme` | ThemeChoice (light \| dark; absent = auto) | none | lib/theme/index.ts |
 | `pickerLog` | localStorage | `rigi.picker.log.v1` | PickerLogEntry[] | v1 | lib/picker/log.ts |
 | `panel` | localStorage | `rigi.panel.<id>` | sidebar section open/closed | none | components/controls.tsx |
 | `gipfelbuchPhoto` | localStorage | `rigi.gipfelbuch.photo` | demo photo id followed through the Gipfelbuch notebook | none | components/gipfelbuch/notebook/useNotebookPhoto.ts |
-| `topoSharp` | localStorage | `rigi:topoSharp` | landing topo board sharp/soft toggle (colon separator predates the rigi. convention; kept so the saved toggle survives) | none | components/site/TopoBoard.tsx |
-| `uploads` | indexedDB | `mt-image-uploads` | PhotoRecord (photos store) + LocalRegion (regions store) | v1 | lib/upload/store.ts |
-| `tileCache` | cacheStorage | `summit-lens-tiles-v1` | DEM / imagery tile bytes (IndexedDB fallback of the same name) (legacy brand kept: renaming would orphan every user's cache) | v1 | lib/cache/tile-cache.ts |
+| `topoSharp` | localStorage | `rigi.topoSharp` | landing topo board sharp/soft toggle | none | components/site/TopoBoard.tsx |
+| `uploads` | indexedDB | `rigi-uploads` | PhotoRecord (photos store) + LocalRegion (regions store) | v1 | lib/upload/store.ts |
+| `tileCache` | cacheStorage | `rigi-tiles-v1` | DEM / imagery tile bytes (IndexedDB fallback of the same name) | v1 | lib/cache/tile-cache.ts |
 | `flags` | url | `?<flag>=<value>` | Flags (lib/flags FLAG_SCHEMA) | none | lib/flags |
-| `poseJson` | file | `<photoId>.pose.json (schema summit-lens/pose)` | PoseJson (legacy brand kept so exported files still load) | v1 | lib/export/pose-json.ts |
-| `xmp` | file | `<photoId>.xmp (ns https://summit-lens.app/ns/pose/1.0/)` | XMP sidecar (legacy brand kept so exported files still load) | v1 | lib/export/xmp.ts |
+| `poseJson` | file | `<photoId>.pose.json (schema rigi/pose)` | PoseJson | v1 | lib/export/pose-json.ts |
+| `xmp` | file | `<photoId>.xmp (ns https://rigi.app/ns/pose/1.0/)` | XMP sidecar | v1 | lib/export/xmp.ts |
 
 ## Findings
 

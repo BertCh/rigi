@@ -220,14 +220,14 @@ describe("buildXmp estimate", () => {
 		parseXml(xml).attrs.find((a) => a._tag === "rdf:Description") ?? {};
 	it("writes nothing about provenance when it is unknown", () => {
 		const xml = buildXmp(FIXTURE);
-		expect(xml).not.toMatch(/slens:Pose(Trusted|Status|Method|Label)/);
+		expect(xml).not.toMatch(/rigi:Pose(Trusted|Status|Method|Label)/);
 	});
 	it("writes trusted, status, label and confidence", () => {
 		const a = attrs(buildXmp({ ...FIXTURE, estimate: ACCEPTED }));
-		expect(a["slens:PoseTrusted"]).toBe("True");
-		expect(a["slens:PoseStatus"]).toBe("accepted");
-		expect(a["slens:PoseLabel"]).toBe("Accepted");
-		expect(a["slens:PoseConfidence"]).toBe("0.83");
+		expect(a["rigi:PoseTrusted"]).toBe("True");
+		expect(a["rigi:PoseStatus"]).toBe("accepted");
+		expect(a["rigi:PoseLabel"]).toBe("Accepted");
+		expect(a["rigi:PoseConfidence"]).toBe("0.83");
 	});
 	it("marks a prior untrusted and escapes the label", () => {
 		const xml = buildXmp({
@@ -235,8 +235,8 @@ describe("buildXmp estimate", () => {
 			estimate: { ...PRIOR, label: 'Phone "sensors" & co' },
 		});
 		const a = attrs(xml);
-		expect(a["slens:PoseTrusted"]).toBe("False");
-		expect(a["slens:PoseMethod"]).toBe("exif-prior");
+		expect(a["rigi:PoseTrusted"]).toBe("False");
+		expect(a["rigi:PoseMethod"]).toBe("exif-prior");
 		expect(xml).toContain("Phone &quot;sensors&quot; &amp; co");
 	});
 });

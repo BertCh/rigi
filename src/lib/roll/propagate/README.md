@@ -23,7 +23,7 @@ comes from a relative rotation between the two photos. Everything here is opt-in
   - Baselines over 50 m show a parallax warning. `REPORT.txt` post hoc gives the bias as ≈ baseline / 3 km of
     terrain, which is 1.4° at 73 m.
   - Lenses with a vfov over 80° show an ultrawide warning.
-- **Accept or dismiss**: suggestions are stored in `localStorage` under `mt-image:propagate:v1`, with
+- **Accept or dismiss**: suggestions are stored in `localStorage` under `rigi.propagate.v1`, with
   `provenance: "propagated-suggestion"` and status `pending`. Accept is always a user click. It writes the roll's
   solved-pose slot with `method: "propagated-suggestion"` and `confidence: 0`, so the pose is never HIGH.
   - A pose accepted this way never becomes an anchor itself (no chaining; see `PREREG_DRAFT.txt` §2).

@@ -289,36 +289,24 @@ describe("matcherLoad", () => {
 			etaS: null,
 		});
 	});
-	it("honours the legacy busy flag", async () => {
+	it("honours the busy flag", async () => {
 		expect(await load({ ok: true, busy: true })).toEqual({
 			busy: true,
 			waiting: 0,
 			etaS: null,
 		});
 	});
-	it("reads a numeric queue", async () => {
-		expect(await load({ ok: true, queue: 3 })).toEqual({
-			busy: true,
-			waiting: 3,
-			etaS: null,
-		});
-		expect(await load({ ok: true, queue: 0 })).toMatchObject({
-			busy: false,
-			waiting: 0,
-		});
-	});
-	it("reads waiting/depth and eta aliases in priority order", async () => {
+	it("reads waiting and eta", async () => {
 		expect(await load({ ok: true, queue: { waiting: 2, etaS: 12 } })).toEqual({
 			busy: true,
 			waiting: 2,
 			etaS: 12,
 		});
-		expect(
-			await load({ ok: true, queue: { depth: 4, remainingS: 9 } }),
-		).toEqual({ busy: true, waiting: 4, etaS: 9 });
-		expect(
-			await load({ ok: true, queue: { waiting: 0, retryAfterS: 5 } }),
-		).toEqual({ busy: false, waiting: 0, etaS: 5 });
+		expect(await load({ ok: true, queue: { waiting: 0, etaS: 5 } })).toEqual({
+			busy: false,
+			waiting: 0,
+			etaS: 5,
+		});
 	});
 	it("a running job counts as busy even with nobody waiting", async () => {
 		expect(await load({ ok: true, queue: { running: 1 } })).toMatchObject({
@@ -585,7 +573,7 @@ describe("requestMatchOrDefer", () => {
 		expect("result" in r && r.result?.confidence).toBe(0.9);
 	});
 	it("defers immediately when /health shows contention", async () => {
-		setup({ ok: true, queue: 2 }, () => json(result()));
+		setup({ ok: true, queue: { waiting: 2 } }, () => json(result()));
 		const r = await M.requestMatchOrDefer({ photoId: "p", prior: pose(0) });
 		expect("deferred" in r).toBe(true);
 		if ("deferred" in r) expect((await r.deferred)?.confidence).toBe(0.9);

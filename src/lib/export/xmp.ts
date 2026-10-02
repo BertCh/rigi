@@ -9,7 +9,7 @@
 //   PoseHeadingDegrees/PosePitchDegrees/PoseRollDegrees, with UsePanoramaViewer=False so viewers
 //   keep treating it as a flat photo. GPano roll: "as roll increases, the horizon rotates
 //   counterclockwise in the image" = camera right side down = the app's roll sign.
-// - Full model: a custom namespace `slens` (https://summit-lens.app/ns/pose/1.0/) with fov,
+// - Full model: a custom namespace `rigi` (https://rigi.app/ns/pose/1.0/) with fov,
 //   focal px, ECEF centre and camera→ECEF rotation.
 import {
 	buildCameraModel,
@@ -21,7 +21,7 @@ import {
 } from "./camera";
 import { xmlEscape } from "./kml";
 
-export const SLENS_NS = "https://summit-lens.app/ns/pose/1.0/";
+export const RIGI_NS = "https://rigi.app/ns/pose/1.0/";
 
 /** EXIF-XMP GPS coordinate string "DDD,MM.mmmmmmR". */
 export function xmpGpsCoord(deg: number, pos: "N" | "E", neg: "S" | "W") {
@@ -44,17 +44,17 @@ export function buildXmp(input: CameraInput | CameraModel): string {
 	// How the pose is known; nothing is written when the exporter did not say (unknown, not "untrusted")
 	const estimate = [
 		est
-			? `\n   slens:PoseTrusted="${isTrustedEstimate(est) ? "True" : "False"}"`
+			? `\n   rigi:PoseTrusted="${isTrustedEstimate(est) ? "True" : "False"}"`
 			: "",
 		est?.provenance.status
-			? `\n   slens:PoseStatus="${xmlEscape(est.provenance.status)}"`
+			? `\n   rigi:PoseStatus="${xmlEscape(est.provenance.status)}"`
 			: "",
 		est?.provenance.method
-			? `\n   slens:PoseMethod="${xmlEscape(est.provenance.method)}"`
+			? `\n   rigi:PoseMethod="${xmlEscape(est.provenance.method)}"`
 			: "",
-		est?.label ? `\n   slens:PoseLabel="${xmlEscape(est.label)}"` : "",
+		est?.label ? `\n   rigi:PoseLabel="${xmlEscape(est.label)}"` : "",
 		est?.confidence != null && Number.isFinite(est.confidence)
-			? `\n   slens:PoseConfidence="${f(est.confidence)}"`
+			? `\n   rigi:PoseConfidence="${f(est.confidence)}"`
 			: "",
 	].join("");
 	const ts = m.input.takenAt
@@ -66,7 +66,7 @@ export function buildXmp(input: CameraInput | CameraModel): string {
   <rdf:Description rdf:about=""
    xmlns:exif="http://ns.adobe.com/exif/1.0/"
    xmlns:GPano="http://ns.google.com/photos/1.0/panorama/"
-   xmlns:slens="${SLENS_NS}"
+   xmlns:rigi="${RIGI_NS}"
    exif:GPSVersionID="2.3.0.0"
    exif:GPSLatitude="${xmpGpsCoord(m.lat, "N", "S")}"
    exif:GPSLongitude="${xmpGpsCoord(m.lon, "E", "W")}"
@@ -80,20 +80,20 @@ export function buildXmp(input: CameraInput | CameraModel): string {
    GPano:PoseHeadingDegrees="${fixedAzimuth(heading, 6)}"
    GPano:PosePitchDegrees="${f(p.pitch)}"
    GPano:PoseRollDegrees="${f(p.roll)}"
-   slens:SchemaVersion="1"
-   slens:Yaw="${f(p.yaw)}"
-   slens:Pitch="${f(p.pitch)}"
-   slens:Roll="${f(p.roll)}"
-   slens:VerticalFOV="${f(m.vfov)}"
-   slens:HorizontalFOV="${f(m.hfov)}"
-   slens:FocalLengthPixels="${f(m.f, 4)}"
-   slens:ImageWidth="${m.width}"
-   slens:ImageHeight="${m.height}"
-   slens:AltitudeMSL="${f(m.altMsl, 3)}"
-   slens:AltitudeEllipsoid="${f(m.altEllipsoid, 3)}"
-   slens:CameraCenterECEF="${m.C_ecef.map((v) => f(v, 4)).join(" ")}"
-   slens:RotationCameraToECEF="${m.R_cam2ecef.map((v) => f(v, 12)).join(" ")}"${estimate}
-   slens:Convention="yaw clockwise from true north; pitch up +; roll right-side-down +; camera axes x right, y down, z forward; rotation row-major"/>
+   rigi:SchemaVersion="1"
+   rigi:Yaw="${f(p.yaw)}"
+   rigi:Pitch="${f(p.pitch)}"
+   rigi:Roll="${f(p.roll)}"
+   rigi:VerticalFOV="${f(m.vfov)}"
+   rigi:HorizontalFOV="${f(m.hfov)}"
+   rigi:FocalLengthPixels="${f(m.f, 4)}"
+   rigi:ImageWidth="${m.width}"
+   rigi:ImageHeight="${m.height}"
+   rigi:AltitudeMSL="${f(m.altMsl, 3)}"
+   rigi:AltitudeEllipsoid="${f(m.altEllipsoid, 3)}"
+   rigi:CameraCenterECEF="${m.C_ecef.map((v) => f(v, 4)).join(" ")}"
+   rigi:RotationCameraToECEF="${m.R_cam2ecef.map((v) => f(v, 12)).join(" ")}"${estimate}
+   rigi:Convention="yaw clockwise from true north; pitch up +; roll right-side-down +; camera axes x right, y down, z forward; rotation row-major"/>
  </rdf:RDF>
 </x:xmpmeta>
 <?xpacket end="w"?>

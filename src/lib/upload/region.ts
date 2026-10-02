@@ -127,14 +127,12 @@ export type RegionProgress = (
 ) => void;
 
 /**
- * RegionData plus `warnings`, `partial` (set by older versions when trails failed, so the cache
- * retries later) and `trailsFetched` (fetchRegionTrails has queried this region's paths).
+ * RegionData plus `warnings` and `trailsFetched` (fetchRegionTrails has queried this region's paths).
  */
 export type LocalRegion = RegionData & {
 	/** ?geoLakes: compact lake outlines (src/lib/geocam/lakes) from the same water query. */
 	lakes?: LakeGeo[];
 	warnings?: string[];
-	partial?: boolean;
 	trailsFetched?: boolean;
 };
 
@@ -190,9 +188,8 @@ function startEntry(
 	};
 	entry.promise = run(ctl.signal, progress);
 	entry.promise.then(
-		(r) => {
+		() => {
 			entry.settled = true;
-			if (r.partial && memo.get(key) === entry) memo.delete(key);
 		},
 		() => {
 			entry.settled = true;
@@ -274,7 +271,7 @@ export function fetchRegion(
 			const cached = (await getRegion(id).catch(
 				() => null,
 			)) as LocalRegion | null;
-			if (cached && !cached.partial && !opts.force) {
+			if (cached && !opts.force) {
 				progress("done", "cache");
 				return cached;
 			}
@@ -284,7 +281,7 @@ export function fetchRegion(
 					onProgress: progress,
 				});
 			} catch (e) {
-				// offline / Overpass down: an older partial region beats nothing
+				// offline / Overpass down: a cached region beats nothing
 				if (cached && !signal.aborted)
 					return {
 						...cached,
@@ -373,7 +370,7 @@ export function attachPhotoToRegion(
 
 async function attachNow(region: RegionData, photoId: string) {
 	if (!isLocalRegionId(region.id)) {
-		const { warnings: _w, partial: _p, ...clean } = region as LocalRegion;
+		const { warnings: _w, ...clean } = region as LocalRegion;
 		return clean as LocalRegion;
 	}
 	const stored = await getRegion(region.id).catch(() => null);
@@ -404,8 +401,7 @@ export function fetchRegionTrails(
 				() => null,
 			)) as LocalRegion | null;
 			if (!region) return [];
-			// regions stored before trails went on-demand already hold their paths
-			if (region.trailsFetched || region.trails.length) return region.trails;
+			if (region.trailsFetched) return region.trails;
 			const q = regionQueries(region.center[0], region.center[1]);
 			const json = await overpass(q.trails, {
 				timeoutMs: 45_000,
@@ -416,9 +412,8 @@ export function fetchRegionTrails(
 			// re-read: the photo list may have changed while Overpass answered
 			const latest = ((await getRegion(regionId).catch(() => null)) ??
 				region) as LocalRegion;
-			const { partial: _p, ...rest } = latest;
 			await putRegion({
-				...rest,
+				...latest,
 				trails,
 				trailsFetched: true,
 			} as LocalRegion).catch(() => {});

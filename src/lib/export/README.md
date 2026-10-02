@@ -6,7 +6,7 @@ These are pure TypeScript modules with no UI and no new dependencies. They turn 
 
 | Output | Function | Consumers |
 |---|---|---|
-| Pose JSON (`summit-lens/pose` v1) | `buildPoseJson` | scripts, re-import, archival |
+| Pose JSON (`rigi/pose` v1) | `buildPoseJson` | scripts, re-import, archival |
 | COLMAP text model (zip of `sparse/0/{cameras,images,points3D}.txt`) | `buildColmapZip`, `colmapFiles` | COLMAP, nerfstudio, OpenMVG (via COLMAP) |
 | OpenCV R,t and K | `buildCameraModel`, which is also in the JSON | cv::projectPoints, custom tools |
 | KML PhotoOverlay | `buildPhotoOverlayKml` | Google Earth Pro/Web |
@@ -56,8 +56,8 @@ Import everything from `#/lib/export` (the barrel is `index.ts`).
   - Other exports: `destination`, `ringSignedArea`, `sampleFootprint`, `unwrapLon`, `polygonGeometry` and `lineGeometry`.
   - **Antimeridian:** longitudes are unwrapped around the camera. Any wedge, view line or footprint that crosses ±180° is split into a `MultiPolygon` or `MultiLineString`, as RFC 7946 §3.1.9 requires, so every longitude stays within [−180, 180].
   - **Heights (RFC 7946 §4):** a third coordinate means height above the ellipsoid. So the camera and peak points get a z value (altEllipsoid, or ele + N) only when `geoidUndulation` was passed. Otherwise they are 2D, and the MSL heights are in `properties.altMsl` and `ele`. The camera's `properties.heightDatum` says which case applies.
-- `buildXmp(inputOrModel) → string` (the .xmp text), plus `xmpGpsCoord` and `SLENS_NS`.
-  - When the input has an `estimate`, the sidecar also carries `slens:PoseTrusted` (`True`/`False`), `slens:PoseStatus`, `slens:PoseMethod`, `slens:PoseLabel` and `slens:PoseConfidence`. Without one, none of these tags is written: the provenance is unknown, which is not the same as untrusted.
+- `buildXmp(inputOrModel) → string` (the .xmp text), plus `xmpGpsCoord` and `RIGI_NS`.
+  - When the input has an `estimate`, the sidecar also carries `rigi:PoseTrusted` (`True`/`False`), `rigi:PoseStatus`, `rigi:PoseMethod`, `rigi:PoseLabel` and `rigi:PoseConfidence`. Without one, none of these tags is written: the provenance is unknown, which is not the same as untrusted.
   - `xmpGpsCoord` rounds the total minutes first, so a value like 46.99999999999 becomes `47,0.000000N` and never `46,60.000000N`.
   - `GPSImgDirection` stays within 0 to 359.99: it rounds to hundredths and then takes the result mod 36000.
 - `exportFromEngine(engine, kind, {estimate})` passes the estimate through. When the estimate is not trusted, every export adds the note "Pose not verified (label): check it before use".
@@ -102,7 +102,7 @@ Reference: https://developers.google.com/kml/documentation/kmlreference#camera a
 - **GPS:** the standard EXIF-in-XMP tags `exif:GPSLatitude`, `exif:GPSLongitude`, `exif:GPSAltitude`/`Ref` (MSL), `exif:GPSImgDirection` (T) and `FocalLengthIn35mmFilm`.
 - **Orientation:** Google Photo Sphere tags `GPano:PoseHeadingDegrees`, `PosePitchDegrees` and `PoseRollDegrees`, with `UsePanoramaViewer=False`.
   - Per the GPano spec, "as roll increases, the horizon rotates counterclockwise in the image". That happens when the camera's right side goes down, so GPano roll = our roll.
-- **Full model:** a custom namespace `slens` = `https://summit-lens.app/ns/pose/1.0/`. It holds yaw, pitch and roll, vfov and hfov, focal length in pixels, image size, MSL and ellipsoidal altitude, the ECEF centre and the row-major camera→ECEF rotation.
+- **Full model:** a custom namespace `rigi` = `https://rigi.app/ns/pose/1.0/`. It holds yaw, pitch and roll, vfov and hfov, focal length in pixels, image size, MSL and ellipsoidal altitude, the ECEF centre and the row-major camera→ECEF rotation.
 
 ## Integration: adding an "Export" menu to PhotoWorkspace
 

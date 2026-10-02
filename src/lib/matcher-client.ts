@@ -367,8 +367,8 @@ export async function requestMatch(
 }
 
 /**
- * Uncached /health load probe. v0.3.2 adds a `queue` field; accepted shapes: a number of waiters, or
- * `{ waiting | depth, etaS | remainingS | retryAfterS }`. Older servers only report `busy`.
+ * Uncached /health load probe: `busy` plus `queue: { waiting, running, etaS }` (the matcher server's
+ * queue_status).
  */
 export async function matcherLoad(): Promise<{
 	busy: boolean;
@@ -381,16 +381,13 @@ export async function matcherLoad(): Promise<{
 		const j = r.ok ? await r.json() : null;
 		if (j?.ok !== true) return null;
 		const q = j.queue;
-		const num = (...xs: unknown[]) => {
-			const x = xs.find((v) => typeof v === "number" && Number.isFinite(v));
-			return x === undefined ? null : (x as number);
-		};
-		const waiting =
-			typeof q === "number" ? q : (num(q?.waiting, q?.depth) ?? 0);
+		const finite = (x: unknown) =>
+			typeof x === "number" && Number.isFinite(x) ? x : null;
+		const waiting = finite(q?.waiting) ?? 0;
 		return {
 			busy: j.busy === true || q?.running != null || waiting > 0,
 			waiting,
-			etaS: num(q?.etaS, q?.remainingS, q?.retryAfterS),
+			etaS: finite(q?.etaS),
 		};
 	} catch {
 		return null;

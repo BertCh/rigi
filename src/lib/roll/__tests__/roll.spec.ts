@@ -11,7 +11,6 @@ import type { PhotoMeta } from "../../photos";
 import {
 	clusterPhotos,
 	hfovOf,
-	legacyUploadRollIndex,
 	loadSolvedPose,
 	makeRoll,
 	priorPose,
@@ -130,12 +129,6 @@ describe("upload roll ids", () => {
 		const first = meta("local-1", { takenAt: "2025-08-01T09:00:00Z" });
 		const later = meta("local-2", { takenAt: "2025-08-02T09:00:00Z" });
 		expect(uploadRollId([first])).toBe(uploadRollId([first, later]));
-	});
-	it("parses only legacy numeric ids", () => {
-		expect(legacyUploadRollIndex("local-roll-3")).toBe(3);
-		expect(legacyUploadRollIndex("local-roll-12345")).toBeNull();
-		expect(legacyUploadRollIndex("local-roll-abc")).toBeNull();
-		expect(legacyUploadRollIndex("demo")).toBeNull();
 	});
 });
 

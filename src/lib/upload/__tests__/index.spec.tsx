@@ -153,11 +153,10 @@ describe("attachPhotoToRegion", () => {
 	});
 	it("returns bundled regions untouched, stripping transient fields, without persisting", async () => {
 		const r = await attachPhotoToRegion(
-			{ ...region("region-3"), warnings: ["w"], partial: true } as never,
+			{ ...region("region-3"), warnings: ["w"] } as never,
 			"p1",
 		);
 		expect(r).not.toHaveProperty("warnings");
-		expect(r).not.toHaveProperty("partial");
 		expect(r.photos).toEqual([]);
 		expect(db.regions.size).toBe(0);
 	});
@@ -272,14 +271,11 @@ describe("listLocalPhotos / deleteLocalPhoto / gcRegions", () => {
 		expect(l[0].thumbUrl).toMatch(/^blob:/);
 		expect(l[2].thumbUrl).toBeNull();
 	});
-	it("gcRegions drops unreferenced local regions and any stored bundled copies", async () => {
+	it("gcRegions drops unreferenced regions", async () => {
 		put("p", 1, "local-region-keep");
-		for (const id of ["local-region-keep", "local-region-orphan", "region-2"])
+		for (const id of ["local-region-keep", "local-region-orphan"])
 			db.regions.set(id, { id });
-		expect((await U.gcRegions()).sort()).toEqual([
-			"local-region-orphan",
-			"region-2",
-		]);
+		expect(await U.gcRegions()).toEqual(["local-region-orphan"]);
 		expect([...db.regions.keys()]).toEqual(["local-region-keep"]);
 	});
 	it("deleteLocalPhoto removes the record, garbage-collects its region and revokes blob URLs", async () => {

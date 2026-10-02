@@ -144,7 +144,7 @@ describe("fetchRegion", () => {
 			peaks: [expect.anything()],
 		});
 	});
-	it("offline with an older partial region falls back to it with a warning", async () => {
+	it("offline with a cached region (forced refresh) falls back to it with a warning", async () => {
 		db.regions.set("local-region--80.00_10.00", {
 			id: "local-region--80.00_10.00",
 			center: [-80, 10],
@@ -152,18 +152,17 @@ describe("fetchRegion", () => {
 			peaks: [],
 			trails: [],
 			waterNames: [],
-			partial: true,
 		});
 		serveOverpass({
 			peaks: () => {
 				throw new Error("offline");
 			},
 		});
-		const r = await fetchRegion(LAT, LON);
+		const r = await fetchRegion(LAT, LON, { force: true });
 		expect(r.warnings?.[0]).toBe("using cached data: offline");
 		expect(r.photos).toEqual(["p"]);
 	});
-	it("keeps the stored photo ids when refreshing a partial region", async () => {
+	it("keeps the stored photo ids when forcing a refresh", async () => {
 		db.regions.set("local-region--80.00_10.00", {
 			id: "local-region--80.00_10.00",
 			center: [-80, 10],
@@ -171,10 +170,9 @@ describe("fetchRegion", () => {
 			peaks: [],
 			trails: [],
 			waterNames: [],
-			partial: true,
 		});
 		serveOverpass();
-		const r = await fetchRegion(LAT, LON);
+		const r = await fetchRegion(LAT, LON, { force: true });
 		expect(r.photos).toEqual(["p"]);
 		expect(r.peaks).toHaveLength(1);
 	});
@@ -291,6 +289,7 @@ describe("fetchRegionTrails", () => {
 				},
 			],
 			waterNames: [],
+			trailsFetched: true,
 		});
 		expect(await fetchRegionTrails("local-region-held")).toHaveLength(1);
 		expect(overpassMock).not.toHaveBeenCalled();

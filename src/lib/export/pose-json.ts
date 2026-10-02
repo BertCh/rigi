@@ -23,7 +23,7 @@ import {
 	type PoseEstimateNote,
 } from "./camera";
 
-export const POSE_SCHEMA = "summit-lens/pose" as const;
+export const POSE_SCHEMA = "rigi/pose" as const;
 export const POSE_SCHEMA_VERSION = 1 as const;
 
 export type PoseJson = {
@@ -269,7 +269,7 @@ const obj = (v: unknown): Record<string, unknown> | null =>
 		: null;
 
 /**
- * Reads a `summit-lens/pose` v1 file (text or parsed JSON). Fails closed: a wrong schema or version,
+ * Reads a `rigi/pose` v1 file (text or parsed JSON). Fails closed: a wrong schema or version,
  * a missing or non-finite field, or angles that disagree with the file's own R_cam2enu or fx (a hand
  * edit of one but not the other) is an error, never a best guess. Only the camera is read as fact;
  * the file's provenance comes back as `claimed` and is never trusted.

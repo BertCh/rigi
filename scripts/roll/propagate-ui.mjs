@@ -57,9 +57,9 @@ await page.evaluate(() => {
 	sessionStorage.clear();
 	for (const k of Object.keys(localStorage))
 		if (
-			k.startsWith("mt-image:propagate") ||
-			k === "mt-image:pose:IMG_7063" ||
-			k.startsWith("mt-image:rollpose:")
+			k.startsWith("rigi.propagate") ||
+			k === "rigi.pose.IMG_7063" ||
+			k.startsWith("rigi.rollpose.")
 		)
 			localStorage.removeItem(k);
 });
@@ -151,7 +151,7 @@ if (!up) {
 		);
 		await page.screenshot({ path: `${OUT}/dev-target-7068.png` });
 		const stored = await page.evaluate(() =>
-			JSON.parse(localStorage.getItem("mt-image:propagate:v1") || "{}"),
+			JSON.parse(localStorage.getItem("rigi.propagate.v1") || "{}"),
 		);
 		ok(
 			Object.values(stored).every(
@@ -163,9 +163,7 @@ if (!up) {
 			`stored suggestions: provenance propagated-suggestion, pending, no confidence (${Object.keys(stored).length})`,
 		);
 		const rp = await page.evaluate(() =>
-			Object.keys(localStorage).filter((k) =>
-				k.startsWith("mt-image:rollpose:"),
-			),
+			Object.keys(localStorage).filter((k) => k.startsWith("rigi.rollpose.")),
 		);
 		ok(
 			rp.length === 0,
@@ -176,7 +174,7 @@ if (!up) {
 	// 3. mode on: 7063 saved by the user (its GT pose) anchors; targets are prior-only photos
 	await page.evaluate(() => {
 		localStorage.setItem(
-			"mt-image:pose:IMG_7063",
+			"rigi.pose.IMG_7063",
 			JSON.stringify({
 				yaw: 29.553,
 				pitch: 1.936,
@@ -184,7 +182,7 @@ if (!up) {
 				vfov: 52.22019110850652,
 			}),
 		);
-		localStorage.removeItem("mt-image:propagate:v1");
+		localStorage.removeItem("rigi.propagate.v1");
 	});
 	await page.goto(`${BASE}/roll/region-0?propagate=on&photo=IMG_7063`, {
 		waitUntil: "domcontentloaded",
@@ -216,8 +214,8 @@ if (!up) {
 		"panel stays after navigating within the roll",
 	);
 	await page.evaluate(() => {
-		localStorage.removeItem("mt-image:pose:IMG_7063");
-		localStorage.removeItem("mt-image:propagate:v1");
+		localStorage.removeItem("rigi.pose.IMG_7063");
+		localStorage.removeItem("rigi.propagate.v1");
 		sessionStorage.clear();
 	});
 }

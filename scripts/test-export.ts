@@ -573,7 +573,7 @@ function colmapReadImages(text: string) {
 }
 check(
 	"pose JSON fields",
-	poseJson.schema === "summit-lens/pose" &&
+	poseJson.schema === "rigi/pose" &&
 		poseJson.version === 1 &&
 		poseJson.intrinsics.K.length === 9 &&
 		poseJson.extrinsics.R_cam2ecef.length === 9 &&

@@ -361,7 +361,7 @@ export function renderOntologyDoc(): string {
 	out.push(
 		"## Storage",
 		"",
-		"Every key Rigi persists. The check fails on any `mt-image:` / `mt-image.` / `mt-image-` / `rigi.` literal in `src/` that is not registered here.",
+		"Every key Rigi persists. The check fails on any `rigi.` / `rigi-` literal in `src/` that is not registered here.",
 		"",
 		table(
 			["id", "medium", "key", "holds", "version", "module"],
