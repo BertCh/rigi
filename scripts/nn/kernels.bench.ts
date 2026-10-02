@@ -42,6 +42,7 @@ type Ctx = {
 };
 const capsOf = (variant: string) => ({
 	legacy: variant === "legacy",
+	convScalarWeights: variant === "scalarw",
 	f16Math: variant.startsWith("f16"),
 	f16Accumulate: variant === "f16acc",
 	gemmTileOverride: variant.startsWith("tile:") ? variant.slice(5) : null,
@@ -128,6 +129,26 @@ if (only.has("conv"))
 				const x = c.nn.fromArray(rnd(C * H * W), [1, C, H, W]);
 				const w = c.nn.fromArray(rnd(Co * C * 9), [Co, C, 3, 3]);
 				return () => c.nn.conv2d(x, w, null, { padding: 1 });
+			},
+		);
+// the depth net's neck / head convs (group 3 = the batched heads), 256- and 1200-token levels
+if (only.has("depthconv"))
+	for (const [G, C, H, W] of [
+		[3, 256, 28, 36],
+		[3, 128, 56, 72],
+		[3, 64, 112, 144],
+		[1, 256, 60, 80],
+		[1, 128, 120, 160],
+		[1, 64, 240, 320],
+	])
+		await bench(
+			`conv g${G} ${C}->${C} 3x3 @${H}x${W}`,
+			2 * G * C * H * W * C * 9,
+			4,
+			(c) => {
+				const x = c.nn.fromArray(rnd(G * C * H * W), [1, G * C, H, W]);
+				const w = c.nn.fromArray(rnd(G * C * C * 9), [G * C, C, 3, 3]);
+				return () => c.nn.conv2d(x, w, null, { padding: 1, groups: G });
 			},
 		);
 if (only.has("attention"))

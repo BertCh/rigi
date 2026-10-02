@@ -4,6 +4,10 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **nn GPU kernels, depth net 14 to 20% faster (2026-10-02, browser-unverified).** Measured over Dawn on an M3 Pro, median of 4 interleaved rounds of 5: liveFast 54 to 46 ms, live 78 to 62 ms, 1200 tokens 212 to 170 ms.
+  - Conv: a replicate pad feeding a conv folds into its loads and a residual add folds into its store (`fuseConv`, 255 to 220 nodes per liveFast forward); conv weights load as vec4 along k.
+  - f16 GEMM / conv products (f32 accumulation) are on by default where the device has `shader-f16` (`KernelCaps.f16Math`, also for resident q8 weights): depth median error vs f32 is 0.03% on 12 photos. f16 accumulation stays opt-in (0.4 to 0.6%).
+  - Fused kernels use the device's `maxStorageBuffersPerShaderStage` (`KernelCaps.maxStorageBuffers`) instead of 8. `scripts/nn/depth-profile.ts` prints the per-op GPU profile of the depth net.
 - **Consolidation pass after the luma-graph / math.gl / browser-only moves (2026-10-02, browser-unverified).** Review and outcome table: `reports/consolidation-review-2026-10-02.md`.
   - **GPU-only features:** feature matching, people masks, Step Inside and the ViTPose demo now need WebGPU; no nn CPU forward runs on the main thread, and Step Inside shows "needs WebGPU" when it is missing.
   - **nn runtime:**

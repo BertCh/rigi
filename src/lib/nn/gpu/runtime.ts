@@ -29,7 +29,7 @@ import { submit } from "#/lib/gpu/core/queue";
 import { stageReads } from "#/lib/gpu/core/readback";
 import { numel } from "../shape";
 import type { DType, Tensor } from "../types";
-import { fuseElementwise, fuseLayerNorm } from "./fusion";
+import { fuseConv, fuseElementwise, fuseLayerNorm } from "./fusion";
 import type { EwDesc } from "./k-elementwise";
 import type { LayerNormDesc } from "./k-fused";
 
@@ -132,6 +132,10 @@ export type Node = {
 	ln?: LayerNormDesc;
 	/** the caller's `nn.scope(name, …)` path when it was recorded (profiler labels) */
 	scope?: string;
+	/** a replicate pad node (a conv may fold it into its loads, fusion.ts fuseConv) */
+	pad?: { height: [number, number]; width: [number, number] };
+	/** a plain implicit-GEMM conv that can absorb a residual add and a replicate pad (fusion.ts fuseConv) */
+	conv?: ConvFusable;
 	/** a node with an activation epilogue: the same node with `act` fused into its output */
 	fuse?: (act: Activation) => {
 		spec: KernelSpec;
@@ -141,6 +145,18 @@ export type Node = {
 };
 
 export type Activation = { op: string; alpha: number; beta: number };
+
+/** What fuseConv needs to rebuild a conv kernel around a residual add and / or a folded replicate pad. */
+export type ConvFusable = {
+	/** the conv's current activation epilogue (set by fuseEpilogues) */
+	act: Activation | null;
+	/** `replicatePad`: the symmetric (height, width) replicate pad that fed the conv, now folded into its loads */
+	make(fused: { residual: boolean; replicatePad: [number, number] | null }): {
+		spec: KernelSpec;
+		meta: number[];
+		wg: [number, number, number];
+	};
+};
 
 /**
  * Epilogue fusion: a unary node whose input is the single output of a fusable node (GEMM / conv),
@@ -168,6 +184,7 @@ export function fuseEpilogues(nodes: Node[], outputs: Set<Storage>): Node[] {
 		if (consumers.get(src) !== 1 || outputs.has(src)) continue;
 		Object.assign(p, p.fuse(u.act));
 		p.fuse = undefined;
+		if (p.conv) p.conv.act = u.act;
 		p.outputs = [u.outputs[0]];
 		dropped.add(u);
 	}
@@ -375,7 +392,10 @@ export class Runtime {
 		const live = new Set<Storage>(outputs);
 		const keep: Node[] = [];
 		const nodes = fuseLayerNorm(
-			fuseElementwise(fuseEpilogues(rec.nodes, outputs), outputs),
+			fuseElementwise(
+				fuseConv(fuseEpilogues(rec.nodes, outputs), outputs),
+				outputs,
+			),
 			outputs,
 		);
 		for (let i = nodes.length - 1; i >= 0; i--) {

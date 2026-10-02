@@ -369,7 +369,9 @@ fn store(m: u32, n: u32, v: f32, al: f32, be: f32) {
 		const vecB = transB ? (K % 4 === 0 ? "k" : null) : N % 4 === 0 ? "n" : null;
 		if (da === "q8")
 			throw new Error("nn: a q8 weight can only be the matmul B operand");
-		const f16Math = caps.f16 && caps.f16Math && (da === "f16" || db === "f16");
+		// products in f16 whenever an operand is a reduced-precision weight (f16 storage or resident q8)
+		const f16Math =
+			caps.f16 && caps.f16Math && (da === "f16" || db === "f16" || db === "q8");
 		const config = selectGemmConfig(M, N, caps.gemmTileOverride);
 		const vec4Of = (d: DType) => `vec4<${d}>`;
 		const elem: Record<string, string> = {};
@@ -409,6 +411,7 @@ ${
 			}),
 			[],
 			elem,
+			f16Math,
 		);
 		return {
 			spec,
@@ -507,7 +510,7 @@ const convFieldsBaked = (p: ConvParams) =>
 		.replace(/fn cDg\(\).*\n/, `fn cDg() -> u32 { return ${p.dg}u; }\n`);
 
 /** Four consecutive output pixels (n .. n+3) of one im2col row k, for plain convs (fn loadB4). */
-const convLoadB4 = (cig: number) => `
+const convLoadB4 = (cig: number, replicate: boolean) => `
 fn loadB4(k: u32, n: u32) -> vec4<f32> {
   let kk = ckh() * ckw();
   let ci = k / kk;
@@ -519,11 +522,17 @@ fn loadB4(k: u32, n: u32) -> vec4<f32> {
   let xb = (nb * cCin() + gg * ${cig}u + ci) * cH();
   var v = vec4<f32>(0.0);
   for (var j = 0u; j < 4u; j++) {
-    let iy = i32(oy * csh() + ky * cdh()) - cph();
+${
+	replicate
+		? `    let iy = clamp(i32(oy * csh() + ky * cdh()) - cph(), 0, i32(cH()) - 1);
+    let ix = clamp(i32(ox * csw() + kx * cdw()) - cpw(), 0, i32(cW()) - 1);
+    v[j] = ld_x((xb + u32(iy)) * cW() + u32(ix));`
+		: `    let iy = i32(oy * csh() + ky * cdh()) - cph();
     let ix = i32(ox * csw() + kx * cdw()) - cpw();
     if (iy >= 0 && ix >= 0 && iy < i32(cH()) && ix < i32(cW())) {
       v[j] = ld_x((xb + u32(iy)) * cW() + u32(ix));
-    }
+    }`
+}
     ox += 1u;
     if (ox == cWo()) { ox = 0u; oy += 1u; }
   }
@@ -534,6 +543,13 @@ fn loadB4(k: u32, n: u32) -> vec4<f32> {
 export type ConvKind = "conv" | "convT" | "deform";
 
 /**
+ * Neighbours a plain conv absorbed (fusion.ts): `residual` adds a same-shape f32 tensor (the last
+ * input, `res`) to the activated output; `replicate` reads x with replicate-clamped coordinates,
+ * i.e. the conv folded the replicate pad that used to feed it (the params are the unpadded geometry).
+ */
+export type ConvFused = { residual?: boolean; replicate?: boolean };
+
+/**
  * Implicit-GEMM convolution: per (image, group) z, C[co, pixel] = Σ_k W[co, k] · col[k, pixel],
  * with k = (ci, ky, kx). col is computed on the fly from x (and the offsets / mask for deform).
  */
@@ -542,7 +558,9 @@ export function convGemmKernel(
 	p: ConvParams,
 	dt: { x: DType; w: DType; b: DType | null; off?: DType; mask?: DType | null },
 	ep: Epilogue,
+	fused: ConvFused = {},
 ): KernelCall {
+	const { residual = false, replicate = false } = fused;
 	const cig = p.Cin / p.groups;
 	const cog = p.Cout / p.groups;
 	const K = cig * p.kh * p.kw;
@@ -633,7 +651,8 @@ ${loadA}
 ${loadB}
 fn store(m: u32, n: u32, v: f32, al: f32, be: f32) {
   let co = gg * ${cog}u + m;
-  out[(nb * cCout() + co) * gN + n] = act(v${dt.b ? " + ld_bias(co)" : ""}, al, be);
+  let oi = (nb * cCout() + co) * gN + n;
+  out[oi] = act(v${dt.b ? " + ld_bias(co)" : ""}, al, be)${residual ? " + ld_res(oi)" : ""};
 }`;
 	const inputs = [
 		{ name: "x", dtype: dt.x },
@@ -641,32 +660,49 @@ fn store(m: u32, n: u32, v: f32, al: f32, be: f32) {
 		...(kind === "deform" && dt.mask ? [{ name: "mask", dtype: dt.mask }] : []),
 		{ name: "w", dtype: dt.w },
 		...(dt.b ? [{ name: "bias", dtype: dt.b }] : []),
+		...(residual ? [{ name: "res", dtype: "f32" as DType }] : []),
 	];
 	// cig / cog are baked into the source (constant folding of the hot divisions)
 	const caps = getKernelCaps();
-	const keyBase = `${kind}-gemm-${cig}-${cog}${dt.b ? "-bias" : ""}${dt.mask ? "-mask" : ""}${epKey(ep)}`;
+	const keyBase = `${kind}-gemm-${cig}-${cog}${dt.b ? "-bias" : ""}${dt.mask ? "-mask" : ""}${epKey(ep)}${residual ? "-res" : ""}${replicate ? "-rep" : ""}`;
 	if (!caps.legacy) {
 		const config = selectGemmConfig(M, N, caps.gemmTileOverride);
 		// plain convs gather 4 consecutive output pixels per loader call: the k → (ci, ky, kx) split and
 		// the pixel's (oy, ox) are computed once for the four
 		const gather4 = kind === "conv";
+		// weights are [Cout, K] row-major: vec4 loads along k when K is a multiple of 4
+		const vecA = kind === "conv" && K % 4 === 0 && !caps.convScalarWeights;
+		const elem: Record<string, string> = {};
+		if (vecA && dt.w !== "q8") elem.w = `vec4<${dt.w}>`;
+		const loadA4 =
+			dt.w === "q8"
+				? `fn loadA4(m: u32, k: u32) -> vec4<f32> { return ld4rc_w(gg * ${cog}u + m, k); }`
+				: `fn loadA4(m: u32, k: u32) -> vec4<f32> { return vec4<f32>(w[((gg * ${cog}u + m) * gK + k) >> 2u]); }`;
+		const f16Math = caps.f16 && caps.f16Math;
 		const spec = nnKernel(
-			`${keyBase}${gather4 ? "-g4" : ""}-${gemmConfigKey(config)}-${convBakeKey(p)}`,
+			`${keyBase}${gather4 ? "-g4" : ""}${vecA ? "-a4" : ""}${f16Math ? (caps.f16Accumulate ? "-h16" : "-h") : ""}-${gemmConfigKey(config)}-${convBakeKey(p)}`,
 			inputs,
 			["out"],
 			gemmSourceV2(
-				ops.replace(CONV_FIELDS, convFieldsBaked(p)) +
-					(gather4 ? convLoadB4(cig) : ""),
+				(vecA && dt.w !== "q8" ? ops.replace(loadA, "") : ops).replace(
+					CONV_FIELDS,
+					convFieldsBaked(p),
+				) +
+					(gather4 ? convLoadB4(cig, replicate) : "") +
+					(vecA ? loadA4 : ""),
 				"n",
 				ep,
 				config,
 				{
-					vecA: false,
+					vecA,
 					vecB: gather4 ? "n" : null,
-					f16Math: false,
-					f16Accumulate: false,
+					f16Math,
+					f16Accumulate: caps.f16Accumulate,
 				},
 			),
+			[],
+			elem,
+			f16Math,
 		);
 		return {
 			spec,

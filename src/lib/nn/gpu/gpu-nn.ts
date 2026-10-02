@@ -99,6 +99,7 @@ import {
 } from "./luma-ops";
 import {
 	type Activation,
+	type ConvFusable,
 	GpuTensor,
 	type LumaCall,
 	type Node,
@@ -172,7 +173,13 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		this.quantResident = opts.quantResident ?? false;
 		this.runtime = new Runtime(device, opts.graphGroup);
 		this.backend = { kind: "gpu", f16: device.features.has("shader-f16") };
-		setKernelCaps(capsFromFeatures((f) => device.features.has(f as never)));
+		setKernelCaps({
+			...capsFromFeatures((f) => device.features.has(f as never)),
+			maxStorageBuffers: Math.min(
+				16,
+				device.limits.maxStorageBuffersPerShaderStage || 8,
+			),
+		});
 	}
 
 	// ---- tensors ------------------------------------------------------------------------------
@@ -187,7 +194,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		call: KernelCall,
 		inputs: GpuTensor[],
 		shapes: number[][],
-		extra: Pick<Node, "act" | "fuse" | "ew" | "ln"> = {},
+		extra: Pick<Node, "act" | "fuse" | "ew" | "ln" | "conv" | "pad"> = {},
 		q8Input = -1,
 	): GpuTensor[] {
 		// resident int8 weights are only readable by the GEMM / conv weight loads (k-gemm.ts)
@@ -218,7 +225,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		call: KernelCall,
 		inputs: GpuTensor[],
 		shape: number[],
-		extra: Pick<Node, "act" | "fuse" | "ew" | "ln"> = {},
+		extra: Pick<Node, "act" | "fuse" | "ew" | "ln" | "conv" | "pad"> = {},
 		q8Input = -1,
 	): GpuTensor {
 		return this.node(call, inputs, [shape], extra, q8Input)[0];
@@ -733,11 +740,50 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		const shape = [p.N, p.Cout, p.Ho, p.Wo];
 		const dt = { x: x.dtype, w: w.dtype, b: b?.dtype ?? null };
 		const ins = [x, w, ...(b ? [b] : [])];
+		const direct = !transpose && p.Cout / p.groups < DIRECT_CONV_COG;
 		const make = (e: Epilogue) =>
-			!transpose && p.Cout / p.groups < DIRECT_CONV_COG
+			direct
 				? convDirectKernel(p, dt, e)
 				: convGemmKernel(transpose ? "convT" : "conv", p, dt, e);
-		return this.one(make(ep), ins, shape, ep ? {} : { fuse: fuser(make) }, 1);
+		// a plain GEMM conv may absorb its residual add and a replicate pad (fusion.ts fuseConv)
+		const fusable: ConvFusable | null =
+			direct || transpose || getKernelCaps().legacy
+				? null
+				: {
+						act: ep ? { op: ep.op, alpha: ep.alpha, beta: ep.beta } : null,
+						make: ({ residual, replicatePad }) =>
+							convGemmKernel(
+								"conv",
+								replicatePad
+									? {
+											...p,
+											H: p.H - 2 * replicatePad[0],
+											W: p.W - 2 * replicatePad[1],
+											ph: p.ph + replicatePad[0],
+											pw: p.pw + replicatePad[1],
+										}
+									: p,
+								dt,
+								fusable?.act
+									? {
+											op: fusable.act.op as UnaryPrim,
+											alpha: fusable.act.alpha,
+											beta: fusable.act.beta,
+										}
+									: null,
+								{ residual, replicate: replicatePad !== null },
+							),
+					};
+		return this.one(
+			make(ep),
+			ins,
+			shape,
+			{
+				...(ep ? {} : { fuse: fuser(make) }),
+				...(fusable ? { conv: fusable } : {}),
+			},
+			1,
+		);
 	}
 
 	pDeform(
@@ -1064,10 +1110,19 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		value: number,
 		out: number[],
 	) {
+		const plain =
+			mode === "replicate" &&
+			x.shape.length === 4 &&
+			pads[0][0] === 0 &&
+			pads[0][1] === 0 &&
+			pads[1][0] === 0 &&
+			pads[1][1] === 0 &&
+			x.dtype === "f32";
 		return this.one(
 			padKernel(x.dtype, x.shape, pads, mode, value, out),
 			[x],
 			out,
+			plain ? { pad: { height: pads[2], width: pads[3] } } : {},
 		);
 	}
 

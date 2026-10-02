@@ -29,6 +29,8 @@ if (!device) {
 	process.exit(0);
 }
 let gpu = new GpuNn(device);
+// the f32 passes check the f32 kernels; the f16 products pass below checks the shipped default (f16Math on)
+setKernelCaps({ f16Math: false });
 const cpu = new CpuNn();
 console.log(`nn-parity: f16 storage ${gpu.backend.f16 ? "yes" : "no"}`);
 
@@ -189,6 +191,31 @@ const cases: Case[] = [
 		shapes: [[2, 8, 17, 19], [16, 8, 3, 3], [16]],
 		weights: [1, 2],
 		fn: (nn, x, w, b) => nn.conv2d(x, w, b, { padding: 1 }),
+	},
+	// conv fusion (fusion.ts fuseConv): a replicate pad folded into the loads, a residual add folded into the store
+	{
+		name: "conv-replicate-pad-residual",
+		shapes: [[2, 16, 13, 17], [16, 16, 3, 3], [16], [16, 16, 3, 3], [16]],
+		weights: [1, 2, 3, 4],
+		fn: (nn, x, w, b, w2, b2) => {
+			const pad = (t: Tensor) => nn.pad(t, [1, 1, 1, 1], { mode: "replicate" });
+			const y = nn.relu(nn.conv2d(pad(nn.relu(x)), w, b));
+			return nn.add(x, nn.conv2d(pad(y), w2, b2));
+		},
+	},
+	{
+		name: "conv-grouped-act-residual",
+		shapes: [[1, 24, 11, 9], [24, 8, 3, 3], [24]],
+		weights: [1, 2],
+		fn: (nn, x, w, b) =>
+			nn.add(
+				nn.relu(
+					nn.conv2d(nn.pad(x, [1, 1, 1, 1], { mode: "replicate" }), w, b, {
+						groups: 3,
+					}),
+				),
+				x,
+			),
 	},
 	{
 		name: "conv-stride-dil",
@@ -1157,6 +1184,11 @@ if (!argv.includes("--no-f16") && gpu.backend.f16) await runPass(true);
 					"linear-big",
 					"matmul-transB",
 					"linear-8x4-bias-act",
+					"conv3x3",
+					"conv-stride-dil",
+					"conv-g4-wrap",
+					"conv-replicate-pad-residual",
+					"conv-grouped-act-residual",
 				]),
 			);
 			cases.forEach((c, i) => {

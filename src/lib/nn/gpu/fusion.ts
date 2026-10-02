@@ -15,10 +15,18 @@
 import { sameShape, stridesOf } from "../shape";
 import { type EwDesc, ewKernel } from "./k-elementwise";
 import { layerNormResidualKernel } from "./k-fused";
+import { getKernelCaps } from "./kernel-caps";
 import type { Node, Storage } from "./runtime";
 
-/** Storage buffer bindings a kernel may use (WebGPU default maxStorageBuffersPerShaderStage). */
-export const MAX_KERNEL_BUFFERS = 8;
+/** The default WebGPU maxStorageBuffersPerShaderStage; GpuNn raises the limit to the device's own. */
+export const DEFAULT_KERNEL_BUFFERS = 8;
+
+/**
+ * Storage buffer bindings a fused kernel may use (the parameter buffer included): the device's
+ * `maxStorageBuffersPerShaderStage`, set by GpuNn's constructor through kernel-caps (capped, a
+ * longer fused chain gains nothing past this).
+ */
+const kernelBuffers = () => getKernelCaps().maxStorageBuffers;
 
 type Graph = {
 	consumers: Map<Storage, number>;
@@ -81,8 +89,7 @@ export function fuseElementwise(nodes: Node[], outputs: Set<Storage>): Node[] {
 					sameShape(pd.shape, d.shape) &&
 					isContiguous(o.strides, d.shape) &&
 					singleAssignment(g, p) &&
-					tensorOps(d).length - 1 + tensorOps(pd).length <=
-						MAX_KERNEL_BUFFERS - 2
+					tensorOps(d).length - 1 + tensorOps(pd).length <= kernelBuffers() - 2
 				) {
 					c.ew = absorb(d, k, pd);
 					c.inputs = [
@@ -124,6 +131,83 @@ export function absorb(c: EwDesc, k: number, p: EwDesc): EwDesc {
 	};
 }
 
+/**
+ * Conv fusion (plain implicit-GEMM convs, `Node.conv`):
+ * - a replicate pad feeding only the conv folds into the conv's loads (clamped coordinates), so the
+ *   padded copy is never written;
+ * - the residual add after the conv (`ew` key bin-add over two contiguous same-shape tensors, one of
+ *   them the conv's output, consumed by nothing else) folds into the store: out = act(conv + bias) + res.
+ */
+export function fuseConv(nodes: Node[], outputs: Set<Storage>): Node[] {
+	if (getKernelCaps().legacy) return nodes;
+	const g = analyse(nodes);
+	const at = new Map(nodes.map((n, i) => [n, i]));
+	const dropped = new Set<Node>();
+	for (const c of nodes) {
+		const conv = c.conv;
+		if (!conv || dropped.has(c)) continue;
+		let replicatePad: [number, number] | null = null;
+		const xin = c.inputs[0];
+		const pn = soleProducer(g, xin);
+		if (
+			pn?.pad &&
+			!dropped.has(pn) &&
+			g.consumers.get(xin) === 1 &&
+			!outputs.has(xin) &&
+			pn.outputs.length === 1 &&
+			pn.pad.height[0] === pn.pad.height[1] &&
+			pn.pad.width[0] === pn.pad.width[1] &&
+			singleAssignment(g, pn) &&
+			(at.get(pn) as number) < (at.get(c) as number)
+		) {
+			replicatePad = [pn.pad.height[0], pn.pad.width[0]];
+			c.inputs = [pn.inputs[0], ...c.inputs.slice(1)];
+			dropped.add(pn);
+		}
+		const y = c.outputs[0];
+		let residual: Storage | null = null;
+		let add: Node | undefined;
+		if (c.outputs.length === 1 && g.consumers.get(y) === 1 && !outputs.has(y)) {
+			add = nodes.find(
+				(n) =>
+					!dropped.has(n) && n.ew?.key === "bin-add" && n.inputs.includes(y),
+			);
+			const d = add?.ew;
+			if (add && d && add.inputs.length === 2 && add.outputs.length === 1) {
+				const other = add.inputs[0] === y ? add.inputs[1] : add.inputs[0];
+				const shape = d.shape;
+				const op = tensorOps(d);
+				const rp = soleProducer(g, other);
+				if (
+					other !== y &&
+					op.length === 2 &&
+					op.every(
+						(o) => o.dtype === "f32" && isContiguous(o.strides, shape),
+					) &&
+					singleAssignment(g, add) &&
+					(g.producers.get(other)?.length ?? 0) <= 1 &&
+					(!rp || (at.get(rp) as number) < (at.get(c) as number)) &&
+					c.inputs.length + 1 + 1 + 1 <= kernelBuffers()
+				)
+					residual = other;
+				else add = undefined;
+			} else add = undefined;
+		}
+		if (!replicatePad && !residual) continue;
+		Object.assign(c, conv.make({ residual: residual !== null, replicatePad }));
+		c.fuse = undefined;
+		c.luma = undefined;
+		c.textures = undefined;
+		if (residual && add) {
+			c.inputs = [...c.inputs, residual];
+			c.outputs = [add.outputs[0]];
+			dropped.add(add);
+		}
+		c.conv = undefined;
+	}
+	return dropped.size ? nodes.filter((n) => !dropped.has(n)) : nodes;
+}
+
 export function fuseLayerNorm(nodes: Node[], outputs: Set<Storage>): Node[] {
 	const g = analyse(nodes);
 	const at = new Map(nodes.map((n, i) => [n, i]));
@@ -154,7 +238,7 @@ export function fuseLayerNorm(nodes: Node[], outputs: Set<Storage>): Node[] {
 		const emitSum = (g.consumers.get(x) ?? 0) > 1 || outputs.has(x);
 		const buffers =
 			1 + tensorOps(pd).length + params.length + (emitSum ? 2 : 1);
-		if (buffers > MAX_KERNEL_BUFFERS) continue;
+		if (buffers > kernelBuffers()) continue;
 		Object.assign(p, layerNormResidualKernel(pd, ln, emitSum));
 		p.inputs = [...p.inputs, ...params];
 		p.outputs = emitSum ? [l.outputs[0], x] : [l.outputs[0]];

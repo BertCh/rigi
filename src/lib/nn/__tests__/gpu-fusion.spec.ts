@@ -8,7 +8,12 @@
 
 import type { Device } from "@luma.gl/core";
 import { describe, expect, it } from "vitest";
-import { absorb, fuseElementwise, fuseLayerNorm } from "../gpu/fusion";
+import {
+	absorb,
+	fuseConv,
+	fuseElementwise,
+	fuseLayerNorm,
+} from "../gpu/fusion";
 import {
 	type EwDesc,
 	ewKernel,
@@ -18,7 +23,10 @@ import {
 	unaryKernel,
 } from "../gpu/k-elementwise";
 import { layerNormResidualKernel } from "../gpu/k-fused";
+import { convGemmKernel } from "../gpu/k-gemm";
+import { setKernelCaps } from "../gpu/kernel-caps";
 import { type Node, nodeLabel, Runtime, Storage } from "../gpu/runtime";
+import type { ConvParams } from "../shape";
 import { stridesOf } from "../shape";
 
 const st = (bytes = 4) => new Storage(bytes, "f32", null);
@@ -259,5 +267,86 @@ describe("runtime helpers", () => {
 			}),
 		).rejects.toThrow("boom");
 		await expect(rt.enqueue(() => 2)).resolves.toBe(2);
+	});
+});
+
+describe("fuseConv", () => {
+	const params = (H: number, W: number, ph: number): ConvParams => ({
+		N: 1,
+		Cin: 8,
+		H,
+		W,
+		Cout: 8,
+		kh: 3,
+		kw: 3,
+		sh: 1,
+		sw: 1,
+		ph,
+		pw: ph,
+		dh: 1,
+		dw: 1,
+		groups: 1,
+		Ho: 6,
+		Wo: 6,
+		dg: 1,
+		oph: 0,
+		opw: 0,
+	});
+	const dt = { x: "f32", w: "f32", b: "f32" } as const;
+	/** a pad(replicate 1) -> conv -> add(residual) chain over [1, 8, 6, 6] */
+	function chain() {
+		const [x, padded, w, b, y, res, out] = [8, 8, 8, 8, 8, 8, 8].map((n) =>
+			st(n),
+		);
+		const padNode: Node = {
+			...unaryKernel("relu", "f32", 1, 0, 0),
+			inputs: [x],
+			outputs: [padded],
+			pad: { height: [1, 1], width: [1, 1] },
+		};
+		const base = params(8, 8, 0);
+		const conv: Node = {
+			...convGemmKernel("conv", base, dt, null),
+			inputs: [padded, w, b],
+			outputs: [y],
+			conv: {
+				act: null,
+				make: ({ residual, replicatePad }) =>
+					convGemmKernel(
+						"conv",
+						replicatePad ? params(6, 6, 1) : base,
+						dt,
+						null,
+						{ residual, replicate: replicatePad !== null },
+					),
+			},
+		};
+		const add = binary("add", [1, 8, 6, 6], y, res, out);
+		return { x, res, out, nodes: [padNode, conv, add] };
+	}
+	it("folds the replicate pad and the residual add into the conv", () => {
+		const { x, res, out, nodes } = chain();
+		const fused = fuseConv(nodes, new Set([out]));
+		expect(fused).toHaveLength(1);
+		expect(fused[0].inputs[0]).toBe(x);
+		expect(fused[0].inputs.at(-1)).toBe(res);
+		expect(fused[0].outputs).toEqual([out]);
+		expect(fused[0].spec?.id).toContain("-res-rep");
+	});
+	it("keeps the pad when its output is a forward output and the add when the conv output is shared", () => {
+		const { nodes, out } = chain();
+		const [padNode, conv] = nodes;
+		const kept = fuseConv(
+			nodes,
+			new Set([out, padNode.outputs[0], conv.outputs[0]]),
+		);
+		expect(kept).toHaveLength(3);
+	});
+	it("honours the legacy switch and the device's binding limit", () => {
+		setKernelCaps({ legacy: true });
+		expect(fuseConv(chain().nodes, new Set())).toHaveLength(3);
+		setKernelCaps({ legacy: false, maxStorageBuffers: 4 });
+		expect(fuseConv(chain().nodes, new Set())).toHaveLength(2);
+		setKernelCaps({ maxStorageBuffers: 8 });
 	});
 });

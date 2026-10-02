@@ -84,11 +84,13 @@ export function nnKernel(
 	textures: string[] = [],
 	/** element type override by binding name (e.g. `u32` for sort keys); such inputs have no ld_<name>() */
 	elem: Record<string, string> = {},
+	/** the body uses f16 arithmetic although no input is f16 storage */
+	needsF16 = false,
 ): KernelSpec {
 	const id = `nn/${key}|${inputs.map((i) => i.dtype).join(",")}`;
 	let s = specs.get(id);
 	if (s) return s;
-	const f16 = inputs.some((i) => i.dtype === "f16");
+	const f16 = needsF16 || inputs.some((i) => i.dtype === "f16");
 	let src = f16 ? "enable f16;\n" : "";
 	let b = 0;
 	src += `@group(0) @binding(${b++}) var<storage, read> M: array<u32>;\n`;

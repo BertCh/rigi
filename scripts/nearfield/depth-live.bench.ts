@@ -8,7 +8,7 @@
 // the scale), mask IoU, focal. Photos are pre-decoded like depth-weights-eval.ts: `--dir` holds
 // index.json ([{ name, W, H }]) and <name>.rgb (RGB8 at W × H); each tier resizes (bilinear) on the CPU.
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/nearfield/depth-live.bench.ts --dir <dir> [--runs 7] [--ref fp16|q8]
-//     [--quality-photos 24] [--only parity|time|quality|focal] [--json out.json]
+//     [--quality-photos 24] [--only parity|time|quality|focal|f16] [--json out.json]
 
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -25,6 +25,7 @@ import {
 } from "../../src/lib/nearfield/local/depth-net";
 import { focalFromVfov } from "../../src/lib/nearfield/local/focal-shift";
 import { GpuNn } from "../../src/lib/nn/gpu/gpu-nn";
+import { setKernelCaps } from "../../src/lib/nn/gpu/kernel-caps";
 import { dawnDevice } from "../nn/dawn";
 
 const argv = process.argv.slice(2);
@@ -472,6 +473,114 @@ if (only === "focal") {
 	console.log(`liveFast, ${per.get("net focal")?.med.length} photos`);
 	console.table(rows);
 	result.focal = { refFocalVsExif: median(refFocalVsExif), rows };
+}
+
+if (only === "f16") {
+	// f16 GEMM / conv products (and f16 accumulation) against the same net in f32, per photo: raw depth
+	// median |b/a - 1| (no scale alignment), scale-aligned median and p90, mask IoU, focal
+	const setups: [string, Config][] = [
+		["q8 1200 pm", cfg("q8", 1200, 4, false, false)],
+		...Object.entries(DEPTH_LIVE_PRESETS).map(
+			([name, preset]): [string, Config] => [
+				`preset ${name}`,
+				{
+					...cfg(
+						preset.weights,
+						preset.tokens,
+						preset.headStopLevel,
+						preset.batchedHeads,
+						preset.normals,
+					),
+					label: `preset ${name}`,
+				},
+			],
+		),
+	];
+	const rows: Record<string, unknown>[] = [];
+	for (const [name, c] of setups) {
+		const net = await netFor(c.weights);
+		const composeWith = async (p: Photo) => {
+			const { image, o } = await forward(net, p, c);
+			const [z, mask, points64, mask64, scale] = await Promise.all([
+				nn.read(o.z),
+				nn.read(o.mask),
+				nn.read(o.points64),
+				nn.read(o.mask64),
+				nn.read(o.metricScale),
+			]);
+			release(image, o);
+			return composeDepth(
+				{
+					width: p.W,
+					height: p.H,
+					z,
+					mask,
+					normal: null,
+					points64,
+					mask64,
+					focalGrid: FOCAL_GRID,
+					metricScale: scale[0],
+				},
+				c.weights,
+			);
+		};
+		setKernelCaps({ f16Math: false, f16Accumulate: false });
+		const refs = new Map<string, Awaited<ReturnType<typeof composeWith>>>();
+		for (const p of photos) refs.set(p.name, await composeWith(p));
+		for (const [mode, caps] of [
+			["f16", { f16Math: true, f16Accumulate: false }],
+			["f16acc", { f16Math: true, f16Accumulate: true }],
+		] as const) {
+			setKernelCaps(caps);
+			const per: Record<string, number[]> = {
+				raw: [],
+				aligned: [],
+				p90: [],
+				iou: [],
+				focal: [],
+			};
+			for (const p of photos) {
+				const a = refs.get(p.name) as NonNullable<ReturnType<typeof refs.get>>;
+				const b = await composeWith(p);
+				const ratio: number[] = [];
+				let inter = 0;
+				let union = 0;
+				for (let k = 0; k < a.depth.length; k++) {
+					if (a.valid[k] || b.valid[k]) union++;
+					if (a.valid[k] && b.valid[k]) {
+						inter++;
+						if (k % 3 === 0) ratio.push(b.depth[k] / a.depth[k]);
+					}
+				}
+				const r0 = quantile(ratio, 0.5);
+				const al = ratio.map((r) => Math.abs(r / r0 - 1));
+				per.raw.push(
+					quantile(
+						ratio.map((r) => Math.abs(r - 1)),
+						0.5,
+					),
+				);
+				per.aligned.push(quantile(al, 0.5));
+				per.p90.push(quantile(al, 0.9));
+				per.iou.push(union ? inter / union : 1);
+				per.focal.push(Math.abs(b.focal / a.focal - 1));
+			}
+			setKernelCaps({ f16Math: false, f16Accumulate: false });
+			rows.push({
+				config: name,
+				mode,
+				rawDepthMedRel: +median(per.raw).toFixed(5),
+				rawWorst: +Math.max(...per.raw).toFixed(5),
+				alignedMedRel: +median(per.aligned).toFixed(5),
+				alignedP90Rel: +median(per.p90).toFixed(5),
+				maskIoUMin: +Math.min(...per.iou).toFixed(4),
+				focalRelMedian: +median(per.focal).toFixed(5),
+				focalRelWorst: +Math.max(...per.focal).toFixed(5),
+			});
+			console.log(rows[rows.length - 1]);
+		}
+	}
+	result.f16 = rows;
 }
 
 const json = arg("--json");
