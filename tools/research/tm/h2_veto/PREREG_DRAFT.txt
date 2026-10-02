@@ -1,0 +1,75 @@
+H2 — veto threshold rule on DEV (TM program, roadmap R2 + N4)                 DRAFT, NOT FROZEN
+Status: written 2026-10-02 before any H1 verdict exists. Becomes binding only when the owner signs off and runs
+`npx tsx tools/research/tm/h2_veto/run.ts --freeze` (writes FROZEN.json = sha1 of rule.json + UTC time). Nothing below
+may be edited after that; a change needs a new prereg. Everything the evaluator needs to refuse is enforced in code
+(lib.ts), covered by __tests__/h2.spec.ts on synthetic fixtures.
+
+QUESTION
+Can a written, label-free-calibrated veto reject confident-wrong poses (the hard negatives H1 mines) and the E1 displaced-
+eye decoys while killing none of the verified-correct dev poses? Precision over recall: a veto may only remove an accept,
+never add one. Nothing here changes what production accepts; a PASS only licenses a v3 prereg row (R6).
+
+INPUTS (all DEV; the code refuses any id outside tools/bench/split.json "dev", and any feature key with a non-dev photo id)
+ (a) h1-hardneg/1 from tools/research/tm/h1_mine/verify/score_verdicts.ts: hard negatives in the protocol's 3-way split
+     (blind-wrong / wrong-construct / inherited-wrong) and the verified-correct dev poses (blind-correct, inherited-correct,
+     positive controls the verifiers confirmed). Its generatedAt must be later than FROZEN.json frozenAt.
+ (b) one h2-feature/1 file per feature (schema in lib.ts: {schema, feature, version, direction, values{hypKey->number|null},
+     repeats?{hypKey->number[]}}). hypKey = the H1 hypothesis id without its source prefix, e.g. wc_0001_k000.
+     Features (producers compute them; this evaluator computes nothing and downloads nothing):
+       moge_depth_agreement   higher is better. Ordinal/rank agreement of MoGe-2 relative depth of the photo with the DEM depth
+                              rendered at the candidate pose (X2 "rank_all"-style statistic, defined by the producer in the file's version).
+       pnp_shift              lower is better. |pose change| in degrees when the candidate's 2D-3D inliers are re-solved by PnP
+                              (tools/research/geo REPORT_PNP convention).
+       three_strip_agreement  lower is better. Max pairwise yaw disagreement (deg) of the three vertical-strip solves.
+       xoftr_depth            higher is better. Fraction of XoFTR-lifted matches whose lifted depth agrees with the candidate geometry.
+       ga5_integrity          1 = solution-separation integrity + viewshed pass, 0 = fail (adapt_ga5.ts wires out/geocam/ga5/hyps.json;
+                              rule frozen in tools/research/geo/PROTOCOL.txt SECTION GA5). Fixed threshold 0.5, descriptive only.
+       basin_gap              higher is better. pipeline.basin_gap gap (N4), with >= 3 independent re-runs in `repeats`.
+ (c) h2-decoys/1: the 56 FUND E1 displaced-eye decoys (NE-dec, distance >= 150 m, non-secondary), from adapt_ga5.ts over
+     out/geocam/decoys. REQUIRED pass set: the evaluator refuses without it (fewer than criteria.minDecoys = 56 also refuses).
+     Each decoy needs a value in every primary feature; a missing value is "not vetoed" and counts against the pass.
+
+THRESHOLDS (rule.json; no negative label is read to set them)
+ - Calibrated features: tau = the worst value among verified-correct poses of ODD photo ids (the X2 veto.py convention);
+   calibration kills nothing on odd ids by construction. Held-out check = verified-correct poses of EVEN ids.
+   Refuses with < 10 calibration points. veto if value < tau (higher-is-better) or > tau (lower-is-better).
+ - ga5_integrity: fixed 0.5 (a boolean). Optional features without a file, or that cannot be calibrated, are skipped and listed.
+ - Missing value = no veto (a veto never fires on something unmeasured).
+
+COMBINATION (one primary decides; the rest are reported only)
+ - primary "any-of-geometry-4": veto if ANY of moge_depth_agreement, pnp_shift, three_strip_agreement, xoftr_depth vetoes.
+ - descriptive: each feature alone, basin-gap alone, ga5 alone, and 2-of-5 (4 geometry features + ga5).
+   GA5 is a candidate only: it rejected a large share of correct poses on the E1 set (reports/negative-results.md GA5), so it is
+   never in the primary; its row is there so the panel can see whether 2-of-5 changes that.
+
+PASS CRITERIA (all must hold for the primary; fixed here, owner may change them BEFORE freezing)
+ 1. Hard negatives >= 30 (code floor, also enforced when a rule says less).
+ 2. Decoys vetoed >= 95% (point estimate; Wilson 95% interval reported, not decisive).
+ 3. Verified-correct poses vetoed: 0 on the held-out EVEN ids and 0 overall (the "kill 0 verified-correct HIGHs" requirement;
+    H1's verified-correct set is the proxy because HIGH status is not stored with the labels).
+ 4. Hard negatives vetoed >= 50% (utility floor; a rule that vetoes nothing is not a result).
+ 5. Repeat noise: for a primary feature carrying repeats, <= 5% of items may have a repeat range straddling tau.
+ Reported with Wilson 95% intervals: hard negatives by source (3-way split), decoys, correct kills (all / even / odd), missing counts.
+ FAIL is a real negative: record it in reports/negative-results.md; do not retune tau, features or criteria on these labels.
+ OWNER DECISIONS: (i) criteria 2 and 4 thresholds (0.95, 0.5 are proposals); (ii) merge rule for the H1 dual verifiers
+ (protocol "wrong if either" is the default; --strict makes disagreement unsure; pick before scoring and state it here);
+ (iii) whether decoys with a truth-geometry misfit under 15 px (E1 post-hoc near-misses) are dropped (default: no, all 56 count).
+
+N4 — BASIN-GAP RE-DERIVATION (same run, no extra labels)
+ v034's 0.20 was tuned on verdicts that later flipped and sits inside run-to-run noise (roadmap N4). Procedure:
+ 1. Producer computes basin_gap for every H1 hard negative, verified-correct pose and decoy, three times independently
+    (>= 3 `repeats`), fresh worker per repeat.
+ 2. The evaluator reports tau_gap = the worst verified-correct odd-id gap, the straddle share of items whose repeats cross tau_gap,
+    and the median within-item repeat sd (result.straddle.basin_gap), plus basin-gap-alone veto rates on all three negative sets.
+ 3. Decision: keep 0.20 only if tau_gap <= 0.20 AND straddle share <= 5%; if tau_gap > 0.20 the new threshold is tau_gap (held-out
+    check applies); if the straddle share is above 5%, the gap is declared unusable as a threshold and v3 keeps EXIF-GPS-or-eye-
+    not-moved without a gap clause. The basin gap does not enter the primary veto either way.
+
+RUN (after H1 scoring; HUMAN_RUN.txt in ../h1_mine/verify covers the labels)
+ npx tsx tools/research/tm/h2_veto/adapt_ga5.ts --decoys out/geocam/decoys --ga5 out/geocam/ga5/hyps.json --out <dir>
+ (put the other feature files in <dir>/features/)
+ npx tsx tools/research/tm/h2_veto/run.ts --hardneg hardneg.json --decoys <dir>/decoys.json --features <dir>/features --out result.json
+ Exit 0 = PASS, 1 = FAIL, 2 = refused (reason on stderr). --allow-unfrozen gives a DRAFT dry run, stamped draft:true.
+
+NOT IN SCOPE: test ids and tools/bench/data_v3; any change to production accept; running models (producers do that, under their
+own locks). Anything decided after seeing labels is labelled post hoc.

@@ -1,0 +1,30 @@
+{
+ "schema": "h2-rule/1",
+ "features": [
+  { "name": "moge_depth_agreement", "direction": "higher-is-better", "threshold": { "kind": "calibrate-min-correct-odd" }, "minCalibrationPoints": 10 },
+  { "name": "pnp_shift", "direction": "lower-is-better", "threshold": { "kind": "calibrate-min-correct-odd" }, "minCalibrationPoints": 10 },
+  { "name": "three_strip_agreement", "direction": "lower-is-better", "threshold": { "kind": "calibrate-min-correct-odd" }, "minCalibrationPoints": 10 },
+  { "name": "xoftr_depth", "direction": "higher-is-better", "threshold": { "kind": "calibrate-min-correct-odd" }, "minCalibrationPoints": 10 },
+  { "name": "ga5_integrity", "direction": "higher-is-better", "threshold": { "kind": "fixed", "tau": 0.5 } },
+  { "name": "basin_gap", "direction": "higher-is-better", "threshold": { "kind": "calibrate-min-correct-odd" }, "minCalibrationPoints": 10 }
+ ],
+ "primary": { "name": "any-of-geometry-4", "kind": "any", "features": ["moge_depth_agreement", "pnp_shift", "three_strip_agreement", "xoftr_depth"] },
+ "descriptive": [
+  { "name": "moge", "kind": "single", "features": ["moge_depth_agreement"] },
+  { "name": "pnp", "kind": "single", "features": ["pnp_shift"] },
+  { "name": "strips", "kind": "single", "features": ["three_strip_agreement"] },
+  { "name": "xoftr", "kind": "single", "features": ["xoftr_depth"] },
+  { "name": "ga5", "kind": "single", "features": ["ga5_integrity"] },
+  { "name": "basin-gap", "kind": "single", "features": ["basin_gap"] },
+  { "name": "2-of-5", "kind": "k-of-n", "k": 2, "features": ["moge_depth_agreement", "pnp_shift", "three_strip_agreement", "xoftr_depth", "ga5_integrity"] }
+ ],
+ "criteria": {
+  "minHardNegatives": 30,
+  "minDecoys": 56,
+  "decoyVetoRateMin": 0.95,
+  "maxCorrectKillsHeldOut": 0,
+  "maxCorrectKillsAll": 0,
+  "hardNegVetoRateMin": 0.5,
+  "maxThresholdStraddleFrac": 0.05
+ }
+}
