@@ -2,25 +2,22 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { MOTION } from "../motion";
 import type { GipfelbuchPeak, GipfelbuchPhotoData } from "../real";
 import {
-	BEAT_MS,
 	coneFitBox,
-	DRAW_MS,
+	declutterRim,
 	followMode,
 	footprintRuns,
-	LEAD_MS,
 	mapPeakSet,
 	mixHex,
 	peakInk,
-	REPLAY_FADE_MS,
-	RESULT_HOLD,
+	placeNamed,
 	rayDraw,
-	SWEEP_MS,
+	SEARCH_LOOP_MS,
 	searchT,
-	splitByCone,
-	wrap180,
 } from "../story-map";
 
 const peak = (
@@ -131,32 +128,6 @@ describe("footprintRuns", () => {
 	});
 });
 
-describe("splitByCone", () => {
-	it("covers every point and keeps the inside part in the cone", () => {
-		const profile = Array.from({ length: 41 }, (_, i) => ({
-			az: i - 20,
-			d: 3000,
-		}));
-		const runs = footprintRuns(fake([], profile));
-		expect(runs).toHaveLength(1);
-		const { inside, outside } = splitByCone(runs, 0, 10);
-		expect(inside).toHaveLength(1);
-		expect(outside).toHaveLength(2);
-		for (const az of inside[0].azs.slice(1, -1))
-			expect(Math.abs(wrap180(az))).toBeLessThanOrEqual(5);
-		const total = [...inside, ...outside].reduce((n, r) => n + r.pts.length, 0);
-		expect(total).toBe(41 + 4); // four shared boundary points
-	});
-	it("wraps across north", () => {
-		const profile = Array.from({ length: 21 }, (_, i) => ({
-			az: (350 + i) % 360,
-			d: 3000,
-		}));
-		const { inside } = splitByCone(footprintRuns(fake([], profile)), 0, 10);
-		expect(inside).toHaveLength(1);
-	});
-});
-
 describe("peakInk, rayDraw, followMode", () => {
 	it("mixes the guess ink to the solved ink inside the cone, null outside", () => {
 		expect(peakInk(0.5, false)).toBeNull();
@@ -182,15 +153,24 @@ describe("peakInk, rayDraw, followMode", () => {
 	it("staggers rays by rank", () => {
 		expect(rayDraw(0.9, 5, 6)).toBeLessThan(rayDraw(0.9, 0, 6));
 	});
-	it("follows a run of small fast steps at once and settles on a jump", () => {
+	it("follows any stream of fast updates at once, even with big steps", () => {
 		expect(
 			followMode({ target: 0.5, at: 1000 }, { target: 0.53, at: 1016 }),
 		).toBe("instant");
-		expect(followMode({ target: 0, at: 1000 }, { target: 1, at: 1016 })).toBe(
+		// a fast drag: 0.1 steps 16 ms apart
+		expect(
+			followMode({ target: 0.5, at: 1000 }, { target: 0.6, at: 1016 }),
+		).toBe("instant");
+		expect(
+			followMode({ target: 0.5, at: 1000 }, { target: 0.52, at: 1400 }),
+		).toBe("instant");
+	});
+	it("settles on a lone jump", () => {
+		expect(followMode({ target: 0, at: 1000 }, { target: 1, at: 1400 })).toBe(
 			"settle",
 		);
 		expect(
-			followMode({ target: 0.5, at: 1000 }, { target: 0.52, at: 1400 }),
+			followMode({ target: 0.5, at: 1000 }, { target: 0.6, at: 1200 }),
 		).toBe("settle");
 	});
 });
@@ -216,44 +196,144 @@ describe("coneFitBox", () => {
 			prior: { yaw: 0, hfov: 340 },
 			solved: { yaw: 0, hfov: 340 },
 		});
-		expect(coneFitBox(wide, 4 / 3)).toEqual({ x: 0, y: 50, w: 400, h: 300 });
+		const b = coneFitBox(wide, 4 / 3);
+		expect(b.w).toBe(400);
+		expect(b.h).toBeCloseTo(300, 6);
+		expect(b.y).toBeGreaterThanOrEqual(0);
+		expect(b.y + b.h).toBeLessThanOrEqual(400 + 1e-9);
 	});
 });
 
 describe("searchT", () => {
-	it("runs lead, sweep, hold, fade and loops", () => {
-		const hold = BEAT_MS * RESULT_HOLD;
-		const total = LEAD_MS + SWEEP_MS + hold + REPLAY_FADE_MS;
-		expect(searchT(0)).toEqual({ t: 0, phase: "lead", fade: 0, rays: 0 });
-		expect(searchT(LEAD_MS + 1).phase).toBe("sweep");
-		const held = searchT(LEAD_MS + SWEEP_MS + 10);
-		expect(held).toMatchObject({ t: 1, phase: "hold", fade: 0 });
+	const hold = MOTION.beat * MOTION.resultHold;
+	const lead0 = MOTION.replayFade;
+	const sweep0 = lead0 + MOTION.lead;
+	const hold0 = sweep0 + MOTION.sweep;
+	const out0 = hold0 + hold;
+	it("runs fadeIn, lead, sweep, hold, fadeOut and loops", () => {
+		expect(SEARCH_LOOP_MS).toBe(out0 + MOTION.replayFade);
+		expect(searchT(0)).toEqual({ t: 0, phase: "fadeIn", opacity: 0, rays: 0 });
+		expect(searchT(MOTION.replayFade / 2)).toMatchObject({
+			phase: "fadeIn",
+			opacity: 0.5,
+			t: 0,
+		});
+		expect(searchT(lead0 + 1).phase).toBe("lead");
+		expect(searchT(sweep0 + 1).phase).toBe("sweep");
+		const held = searchT(hold0 + 10);
+		expect(held).toMatchObject({ t: 1, phase: "hold", opacity: 1 });
 		expect(held.rays).toBeGreaterThan(0);
 		expect(held.rays).toBeLessThan(0.1);
-		expect(searchT(LEAD_MS + SWEEP_MS + DRAW_MS + 1).rays).toBe(1);
-		const mid = searchT(LEAD_MS + SWEEP_MS + hold + REPLAY_FADE_MS / 2);
-		expect(mid.phase).toBe("fade");
-		expect(mid.fade).toBeCloseTo(0.5, 6);
-		expect(searchT(total + 5).phase).toBe("lead");
+		expect(searchT(hold0 + MOTION.draw + 1).rays).toBe(1);
+		const mid = searchT(out0 + MOTION.replayFade / 2);
+		expect(mid.phase).toBe("fadeOut");
+		expect(mid.opacity).toBeCloseTo(0.5, 6);
+		expect(searchT(SEARCH_LOOP_MS + 5).phase).toBe("fadeIn");
 	});
-	it("keeps the rays off through the sweep's overshoot and on through the fade", () => {
-		for (let ms = 0; ms < LEAD_MS + SWEEP_MS; ms += 25)
-			expect(searchT(ms).rays).toBe(0);
-		expect(searchT(LEAD_MS + SWEEP_MS + BEAT_MS * RESULT_HOLD + 10).rays).toBe(
-			1,
-		);
+	it("is continuous in opacity across the loop wrap", () => {
+		const end = searchT(SEARCH_LOOP_MS - 0.001).opacity;
+		const start = searchT(SEARCH_LOOP_MS).opacity;
+		expect(Math.abs(end - start)).toBeLessThan(1e-3);
 	});
-	it("starts at the guess, overshoots past it and settles at the solved pose", () => {
-		expect(searchT(LEAD_MS).t).toBeCloseTo(0, 6);
+	it("keeps the rays off through the sweep's overshoot and on through the fade out", () => {
+		for (let ms = 0; ms < hold0; ms += 25) expect(searchT(ms).rays).toBe(0);
+		expect(searchT(out0 + 10).rays).toBe(1);
+	});
+	it("starts the sweep at the guess, overshoots past the solved pose and settles on it", () => {
+		expect(searchT(sweep0).t).toBeCloseTo(0, 6);
 		let lo = 1;
 		let hi = 0;
-		for (let ms = LEAD_MS; ms < LEAD_MS + SWEEP_MS; ms += 20) {
+		for (let ms = sweep0; ms < hold0; ms += 20) {
 			const { t } = searchT(ms);
 			lo = Math.min(lo, t);
 			hi = Math.max(hi, t);
 		}
 		expect(lo).toBeGreaterThanOrEqual(0);
 		expect(hi).toBeGreaterThan(1);
-		expect(searchT(LEAD_MS + SWEEP_MS - 1).t).toBeCloseTo(1, 1);
+		expect(searchT(hold0 - 1).t).toBeCloseTo(1, 1);
+	});
+});
+
+// ---- real data: the tracked demo JSONs ----
+
+const DEMOS = Array.from({ length: 12 }, (_, i) => {
+	const id = `demo-${String(i + 1).padStart(2, "0")}`;
+	return JSON.parse(
+		readFileSync(`public/demo/gipfelbuch/${id}.json`, "utf8"),
+	) as GipfelbuchPhotoData;
+});
+
+describe("placeNamed and declutterRim", () => {
+	it("places every named peak: exact inside the square, on the rim beyond it", () => {
+		let rimmed = 0;
+		for (const d of DEMOS) {
+			const { named } = mapPeakSet(d);
+			const placed = placeNamed(d, named);
+			expect(placed).toHaveLength(named.length);
+			for (const q of placed) {
+				expect(q.x).toBeGreaterThanOrEqual(0);
+				expect(q.x).toBeLessThanOrEqual(400);
+				expect(q.y).toBeGreaterThanOrEqual(0);
+				expect(q.y).toBeLessThanOrEqual(400);
+				if (q.rim) {
+					rimmed++;
+					expect(Math.hypot(q.x - 200, q.y - 200)).toBeCloseTo(184, 6);
+				}
+			}
+		}
+		expect(rimmed).toBeGreaterThan(0);
+	});
+	it("keeps the rim points on the peak's bearing", () => {
+		const d = DEMOS[2];
+		for (const q of placeNamed(d, mapPeakSet(d).named).filter((r) => r.rim)) {
+			const az = (Math.atan2(q.x - 200, -(q.y - 200)) * 180) / Math.PI;
+			expect(Math.abs(((az - q.p.az + 540) % 360) - 180)).toBeLessThan(1e-6);
+			expect(q.km).toBe(Math.round(q.p.distance / 1000));
+		}
+	});
+	it("drops the label, never the peak, of rim points closer than the gap", () => {
+		const mk = (name: string, az: number): GipfelbuchPeak =>
+			peak(name, null, null, { az, distance: 90000 });
+		const d = fake([], [], { demPatch: { halfKm: 5 } });
+		const placed = placeNamed(d, [mk("A", 0), mk("B", 2), mk("C", 90)]);
+		const out = declutterRim(placed, 16);
+		expect(out).toHaveLength(3);
+		expect(out.map((q) => q.label)).toEqual([true, false, true]);
+		expect(declutterRim(placed, 1).every((q) => q.label)).toBe(true);
+	});
+	it("labels inside peaks untouched", () => {
+		const d = fake([], [], { demPatch: { halfKm: 5 } });
+		const near = peak("N", null, null, { az: 10, distance: 1000 });
+		const [q] = declutterRim(placeNamed(d, [near]));
+		expect(q.rim).toBe(false);
+		expect(q.label).toBe(true);
+	});
+});
+
+describe("coneFitBox on the demo photos", () => {
+	it("crops at least 4 of 12 and holds the camera and the solved cone tip", () => {
+		let cropped = 0;
+		for (const d of DEMOS) {
+			const b = coneFitBox(d, 4 / 3);
+			if (b.w < 399 || b.h < 399) cropped++;
+			expect(b.x).toBeGreaterThanOrEqual(-1e-9);
+			expect(b.y).toBeGreaterThanOrEqual(-1e-9);
+			expect(b.x + b.w).toBeLessThanOrEqual(400 + 1e-9);
+			expect(b.y + b.h).toBeLessThanOrEqual(400 + 1e-9);
+			const inBox = (x: number, y: number) =>
+				x >= b.x - 1e-6 &&
+				x <= b.x + b.w + 1e-6 &&
+				y >= b.y - 1e-6 &&
+				y <= b.y + b.h + 1e-6;
+			expect(inBox(200, 200)).toBe(true);
+			// the solved cone's centre line, at the same reach the box uses
+			const half = d.demPatch.halfKm * 1000;
+			const r = (Math.min(half * 1.6, 0.92 * half) * 400) / (2 * half);
+			const a = (d.solved.yaw * Math.PI) / 180;
+			// only when the whole box could hold it (a fallback crop may cut a very wide cone)
+			if (b.w < 399 || b.h < 399)
+				expect(inBox(200 + Math.sin(a) * r, 200 - Math.cos(a) * r)).toBe(true);
+		}
+		expect(cropped).toBeGreaterThanOrEqual(4);
 	});
 });

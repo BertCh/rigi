@@ -2,45 +2,23 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mixHex as mixHexRaw } from "./ground";
 import { LAYER_INKS } from "./inks";
+import { ease, MOTION } from "./motion";
 import { demToPx, type GipfelbuchPeak, type GipfelbuchPhotoData } from "./real";
 
 // Pure logic of StoryMap (viz/StoryMap.tsx): which peaks the map names, the skyline footprint on the
 // DEM patch, the ray draw-on, how the map follows its story, the cone fit for minis and the search
 // loop clock. No React, so every rule is specced in __tests__/story-map.spec.ts.
 
-// Motion constants, named after the grammar tokens (reports/gipfelbuch-explainers-2026-10-02/grammar.md).
-// Swap to imports from ./motion when it lands.
-/** MOTION.settle */
-export const SETTLE_MS = 620;
-/** MOTION.sweep */
-export const SWEEP_MS = 4200;
-export const LEAD_MS = 80;
-export const BEAT_MS = 2800;
-export const RESULT_HOLD = 1.6;
-export const REPLAY_FADE_MS = 450;
-export const QUICK_MS = 160;
-/** MOTION.draw */
-export const DRAW_MS = 900;
-/** ease.out */
-export const easeOut = (t: number) => 1 - (1 - t) ** 3;
-
 /** DemPatch's square viewBox side. */
 export const MAP_SIZE = 400;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 export const wrap180 = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
 
-export function mixHex(a: string, b: string, t: number): string {
-	const c = (h: string, i: number) => Number.parseInt(h.slice(i, i + 2), 16);
-	const u = clamp01(t);
-	return `#${[1, 3, 5]
-		.map((i) =>
-			Math.round(c(a, i) + (c(b, i) - c(a, i)) * u)
-				.toString(16)
-				.padStart(2, "0"),
-		)
-		.join("")}`;
-}
+/** One implementation (ground.ts), behind a clamp on t. */
+export const mixHex = (a: string, b: string, t: number) =>
+	mixHexRaw(a, b, clamp01(t));
 
 type Crop = [number, number, number, number];
 
@@ -132,52 +110,6 @@ export function footprintRuns(
 	return runs;
 }
 
-/** The parts of `runs` inside and outside the view cone; the boundary point is shared by both sides. */
-export function splitByCone(
-	runs: FootprintRun[],
-	yaw: number,
-	hfov: number,
-): { inside: FootprintRun[]; outside: FootprintRun[] } {
-	const inside: FootprintRun[] = [];
-	const outside: FootprintRun[] = [];
-	const isIn = (az: number) => Math.abs(wrap180(az - yaw)) <= hfov / 2;
-	for (const run of runs) {
-		let part: FootprintRun | null = null;
-		let partIn = false;
-		const close = () => {
-			if (part && part.pts.length >= 2) (partIn ? inside : outside).push(part);
-			part = null;
-		};
-		run.pts.forEach((pt, i) => {
-			const az = run.azs[i];
-			const here = isIn(az);
-			if (part && here !== partIn) {
-				part.pts.push(pt);
-				part.azs.push(az);
-				part.az1 = az;
-				close();
-				const last = run.pts[i - 1];
-				part = {
-					pts: [last],
-					azs: [run.azs[i - 1]],
-					az0: run.azs[i - 1],
-					az1: run.azs[i - 1],
-				};
-				partIn = here;
-			}
-			if (!part) {
-				part = { pts: [], azs: [], az0: az, az1: az };
-				partIn = here;
-			}
-			part.pts.push(pt);
-			part.azs.push(az);
-			part.az1 = az;
-		});
-		close();
-	}
-	return { inside, outside };
-}
-
 /** A named peak's ink inside the live cone: the guess layer's RM at t = 0, the solved layer's ink at 1. null = outside, pencil. */
 export function peakInk(t: number, inside: boolean): string | null {
 	return inside
@@ -191,14 +123,75 @@ export function rayDraw(t: number, rank: number, count: number): number {
 	return clamp01((t - start) / (1 - start));
 }
 
-/** Follow a drag-like run of small, fast steps at once; settle over SETTLE_MS otherwise. */
+/**
+ * A stream of updates (a drag, a scrub, a sweep) is followed at once, whatever the step; a lone jump
+ * of 0.08 or more settles over MOTION.settle.
+ */
 export function followMode(
 	prev: { target: number; at: number },
 	next: { target: number; at: number },
 ): "instant" | "settle" {
-	return Math.abs(next.target - prev.target) < 0.08 && next.at - prev.at < 90
-		? "instant"
-		: "settle";
+	if (next.at - prev.at < 90) return "instant";
+	return Math.abs(next.target - prev.target) < 0.08 ? "instant" : "settle";
+}
+
+export type Placed = {
+	p: GipfelbuchPeak;
+	x: number;
+	y: number;
+	/** Beyond the patch: put on the rim along its bearing. */
+	rim: boolean;
+	km: number;
+	/** The label is drawn (declutterRim may drop it). */
+	label: boolean;
+};
+
+/**
+ * Where each named peak is drawn: at its exact map pixel inside the square (4 px margin), else on a rim
+ * circle at `size / 2 - 16` along its bearing, so the photo's named summits all show even when the patch
+ * is smaller than the view.
+ */
+export function placeNamed(
+	d: GipfelbuchPhotoData,
+	named: GipfelbuchPeak[],
+	size = MAP_SIZE,
+): Placed[] {
+	const margin = 4;
+	const c = size / 2;
+	return named.map((p) => {
+		const [x, y] = demToPx(d.demPatch.halfKm, p.az, p.distance, size);
+		const km = Math.round(p.distance / 1000);
+		if (x > margin && y > margin && x < size - margin && y < size - margin)
+			return { p, x, y, rim: false, km, label: true };
+		const r = c - 16;
+		const a = (p.az * Math.PI) / 180;
+		return {
+			p,
+			x: c + Math.sin(a) * r,
+			y: c - Math.cos(a) * r,
+			rim: true,
+			km,
+			label: true,
+		};
+	});
+}
+
+/**
+ * Walks the rim peaks by bearing and drops the label (the ray and the tick stay) of any whose rim
+ * point lies within `minGap` of a label already kept.
+ */
+export function declutterRim(placed: Placed[], minGap = 16): Placed[] {
+	const kept: Placed[] = [];
+	const drop = new Set<Placed>();
+	const byAz = placed
+		.filter((q) => q.rim)
+		.sort((a, b) => wrap180(a.p.az) - wrap180(b.p.az));
+	for (const q of byAz) {
+		if (kept.some((k) => Math.hypot(k.x - q.x, k.y - q.y) < minGap))
+			drop.add(q);
+		else kept.push(q);
+	}
+	return placed.map((q) => (drop.has(q) ? { ...q, label: false } : q));
 }
 
 /**
@@ -213,7 +206,8 @@ export function coneFitBox(
 	size = MAP_SIZE,
 ): { x: number; y: number; w: number; h: number } {
 	const halfKm = d.demPatch.halfKm;
-	const reach = halfKm * 1600;
+	// stay inside the patch: a cone drawn out to 1.6 half-widths is clipped by the square anyway
+	const reach = Math.min(halfKm * 1600, 0.92 * halfKm * 1000);
 	const c = size / 2;
 	let x0 = c;
 	let y0 = c;
@@ -240,9 +234,14 @@ export function coneFitBox(
 	if (w / h < aspect) w = h * aspect;
 	else h = w / aspect;
 	if (w > size || h > size) {
-		return aspect >= 1
-			? { x: 0, y: (size - size / aspect) / 2, w: size, h: size / aspect }
-			: { x: (size - size * aspect) / 2, y: 0, w: size * aspect, h: size };
+		// the widest box of this aspect that fits, centred on the cones' box, then clamped to the square
+		if (aspect >= 1) {
+			w = size;
+			h = size / aspect;
+		} else {
+			h = size;
+			w = size * aspect;
+		}
 	}
 	return {
 		x: Math.min(size - w, Math.max(0, cx - w / 2)),
@@ -253,44 +252,55 @@ export function coneFitBox(
 }
 
 /**
- * The search loop clock: lead (t = 0), a damped sweep either side of the guess that settles on the
- * solved pose, a hold with the rays drawn, then a fade (`fade` 0..1) before it repeats.
+ * The search loop clock: fade in on the guess, a lead, a damped sweep either side of the guess that
+ * settles on the solved pose, a hold with the rays drawing on, then a fade out before it repeats.
+ * `opacity` is 0 at the loop's start and end, so the wrap never flashes.
  */
 export function searchT(ms: number): {
 	t: number;
-	phase: "lead" | "sweep" | "hold" | "fade";
-	fade: number;
+	phase: "fadeIn" | "lead" | "sweep" | "hold" | "fadeOut";
+	/** Live layer opacity 0..1. */
+	opacity: number;
 	/** Ray draw-on progress 0..1: only in the hold, so the sweep's overshoot never flickers them. */
 	rays: number;
 } {
-	const hold = BEAT_MS * RESULT_HOLD;
-	const total = LEAD_MS + SWEEP_MS + hold + REPLAY_FADE_MS;
-	const m = ((ms % total) + total) % total;
-	if (m < LEAD_MS) return { t: 0, phase: "lead", fade: 0, rays: 0 };
-	if (m < LEAD_MS + SWEEP_MS) {
-		const u = (m - LEAD_MS) / SWEEP_MS;
+	const { replayFade, lead, sweep, draw } = MOTION;
+	const hold = MOTION.beat * MOTION.resultHold;
+	const m = ((ms % SEARCH_LOOP_MS) + SEARCH_LOOP_MS) % SEARCH_LOOP_MS;
+	if (m < replayFade)
+		return { t: 0, phase: "fadeIn", opacity: m / replayFade, rays: 0 };
+	let r = m - replayFade;
+	if (r < lead) return { t: 0, phase: "lead", opacity: 1, rays: 0 };
+	r -= lead;
+	if (r < sweep) {
+		const u = r / sweep;
 		return {
 			t: 1 - Math.cos(3 * Math.PI * u) * (1 - u) ** 1.4,
 			phase: "sweep",
-			fade: 0,
+			opacity: 1,
 			rays: 0,
 		};
 	}
-	if (m < LEAD_MS + SWEEP_MS + hold)
+	r -= sweep;
+	if (r < hold)
 		return {
 			t: 1,
 			phase: "hold",
-			fade: 0,
-			rays: easeOut(clamp01((m - LEAD_MS - SWEEP_MS) / DRAW_MS)),
+			opacity: 1,
+			rays: ease.out(clamp01(r / draw)),
 		};
+	r -= hold;
 	return {
 		t: 1,
-		phase: "fade",
-		fade: clamp01((m - LEAD_MS - SWEEP_MS - hold) / REPLAY_FADE_MS),
+		phase: "fadeOut",
+		opacity: 1 - clamp01(r / replayFade),
 		rays: 1,
 	};
 }
 
 /** Total length of one search loop, ms. */
 export const SEARCH_LOOP_MS =
-	LEAD_MS + SWEEP_MS + BEAT_MS * RESULT_HOLD + REPLAY_FADE_MS;
+	MOTION.replayFade * 2 +
+	MOTION.lead +
+	MOTION.sweep +
+	MOTION.beat * MOTION.resultHold;

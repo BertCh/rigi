@@ -22,7 +22,6 @@ import {
 	HandMark,
 } from "#/components/gipfelbuch/notebook/marks";
 import type { Point } from "#/components/gipfelbuch/notebook/sketch";
-import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import {
 	Callout,
@@ -1334,8 +1333,7 @@ const REAL_CROP: Record<string, [number, number, number, number]> = {
 };
 
 function MiniDem() {
-	const [id] = useNotebookPhoto();
-	const d = useGipfelbuchPhoto(id);
+	const d = useGipfelbuchPhoto("demo-01");
 	return <DemPatch data={d} cone={["solved"]} peaks={false} />;
 }
 

@@ -18,9 +18,15 @@ import {
 import { cn } from "#/lib/utils";
 import { HandScaleBar, NorthArrow } from "../notebook/carto";
 import { PenLine, SketchPath, SketchPolyline } from "../notebook/Ink";
-import { useInView, useReducedMotion } from "./hooks";
 import { inkFor, LAYER_INKS } from "./inks";
 import { HandLabel } from "./labels";
+import {
+	ARM_SEQUENCE,
+	ease,
+	MOTION,
+	useArmedInView,
+	useMotionAllowed,
+} from "./motion";
 import {
 	CrispLine,
 	coneWedge,
@@ -30,17 +36,17 @@ import {
 import { poseAt, useAlignmentStory } from "./story";
 import {
 	coneFitBox,
-	easeOut,
+	declutterRim,
 	type FootprintRun,
 	followMode,
 	footprintRuns,
 	mapPeakSet,
 	mixHex,
+	type Placed,
 	peakInk,
-	QUICK_MS,
+	placeNamed,
 	rayDraw,
 	SEARCH_LOOP_MS,
-	SETTLE_MS,
 	searchT,
 	wrap180,
 } from "./story-map";
@@ -65,33 +71,21 @@ const TERRAIN_INK = "var(--fig-terrain-ink, var(--gb-contour))";
 const sgn = (v: number) =>
 	`${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}`;
 
-/** Motion is allowed: not reduced motion, not automation, not print. */
-function useMotionOk(): boolean {
-	const reduce = useReducedMotion();
-	const [printing, setPrinting] = useState(false);
-	useEffect(() => {
-		const m = window.matchMedia("print");
-		const f = () => setPrinting(m.matches);
-		f();
-		m.addEventListener("change", f);
-		return () => m.removeEventListener("change", f);
-	}, []);
-	return !reduce && !printing && !navigator.webdriver;
-}
-
 /** The search loop clock; re-renders only the component that holds it, and only while on screen. */
 function useSearchClock(
 	on: boolean,
 ): [
 	RefObject<HTMLDivElement | null>,
-	{ t: number; fade: number; rays: number },
+	{ t: number; opacity: number; rays: number },
 ] {
-	const [ref, inView] = useInView<HTMLDivElement>({ once: false });
-	const motion = useMotionOk();
-	const [state, setState] = useState({ t: 1, fade: 0, rays: 1 });
+	const { ref, armed } = useArmedInView<HTMLDivElement>({
+		arm: ARM_SEQUENCE,
+	});
+	const motion = useMotionAllowed();
+	const [state, setState] = useState({ t: 1, opacity: 1, rays: 1 });
 	useEffect(() => {
-		if (!on || !inView || !motion) {
-			setState({ t: 1, fade: 0, rays: 1 });
+		if (!on || !armed || !motion) {
+			setState({ t: 1, opacity: 1, rays: 1 });
 			return;
 		}
 		const t0 = performance.now();
@@ -102,19 +96,21 @@ function useSearchClock(
 			// 30 fps cap (landing perf): a state update per display frame buys nothing visible
 			if (now - lastFrame < 1000 / 30 - 2) return;
 			lastFrame = now;
-			const { t, fade, rays } = searchT((now - t0) % SEARCH_LOOP_MS);
+			const { t, opacity, rays } = searchT((now - t0) % SEARCH_LOOP_MS);
 			setState((s) =>
-				s.t === t && s.fade === fade && s.rays === rays ? s : { t, fade, rays },
+				s.t === t && s.opacity === opacity && s.rays === rays
+					? s
+					: { t, opacity, rays },
 			);
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
-	}, [on, inView, motion]);
+	}, [on, armed, motion]);
 	return [ref, state];
 }
 
 /**
- * Follows the story's t: settles to it over SETTLE_MS (ease.out, like the geo spill's slide), but
+ * Follows the story's t: settles to it over MOTION.settle (ease.out, like the geo spill's slide), but
  * at once for a drag (this map's own pointer, the story's `instant` flag, or a run of small fast steps).
  */
 function useFollowT(
@@ -123,7 +119,7 @@ function useFollowT(
 	dragging: RefObject<boolean>,
 	storyInstant: boolean | undefined,
 ): number {
-	const motion = useMotionOk();
+	const motion = useMotionAllowed();
 	const [v, setV] = useState(target);
 	const cur = useRef(target);
 	const prev = useRef({ target, at: performance.now() });
@@ -147,8 +143,8 @@ function useFollowT(
 		const t0 = performance.now();
 		let raf = 0;
 		const tick = (now: number) => {
-			const u = Math.min(1, (now - t0) / SETTLE_MS);
-			cur.current = from + (target - from) * easeOut(u);
+			const u = Math.min(1, (now - t0) / MOTION.settle);
+			cur.current = from + (target - from) * ease.out(u);
 			setV(cur.current);
 			if (u < 1) raf = requestAnimationFrame(tick);
 		};
@@ -251,16 +247,14 @@ function LiveLayer({
 	d,
 	t,
 	runs,
-	named,
-	maxNamed,
+	placed,
 	opacity,
 	rayT,
 }: {
 	d: GipfelbuchPhotoData;
 	t: number;
 	runs: FootprintRun[];
-	named: ReturnType<typeof mapPeakSet>["named"];
-	maxNamed: number;
+	placed: Placed[];
 	opacity: number;
 	/** Position on the t axis the rays draw at (search mode); defaults to t. */
 	rayT?: number;
@@ -283,13 +277,6 @@ function LiveLayer({
 	const p1 = toPx(live.yaw, arcDist);
 	const sweep = wrap180(live.yaw - d.prior.yaw);
 	const mid = toPx(d.prior.yaw + sweep / 2, arcDist + (26 * 2 * half) / S);
-	const shown = named
-		.map((p) => {
-			const [x, y] = toPx(p.az, p.distance);
-			return { p, x, y };
-		})
-		.filter(({ x, y }) => x > 4 && y > 4 && x < S - 4 && y < S - 4)
-		.slice(0, maxNamed);
 	return (
 		<svg
 			viewBox={`0 0 ${S} ${S}`}
@@ -328,8 +315,8 @@ function LiveLayer({
 				))}
 			</g>
 			<CrispLine d={wedge} color={ink} width={2} seed="story-live" />
-			{shown.map(({ p, x, y }, rank) => {
-				const k = rayDraw(rayT ?? t, rank, shown.length);
+			{placed.map(({ p, x, y }, rank) => {
+				const k = rayDraw(rayT ?? t, rank, placed.length);
 				if (k <= 0.01) return null;
 				return (
 					<PenLine
@@ -363,28 +350,60 @@ function LiveLayer({
 					</HandLabel>
 				</g>
 			)}
-			{shown.map(({ p, x, y }) => {
+			{placed.map(({ p, x, y, rim, km, label }) => {
 				const inside = Math.abs(wrap180(p.az - live.yaw)) <= live.hfov / 2;
 				const color = (inside && peakInk(t, true)) || "var(--gb-pencil)";
-				const flip = x > S - 90;
+				const flip = rim ? x > S / 2 : x > S - 90;
+				const ax = Math.sin(p.az * RAD);
+				const ay = -Math.cos(p.az * RAD);
 				return (
 					<g
 						key={p.name}
 						opacity={inside ? 1 : 0.32}
-						style={{ transition: `opacity ${QUICK_MS}ms ease-out` }}
+						style={{ transition: `opacity ${MOTION.quick}ms ease-out` }}
 					>
-						<path d={`M${x} ${y - 4}l-3.6 6.2h7.2z`} style={{ fill: color }} />
-						<HandLabel
-							x={flip ? x - 6 : x + 6}
-							y={y + 2}
-							anchor={flip ? "end" : "start"}
-							size={10.5}
-							halo={2.8}
-							color={color}
-							caps
-						>
-							{p.name}
-						</HandLabel>
+						{rim ? (
+							<path
+								d={`M${x - ay * 6} ${y + ax * 6}L${x + ay * 6} ${y - ax * 6}`}
+								fill="none"
+								strokeWidth={1.6}
+								strokeLinecap="round"
+								style={{ stroke: color }}
+							/>
+						) : (
+							<path
+								d={`M${x} ${y - 4}l-3.6 6.2h7.2z`}
+								style={{ fill: color }}
+							/>
+						)}
+						{label && (
+							<>
+								<HandLabel
+									x={flip ? x - 6 : x + 6}
+									y={y + 2}
+									anchor={flip ? "end" : "start"}
+									size={10.5}
+									halo={2.8}
+									color={color}
+									caps
+								>
+									{p.name}
+								</HandLabel>
+								{rim && (
+									<HandLabel
+										x={flip ? x - 6 : x + 6}
+										y={y + 13}
+										anchor={flip ? "end" : "start"}
+										size={9.5}
+										halo={2.8}
+										color={color}
+										italic
+									>
+										{`${km} km`}
+									</HandLabel>
+								)}
+							</>
+						)}
 					</g>
 				);
 			})}
@@ -464,6 +483,10 @@ export function StoryMap({
 		[d, cropKey, maxLabels],
 	);
 	const runs = useMemo(() => (d ? footprintRuns(d, S) : []), [d]);
+	const placed = useMemo(
+		() => (d && set ? declutterRim(placeNamed(d, set.named, S)) : []),
+		[d, set],
+	);
 	const box = useMemo(
 		() => (d && fit === "cone" ? coneFitBox(d, aspect) : null),
 		[d, fit, aspect],
@@ -505,9 +528,8 @@ export function StoryMap({
 				d={d}
 				t={tNow}
 				runs={runs}
-				named={set.named}
-				maxNamed={width > 0 && width < 400 ? 4 : set.named.length}
-				opacity={search && !story ? 1 - searched.fade : 1}
+				placed={width > 0 && width < 280 ? placed.slice(0, 4) : placed}
+				opacity={search && !story ? searched.opacity : 1}
 				rayT={search && !story ? 0.82 + 0.18 * searched.rays : undefined}
 			/>
 		</div>
