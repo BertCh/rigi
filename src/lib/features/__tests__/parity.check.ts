@@ -11,7 +11,7 @@
  * descriptor cosine, LightGlue match agreement on the reference features (isolates the matcher) and
  * on our own features (whole pipeline).
  *
- *   npx tsx src/lib/features/__tests__/parity.check.ts [--quick] [--json out.json]
+ *   [NN_BACKEND=gpu DAWN_DIR=/tmp/dawn] npx tsx src/lib/features/__tests__/parity.check.ts [--quick] [--only tag,…] [--json out.json]
  * SKIPs (exit 0) when the fixtures or the weights are missing.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -210,9 +210,28 @@ function geometricAgreement(
 	return +(hit / Math.max(n, 1)).toFixed(4);
 }
 
+const wantBackend =
+	(process.env.NN_BACKEND as "cpu" | "gpu" | undefined) ?? "cpu";
+const gpuDevice =
+	wantBackend === "gpu"
+		? await (await import("../../../../scripts/nn/dawn")).dawnDevice(
+				"features-parity",
+			)
+		: null;
+if (wantBackend === "gpu" && !gpuDevice) {
+	console.log("SKIP: NN_BACKEND=gpu needs DAWN_DIR (Dawn WebGPU in node)");
+	process.exit(0);
+}
 const nn = await createNn({
-	backend: (process.env.NN_BACKEND as "cpu" | "gpu" | undefined) ?? "auto",
+	backend: wantBackend,
+	...(gpuDevice && { device: gpuDevice }),
 });
+/** --only a,b: image / pair tags containing any of these substrings. */
+const only = (() => {
+	const i = process.argv.indexOf("--only");
+	return i > 0 ? process.argv[i + 1].split(",") : null;
+})();
+const selected = (tag: string) => !only || only.some((o) => tag.includes(o));
 const aw = await nn.loadWeights(ALIKED_WEIGHTS);
 const lw = await nn.loadWeights(LIGHTGLUE_WEIGHTS);
 const report: Record<string, unknown> = { backend: nn.backend.kind };
@@ -231,6 +250,7 @@ const ours = new Map<
 const t0 = performance.now();
 // ---- ALIKED: per layer (small) + end to end
 for (const im of index.images) {
+	if (!selected(im.tag)) continue;
 	if (quick && im.maxKeypoints !== index.images[0].maxKeypoints) continue;
 	const fx = load(im.tag);
 	const { planes, width, height } = rgbTensorData(fx);
@@ -299,6 +319,7 @@ for (const im of index.images) {
 
 // ---- LightGlue
 for (const p of index.pairs) {
+	if (!selected(p.tag)) continue;
 	if (quick && p !== index.pairs[0]) continue;
 	const fa = load(p.a);
 	const fb = load(p.b);
@@ -390,3 +411,5 @@ if (failures.length) {
 	process.exit(1);
 }
 console.log(`PASS: features parity (${nn.backend.kind}, ${report.seconds}s)`);
+// a Dawn device keeps the event loop alive
+process.exit(0);

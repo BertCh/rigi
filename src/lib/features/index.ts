@@ -44,6 +44,8 @@ export const DEFAULT_MIN_SCORE = 0.1;
  * Keypoint cap on the CPU backend (no WebGPU): ALIKED at 1024 px takes ~10 s there and LightGlue grows
  * with the square of the keypoint count (~12–30 s per pair at 1024), so the fallback runs at most 1024
  * keypoints per image (a smaller input than the services' 2048 / 4096; slower, but it works).
+ * The GPU backend is not capped: it runs the services' 2048 / 4096 (on Dawn, 0.1–0.26 s per extract
+ * and 0.15–0.6 s per LightGlue pair at 4096).
  */
 export const CPU_MAX_KEYPOINTS = 1024;
 
