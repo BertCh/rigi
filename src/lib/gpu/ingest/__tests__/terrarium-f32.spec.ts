@@ -6,9 +6,7 @@ import { describe, expect, it } from "vitest";
 import { seededRandom } from "#/test/helpers";
 import {
 	decodeTileStats,
-	fromOrderKey,
 	inexactPartial,
-	orderKey,
 	terrariumF32,
 	terrariumTileF32,
 	unormToByte,
@@ -50,31 +48,19 @@ describe("unormToByte / inexactPartial", () => {
 	});
 });
 
-describe("orderKey", () => {
-	it("is order preserving across sign", () => {
-		const xs = [-1e6, -3.5, -0.25, 0, 0.25, 1, 1500.5, 1e6];
-		const keys = xs.map(orderKey);
-		for (let i = 1; i < keys.length; i++)
-			expect(keys[i]).toBeGreaterThan(keys[i - 1]);
-	});
-	it("round-trips through fromOrderKey", () => {
-		for (const x of [-4000.125, -1, 0, 1, 2961.5, 8848])
-			expect(fromOrderKey(orderKey(x))).toBe(x);
-	});
-});
-
 describe("decodeTileStats", () => {
-	it("undoes the inverted min words", () => {
-		const words = new Uint32Array(8);
+	it("reads the invalid count and the f32 extents", () => {
+		const words = new Uint32Array(5);
+		const f32 = new Float32Array(words.buffer);
 		words[0] = 3;
-		words[1] = ~orderKey(-5) >>> 0;
-		words[2] = orderKey(100);
-		words[3] = ~orderKey(-2) >>> 0;
-		words[4] = orderKey(90);
+		f32[1] = -5;
+		f32[2] = 100.5;
+		f32[3] = -2;
+		f32[4] = 90;
 		expect(decodeTileStats(words)).toEqual({
 			invalid: 3,
 			lo: -5,
-			hi: 100,
+			hi: 100.5,
 			lo7: -2,
 			hi7: 90,
 		});

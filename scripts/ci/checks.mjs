@@ -1094,4 +1094,11 @@ export const CHECKS = [
 		cmd: tsx("scripts/gpu/stats-fold-dawn.ts"),
 		timeoutS: 120,
 	},
+	{
+		id: "terrarium-stats-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/terrarium-stats-dawn.ts"),
+		timeoutS: 120,
+	},
 ];

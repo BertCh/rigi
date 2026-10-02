@@ -5,9 +5,12 @@
 // GPU Terrarium tile ingest (WAG W2.3 wiring): one kernel decodes a Terrarium
 // tile texture, optionally halves it with the streamer's 2× box filter, and reduces the statistics the
 // CPU needs without the heights (validateTile's out-of-range count, lo / hi, the stride-7 lo / hi).
+// The kernel only decodes: besides the heights it writes a per-output-texel invalid count and a
+// stride-7 selector plane, and three luma GPUReduction nodes (sum, extent, masked extent) fold them
+// into the 5-word stats buffer [invalid u32, lo, hi, lo7, hi7 f32] that decodeTileStats reads.
 // Three graphs use it:
 //   - terrariumTileStatsGpu (load time without a height atlas, cachedGraph group
-//     "ingest-terrarium-tile"): bitmap → stats (32 B read back). The caller keeps the CPU path when
+//     "ingest-terrarium-tile"): bitmap → stats (20 B read back). The caller keeps the CPU path when
 //     `invalid` > 0 (validateTile would fill).
 //   - TerrariumLayerWriter.writeWithStats (load time, the default on the WebGPU engine; ComputeGraphs
 //     "ingest-terrarium-layer|…|stats"): bitmap → heights → one layer of a TextureArrayAtlas r32float
@@ -20,6 +23,8 @@
 // twin's own code (bitmapHeights = canvas + decodeTerrarium, validateTile, downsampleHeights2) on the
 // same ImageBitmap, run only when a CPU consumer asks.
 //
+// Heights are bit-identical to the CPU path's; the stats are exact too (an integer sum, f32 min / max
+// compare exactly), except that lo / hi / lo7 / hi7 may differ from the CPU in the sign of a zero.
 // Bit identity (heights in the layer == the CPU path's heights): terrarium-f32.ts has the arithmetic
 // argument (ingest.check.ts proves the kernel twin over all 2^24 RGB and random tiles);
 // scripts/gpu/terrarium-ingest-check.mjs measures the texel bytes (copyExternalImageToTexture vs canvas
@@ -31,10 +36,11 @@ import { downsampleHeights2 } from "#/lib/dem/grid";
 import { bitmapHeights } from "#/lib/dem/image";
 import { ComputeGraph, cachedGraph } from "../core/graph";
 import { defineKernel, warmKernelsAsync } from "../core/kernel";
-import type {
-	GraphBufferHandle,
-	GraphTextureDescriptor,
-	GraphTextureHandle,
+import {
+	GPUReduction,
+	type GraphBufferHandle,
+	type GraphTextureDescriptor,
+	type GraphTextureHandle,
 } from "../core/luma";
 import { withLease } from "../core/pool";
 import { submit } from "../core/queue";
@@ -58,27 +64,24 @@ export const TERRARIUM_BITMAP_OPTIONS: ImageBitmapOptions = {
 	premultiplyAlpha: "none",
 };
 
-/** u32 words of the stats buffer: invalid, ~key(lo), key(hi), ~key(lo7), key(hi7), 3 spare. */
-export const TILE_STATS_WORDS = 8;
+/** 32-bit words of the stats buffer: invalid (u32), lo, hi, lo7, hi7 (f32 bit patterns). */
+export const TILE_STATS_WORDS = 5;
 
 /**
  * One output texel per invocation (DOWN = 1: one source texel; 2: a 2×2 block, summed a + b + c + d
  * left to right, top row first, × 0.25, as downsampleHeights2). Every source texel decodes exactly as
- * TERRARIUM_WGSL. Stats reduce per workgroup in workgroup atomics (explicitly zeroed), then one global
- * atomic per word; min is kept as max of the inverted order key so an all-zero clear is the identity.
+ * TERRARIUM_WGSL. Besides `heights` it writes two u32 planes the statistics reductions fold: `bad`
+ * (invalid source samples behind the texel, 0..4) and `mask7` (1 where the row-major index is a
+ * multiple of 7: the stride-7 sample of localElevRange). Every element of all three is written, so
+ * the planes need no clear. One 8×8 workgroup per 64 output texels.
  */
 export const TERRARIUM_TILE_WGSL = /* wgsl */ `\
 override DOWN: u32 = 1u;
 
 @group(0) @binding(0) var rgba: texture_2d<f32>;
 @group(0) @binding(1) var<storage, read_write> heights: array<f32>;
-@group(0) @binding(2) var<storage, read_write> stats: array<atomic<u32>, ${TILE_STATS_WORDS}>;
-
-var<workgroup> wInvalid: atomic<u32>;
-var<workgroup> wLo: atomic<u32>;
-var<workgroup> wHi: atomic<u32>;
-var<workgroup> wLo7: atomic<u32>;
-var<workgroup> wHi7: atomic<u32>;
+@group(0) @binding(2) var<storage, read_write> bad: array<u32>;
+@group(0) @binding(3) var<storage, read_write> mask7: array<u32>;
 
 fn decode(p: vec2i) -> f32 {
   let v = textureLoad(rgba, p, 0);
@@ -91,56 +94,28 @@ fn invalid(h: f32) -> u32 {
   return select(1u, 0u, h > ${wgslF32(VALID_MIN)} && h < ${wgslF32(VALID_MAX)});
 }
 
-fn orderKey(h: f32) -> u32 {
-  let b = bitcast<u32>(h);
-  return select(b | 0x80000000u, ~b, (b & 0x80000000u) != 0u);
-}
-
 @compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32) {
-  if (li == 0u) {
-    atomicStore(&wInvalid, 0u);
-    atomicStore(&wLo, 0u);
-    atomicStore(&wHi, 0u);
-    atomicStore(&wLo7, 0u);
-    atomicStore(&wHi7, 0u);
-  }
-  workgroupBarrier();
+fn main(@builtin(global_invocation_id) id: vec3u) {
   let out = textureDimensions(rgba) / DOWN;
   if (id.x < out.x && id.y < out.y) {
     var h: f32;
-    var bad: u32;
+    var n: u32;
     if (DOWN == 1u) {
       h = decode(vec2i(id.xy));
-      bad = invalid(h);
+      n = invalid(h);
     } else {
       let p = vec2i(id.xy) * 2;
       let a = decode(p);
       let b = decode(p + vec2i(1, 0));
       let c = decode(p + vec2i(0, 1));
       let d = decode(p + vec2i(1, 1));
-      bad = invalid(a) + invalid(b) + invalid(c) + invalid(d);
+      n = invalid(a) + invalid(b) + invalid(c) + invalid(d);
       h = (((a + b) + c) + d) * 0.25;
     }
     let i = id.y * out.x + id.x;
     heights[i] = h;
-    if (bad > 0u) { atomicAdd(&wInvalid, bad); }
-    let k = orderKey(h);
-    atomicMax(&wLo, ~k);
-    atomicMax(&wHi, k);
-    if (i % 7u == 0u) {
-      atomicMax(&wLo7, ~k);
-      atomicMax(&wHi7, k);
-    }
-  }
-  workgroupBarrier();
-  if (li == 0u) {
-    let n = atomicLoad(&wInvalid);
-    if (n > 0u) { atomicAdd(&stats[0], n); }
-    atomicMax(&stats[1], atomicLoad(&wLo));
-    atomicMax(&stats[2], atomicLoad(&wHi));
-    atomicMax(&stats[3], atomicLoad(&wLo7));
-    atomicMax(&stats[4], atomicLoad(&wHi7));
+    bad[i] = n;
+    mask7[i] = select(0u, 1u, i % 7u == 0u);
   }
 }
 `;
@@ -155,7 +130,8 @@ const tileKernel = (down: 1 | 2) =>
 		[
 			["rgba", "texture"],
 			["heights", "storage"],
-			["stats", "storage"],
+			["bad", "storage"],
+			["mask7", "storage"],
 		],
 		{
 			group: TERRARIUM_TILE_GROUP,
@@ -175,8 +151,10 @@ export function warmTerrariumTileKernels(device: Device): Promise<number> {
 }
 
 /**
- * Add the tile node: `input` (rgba8unorm, `size`²) → (size/down)² f32 heights at `heights` (written
- * in full) and the stats words at `stats` (cleared here first: atomics).
+ * Add the tile node and its three statistics reductions: `input` (rgba8unorm, `size`²) → (size/down)²
+ * f32 heights at `heights` (written in full) and the TILE_STATS_WORDS stats words at `stats`
+ * ([invalid, lo, hi, lo7, hi7]; only those 20 bytes are written, each by one GPUReduction, none
+ * needs a clear). `bad` / `mask7` are graph transients.
  */
 export function addTerrariumTile<P>(
 	g: ComputeGraph<P>,
@@ -191,22 +169,49 @@ export function addTerrariumTile<P>(
 ): ComputeGraph<P> {
 	const { input, heights, stats, size, down } = node;
 	const out = size / down;
-	// invariant: whole output texels, a heights buffer of out² f32 and the 8 stats words
+	// invariant: whole output texels, a heights buffer of out² f32 and the 5 stats words
 	if (!Number.isInteger(out) || heights.byteLength < out * out * 4)
 		throw new Error(
 			`${g.id}/${node.id}: ${size} px / ${down} does not fit "${heights.id}"`,
 		);
 	if (stats.byteLength < TILE_STATS_WORDS * 4)
 		throw new Error(`${g.id}/${node.id}: stats buffer too small`);
+	const n = out * out;
+	const bad = g.transientBuffer(`${node.id}-bad`, n * 4);
+	const mask7 = g.transientBuffer(`${node.id}-mask7`, n * 4);
 	const [x, y] = texelWorkgroups(out, out);
-	g.clearNode(`${node.id}-clear`, stats);
 	g.addKernel({
 		id: node.id,
 		spec: K_TERRARIUM_TILE[down],
-		bindings: { rgba: input, heights, stats },
+		bindings: { rgba: input, heights, bad, mask7 },
 		workgroups: [x, y],
-		writes: { stats: "atomic" },
 	});
+	const heightView = g.view(heights, "float32", n);
+	g.add(
+		new GPUReduction({
+			id: `${node.id}-invalid`,
+			input: g.view(bad, "uint32", n),
+			output: g.view(stats, "uint32", 1, 0),
+			operation: "sum",
+		}),
+	);
+	g.add(
+		new GPUReduction({
+			id: `${node.id}-extent`,
+			input: heightView,
+			output: g.view(stats, "float32", 2, 4),
+			operation: "extent",
+		}),
+	);
+	g.add(
+		new GPUReduction({
+			id: `${node.id}-extent7`,
+			input: heightView,
+			mask: g.view(mask7, "uint32", n),
+			output: g.view(stats, "float32", 2, 12),
+			operation: "extent",
+		}),
+	);
 	return g;
 }
 
@@ -217,7 +222,7 @@ export type TerrariumTileStats = HeightStats & {
 
 /**
  * Load time: decode `bitmap` (a square Terrarium tile, decoded with TERRARIUM_BITMAP_OPTIONS) on the
- * GPU, halved when `down` = 2, and read back only its statistics. Concurrent callers overlap: the
+ * GPU, halved when `down` = 2, and read back only its statistics (20 B). Concurrent callers overlap: the
  * group lease covers encode + submit, the read is awaited outside it.
  */
 export async function terrariumTileStatsGpu(
@@ -246,7 +251,7 @@ export async function terrariumTileStatsGpu(
 						size,
 						down,
 					});
-					g.readNode("read", [stats]);
+					g.readNode("read", [{ buffer: stats, size: TILE_STATS_WORDS * 4 }]);
 					return null;
 				},
 			);
@@ -280,7 +285,7 @@ export async function terrariumTileStatsGpu(
  * rgba8unorm texture per source size is reused: copyExternalImageToTexture and the submit that reads
  * it are queue-ordered.
  *   write():          bitmap → layer (a tile re-entering the atlas without a resident layer)
- *   writeWithStats(): bitmap → layer AND the load-time stats (terrariumTileStatsGpu's 32 B), one
+ *   writeWithStats(): bitmap → layer AND the load-time stats (terrariumTileStatsGpu's 20 B), one
  *                     upload: the loader decodes a tile straight into the layer it keeps
  *                     (deck-webgpu/terrain-gpu-decode.ts), so the bitmap is uploaded once per load.
  */
@@ -321,7 +326,7 @@ export class TerrariumLayerWriter {
 	}
 
 	/**
-	 * write() plus the tile's statistics, read back (32 B). Encoded and submitted synchronously; the
+	 * write() plus the tile's statistics, read back (20 B). Encoded and submitted synchronously; the
 	 * layer is written whatever the stats say (the caller releases it when `invalid` > 0).
 	 */
 	async writeWithStats(
@@ -420,7 +425,8 @@ export class TerrariumLayerWriter {
 			height: out,
 			layer: (p) => p.layer,
 		});
-		if (read) g.readNode("read", [stats]);
+		if (read)
+			g.readNode("read", [{ buffer: stats, size: TILE_STATS_WORDS * 4 }]);
 		g.compile();
 		return g;
 	}

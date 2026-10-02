@@ -15,7 +15,7 @@
 //  5. the tile kernel (terrarium-tile.ts): its f32 twin (terrariumTileF32) ==
 //     decodeTerrarium + downsampleHeights2 + heightStats bit for bit on tiles validateTile leaves alone,
 //     its out-of-range count == validateTile's fill count, every partial sum of a 2×2 block is f32-exact,
-//     order keys, WGSL constants.
+//     WGSL constants.
 // What this does not cover: the texel BYTES copyExternalImageToTexture produces (browser check
 // scripts/gpu/terrarium-ingest-check.mjs).
 import { heightStats } from "#/lib/dem/cpu-heights";
@@ -32,11 +32,9 @@ import {
 } from "./layout";
 import {
 	decodeTileStats,
-	fromOrderKey,
 	INV_256,
 	inexactPartial,
 	OFFSET,
-	orderKey,
 	SEA_FLOOR,
 	terrariumF32,
 	terrariumTileF32,
@@ -286,10 +284,11 @@ try {
 				firstBad ||= `${c.name}/${down}: heights differ`;
 			}
 			if (
-				!Object.is(ws.lo, st.lo) ||
-				!Object.is(ws.hi, st.hi) ||
-				!Object.is(ws.lo7, st.lo7) ||
-				!Object.is(ws.hi7, st.hi7)
+				// equal up to the sign of zero (min / max of -0 and +0 is order-dependent)
+				ws.lo !== st.lo ||
+				ws.hi !== st.hi ||
+				ws.lo7 !== st.lo7 ||
+				ws.hi7 !== st.hi7
 			) {
 				statBad++;
 				firstBad ||= `${c.name}/${down}: stats ${JSON.stringify(ws)} vs ${JSON.stringify(st)}`;
@@ -319,17 +318,6 @@ try {
 		"every partial sum (and its quarter) of four valid samples is exact in f32",
 		!inexact,
 		`(200000 quadruples × 15 subsets, ${inexact} inexact)`,
-	);
-	// the order keys sort like the floats and round-trip
-	const vals = [
-		-32768, -12000.5, -999.99609375, -0.00390625, 0, 0.00390625, 1, 255.5,
-		8999.99609375, 9000, 32767.99609375,
-	];
-	const keys = vals.map(orderKey);
-	check(
-		"orderKey is monotone and inverts",
-		keys.every((k, i) => i === 0 || k > keys[i - 1]) &&
-			vals.every((v, i) => Object.is(fromOrderKey(keys[i]), v)),
 	);
 	try {
 		const { TERRARIUM_TILE_WGSL } = await import("./terrarium-tile");

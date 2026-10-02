@@ -323,7 +323,7 @@ export async function terrariumIngestSelftest(
 					if (filled) continue; // the app keeps the CPU path for such tiles
 					const want = heightStats(ref);
 					for (const k of ["lo", "hi", "lo7", "hi7"] as const)
-						if (!Object.is(st[k], want[k])) r.tileStatsDiff++;
+						if (st[k] !== want[k]) r.tileStatsDiff++; // equal up to the sign of zero
 					const layer = await writerLayer(device, bmp, down);
 					r.tileLayerDiff += countDiff(bitsOf(layer), bitsOf(ref));
 					const lazy = new GpuDecodedHeights(bmp, down).materialize();
