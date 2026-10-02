@@ -27,7 +27,7 @@ describe("summarize-log CLI", () => {
 		writeFileSync(
 			f,
 			JSON.stringify({
-				schema: "rigi.picker.log.v1",
+				schema: "rigi/picker-log.v1",
 				version: 1,
 				events: [
 					{ kind: "shown", candidates: [], shownIndex: 0, ...e },

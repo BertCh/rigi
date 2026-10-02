@@ -17,8 +17,8 @@ import type { AlignState, Verify } from "#/lib/ontology/crosswalk/pose";
 import type { CandidateSource } from "./candidates";
 
 export const PICKER_LOG_VERSION = 1;
-/** `schema` field of the exported file. */
-export const PICKER_LOG_SCHEMA = "rigi.picker.log.v1";
+/** `schema` field of the exported file (a file-format id, deliberately not the storage key). */
+export const PICKER_LOG_SCHEMA = "rigi/picker-log.v1";
 
 export type LoggedCandidate = {
 	rank: number;

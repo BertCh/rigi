@@ -46,7 +46,7 @@ wrong skyline once they can compare.
 
 Every event is appended to `localStorage["rigi.picker.log.v1"]` (a bare array, ring of 2000, in memory if storage
 throws or is corrupt); the panel's "Export log (n)" button downloads it as `rigi-picker-log-<date>.json`
-(`{schema: "rigi.picker.log.v1", version, exportedAt, app, count, events}`), "Clear log" empties it.
+(`{schema: "rigi/picker-log.v1", version, exportedAt, app, count, events}`), "Clear log" empties it.
 The event types, the version rules and the tolerant parser (corrupt or other-version entries are dropped) are in `schema.ts`. Events: `shown` (the 3 candidates
 with source, source rank, score, pose, separation from the shown pose, and which one was shown), `preview`,
 `pick` (rank, source, before / after pose, taps), `revert`, `tap` (u, v, peaks offered with angular distance,

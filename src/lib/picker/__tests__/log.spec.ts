@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { storageKey } from "#/lib/ontology/core/storage";
 import {
 	clearPickerLog,
 	downloadPickerLog,
@@ -13,6 +12,7 @@ import {
 	type PickerLogEntry,
 	readPickerLog,
 } from "../log";
+import { PICKER_LOG_SCHEMA } from "../schema";
 
 const store = new Map<string, string>();
 const entry = (n: number): PickerLogEntry => ({
@@ -112,7 +112,7 @@ describe("downloadPickerLog", () => {
 		expect(a.href).toBe("blob:log");
 		expect(a.download).toMatch(/^rigi-picker-log-\d{4}-\d{2}-\d{2}\.json$/);
 		const parsed = JSON.parse(await (blob as Blob).text());
-		expect(parsed.schema).toBe(storageKey("pickerLog"));
+		expect(parsed.schema).toBe(PICKER_LOG_SCHEMA);
 		expect(parsed.events).toHaveLength(1);
 	});
 });
