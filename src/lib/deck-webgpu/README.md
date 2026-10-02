@@ -395,6 +395,29 @@ path; "in-app A/B" means compared inside the running engine against `/photo/<id>
 | `engine.ts` WebGpuEngine | DeckEngine | — | ranges identical to WebGL (median/p90 diff 0), 14/14 labels | lab + bench | see gaps |
 | `lab-engine.ts` + route | — | — | `engine-lab.mjs`: errors [] | — | — |
 
+## Glow summit markers (`layers/glow.ts`, LF2)
+
+`style.labels.glow` (default absent = off; `GLOW_DEFAULT` in `look/labels/glow.ts` is the dusk look) draws
+additive point sprites over the labelled summits with luma's `pointGlow` shader module
+(`@luma.gl/shadertools`, #3321, public WGSL and GLSL). The sprite centres are the `engine.peakLabels` (u, v)
+that PhotoWorkspace already computes for the DOM labels, handed over with `engine.setGlowMarkers(markers | null)`
+(`Renderer`). `GlowCore` is a `screen`-pass core (order 50, after the composite, photo view only) and its GLSL
+twin is `deck/glow-layer.ts` (`screen-glow` layer after `screen-composite`). Output is the sRGB-encoded radiance
+added into the canvas (alpha untouched). With the option off no core draws and no layer is added, so the
+render is unchanged. Display-only: exports (`exportImage`) and the world view do not draw it.
+
+## `selectionOutline` (LF2): evaluated, not adopted
+
+luma's `selectionOutline` (`@luma.gl/effects`, #3323) outlines the edge of an external `selectionTexture`
+mask (a max filter over the mask minus the mask). The app has no selected or hovered peak with a region: a
+peak is a point (the `?picker=on` tap-a-peak and the inspect hover read a single terrain sample), and our
+geometry buffer carries xyz + range, normal + class, with no per-peak id. A mask of "the mountain under the
+picked summit" would need a segmentation of the terrain around a summit (or a flood fill over the range map),
+which is a new feature rather than a cheap render pass, and a ring around a lone dot is what the glow marker
+and the DOM dot already give. Our compositors are also not luma `ShaderPassEffect`s (the pass would have to be
+hand-wired into `layers/composite.ts` and `deck/composite.ts`). Skipped on purpose; revisit if a region-valued
+selection (a glacier, a picked object mask from Step Inside) ever needs an outline.
+
 ## Per-pass GPU timings (`frame-timings.ts`, `?gpuFrameTimings=on`)
 
 Opt-in, WebGPU only, needs `timestamp-query`. `hosts/passes.ts` and the direct host's screen pass spread `passTimestamps(device, name)` into `beginRenderPass`; it is an empty object unless a frame is open on a timer attached for the device (`attachFrameTimings`, called by both hosts when the flag is on), so the off path is unchanged. A frame leases one 64-slot query set from a ring of 4 (`frame-timings-core.ts`, pure and node-checked); one `readResults` after `queue.onSubmittedWorkDone` yields the samples. All sets in flight, more than 32 passes, or a readback error drops the frame (an error also disables the timer, one warning). Results: `engine.onFrameTimings(cb)`, `engine.frameTimingsMean`, and the table on `/dev/graph`. The deck host times its offscreen geometry and colour passes (from the effect's preRender); deck's own canvas pass is not ours to time. Design after deck.gl PR #10778 (FrameTimer); not browser-verified.

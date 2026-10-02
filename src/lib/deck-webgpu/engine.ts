@@ -148,6 +148,7 @@ import {
 } from "#/lib/look/haze-controller";
 import type { SkyMask } from "#/lib/look/haze-fit";
 import { drawExportLabels, skylineAt } from "#/lib/look/labels";
+import { type GlowMarkers, sameGlowMarkers } from "#/lib/look/labels/glow";
 import { lookKey } from "#/lib/look/look-key";
 import { ReliefController } from "#/lib/look/relief/field";
 import { waterWavesAnimate } from "#/lib/look/water/waves";
@@ -234,6 +235,7 @@ import {
 	webgpuGeometryFactory,
 } from "./layers/geometry-source";
 import { createGizmoCore, type GizmoCore } from "./layers/gizmo";
+import { createGlowCore, type GlowCore } from "./layers/glow";
 import { createPhotoSkyCore, type PhotoSkyCore } from "./layers/photo-sky";
 import { createSplatsCore, type SplatsCore } from "./layers/splats";
 import {
@@ -396,6 +398,7 @@ type Gpu = {
 	atmSky: AtmSkyCore;
 	photoSky: PhotoSkyCore;
 	gizmo: GizmoCore;
+	glow: GlowCore;
 	splats: SplatsCore;
 	tiles3d: Tiles3DCore | null;
 	photoTex: Texture | null;
@@ -606,6 +609,7 @@ export class WebGpuEngine implements Renderer {
 	private photoImg?: HTMLImageElement;
 	private fgMask: FgMask | null = null;
 	private occluder: FgMask | null = null;
+	private glow: GlowMarkers | null = null;
 	private reveal: RevealUniforms | null = null;
 	private skyMaskStore: SkyMask | null = null;
 	/** the photo prep: edge planes resident on the GPU, CPU EdgeMap read on first use (W1.1) */
@@ -887,6 +891,7 @@ export class WebGpuEngine implements Renderer {
 			const atmSky = made(new AtmSkyCore());
 			const photoSky = made(createPhotoSkyCore());
 			const gizmo = made(createGizmoCore(device));
+			const glow = made(createGlowCore(device));
 			const splats = made(createSplatsCore(device));
 			splats.onChange = () => this.schedule("all");
 			const t3cfg = this.tiles3d ? tiles3dConfig() : null;
@@ -910,6 +915,7 @@ export class WebGpuEngine implements Renderer {
 				atmSky,
 				photoSky,
 				gizmo,
+				glow,
 				splats,
 				tiles3d,
 				photoTex: null,
@@ -929,6 +935,7 @@ export class WebGpuEngine implements Renderer {
 				new ViewGate(photoSky, view, inWorld),
 				new ViewGate(splats, view, inWorld),
 				new ViewGate(composite, view, inPhoto),
+				new ViewGate(glow, view, inPhoto),
 				new ViewGate(present, view, inWorld),
 				new ViewGate(debug, view, () => inPhoto() && !!gpu.debugMode),
 			];
@@ -1029,6 +1036,7 @@ export class WebGpuEngine implements Renderer {
 		g.composite.setReveal(this.reveal);
 		g.composite.setForegroundMask(this.fgMask);
 		g.composite.setOccluder(this.occluder);
+		g.glow.setMarkers(this.glow);
 		this.ensurePhotoTexture();
 		if (this.renderSet) g.terrain.setTiles(this.renderSet.tiles);
 		this.pushImagery();
@@ -1908,6 +1916,14 @@ export class WebGpuEngine implements Renderer {
 	setOccluder(m: FgMask | null) {
 		this.occluder = m;
 		this.gpu?.composite.setOccluder(m);
+	}
+
+	/** style.labels.glow (look/labels/glow.ts); null = off. A screen-pass change only. */
+	setGlowMarkers(m: GlowMarkers | null) {
+		if (sameGlowMarkers(this.glow, m)) return;
+		this.glow = m;
+		this.gpu?.glow.setMarkers(m);
+		this.schedule("screen");
 	}
 
 	setReveal(r: RevealUniforms | null) {

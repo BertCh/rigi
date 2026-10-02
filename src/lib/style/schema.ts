@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { GLOW_DEFAULT } from "../look/labels/glow";
 // Schema for ViewStyle: validation (clamps, hex checks, unknown keys dropped), schema-aware deep
 // merge (tuples / ramps replaced wholesale, discriminated unions switch variant cleanly), pruning of
 // untrusted partials (localStorage) and diffing (so storage keeps diff-only overrides).
@@ -330,6 +331,19 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 			glowPx: num(0, 30),
 		}),
 		maxLabels: num(0, 100, true),
+		glow: {
+			k: "nullable",
+			inner: obj({
+				radiusPx: num(2, 200),
+				tint: hex,
+				intensity: num(0, 8),
+				coreRadius: unit,
+				coreIntensity: num(0, 8),
+				haloIntensity: num(0, 8),
+				falloff: num(0.01, 40),
+			}),
+			def: GLOW_DEFAULT,
+		},
 		export: {
 			k: "nullable",
 			inner: obj(exportFields),
@@ -465,7 +479,8 @@ export function mergeNode(n: Node, base: unknown, over: unknown): unknown {
 		}
 		case "nullable":
 			if (over === null) return null;
-			return mergeNode(n.inner, base === null ? n.def : base, over);
+			// undefined = an optional field that is absent (off), like null
+			return mergeNode(n.inner, base == null ? n.def : base, over);
 		case "litOr":
 			if (over === n.lit) return n.lit;
 			if (!isObj(over)) return base;

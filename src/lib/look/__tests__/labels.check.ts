@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { CLASSIC } from "../../style/defaults.ts";
+import { mergeStyle, pruneOverrides } from "../../style/schema.ts";
+import {
+	GLOW_DEFAULT,
+	glowMarkersFor,
+	glowUniformsOf,
+	sameGlowMarkers,
+} from "../labels/glow.ts";
 // Node check for the peak labels: `npx tsx src/lib/look/__tests__/labels.check.ts`
 //  - classic: rankPeaks + declutterClassic reproduce the engines' original code byte for byte
 //  - panorama / inline layout: no overlaps, only visible peaks, stable under small moves, < 2 ms
@@ -281,6 +289,60 @@ check(
 		JSON.stringify(Array.from(a)) === JSON.stringify(Array.from(b)) &&
 			a[0] === Math.fround(5 / h),
 		"skylineAt: three RGBA (bottom-up) = deck r32 (top-down)",
+	);
+}
+
+// glow markers (style.labels.glow): off by default, markers only when on, schema round trip
+{
+	const labels = [
+		{ u: 0.25, v: 0.5 },
+		{ u: 0.75, v: 0.125 },
+	];
+	check(CLASSIC.labels.glow == null, "glow: off in the classic style");
+	check(glowMarkersFor(labels, undefined) === null, "glow: off → no markers");
+	check(glowMarkersFor(labels, null) === null, "glow: null → no markers");
+	check(glowMarkersFor([], GLOW_DEFAULT) === null, "glow: no labels → none");
+	check(
+		glowMarkersFor(labels, { ...GLOW_DEFAULT, intensity: 0 }) === null,
+		"glow: zero intensity → none",
+	);
+	const m = glowMarkersFor(labels, GLOW_DEFAULT);
+	check(
+		!!m &&
+			m.points.length === 4 &&
+			m.points[0] === 0.25 &&
+			m.points[3] === 0.125,
+		"glow: one (u, v) per label",
+	);
+	check(
+		sameGlowMarkers(m, glowMarkersFor(labels, GLOW_DEFAULT)) &&
+			!sameGlowMarkers(m, glowMarkersFor(labels.slice(1), GLOW_DEFAULT)) &&
+			!sameGlowMarkers(m, null),
+		"glow: sameGlowMarkers compares points and look",
+	);
+	const u = glowUniformsOf(GLOW_DEFAULT);
+	check(
+		u.tint[0] > u.tint[2] && u.tint[0] <= 1 && u.radiusPx === 22,
+		"glow: tint is linear and warm",
+	);
+	const on = mergeStyle(CLASSIC, { labels: { glow: { radiusPx: 30 } } });
+	check(
+		on.labels.glow?.radiusPx === 30 &&
+			on.labels.glow?.tint === GLOW_DEFAULT.tint,
+		"glow: a partial turns it on over the defaults",
+	);
+	check(
+		mergeStyle(on, { labels: { glow: null } }).labels.glow === null,
+		"glow: null turns it off again",
+	);
+	check(
+		pruneOverrides({ labels: { glow: { radiusPx: 9999, bogus: 1 } } }).labels
+			?.glow?.radiusPx === 200,
+		"glow: untrusted values clamp",
+	);
+	check(
+		JSON.stringify(mergeStyle(CLASSIC, {})) === JSON.stringify(CLASSIC),
+		"glow: an empty override leaves the classic style byte-identical",
 	);
 }
 

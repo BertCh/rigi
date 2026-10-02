@@ -268,6 +268,25 @@ export type LabelExport = {
 	dotShadow: boolean;
 };
 
+/**
+ * Glowing summit markers (look/labels/glow.ts, luma pointGlow): additive sprites over the label dots,
+ * for a dusk or night look. Absent / null = off (the default; the render is untouched).
+ */
+export type LabelGlow = {
+	/** outer radius of the sprite, CSS px */
+	radiusPx: number;
+	/** sprite tint (sRGB); the core is white */
+	tint: Hex;
+	/** overall multiplier of the radiance */
+	intensity: number;
+	/** pointGlow: white core radius, fraction of the sprite (0 = no core) */
+	coreRadius: number;
+	coreIntensity: number;
+	haloIntensity: number;
+	/** pointGlow: halo falloff, larger = tighter */
+	falloff: number;
+};
+
 export type LabelStyle = {
 	/** 'panorama' / 'inline': look/labels/layout.ts */
 	layout: "classic" | "panorama" | "inline";
@@ -285,6 +304,8 @@ export type LabelStyle = {
 	/** glowPx: blur radius of the dot's glow (box-shadow 0 0 glowPx glow) */
 	dot: { px: number; color: Hex; glow: Hex | null; glowPx: number };
 	maxLabels: number;
+	/** Opt-in glowing summit markers (GPU, both engines); absent / null = off. */
+	glow?: LabelGlow | null;
 	/** null = derive from the screen metrics (see labels-canvas, chunk 3). */
 	export: LabelExport | null;
 };

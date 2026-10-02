@@ -69,6 +69,7 @@ import { COMPOSITE_DEFINES } from "../look/glsl/composite";
 import { HazeController, rangeGeo } from "../look/haze-controller";
 import type { SkyMask } from "../look/haze-fit";
 import { drawExportLabels, skylineAt } from "../look/labels";
+import { type GlowMarkers, sameGlowMarkers } from "../look/labels/glow";
 import { lookKey } from "../look/look-key";
 import { ReliefController } from "../look/relief/field";
 import { waterWavesAnimate } from "../look/water/waves";
@@ -134,6 +135,7 @@ import {
 	type GeometrySourceFactory,
 	logRange,
 } from "./geometry-source";
+import { GlowMarkerLayer } from "./glow-layer";
 import { PhotoView, photoViewProjection } from "./photo-view";
 import {
 	eyeAltitude,
@@ -460,6 +462,8 @@ export class DeckEngine implements Renderer {
 	private unwatchContext: () => void = () => {};
 	/** The occluder mask last handed to setOccluder (a rebuilt compositor gets it again). */
 	private occluder: FgMask | null = null;
+	/** style.labels.glow markers (look/labels/glow.ts); null = off, no layer at all. */
+	private glow: { markers: GlowMarkers; layer: Layer } | null = null;
 	/** Compositors made after a context loss (their effect ids). */
 	private compositorGen = 0;
 	private deckMetrics: Record<string, unknown> | null = null;
@@ -1334,6 +1338,28 @@ export class DeckEngine implements Renderer {
 		this.compositor.setOccluder(m);
 	}
 
+	/** The screen-view layers over the terrain: the composite, then the opt-in glow (null = no layer). */
+	private screenLayers(): Layer[] {
+		const out: Layer[] = [this.compositor.layer("screen-composite")];
+		if (this.glow) out.push(this.glow.layer);
+		return out;
+	}
+
+	/** style.labels.glow: glowing summit markers over the composite (null = off). Composite-only. */
+	setGlowMarkers(m: GlowMarkers | null) {
+		if (sameGlowMarkers(this.glow?.markers ?? null, m)) return;
+		this.glow = m
+			? {
+					markers: m,
+					layer: new GlowMarkerLayer({
+						id: "screen-glow",
+						markers: m,
+					}) as never,
+				}
+			: null;
+		this.updateComposite();
+	}
+
 	/** One frame of the overlay reveal (src/lib/reveal); null = off. Composite-only: no terrain pass. */
 	setReveal(r: RevealUniforms | null) {
 		this.compositor.setReveal(r);
@@ -1645,7 +1671,7 @@ export class DeckEngine implements Renderer {
 		this.sceneLayers = layers;
 		this.deck.setProps({
 			viewState: this.viewState(),
-			layers: [...layers, this.compositor.layer("screen-composite")],
+			layers: [...layers, ...this.screenLayers()],
 		} as never);
 		this.scheduleStats();
 	}
@@ -1740,7 +1766,7 @@ export class DeckEngine implements Renderer {
 		if (this.disposed) return;
 		if (this.world?.controls) return this.updateLayers();
 		this.deck.setProps({
-			layers: [...this.sceneLayers, this.compositor.layer("screen-composite")],
+			layers: [...this.sceneLayers, ...this.screenLayers()],
 		} as never);
 	}
 

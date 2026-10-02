@@ -87,6 +87,12 @@ export interface Renderer {
 	/** One frame of the overlay reveal (src/lib/reveal); null = off (the classic composite, untouched). */
 	setReveal(r: RevealUniforms | null): void;
 	/**
+	 * style.labels.glow (look/labels/glow.ts, luma pointGlow): additive glowing sprites at the labelled
+	 * summits, drawn after the composite in the photo view; null = off (the render is untouched).
+	 * Display-only: never in exports.
+	 */
+	setGlowMarkers(m: import("./look/labels/glow").GlowMarkers | null): void;
+	/**
 	 * concord DSM occluder (?concord=occl, src/lib/concord/occl): photo-space dim mask, row 0 = top,
 	 * 255 = dim the overlay there; null = off (bit-identical composite). Display-only.
 	 */

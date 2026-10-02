@@ -58,6 +58,7 @@ import {
 	lumaMapFrom,
 	type PlacedLabel,
 } from "#/lib/look/labels";
+import { glowMarkersFor } from "#/lib/look/labels/glow";
 import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
 import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { needsPhotoSky } from "#/lib/look/look-key";
@@ -509,6 +510,7 @@ export function PhotoWorkspace({
 				// every engine frame re-emits labels: keep the previous array when nothing changed, so React
 				// (and the label layout memos keyed on it) skips the no-op re-render
 				if (engine.settings.mode === "world") {
+					engine.setGlowMarkers(null);
 					setLabels((prev) => (prev.length ? [] : prev));
 					setFlying(engine.isFlying);
 					return;
@@ -521,6 +523,13 @@ export function PhotoWorkspace({
 						: engine.peakLabels(100, { declutter: false });
 				// a fresh skyline re-runs the panorama / inline layout (it reads skylineRef) even when the
 				// labels themselves are unchanged
+				// opt-in glowing summit markers over the label dots (style.labels.glow, default off)
+				engine.setGlowMarkers(
+					glowMarkersFor(
+						ls.layout === "classic" ? next : next.slice(0, ls.maxLabels),
+						ls.glow,
+					),
+				);
 				const sky = engine.skyline();
 				const skyNew = !!sky && sky !== skylineRef.current;
 				if (sky) skylineRef.current = sky;
