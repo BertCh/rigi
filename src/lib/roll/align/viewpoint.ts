@@ -11,6 +11,7 @@
 // decision (alignRoll never accepts on consistency alone).
 
 import type { Pose } from "../../camera";
+import { priorHeading } from "../../geocam/priors/heading";
 import type { PhotoMeta } from "../../photos";
 
 /** Anchors further apart in time than this (s) don't inform each other: compass drift, recalibration. */
@@ -45,6 +46,14 @@ export function hasCompass(meta: PhotoMeta) {
 	return meta.heading != null && !l?.yawUnknown;
 }
 
+/**
+ * The compass heading a yaw offset is measured against: the same true-north heading roll.ts
+ * priorPose starts from, so a bias learnt on one photo shifts its neighbours' priors consistently.
+ * Callers check hasCompass first (null heading ⇒ NaN offset).
+ */
+export const compassHeading = (meta: PhotoMeta) =>
+	priorHeading(meta) ?? Number.NaN;
+
 /** The anchor for a trusted pose, or null when the photo has no compass to compare against. */
 export function anchorOf(
 	meta: PhotoMeta,
@@ -57,7 +66,7 @@ export function anchorOf(
 		id: meta.id,
 		viewpoint,
 		t,
-		yawOffset: angDiff(pose.yaw, meta.heading as number),
+		yawOffset: angDiff(pose.yaw, compassHeading(meta)),
 	};
 }
 

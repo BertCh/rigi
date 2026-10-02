@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { describe, expect, it } from "vitest";
+import { setFlagOverride } from "#/lib/flags";
+import { headingDeclination } from "#/lib/geocam/priors/heading";
 import type { PhotoMeta } from "../../../photos";
 import {
 	type Anchor,
@@ -10,6 +12,7 @@ import {
 	angDiff,
 	BIAS_WINDOW_S,
 	biasedPrior,
+	compassHeading,
 	hasCompass,
 	MAX_BIAS_DEG,
 	MIN_BIAS_DEG,
@@ -74,6 +77,34 @@ describe("hasCompass and anchorOf", () => {
 		expect(
 			anchorOf(meta(null), 0, 0, { yaw: 1, pitch: 0, roll: 0, vfov: 50 }),
 		).toBeNull();
+	});
+});
+
+describe("compassHeading", () => {
+	const magnetic = {
+		id: "m",
+		heading: 100,
+		lat: 46.7,
+		lon: 7.7,
+		alt: 1500,
+		takenAt: "2025-08-01T10:00:00Z",
+		local: { headingRef: "M" },
+	} as unknown as PhotoMeta;
+	it("is the stored heading with geoDecl off, and NaN without one", () => {
+		expect(compassHeading(magnetic)).toBe(100);
+		expect(compassHeading(meta(null))).toBeNaN();
+	});
+	it("measures anchors against the declination-corrected heading under geoDecl", () => {
+		const d = headingDeclination(magnetic) as number;
+		try {
+			setFlagOverride("geoDecl", "on");
+			expect(compassHeading(magnetic)).toBeCloseTo(100 + d, 9);
+			const pose = { yaw: 100 + d + 5, pitch: 0, roll: 0, vfov: 50 };
+			// the offset is the true compass error (5°), not error + declination
+			expect(anchorOf(magnetic, 0, 0, pose)?.yawOffset).toBeCloseTo(5, 9);
+		} finally {
+			setFlagOverride("geoDecl", undefined);
+		}
 	});
 });
 

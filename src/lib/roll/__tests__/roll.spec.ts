@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setFlagOverride } from "#/lib/flags";
+import { headingDeclination } from "#/lib/geocam/priors/heading";
 import { storageKey } from "#/lib/ontology/core/storage";
 import { destination } from "../../geodesy";
 import type { PhotoMeta } from "../../photos";
@@ -146,6 +148,22 @@ describe("priorPose / hfovOf", () => {
 			vfov: 55,
 		});
 		expect(priorPose(meta("a", { heading: null })).yaw).toBe(0);
+	});
+	it("corrects a magnetic heading for declination only under geoDecl, as the engines do", () => {
+		const magnetic = meta("m", {
+			local: { headingRef: "M" },
+		} as Partial<PhotoMeta>);
+		const d = headingDeclination(magnetic) as number;
+		expect(Math.abs(d)).toBeGreaterThan(0.5);
+		try {
+			expect(priorPose(magnetic).yaw).toBe(120); // flag off (default): unchanged
+			setFlagOverride("geoDecl", "on");
+			expect(priorPose(magnetic).yaw).toBeCloseTo(120 + d, 9);
+			expect(priorPose(meta("t")).yaw).toBe(120); // no ref (bundled): unchanged
+			expect(priorPose(meta("n", { heading: null })).yaw).toBe(0);
+		} finally {
+			setFlagOverride("geoDecl", undefined);
+		}
 	});
 	it("converts vfov to hfov through the aspect", () => {
 		expect(hfovOf({ yaw: 0, pitch: 0, roll: 0, vfov: 60 }, 1)).toBeCloseTo(

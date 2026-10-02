@@ -11,6 +11,7 @@
 
 import { storageKey } from "#/lib/ontology/core/storage";
 import { hfovFromAspect, type Pose, vfovFromFocal } from "../camera";
+import { priorHeading } from "../geocam/priors/heading";
 import { distanceM } from "../geodesy";
 import { loadSavedPose, type PhotoMeta, photos, regionNames } from "../photos";
 import type { Roll, RollPhoto, SolvedPose, Viewpoint } from "./types";
@@ -73,10 +74,14 @@ export type ResolveOptions = {
 	ignoreStored?: boolean;
 };
 
-/** The EXIF prior: compass + gravity + lens (heading 0 when the photo has no compass). */
+/**
+ * The EXIF prior: compass + gravity + lens (heading 0 when the photo has no compass). The yaw is the
+ * true-north heading the photo engines use (priorHeading: declination under ?geoDecl=on for a
+ * magnetic-ref upload, else the stored heading unchanged).
+ */
 export function priorPose(meta: PhotoMeta): Pose {
 	return {
-		yaw: meta.heading ?? 0,
+		yaw: priorHeading(meta) ?? 0,
 		pitch: meta.pitch,
 		roll: meta.roll,
 		vfov: meta.vfov,

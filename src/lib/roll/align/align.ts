@@ -28,6 +28,7 @@ import {
 	anchorOf,
 	angDiff,
 	biasedPrior,
+	compassHeading,
 	hasCompass,
 	MIN_BIAS_DEG,
 	OUTLIER_DEG,
@@ -353,7 +354,7 @@ export async function alignRoll(
 		const nb = viewpointBias(anchors, p.viewpoint, p.t, p.meta.id);
 		if (!nb) continue;
 		const deltaDeg = angDiff(
-			angDiff(r.pose.yaw, p.meta.heading as number),
+			angDiff(r.pose.yaw, compassHeading(p.meta)),
 			nb.biasDeg,
 		);
 		r.viewpointCheck = {
