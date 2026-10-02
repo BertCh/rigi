@@ -15,6 +15,7 @@
 import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
 import { abortable } from "./abort";
 import { busy, done, GpuDeviceLostError, onLost, untilLost } from "./lifecycle";
+import { registerPurger, watchOutOfMemory } from "./oom";
 import { capacityFor } from "./pool";
 import { cancelIfSubmitFails, submit, submitted } from "./queue";
 
@@ -42,6 +43,7 @@ function ring(device: Device): Slot[] {
 	if (!r) {
 		const created: Slot[] = [];
 		rings.set(device, created);
+		watchOutOfMemory(device);
 		onLost(device, () => {
 			for (const s of created) {
 				if (s.busy) {
@@ -57,6 +59,14 @@ function ring(device: Device): Slot[] {
 	}
 	return r;
 }
+
+/** Memory pressure (core/oom.ts): destroy the idle staging slots; busy ones return when their read ends. */
+registerPurger((device) => {
+	const r = rings.get(device);
+	if (!r) return;
+	for (let i = r.length - 1; i >= 0; i--)
+		if (!r[i].busy) r.splice(i, 1)[0].buffer.destroy();
+});
 
 function reserve(device: Device, bytes: number): Slot {
 	const r = ring(device);

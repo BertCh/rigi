@@ -18,6 +18,7 @@
 // map, so the readback does not wait longer (core-selftest "error-checks-cost").
 import type { CommandBuffer, CommandEncoder, Device } from "@luma.gl/core";
 import { GpuDeviceLostError, touch } from "./lifecycle";
+import { purgeDeviceMemory } from "./oom";
 import { afterSubmit as poolAfterSubmit } from "./pool";
 
 /** A WebGPU validation / out-of-memory error raised by a checked submit. */
@@ -127,8 +128,14 @@ export function submit(device: Device, enc: CommandEncoder): void {
 }
 
 /** The check promise of a closed scope pair: rejects with GpuValidationError on an error. */
-function verdict(close: () => Promise<ScopeError>, id?: string): Promise<void> {
+function verdict(
+	device: Device,
+	close: () => Promise<ScopeError>,
+	id?: string,
+): Promise<void> {
 	const p = close().then((e) => {
+		// memory pressure: give back idle pooled buffers, readback slots and cached graphs (core/oom.ts)
+		if (e?.kind === "out-of-memory") purgeDeviceMemory(device);
 		if (e) throw new GpuValidationError(e.kind, e.message, id);
 	});
 	p.catch(() => {});
@@ -141,7 +148,7 @@ function finishAndSubmit(device: Device, enc: CommandEncoder) {
 		try {
 			device.submit(enc.finish());
 		} finally {
-			checks.set(enc, verdict(close, (enc as { id?: string }).id));
+			checks.set(enc, verdict(device, close, (enc as { id?: string }).id));
 		}
 	} else device.submit(enc.finish());
 }
@@ -210,7 +217,7 @@ export function submitWithDefault(
 		sent = true;
 	} finally {
 		if (close) {
-			const p = verdict(close, "fused");
+			const p = verdict(device, close, "fused");
 			for (const e of extra) checks.set(e, p);
 		}
 		if (!sent) for (const e of extra) failed(e);

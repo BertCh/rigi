@@ -17,6 +17,11 @@
 //   order is program order and buffers can be recycled as soon as a tensor is disposed.
 
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
+import {
+	purgeBuffers,
+	recycleBuffer,
+	takeBuffer,
+} from "#/lib/gpu/core/buffer-pool";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import type { KernelSpec } from "#/lib/gpu/core/kernel";
 import type { GraphDataView } from "#/lib/gpu/core/luma";
@@ -220,7 +225,6 @@ const ONCE_GRAPHS = 8;
 
 export class Runtime {
 	private chain: Promise<unknown> = Promise.resolve();
-	private free = new Map<number, Buffer[]>();
 	private align: number;
 	readonly stats: RuntimeStats = {
 		graphs: 0,
@@ -270,44 +274,35 @@ export class Runtime {
 		return p;
 	}
 
-	/** A buffer of at least `bytes` from the free list (power-of-two capacities). */
+	/** A buffer of at least `bytes` from the device's shared free pool (power-of-two capacities). */
 	allocate(bytes: number): Buffer {
-		const cap = 2 ** Math.ceil(Math.log2(Math.max(256, bytes)));
-		const list = this.free.get(cap);
-		const b = list?.pop();
-		if (b) {
+		const b = takeBuffer(this.device, bytes, STORAGE, "nn-tensor");
+		this.stats.liveBytes += b.byteLength;
+		return b;
+	}
+
+	/**
+	 * Hand a buffer back to the shared pool once every step queued so far has run. Queue-safe: each
+	 * enqueued step submits its work synchronously before it resolves (a graph run submits inside
+	 * run(), a readback inside its step, a write is queue.writeBuffer), so when this step runs the
+	 * chain has submitted every earlier user of `b`; another owner taking it afterwards writes after
+	 * those commands in queue order. (Recycling at once, as the private free list did, is only safe
+	 * within one runtime.)
+	 */
+	recycle(b: Buffer) {
+		// stats: freeBuffers = hand-backs queued behind the chain, liveBytes = taken and not yet back
+		this.stats.freeBuffers++;
+		const device = this.device;
+		void this.enqueue(() => {
 			this.stats.freeBuffers--;
-			return b;
-		}
-		this.stats.liveBytes += cap;
-		return this.device.createBuffer({
-			id: "nn-tensor",
-			usage: STORAGE,
-			byteLength: cap,
+			this.stats.liveBytes -= b.byteLength;
+			recycleBuffer(device, b);
 		});
 	}
 
-	/** Return a buffer to the free list (later steps reuse it in queue order). */
-	recycle(b: Buffer) {
-		const cap = b.byteLength;
-		let list = this.free.get(cap);
-		if (!list) {
-			list = [];
-			this.free.set(cap, list);
-		}
-		list.push(b);
-		this.stats.freeBuffers++;
-	}
-
-	/** Destroy every free buffer (memory pressure / teardown). */
+	/** Destroy every idle buffer of the shared pool (memory pressure / teardown). */
 	trim() {
-		for (const list of this.free.values())
-			for (const b of list) {
-				this.stats.liveBytes -= b.byteLength;
-				b.destroy();
-			}
-		this.free.clear();
-		this.stats.freeBuffers = 0;
+		purgeBuffers(this.device);
 	}
 
 	/** A ready storage holding `data` (written in queue order). */

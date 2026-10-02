@@ -4,6 +4,7 @@
 
 import type { Device } from "@luma.gl/core";
 import { describe, expect, it } from "vitest";
+import { bufferPoolStats } from "../buffer-pool";
 import {
 	acquire,
 	afterSubmit,
@@ -75,15 +76,14 @@ describe("acquire", () => {
 		const { device } = fakeDevice();
 		expect(acquire(device, "k", 16, 1)).not.toBe(acquire(device, "k", 16, 2));
 	});
-	it("destroys a grown-out buffer once its lease ends, not before", async () => {
-		const { device, created } = fakeDevice();
+	it("recycles a grown-out buffer once its lease ends, not before", async () => {
+		const { device } = fakeDevice();
 		await withLease("grow", () => {
 			acquire(device, "grow/x", 16, 1);
 			acquire(device, "grow/x", 1000, 1);
-			expect(created[0].destroyed).toBe(false);
+			expect(bufferPoolStats(device).idleBuffers).toBe(0);
 		});
-		expect(created[0].destroyed).toBe(true);
-		expect(created[1].destroyed).toBe(false);
+		expect(bufferPoolStats(device).idleBuffers).toBe(1);
 	});
 });
 
@@ -125,14 +125,14 @@ describe("pooledStorage / pooledUniform / range", () => {
 
 describe("releasePool / poolStats", () => {
 	it("releases by prefix and counts bytes", () => {
-		const { device, created } = fakeDevice();
+		const { device } = fakeDevice();
 		acquire(device, "a/one", 100, 1);
 		acquire(device, "a/two", 300, 1);
 		acquire(device, "b/one", 100, 1);
 		expect(poolStats(device)).toEqual({ slots: 3, bytes: 256 + 512 + 256 });
 		releasePool(device, "a/");
 		expect(poolStats(device).slots).toBe(1);
-		expect(created.filter((b) => b.destroyed).length).toBe(2);
+		expect(bufferPoolStats(device).idleBuffers).toBe(2);
 		releasePool(device);
 		expect(poolStats(device)).toEqual({ slots: 0, bytes: 0 });
 	});
@@ -174,25 +174,24 @@ describe("withLease", () => {
 });
 
 describe("afterSubmit (CR-39: unleased growth)", () => {
-	it("destroys a grown-out buffer of an unleased slot only at the next submit", () => {
-		const { device, created } = fakeDevice();
+	it("recycles a grown-out buffer of an unleased slot only at the next submit", () => {
+		const { device } = fakeDevice();
 		acquire(device, "unleased/x", 16, 1);
 		acquire(device, "unleased/x", 1000, 1);
-		expect(created[0].destroyed).toBe(false);
+		expect(bufferPoolStats(device).idleBuffers).toBe(0);
 		afterSubmit(device);
-		expect(created[0].destroyed).toBe(true);
-		expect(created[1].destroyed).toBe(false);
+		expect(bufferPoolStats(device).idleBuffers).toBe(1);
 	});
-	it("never destroys a slot a lease holds, even at a submit from another caller", async () => {
-		const { device, created } = fakeDevice();
+	it("never recycles a slot a lease holds, even at a submit from another caller", async () => {
+		const { device } = fakeDevice();
 		await withLease("held", async () => {
 			acquire(device, "held/x", 16, 1);
 			acquire(device, "held/x", 1000, 1);
 			afterSubmit(device);
 			await Promise.resolve();
 			afterSubmit(device);
-			expect(created[0].destroyed).toBe(false);
+			expect(bufferPoolStats(device).idleBuffers).toBe(0);
 		});
-		expect(created[0].destroyed).toBe(true);
+		expect(bufferPoolStats(device).idleBuffers).toBe(1);
 	});
 });

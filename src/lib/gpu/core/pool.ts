@@ -4,8 +4,10 @@
 
 // Persistent grow-only buffer pool, per device. A kernel module names its buffers once
 // ("look-relief/dem", "horizon/rays", …) and gets the same Buffer back on every call, so warm calls
-// allocate nothing. Capacity grows by powers of two (min 256 B) and never shrinks; everything is
-// destroyed when the device is lost (or releasePool is called).
+// allocate nothing. Capacity grows by powers of two (min 256 B) and never shrinks. Slot buffers are
+// created fresh (zeroed) but tracked by the shared free pool (core/buffer-pool.ts): a grown-out
+// buffer, or one dropped by releasePool, is recycled for the next taker instead of destroyed; all are destroyed when the
+// device is lost.
 //
 // Pooled buffers are shared state, so two async callers must not use one slot at the same time:
 // wrap the whole acquire → encode → submit → read sequence in withLease(owner, fn). Leases are a
@@ -13,7 +15,8 @@
 //
 // Unleased use is safe only when acquire → write → encode → submit run in one synchronous block
 // (geo-query, height-gather): a slot that grows there retires its old buffer, destroyed at the next
-// submit of the device (legal in WebGPU: destroy after submit keeps the data for queued work).
+// submit of the device (queue-safe: every command that used it is submitted by then, so recycling
+// it to the shared pool is legal; destroy after submit would also keep the data for queued work).
 // A caller that awaits between acquire and submit must hold a lease, which defers the destroy of
 // every slot it covers until the lease ends.
 //
@@ -22,6 +25,7 @@
 // when a kernel relies on a fresh buffer being zero, as look/kernel.ts's storage(device, n) did.
 import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
 import { abortable } from "./abort";
+import { capacityFor, recycleBuffer, takeBuffer } from "./buffer-pool";
 import { busy, done as notBusy, onLost } from "./lifecycle";
 
 type Entry = { buffer: Buffer; retired: Buffer[] };
@@ -41,9 +45,7 @@ function poolOf(device: Device): Pool {
 	return p;
 }
 
-/** Capacity for `bytes`: the next power of two, at least 256 (4-byte aligned for WebGPU). */
-export const capacityFor = (bytes: number) =>
-	2 ** Math.ceil(Math.log2(Math.max(256, bytes)));
+export { capacityFor };
 
 /**
  * The pooled buffer for (`key`, `usage`) with at least `byteLength` bytes. Same Buffer across
@@ -60,10 +62,9 @@ export function acquire(
 	const k = `${key}|${usage}`;
 	let e = pool.get(k);
 	if (e && e.buffer.byteLength >= byteLength) return e.buffer;
-	const buffer = device.createBuffer({
-		id: `pool:${key}`,
-		usage,
-		byteLength: capacityFor(byteLength),
+	// fresh (zeroed), as before: a slot's first use may rely on it; its retirement feeds the shared pool
+	const buffer = takeBuffer(device, byteLength, usage, `pool:${key}`, {
+		fresh: true,
 	});
 	pooled.add(buffer);
 	if (e) {
@@ -225,7 +226,7 @@ function destroyRetired(match: (slotKey: string) => boolean) {
 				left = true;
 				continue;
 			}
-			for (const b of e.retired.splice(0)) b.destroy();
+			for (const b of e.retired.splice(0)) retire(device, b);
 		}
 		if (!left) retiring.delete(ref);
 	}
@@ -238,13 +239,19 @@ export function afterSubmit(device: Device) {
 	for (const [k, e] of pool) {
 		if (!e.retired.length) continue;
 		if (leased(k.slice(0, k.lastIndexOf("|")))) continue;
-		for (const b of e.retired.splice(0)) b.destroy();
+		for (const b of e.retired.splice(0)) retire(device, b);
 	}
 }
 
 function markRetiring(device: Device) {
 	for (const r of retiring) if (r.deref() === device) return;
 	retiring.add(new WeakRef(device));
+}
+
+/** A grown-out or released slot buffer goes back to the shared free pool (legal: see retirement above). */
+function retire(device: Device, b: Buffer) {
+	pooled.delete(b);
+	recycleBuffer(device, b);
 }
 
 function destroyPool(device: Device, pool: Pool) {
@@ -262,8 +269,8 @@ export function releasePool(device: Device, prefix = ""): void {
 	if (!pool) return;
 	for (const [k, e] of pool)
 		if (k.startsWith(prefix)) {
-			e.buffer.destroy();
-			for (const b of e.retired) b.destroy();
+			retire(device, e.buffer);
+			for (const b of e.retired) retire(device, b);
 			pool.delete(k);
 		}
 }

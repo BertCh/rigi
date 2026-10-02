@@ -42,6 +42,7 @@ import {
 	type GraphTextureDescriptor,
 	type GraphTextureHandle,
 } from "../core/luma";
+import { registerDeviceBytes } from "../core/memory";
 import { withLease } from "../core/pool";
 import { submit } from "../core/queue";
 import { isCopyAligned, texelWorkgroups } from "./layout";
@@ -301,11 +302,24 @@ export class TerrariumLayerWriter {
 	 */
 	readonly ready: Promise<number>;
 
+	private unregisterBytes: () => void;
+
 	constructor(
 		readonly device: Device,
 		readonly id: string,
 	) {
 		this.ready = warmTerrariumTileKernels(device);
+		// the writer's rgba8unorm staging textures (the atlas itself belongs to its caller)
+		this.unregisterBytes = registerDeviceBytes(
+			device,
+			`dem-staging:${id}`,
+			() => {
+				let n = 0;
+				for (const s of this.staging.values())
+					n += s.texture.width * s.texture.height * 4;
+				return n;
+			},
+		);
 	}
 
 	/** Decode `src` into `layer` of `target` (r32float 2d-array, layers ≥ the output size). */
@@ -432,6 +446,7 @@ export class TerrariumLayerWriter {
 	}
 
 	destroy() {
+		this.unregisterBytes();
 		for (const g of this.graphs.values()) g.destroy();
 		this.graphs.clear();
 		for (const s of this.staging.values()) releaseResource(s);

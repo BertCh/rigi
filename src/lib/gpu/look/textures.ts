@@ -78,6 +78,7 @@ import {
 	warmKernels,
 	warmKernelsAsync,
 } from "../core/kernel";
+import { onLost } from "../core/lifecycle";
 import type { GraphBufferHandle, GraphTextureHandle } from "../core/luma";
 import { acquire, withLease } from "../core/pool";
 import { stageReads } from "../core/readback";
@@ -343,6 +344,7 @@ function dummyMask(device: Device): Texture {
 			usage: Texture.SAMPLE | Texture.COPY_DST,
 		});
 		dummies.set(device, t);
+		onLost(device, () => dummies.delete(device));
 	}
 	return t;
 }
@@ -405,6 +407,8 @@ export async function releaseTextureGraphs(device: Device): Promise<void> {
 					outTextures.delete(device);
 					dummies.get(device)?.destroy();
 					dummies.delete(device);
+					encStatsPrm.get(device)?.destroy();
+					encStatsPrm.delete(device);
 				}),
 			),
 		),
@@ -568,6 +572,7 @@ function ownTexture(
 	if (!m) {
 		m = new Map();
 		outTextures.set(device, m);
+		onLost(device, () => outTextures.delete(device));
 	}
 	let t = m.get(format);
 	if (t && (t.width !== w || t.height !== h || t.destroyed)) {
@@ -1281,6 +1286,8 @@ export function encodeBandStatsTex(
 	if (!prm || prm.destroyed || prm.byteLength !== graphPrm.byteLength) {
 		prm?.destroy();
 		prm = uniform(device, new ArrayBuffer(24));
+		if (!encStatsPrm.has(device))
+			onLost(device, () => encStatsPrm.delete(device));
 		encStatsPrm.set(device, prm);
 	}
 	const minCount = input.minCount ?? 60;

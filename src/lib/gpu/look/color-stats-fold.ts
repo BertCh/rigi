@@ -28,6 +28,7 @@ import {
 	N_BANDS,
 } from "../../look/color-stats";
 import { ComputeGraph, type GraphBinding } from "../core/graph";
+import { onLost } from "../core/lifecycle";
 import { GPUGroupAggregation } from "../core/luma";
 import { STATS_VALUES } from "./color-stats.wgsl";
 import {
@@ -61,6 +62,7 @@ function foldKeys(device: Device, groups: number) {
 	if (!m) {
 		m = new Map();
 		keyBuffers.set(device, m);
+		onLost(device, () => keyBuffers.delete(device));
 	}
 	let buffer = m.get(groups);
 	if (!buffer || buffer.destroyed) {

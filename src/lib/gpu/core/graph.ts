@@ -101,6 +101,7 @@ import {
 	GraphTextureView,
 	type GraphTextureViewProps,
 } from "./luma";
+import { registerPurger, watchOutOfMemory } from "./oom";
 import { clear, withLease } from "./pool";
 import { profileRequested, profiling, recordGpuTime } from "./profile";
 import { submit } from "./queue";
@@ -1185,6 +1186,25 @@ export class ComputeGraph<P = void> {
 
 	private owned: Iterable<{ destroy(): void }>[] = [];
 
+	/** Bytes of the builder-owned resources that report a `byteLength` (see own()). */
+	ownedBytes(): number {
+		let n = 0;
+		for (const resources of this.owned)
+			for (const r of resources)
+				n += (r as { byteLength?: number }).byteLength ?? 0;
+		return n;
+	}
+
+	/** Bytes this graph holds that its cache entry can free: physical transients plus owned resources. */
+	residentBytes(): number {
+		const s = this.compiled?.stats;
+		return (
+			(s?.physicalTransientBytes ?? 0) +
+			(s?.physicalTransientTextureBytes ?? 0) +
+			this.ownedBytes()
+		);
+	}
+
 	/** Free the compiled graph's transients, pipelines and timestamp slots (and what it owns). */
 	destroy() {
 		for (const resources of this.owned) for (const r of resources) r.destroy();
@@ -1219,6 +1239,13 @@ export type CachedGraph<P, X> = {
 };
 
 const MAX_CACHED = 4;
+/** Default per-device budget of compiled transient + owned bytes across all cached graphs. */
+export const GRAPH_CACHE_BUDGET_BYTES = 512 * 1024 * 1024;
+let defaultBudget = GRAPH_CACHE_BUDGET_BYTES;
+const budgets = new WeakMap<Device, number>();
+/** global recency stamp per entry (higher = more recently looked up) */
+const stamps = new WeakMap<CachedGraph<unknown, unknown>, number>();
+let clock = 0;
 const caches = new WeakMap<
 	Device,
 	Map<string, Map<string, CachedGraph<unknown, unknown>>>
@@ -1276,6 +1303,7 @@ export function cachedGraphFrom<P, X = undefined>(
 		const ref = new WeakRef(device);
 		cacheDevices.add(ref);
 		// the graphs die with the device; drop them so a new device rebuilds
+		watchOutOfMemory(device);
 		onLost(device, () => {
 			for (const m of created.values())
 				for (const e of m.values()) e.graph.destroy();
@@ -1295,6 +1323,7 @@ export function cachedGraphFrom<P, X = undefined>(
 		e.hit = true;
 	} else e = { ...make(`${group}|${key}`), hit: false };
 	m.set(key, e as CachedGraph<unknown, unknown>);
+	stamps.set(e as CachedGraph<unknown, unknown>, ++clock);
 	while (m.size > Math.max(1, max)) {
 		const [k0, old] = m.entries().next().value as [
 			string,
@@ -1303,8 +1332,80 @@ export function cachedGraphFrom<P, X = undefined>(
 		m.delete(k0);
 		void old.graph.lease(() => old.graph.destroy());
 	}
+	evictToBudget(device, budgetOf(device), e as CachedGraph<unknown, unknown>);
 	return e;
 }
+
+const budgetOf = (device: Device) => budgets.get(device) ?? defaultBudget;
+
+/**
+ * Byte budget of the compiled graphs cached for `device` (or the default for every device without
+ * its own when `device` is null): when a lookup pushes the resident bytes over it, the globally
+ * least recently used graphs are evicted (never the one returned). The per-group count `max` still
+ * applies. Lowering it evicts at once.
+ */
+export function setGraphCacheBudget(
+	device: Device | null,
+	bytes: number,
+): void {
+	if (device) {
+		budgets.set(device, bytes);
+		evictToBudget(device, bytes);
+	} else defaultBudget = bytes;
+}
+
+/** Resident bytes of the cached graphs of `device` (compiled transients + owned resources). */
+export function cachedGraphBytes(device: Device): number {
+	let n = 0;
+	for (const m of caches.get(device)?.values() ?? [])
+		for (const e of m.values()) n += e.graph.residentBytes();
+	return n;
+}
+
+/**
+ * Evict least-recently-used graphs of `device` (across groups) until at most `limit` bytes remain,
+ * sparing `keep`. Each is destroyed under its lease, i.e. after any run in flight. Entries that are
+ * not compiled hold nothing and stay.
+ */
+function evictToBudget(
+	device: Device,
+	limit: number,
+	keep?: CachedGraph<unknown, unknown>,
+): void {
+	const groups = caches.get(device);
+	if (!groups) return;
+	let total = cachedGraphBytes(device);
+	while (total > limit) {
+		let victim: CachedGraph<unknown, unknown> | undefined;
+		let victimMap: Map<string, CachedGraph<unknown, unknown>> | undefined;
+		let victimKey = "";
+		let victimGroup = "";
+		let best = Number.POSITIVE_INFINITY;
+		for (const [group, m] of groups)
+			for (const [k, e] of m) {
+				if (e === keep || e.graph.residentBytes() === 0) continue;
+				const st = stamps.get(e) ?? 0;
+				if (st < best) {
+					best = st;
+					victim = e;
+					victimMap = m;
+					victimKey = k;
+					victimGroup = group;
+				}
+			}
+		if (!victim || !victimMap) return;
+		total -= victim.graph.residentBytes();
+		victimMap.delete(victimKey);
+		const g = victim.graph;
+		// Another group's caller may hold this graph between its lookup and its run (e.g. across an
+		// await compileAsync()) inside its own group lease (the cachedGraph contract): destroy only
+		// after that lease and then the graph's own, so such a caller's run still finds it alive.
+		void withLease(victimGroup, () => g.lease(() => g.destroy()));
+	}
+}
+
+// memory pressure (core/oom.ts): cached graphs down to half the budget
+registerPurger((device) => evictToBudget(device, budgetOf(device) / 2));
 
 /** Cached graphs of `device` (all groups, or one): for tests and stats. */
 export function cachedGraphCount(device: Device, group?: string): number {
