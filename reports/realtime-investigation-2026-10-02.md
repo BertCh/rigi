@@ -180,3 +180,24 @@ Open:
 - A subgroup GEMM.
 - Full WMM2025 coefficients.
 - Mobile measurements.
+
+### Follow-ups (2026-10-02, landed 856838a … c763027, browser-unverified)
+
+| Item | What landed | Measured (Dawn, shared GPU) |
+|---|---|---|
+| Declination | Full WMM2025 (degree 12), generated from NOAA's coefficient file (`scripts/live/wmm-gen.ts`) | All 12 official test rows match: declination ≤ 0.01°, field ≤ 0.2 nT |
+| Tracker in `/live` | GPU column scanner on the WebGPU render device; horizon loads during the camera prompt and again after a 100 m move (`horizon-warm.ts`); the real sky segmenter as a 2 s heavy skyline that corrects the cheap scan's bias (`?liveSky=auto\|on\|off`) | Synthetic haze (cheap scan biased 5 px): 1.64° median without the heavy skyline, 0.33° with it |
+| Live splat draw | Count-aware GPU counting sort with indirect dispatch, then `drawIndirect` of the kept splats only; the still path is unchanged | 400k capacity, 50k live: sort + draw 3.10 → 0.58 ms; 200k live: 4.48 → 1.92 ms |
+| Live Step Inside | Known camera focal (shift-only solve); depth runs stamped with their pose; refit after a > 25 m move or a > 30° turn; WebGL2 via the sidecar device and a ≤ 2 Hz readback | liveFast 3D position error 15.1% (net focal) → 12.3% (known focal) |
+| Moving eye | `/live` rebuilds the engine at a new eye (> 100 m, accuracy ≤ 150 m, 10 s debounce) on a second canvas and swaps without a gap; the replay sidecar takes an `eyes` track | n/a |
+| nn speed | Replicate pad and residual add fused into conv; vec4 conv weights; f16 products with f32 accumulation **on by default** on `shader-f16` devices (all nn models; opt out with `setKernelCaps({ f16Math: false })`); fusion binding budget taken from the device limits; `scripts/nn/depth-profile.ts` | Depth liveFast 54 → 46 ms, live 78 → 62 ms, 1200 tokens 212 → 170 ms; f16 depth error vs f32: 0.03% median |
+
+Not done, with reasons:
+- **Subgroup GEMM:** the profile shows convs dominate (about 60%), and the tiles are already near their limit on Apple GPUs.
+- **Grouped conv:** it is already a single dispatch, and FLOP-bound.
+
+Still open:
+- The browser and phone pass (see the batch-ledger rows tagged `mt-image-f4`).
+- Sign-off on the tracker gate.
+- The `copy` nodes, about 3–4% of the depth net.
+- Mobile numbers.
