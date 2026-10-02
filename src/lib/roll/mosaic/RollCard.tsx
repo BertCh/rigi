@@ -43,7 +43,8 @@ export function RollCard({
 						<div
 							key={p.meta.id}
 							className="h-full min-w-0 flex-1 overflow-hidden"
-							style={{ flexGrow: p.meta.width / p.meta.height }}
+							// ×100: grow factors summing below 1 (one portrait photo) leave the strip partly empty
+							style={{ flexGrow: (100 * p.meta.width) / p.meta.height }}
 						>
 							{src && (
 								<img
@@ -91,15 +92,10 @@ export function RollCard({
 				<div className="mt-1.5 flex flex-wrap gap-x-3 text-[10.5px] text-white/45">
 					{counts.map(([s, c]) => (
 						<span key={s} className="inline-flex items-center gap-1">
-							<span
-								className="size-1.5 rounded-full"
-								style={{ background: POSE_SOURCE_COLOR[s] }}
-							/>
-							{c}{" "}
 							<span aria-hidden="true" style={{ color: POSE_SOURCE_COLOR[s] }}>
 								{POSE_GLYPH[s]}
-							</span>{" "}
-							{POSE_SOURCE_LABEL[s]}
+							</span>
+							{c} {POSE_SOURCE_LABEL[s]}
 						</span>
 					))}
 				</div>

@@ -3,8 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, GalleryHorizontalEnd, ImagePlus } from "lucide-react";
+import { GalleryHorizontalEnd, ImagePlus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SiteNav } from "#/components/site/SiteNav";
 import { listUploadRolls } from "#/lib/roll/mosaic";
 import { RollCard } from "#/lib/roll/mosaic/RollCard";
 import { builtinRolls } from "#/lib/roll/roll";
@@ -21,13 +22,9 @@ function RollList() {
 	const uploads = useUploadRolls();
 	return (
 		<main className="min-h-dvh bg-[var(--rigi-ink)] px-4 pb-16 text-[var(--rigi-paper)] sm:px-8">
-			<header className="mx-auto max-w-6xl pt-8 pb-8">
-				<Link
-					to="/"
-					className="mb-6 inline-flex items-center gap-1.5 text-xs text-white/55 hover:text-[var(--rigi-paper)]"
-				>
-					<ArrowLeft className="size-3.5" /> Rigi
-				</Link>
+			{/* <main> sets the gutter here */}
+			<SiteNav active="library" className="px-0 sm:px-0" />
+			<header className="mx-auto max-w-6xl pt-10 pb-8">
 				<p className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-[var(--rigi-glow)]/80 uppercase">
 					<GalleryHorizontalEnd className="size-3.5" /> Camera rolls
 				</p>
@@ -52,7 +49,8 @@ function RollList() {
 					<h2 className="mb-4 text-sm font-semibold text-white/70">
 						Your uploads{" "}
 						<span className="text-white/35">
-							· {uploads.rolls.length} rolls on this device
+							· {uploads.rolls.length} roll
+							{uploads.rolls.length === 1 ? "" : "s"} on this device
 						</span>
 					</h2>
 					<div className="grid gap-4 sm:grid-cols-2">

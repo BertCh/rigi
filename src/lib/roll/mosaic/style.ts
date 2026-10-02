@@ -111,11 +111,16 @@ export function fmtDateSpan(ps: RollPhoto[]) {
 	if (!ps.length) return "";
 	const a = localWallClock(ps[0].meta);
 	const b = localWallClock(ps[ps.length - 1].meta);
-	const f = (d: Date, o: Intl.DateTimeFormatOptions) =>
-		d.toLocaleDateString(undefined, { ...o, timeZone: "UTC" });
+	const format = new Intl.DateTimeFormat(undefined, {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+		timeZone: "UTC",
+	});
 	if (dayKey(ps[0].meta) === dayKey(ps[ps.length - 1].meta))
-		return f(a, { day: "numeric", month: "short", year: "numeric" });
-	return `${f(a, { day: "numeric", month: "short" })} – ${f(b, { day: "numeric", month: "short", year: "numeric" })}`;
+		return format.format(a);
+	// "Sep 6 – 7, 2026": the locale drops the repeated month and year
+	return format.formatRange(a, b);
 }
 
 export const fmtDistance = (m: number) =>

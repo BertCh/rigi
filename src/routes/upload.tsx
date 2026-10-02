@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
 	AlertTriangle,
-	ArrowLeft,
 	Check,
 	Compass,
 	ImagePlus,
@@ -16,7 +15,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ThemeToggle } from "#/components/site/ThemeToggle";
+import { SiteNav } from "#/components/site/SiteNav";
 import { hfovFromVfov } from "#/lib/camera";
 import { DEG as D, EARTH_R } from "#/lib/geodesy";
 import type { RegionData } from "#/lib/photos";
@@ -238,19 +237,12 @@ function UploadPage() {
 							: "idle")
 			}
 		>
-			<header className="mx-auto flex max-w-6xl items-center justify-between pt-8 pb-6">
-				<Link
-					to="/"
-					className="flex items-center gap-2 text-sm text-white/60 hover:text-white"
-				>
-					<ArrowLeft className="size-4" /> Rigi
-				</Link>
-				<div className="flex items-center gap-4">
-					<p className="flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-[var(--rigi-glow)] uppercase">
-						<Compass className="size-3.5" /> Add a photo
-					</p>
-					<ThemeToggle />
-				</div>
+			{/* <main> sets the gutter here */}
+			<SiteNav active="library" className="px-0 sm:px-0" />
+			<header className="mx-auto max-w-6xl pt-8 pb-5">
+				<p className="flex items-center gap-2 text-xs font-semibold tracking-[0.18em] text-[var(--rigi-glow)] uppercase">
+					<Compass className="size-3.5" /> Add a photo
+				</p>
 			</header>
 
 			<section className="mx-auto max-w-6xl">

@@ -18,14 +18,17 @@ export const SITE_THEME =
 export function SiteNav({
 	active,
 	variant = "site",
+	className,
 }: {
 	active?: "library" | "gipfelbuch";
 	variant?: "site" | "paper";
+	/** For pages whose <main> already sets the gutter, e.g. `px-0 sm:px-0`. */
+	className?: string;
 }) {
 	const paper = variant === "paper";
 	const item = (on: boolean) =>
 		cn(
-			"rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
+			"rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition",
 			paper
 				? on
 					? "bg-[var(--khipu-lk)]/8 text-[var(--khipu-lk)]"
@@ -40,6 +43,7 @@ export function SiteNav({
 			className={cn(
 				"mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 pt-6 sm:px-8",
 				paper && "bg-[var(--khipu-w)] pb-4 text-[var(--khipu-lk)]",
+				className,
 			)}
 		>
 			<Link to="/" className="flex items-center gap-2.5">
@@ -49,7 +53,8 @@ export function SiteNav({
 				</span>
 			</Link>
 			<div className="flex items-center gap-1">
-				<a href="/#how" className={item(false)}>
+				{/* phones: the three links and the toggle do not fit beside the mark */}
+				<a href="/#how" className={cn(item(false), "max-sm:hidden")}>
 					How it works
 				</a>
 				<Link to="/library" className={item(active === "library")}>

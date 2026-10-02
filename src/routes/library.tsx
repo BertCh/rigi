@@ -157,13 +157,20 @@ function Library() {
 
 function Samples() {
 	const demo = useDemoRoll();
-	const groups = Object.entries(
+	const byRegion = Object.entries(
 		photos.reduce<Record<string, typeof photos>>((acc, p) => {
 			acc[p.region] ??= [];
 			acc[p.region].push(p);
 			return acc;
 		}, {}),
 	);
+	// trips first, largest first; one-photo places share a section instead of a row each
+	const groups = byRegion
+		.filter(([, list]) => list.length > 1)
+		.sort((a, b) => b[1].length - a[1].length);
+	const singles = byRegion.filter(([, list]) => list.length === 1);
+	const sampleDetail = (p: (typeof photos)[number]) =>
+		`${Math.round(p.heading ?? 0)}° · ${p.f35} mm · ${Math.round(p.alt ?? 0)} m`;
 	return (
 		<>
 			{demo && (
@@ -205,12 +212,31 @@ function Samples() {
 								id={p.id}
 								src={p.src}
 								label={p.id}
-								detail={`${Math.round(p.heading ?? 0)}° · ${p.f35} mm · ${Math.round(p.alt ?? 0)} m`}
+								detail={sampleDetail(p)}
 							/>
 						))}
 					</div>
 				</Section>
 			))}
+			{singles.length > 0 && (
+				<Section
+					title="More places"
+					count={`${singles.length} sample photo${singles.length === 1 ? "" : "s"}`}
+				>
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+						{singles.map(([region, [p]]) => (
+							<PhotoTile
+								key={p.id}
+								id={p.id}
+								src={p.src}
+								label={p.id}
+								place={regionNames[region] ?? region}
+								detail={sampleDetail(p)}
+							/>
+						))}
+					</div>
+				</Section>
+			)}
 		</>
 	);
 }
@@ -273,11 +299,14 @@ function PhotoTile({
 	id,
 	src,
 	label,
+	place,
 	detail,
 }: {
 	id: string;
 	src: string | null;
 	label: string;
+	/** Where the photo was taken; shown above the file name when set. */
+	place?: string;
 	detail: string;
 }) {
 	return (
@@ -290,14 +319,22 @@ function PhotoTile({
 				{src && (
 					<img
 						src={src}
-						alt={label}
+						alt={place ?? label}
 						loading="lazy"
 						className="size-full object-cover transition duration-500 group-hover:scale-[1.03]"
 					/>
 				)}
 			</div>
-			<div className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-white/55">
-				<span className="truncate font-mono" title={label}>
+			{place && (
+				<div className="truncate px-3 pt-2 text-xs font-semibold text-white/80">
+					{place}
+				</div>
+			)}
+			<div
+				className={`flex flex-wrap items-center justify-between gap-x-2 px-3 text-[11px] text-white/55 ${place ? "pt-0.5 pb-2" : "py-2"}`}
+			>
+				{/* shrink-0 + wrap: on narrow tiles the detail drops below instead of eliding the name */}
+				<span className="max-w-full shrink-0 truncate font-mono" title={label}>
 					{label}
 				</span>
 				<span className="shrink-0">{detail}</span>
