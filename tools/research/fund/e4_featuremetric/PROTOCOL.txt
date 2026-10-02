@@ -90,4 +90,17 @@ the verdict. All numbers are dev numbers, not results.
    research_notes/featuremetric-e4-2026-10-02/README.md, one negative-results.md row if KILL.
 
 AMENDMENTS
-   (none yet)
+   A1 (2026-10-02, before scoring) Eye floor: 6 of the 12 GT eyes sit below the Mapterhorn ground at the eye position
+      (the renderer then starts inside terrain). Rule added to sections 2/4: if eye < ground(Mapterhorn 8 m grid) + 1.0 m
+      the render and refinement eye is ground + 1.6 m (E3 used the same clamp); recorded per photo (eyeClamped,
+      eyeUsed in out/validation.json and the run files). Eye still fixed during the refinement.
+   A2 (2026-10-02, before scoring) Validation metric definition: the skyline of a render is the first TERRAIN-HIT row
+      per column. Rays that leave the 40 km grids still below the terrain envelope (status 2) are sky or terrain beyond
+      40 km and are not terrain. The first validation run counted them as terrain (bug; log kept as
+      out/validate_v1_nonsky_bug.log, not used); width basis for the skyline comparison is width 588 (the
+      detectSkyline/loadRGBA convention), not long side.
+   A3 (2026-10-02, before scoring) Render cells flagged status 2 or without SWISSIMAGE colour are excluded from S0 when
+      >= 25 % of the cell's 14 px patch is flagged (so the unknown far field is masked, not compared). Render margin
+      is capped at 75 deg half-field. Plumbing smoke tests (no tuning): a synthetic analytic-feature unit test (8 of 9
+      restarts recover the pose to <= 0.17 deg), and two runs on IMG_7033 with a hand-made start (GT + 5 deg) and a
+      synthetic 'photo' = render at GT. Those two runs' outputs were deleted and are not part of any score.
