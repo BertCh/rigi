@@ -115,3 +115,16 @@ not claim it before the batch measurement.
 Dawn test results (this session, node over Dawn, webgpu@0.3.0): direct-vs-bundle, uniform-rule,
 stale-keys-trap and invalidation pass at 1x and 4x with 0 differing bytes; the variants and
 incomplete checks pass. Not run: any browser, any timing.
+
+## Wired (B2w, browser-unverified)
+
+Flag `renderBundles` (onOff, default off). `BatchedTerrainCore.drawCulledBundled` replays the GPU-culled
+draws (geometry 1x and colour 4x / interactive 1x as two variants of one `RenderBundleSet` per kind).
+The CPU-cull path is not bundled (instance buffers change with the visible set; counted as `direct`).
+Keys: model, pipeline, vertexArray, every model binding (incl. the managed uniform buffers, heights,
+base grid, tile table, imagery, plugin textures), cull index/args/inst buffers, indexCount, slots and
+target size. `model.updateShaderInputs()` runs every frame before executing (Dawn cases
+"shader-inputs flush/unflushed/reflush"). Diagnostics: `terrain.stats.bundles.{geometry,color}`
+= `{hits, records, incomplete, direct, last}` (visible in engine diagnostics). Batch pass: expect
+`records` to stay flat while panning, jump on tile/atlas growth, style change, resize, 1x/4x switch.
+With the flag off the code path is the previous one (`drawCulled` now shares `encodeCulled`).

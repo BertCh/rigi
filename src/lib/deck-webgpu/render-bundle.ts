@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Render-bundle spike (wave 5, B2). NOT wired into hosts/passes.ts or batched-terrain; see
+// Render-bundle helper (wave 5, B2). Wired into batched-terrain's GPU-culled draws behind
+// ?renderBundles=on (default off); see
 // research_notes/wave5/render-bundles.md for the wiring plan and the traps found.
 //
 // A bundle records luma Model draws once (pipeline, bind groups, vertex/index buffers, draw calls)
@@ -169,6 +170,17 @@ export class RenderBundleSet {
 
 	get size(): number {
 		return this.variants.size;
+	}
+
+	/** Counters summed over the variants (diagnostics: hits vs re-records). */
+	get stats(): RenderBundleStats {
+		const total: RenderBundleStats = { records: 0, hits: 0, incomplete: 0 };
+		for (const drawBundle of this.variants.values()) {
+			total.records += drawBundle.stats.records;
+			total.hits += drawBundle.stats.hits;
+			total.incomplete += drawBundle.stats.incomplete;
+		}
+		return total;
 	}
 
 	destroy(): void {

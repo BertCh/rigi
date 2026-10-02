@@ -40,7 +40,14 @@
 // foundation.
 //
 // luma 10: nothing deck-specific here; Model / Buffer / Texture / ShaderModule only.
-import type { Buffer, CommandEncoder, Device, Texture } from "@luma.gl/core";
+import type {
+	Buffer,
+	CommandEncoder,
+	Device,
+	RenderBundleEncoder,
+	RenderPass,
+	Texture,
+} from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import {
 	BASE_MAX,
@@ -64,6 +71,11 @@ import {
 	type PrepassContext,
 	passModelProps,
 } from "../pass";
+import {
+	modelBundleKeys,
+	RenderBundleSet,
+	type RenderBundleStats,
+} from "../render-bundle";
 import {
 	DEFAULT_TERRAIN_LOOK,
 	type TerrainLook,
@@ -549,6 +561,21 @@ export type BatchedTerrainStats = {
 	cullPath: { geometry: "cpu" | "gpu"; color: "cpu" | "gpu" };
 	/** CPU ms of the core's prepass + draw, last pass of each kind */
 	cpuMs: { geometry: number; color: number };
+	/**
+	 * ?renderBundles=on diagnostics, cumulative per kind: `hits` replays of a recorded bundle,
+	 * `records` (re-)recordings, `incomplete` recordings dropped (a draw was not ready), `direct`
+	 * frames drawn the plain way while the flag was on (CPU cull, bundle unavailable).
+	 * `last` is what the latest pass of the kind did. All zero with the flag off.
+	 */
+	bundles: {
+		geometry: BundleCounters;
+		color: BundleCounters;
+	};
+};
+
+export type BundleCounters = RenderBundleStats & {
+	direct: number;
+	last: "off" | "hit" | "record" | "direct";
 };
 
 /**
@@ -585,7 +612,16 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		uploadMs: 0,
 		cullPath: { geometry: "cpu", color: "cpu" },
 		cpuMs: { geometry: 0, color: 0 },
+		bundles: {
+			geometry: { records: 0, hits: 0, incomplete: 0, direct: 0, last: "off" },
+			color: { records: 0, hits: 0, incomplete: 0, direct: 0, last: "off" },
+		},
 	};
+	/** ?renderBundles=on: per kind, the recorded GPU-culled draws (MSAA and 1x variants inside) */
+	private bundleSets: Partial<Record<"geometry" | "color", RenderBundleSet>> =
+		{};
+	/** what the bundle record callbacks encode: set by drawCulled just before executing */
+	private bundleSource: { model: Model; draw: CulledDraw } | null = null;
 	/** GPU cull (created on first use under the flag; WebGPU only) */
 	private gpuCull: TerrainGpuCull | null = null;
 	/** the GPU cull's candidates are stale (tile set changed) */
@@ -873,11 +909,17 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		model.setBindings(bindings as never);
 
 		if (culled) {
-			this.drawCulled(model, culled.draw, ctx);
+			if (!this.drawCulledBundled(model, culled.draw, ctx))
+				this.drawCulled(model, culled.draw, ctx);
 			this.stats.cpuMs[kind] = culled.ms + performance.now() - t0;
 			return;
 		}
 		model.setIndirectBuffer(null);
+		if (getFlag("renderBundles") === "on") {
+			// CPU-culled instance buffers change with the visible set: not bundled
+			this.stats.bundles[kind].direct++;
+			this.stats.bundles[kind].last = "direct";
+		}
 		let drawn = 0;
 		let draws = 0;
 		let tris = 0;
@@ -907,19 +949,107 @@ export class BatchedTerrainCore implements GpuLayerCore {
 	 * Empty slots draw nothing (instanceCount 0 in the record).
 	 */
 	private drawCulled(model: Model, d: CulledDraw, ctx: PassContext) {
-		const kind = ctx.kind as "geometry" | "color";
+		this.encodeCulled(model, d, ctx.renderPass);
+		this.noteCulledDraw(d, ctx.kind as "geometry" | "color");
+	}
+
+	private noteCulledDraw(d: CulledDraw, kind: "geometry" | "color") {
+		this.stats.drawn[kind] = this.store.slots.size;
+		this.stats.culled[kind] = -1;
+		this.stats.draws[kind] = d.slots;
+		this.stats.cullPath[kind] = "gpu";
+	}
+
+	/** One drawIndexedIndirect per slot into a pass or a bundle encoder; false if a draw was skipped. */
+	private encodeCulled(
+		model: Model,
+		d: CulledDraw,
+		target: RenderPass | RenderBundleEncoder,
+	) {
+		let complete = true;
 		model.setIndexBuffer(d.index);
 		model.setIndexCount(d.indexCount);
 		for (let s = 0; s < d.slots; s++) {
 			model.setAttributes({ row: d.inst[s] });
 			model.setIndirectBuffer(d.args, s * d.recordBytes);
-			model.draw(ctx.renderPass);
+			if (!model.draw(target)) complete = false;
 		}
 		model.setIndirectBuffer(null);
-		this.stats.drawn[kind] = this.store.slots.size;
-		this.stats.culled[kind] = -1;
-		this.stats.draws[kind] = d.slots;
-		this.stats.cullPath[kind] = "gpu";
+		return complete;
+	}
+
+	/**
+	 * ?renderBundles=on: replay the culled draws from a recorded bundle (one set per kind; the MSAA
+	 * and the interactive 1x colour passes are two variants, and two Models). Returns false when the
+	 * flag is off or no complete bundle exists yet, and the caller then draws directly. Everything
+	 * a bundle bakes is in `keys`: model, pipeline, vertex array and every binding (heights, base
+	 * grid, tile table, imagery, plugin textures, uniform buffers), the draw buffers and counts, and
+	 * the target size. Uniform CONTENTS are not baked, but Model.draw would have flushed the shader
+	 * inputs and a replay does not, so flush them here.
+	 */
+	private drawCulledBundled(model: Model, d: CulledDraw, ctx: PassContext) {
+		if (
+			this.device.type !== "webgpu" ||
+			getFlag("renderBundles") !== "on" ||
+			typeof this.device.createRenderBundleEncoder !== "function"
+		)
+			return false;
+		const kind = ctx.kind as "geometry" | "color";
+		const counters = this.stats.bundles[kind];
+		let set = this.bundleSets[kind];
+		if (!set) {
+			set = new RenderBundleSet(
+				this.device,
+				`${this.id}-${kind}`,
+				(encoder) => {
+					const source = this.bundleSource;
+					return source
+						? this.encodeCulled(source.model, source.draw, encoder)
+						: false;
+				},
+			);
+			this.bundleSets[kind] = set;
+		}
+		model.updateShaderInputs();
+		const keys = [
+			...modelBundleKeys(model),
+			d.index,
+			d.indexCount,
+			d.args,
+			d.recordBytes,
+			d.slots,
+			...d.inst,
+			ctx.target.width,
+			ctx.target.height,
+		];
+		const before = set.stats;
+		this.bundleSource = { model, draw: d };
+		let ok = false;
+		try {
+			ok = set.execute(
+				ctx.renderPass,
+				{
+					colorFormats: ctx.target.colorFormats as never,
+					depthFormat: (ctx.target.depthFormat ?? false) as never,
+					sampleCount: ctx.target.samples,
+				},
+				keys,
+			);
+		} finally {
+			this.bundleSource = null;
+		}
+		const after = set.stats;
+		counters.hits = after.hits;
+		counters.records = after.records;
+		counters.incomplete = after.incomplete;
+		if (ok) {
+			counters.last = after.records > before.records ? "record" : "hit";
+			this.noteCulledDraw(d, kind);
+		} else {
+			counters.direct++;
+			counters.last = "direct";
+		}
+		return ok;
 	}
 
 	private emptyArray() {
@@ -938,6 +1068,8 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		this.gpuCull?.destroy();
 		this.gpuCull = null;
 		this.prepared = {};
+		for (const set of Object.values(this.bundleSets)) set.destroy();
+		this.bundleSets = {};
 		this.models.destroy();
 		for (const b of this.indexBufs.values()) b.buf.destroy();
 		this.indexBufs.clear();

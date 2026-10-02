@@ -118,6 +118,15 @@ export const FLAG_SCHEMA = {
 	 */
 	terrainGpuCull: onOff("on"),
 	/**
+	 * WebGPU batched terrain: replay the GPU-culled terrain draws (geometry + colour passes) from
+	 * recorded render bundles instead of re-encoding them every frame (CPU encode cost only; pixels
+	 * identical, scripts/gpu/render-bundle-dawn.ts). Re-records on any bound-resource, pipeline or
+	 * target change; separate bundles for the MSAA and interactive 1x colour passes. Opt-in until
+	 * the batch pass measures a CPU gain (research_notes/wave5/render-bundles.md); off = the
+	 * existing per-frame encode.
+	 */
+	renderBundles: onOff("off"),
+	/**
 	 * WebGPU splat sort: luma's gpgpu GPUSort (stable radix, 17 key bits) replaces the in-house
 	 * tile/scan/scatter passes after the depth and key kernels (LF5; identical order, measured in
 	 * scripts/gpu/splat-sort-gpgpu-dawn.ts). off = the in-house radix passes.

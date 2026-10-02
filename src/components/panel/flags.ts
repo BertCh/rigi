@@ -240,6 +240,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "renderBundles",
+		label: "Terrain render bundles",
+		help: "WebGPU: replay the GPU-culled terrain draws from recorded render bundles (less CPU encode per frame, same pixels). Opt-in until the batch pass measures it.",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "terrainGpuDecode",
 		label: "Terrain GPU decode",
 		help: "WebGPU: decode the DEM tiles on the GPU straight into the terrain's height arrays; CPU heights only where labels, trails or queries ask (same heights bit for bit). Opt-in until its gates pass.",

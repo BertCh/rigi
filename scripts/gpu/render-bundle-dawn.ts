@@ -14,6 +14,8 @@
 //   invalidation       the uniform buffer is replaced by a new buffer: a stale key replays the OLD
 //                      buffer (the trap, asserted), the correct key re-records and matches direct
 //   msaa4x             same draws into a 4x MSAA target + resolve, bundle via the native-handle path
+//   shader-inputs      per-frame uniforms via model.shaderInputs: replay needs the explicit
+//                      model.updateShaderInputs() (asserted both ways), records stays 1
 //   variants           1x and 4x variants live side by side in one RenderBundleSet and both stay valid
 //   incomplete         a draw that returns false is not cached
 //
@@ -287,6 +289,88 @@ for (const sampleCount of [1, 4]) {
 	);
 	bundle.destroy();
 	models[1].setBindings({ params: paramsB });
+}
+
+// shader-inputs rule: a Model whose per-frame uniforms come through model.shaderInputs.setProps.
+// Model.draw flushes them (updateShaderInputs) at record time only, so a replay needs the explicit
+// model.updateShaderInputs() each frame (what BatchedTerrainCore.drawCulledBundled does).
+for (const sampleCount of [1, 4]) {
+	const label = `${sampleCount}x`;
+	const target = makeTarget(sampleCount);
+	const frameModule = {
+		name: "frame",
+		source: /* wgsl */ `
+struct FrameUniforms { color: vec4f, rect: vec4f, depth: vec4f };
+@group(0) @binding(auto) var<uniform> frame: FrameUniforms;
+`,
+		uniformTypes: {
+			color: "vec4<f32>",
+			rect: "vec4<f32>",
+			depth: "vec4<f32>",
+		},
+		bindingLayout: [{ name: "frame", group: 0 }],
+	};
+	const model = new Model(device, {
+		id: `inputs-${label}`,
+		source: /* wgsl */ `
+@vertex fn vertexMain(@builtin(vertex_index) index: u32) -> @builtin(position) vec4f {
+	var corners = array<vec2f, 6>(vec2f(0, 0), vec2f(1, 0), vec2f(0, 1), vec2f(0, 1), vec2f(1, 0), vec2f(1, 1));
+	let corner = corners[index];
+	return vec4f(mix(frame.rect.x, frame.rect.z, corner.x), mix(frame.rect.y, frame.rect.w, corner.y), frame.depth.x, 1.0);
+}
+@fragment fn fragmentMain() -> @location(0) vec4f { return frame.color; }
+`,
+		vertexEntryPoint: "vertexMain",
+		fragmentEntryPoint: "fragmentMain",
+		modules: [frameModule] as never,
+		topology: "triangle-list",
+		vertexCount: 6,
+		colorAttachmentFormats: [COLOR_FORMAT],
+		depthStencilAttachmentFormat: DEPTH_FORMAT,
+		parameters: { depthWriteEnabled: true, depthCompare: "less", sampleCount },
+	} as never);
+	const setFrame = (color: number[], rect: number[]) =>
+		model.shaderInputs.setProps({
+			frame: { color, rect, depth: [0.5, 0, 0, 0] },
+		} as never);
+	setFrame([1, 0, 0, 1], [-0.8, -0.8, 0.4, 0.4]);
+	await renderDirect(target, [model]);
+	const bundle = new DrawBundle(device, `inputs-${label}`, target.target, (e) =>
+		recordModels(e, [model]),
+	);
+	const run = async (flush: boolean) => {
+		if (flush) model.updateShaderInputs();
+		return renderBundled(target, bundle, modelBundleKeys(model));
+	};
+	setFrame([1, 0, 0, 1], [-0.8, -0.8, 0.4, 0.4]);
+	const first = await run(true);
+	// frame 2: new inputs, flushed explicitly, same bundle
+	setFrame([0, 1, 1, 1], [-0.2, -0.9, 0.9, 0.3]);
+	const flushed = await run(true);
+	const directFrame2 = await renderDirect(target, [model]);
+	check(
+		`shader-inputs flush ${label}`,
+		pixelDiff(flushed, directFrame2) === 0 &&
+			pixelDiff(first, flushed) > 0 &&
+			bundle.stats.records === 1,
+		`records=${bundle.stats.records} hits=${bundle.stats.hits}`,
+	);
+	// frame 3: new inputs WITHOUT the flush: the bundle shows the stale uniforms (the trap)
+	setFrame([1, 1, 0, 1], [-0.9, -0.2, 0.3, 0.9]);
+	const unflushed = await run(false);
+	const directFrame3 = await renderDirect(target, [model]);
+	check(
+		`shader-inputs unflushed is stale ${label}`,
+		pixelDiff(unflushed, directFrame3) > 0 &&
+			pixelDiff(unflushed, flushed) === 0,
+		"without model.updateShaderInputs() the replay keeps the previous frame's uniforms",
+	);
+	const reflushed = await run(true);
+	check(
+		`shader-inputs reflush ${label}`,
+		pixelDiff(reflushed, directFrame3) === 0 && bundle.stats.records === 1,
+	);
+	bundle.destroy();
 }
 
 // variants: 1x and 4x in one set, both valid after interleaved use
