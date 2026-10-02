@@ -100,5 +100,5 @@ tools/nearfield/**/*.ply
 !public/demo/thumbs/**
 !public/demo/shots/**
 !public/demo/step/**
-!public/demo/atlas/**
+!public/demo/gipfelbuch/**
 !public/demo/meta/**

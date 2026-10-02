@@ -1,0 +1,58 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+/* Role aliases: declared in every theme scope, because an alias resolves where it is declared. */
+.gb-swiss,
+.gb-swiss [data-theme="dark"] {
+	--gb-terrain: var(--gb-contour);
+	--gb-measure: var(--gb-water);
+	--gb-route: var(--gb-red);
+	--gb-peak: var(--gb-navy);
+	--gb-result: var(--gb-forest);
+}
+
+/* Full-bleed figure: the parent column clips overflow-x. */
+.tafel-root {
+	position: relative;
+	width: 100vw;
+	margin-left: calc(50% - 50vw);
+	background: var(--gb-paper-deep);
+	overflow: hidden;
+}
+
+/* The spill: terrain ink through a baked stroke mask, intersected with the fade gradients. */
+.tafel-spill {
+	position: absolute;
+	background: var(--gb-terrain);
+	pointer-events: none;
+	-webkit-mask-size: 100% 100%;
+	mask-size: 100% 100%;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-composite: source-in, source-in;
+	mask-composite: intersect, intersect;
+}
+
+.tafel-hand {
+	font-family: var(--gb-font-hand);
+	font-weight: 500;
+}
+
+.tafel-halo {
+	paint-order: stroke;
+	stroke: var(--gb-paper-deep);
+	stroke-width: 3px;
+	stroke-linejoin: round;
+}
+
+.tafel-onphoto {
+	text-shadow:
+		0 0 3px rgb(0 0 0 / 0.75),
+		0 1px 2px rgb(0 0 0 / 0.6);
+	paint-order: stroke;
+	stroke: rgb(0 0 0 / 0.3);
+	stroke-width: 1.5px;
+	stroke-linejoin: round;
+}

@@ -1,0 +1,430 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
+import { useId, useMemo, useRef } from "react";
+import {
+	HandDot,
+	HandText,
+	PenLine,
+	SketchPath,
+	SketchPolyline,
+} from "../notebook/Ink";
+import { paintPolygon } from "./paint";
+import { SheetContourRuns } from "./sheet-contour-runs";
+import { labelSizes, layoutLabels } from "./sheet-labels";
+import {
+	SHEET_ASPECT,
+	type SheetData,
+	useElementWidth,
+	useSheet,
+	useSheetRock,
+} from "./useSheet";
+
+export interface SheetMapProps {
+	className?: string;
+	/** Demo photo id (for example "demo-03") whose viewpoint is emphasised. */
+	highlight?: string;
+	/** Draw the demo camera positions with their view cones. Default true. */
+	showViewpoints?: boolean;
+}
+
+const HALO = {
+	paintOrder: "stroke",
+	stroke: "var(--gb-paper)",
+	strokeWidth: 7,
+	strokeLinejoin: "round",
+} as const;
+
+const rad = (deg: number) => (deg * Math.PI) / 180;
+/** Compass bearing to a sheet-space point offset (north up). */
+const polar = (x: number, y: number, bearing: number, r: number) =>
+	`${(x + r * Math.sin(rad(bearing))).toFixed(1)} ${(y - r * Math.cos(rad(bearing))).toFixed(1)}`;
+
+function Sheet({
+	sheet,
+	highlight,
+	showViewpoints,
+	title,
+	scale,
+}: {
+	sheet: SheetData;
+	highlight?: string;
+	showViewpoints: boolean;
+	title: string;
+	/** Rendered CSS px per sheet unit. */
+	scale: number;
+}) {
+	const uid = useId().replace(/:/g, "");
+	const { width: W, height: H } = sheet;
+	const lakeClip = `${uid}-lake`;
+	const labelId = (i: number) => `${uid}-c${i}`;
+	const lakeTint = "color-mix(in srgb, var(--gb-water) 13%, var(--gb-paper))";
+	const rock = useSheetRock(sheet.rock);
+	const sizes = useMemo(() => labelSizes(scale), [scale]);
+	const placed = useMemo(() => layoutLabels(sheet, sizes), [sheet, sizes]);
+	// minimum on-screen stroke width for the rock drawing (sheet units)
+	const floor = (px: number) => px / scale;
+	const hachureWidth = [0.9, 1.3, 1.7, 2.3].map((u, i) =>
+		Math.max(u, floor([0.45, 0.6, 0.8, 1.0][i])),
+	);
+	const mask = (id: string, href: string) => (
+		<mask id={id} maskUnits="userSpaceOnUse" x={0} y={0} width={W} height={H}>
+			<image href={href} width={W} height={H} preserveAspectRatio="none" />
+		</mask>
+	);
+	return (
+		<svg
+			viewBox={`0 0 ${W} ${H}`}
+			width="100%"
+			role="img"
+			aria-label={title}
+			style={{
+				display: "block",
+				aspectRatio: `${W} / ${H}`,
+				isolation: "isolate",
+			}}
+		>
+			<title>{title}</title>
+			<defs>
+				<clipPath id={lakeClip}>
+					<path d={sheet.lake.d} />
+				</clipPath>
+				{/* d3-contour closes rings along the grid edge; clip those closing segments away */}
+				<clipPath id={`${uid}-inner`}>
+					<rect x={3} y={3} width={W - 6} height={H - 6} />
+				</clipPath>
+				{mask(`${uid}-sun`, sheet.relief.sun)}
+				{mask(`${uid}-shade`, sheet.relief.shade)}
+				{sheet.contours.labels.map((l, i) => (
+					<path key={l.ele} id={labelId(i)} d={l.d} />
+				))}
+			</defs>
+			<rect width={W} height={H} fill="var(--gb-paper)" />
+			{/* lake tint under the relief so the flat water grey multiplies into it */}
+			<path d={sheet.lake.d} fill={lakeTint} />
+			{/* I4 / I6: grey relief, then a cool ink through the shade mask and a warm ink through the sun mask, as overprint */}
+			<image
+				href={sheet.relief.src}
+				width={W}
+				height={H}
+				preserveAspectRatio="none"
+				opacity={0.75}
+				style={{ mixBlendMode: "multiply" }}
+			/>
+			<rect
+				width={W}
+				height={H}
+				fill="var(--gb-navy)"
+				mask={`url(#${uid}-shade)`}
+				opacity={0.16}
+				style={{ mixBlendMode: "multiply" }}
+			/>
+			<rect
+				width={W}
+				height={H}
+				fill="var(--gb-sign-light)"
+				mask={`url(#${uid}-sun)`}
+				opacity={0.32}
+				style={{ mixBlendMode: "multiply" }}
+			/>
+			{/* water-lining: wide soft strokes of the shoreline, clipped to the lake, fading inwards */}
+			<g
+				clipPath={`url(#${lakeClip})`}
+				fill="none"
+				stroke="var(--gb-water)"
+				strokeLinejoin="round"
+			>
+				<path d={sheet.lake.d} strokeWidth={34} opacity={0.1} />
+				<path d={sheet.lake.d} strokeWidth={22} opacity={0.14} />
+				<path d={sheet.lake.d} strokeWidth={12} opacity={0.2} />
+			</g>
+			<path
+				d={sheet.lake.d}
+				fill="none"
+				stroke="var(--gb-water)"
+				strokeWidth={2.4}
+				strokeLinejoin="round"
+			/>
+			{/* R7 / R8: rock hachures and scree, integer quarter-unit paths */}
+			{rock && (
+				<g transform={`scale(${1 / rock.quantum})`} fill="none">
+					<g fill="var(--gb-ink)" opacity={0.8}>
+						{rock.scree.map((d, i) => (
+							// biome-ignore lint/suspicious/noArrayIndexKey: fixed tiers
+							<path key={i} d={d} />
+						))}
+					</g>
+					<g stroke="var(--gb-ink)" strokeLinecap="butt" strokeLinejoin="round">
+						{rock.hachures.map((d, i) => (
+							<path
+								// biome-ignore lint/suspicious/noArrayIndexKey: fixed tiers
+								key={i}
+								d={d}
+								strokeWidth={hachureWidth[i] * rock.quantum}
+								opacity={[0.55, 0.68, 0.8, 0.9][i]}
+							/>
+						))}
+					</g>
+				</g>
+			)}
+			<g clipPath={`url(#${uid}-inner)`}>
+				<SheetContourRuns sheet={sheet} />
+			</g>
+			{scale > 0.22 && (
+				<g
+					fill="var(--gb-contour)"
+					className="gb-coord"
+					style={{ fontSize: sizes.contour }}
+				>
+					{sheet.contours.labels.map((l, i) => (
+						<text
+							key={l.ele}
+							dy={sizes.contour * 0.3}
+							{...HALO}
+							strokeWidth={sizes.contour * 0.4}
+						>
+							<textPath
+								href={`#${labelId(i)}`}
+								startOffset="50%"
+								textAnchor="middle"
+							>
+								{l.ele}
+							</textPath>
+						</text>
+					))}
+				</g>
+			)}
+			<text
+				x={sheet.lake.label[0]}
+				y={sheet.lake.label[1]}
+				textAnchor="middle"
+				className="gb-water"
+				fill="var(--gb-water)"
+				style={{
+					fontSize: sizes.lake,
+					letterSpacing: "0.32em",
+					fontStyle: "italic",
+				}}
+			>
+				{sheet.lake.name}
+			</text>
+			<g
+				fill="var(--gb-ink)"
+				className="gb-caps"
+				style={{ fontSize: sizes.place }}
+			>
+				{placed.places.map((p) => (
+					<g key={p.name}>
+						<HandDot x={p.x} y={p.y} r={5.5} seed={`place-${p.name}`} />
+						<text
+							x={p.x + 12}
+							y={p.y + 7}
+							{...HALO}
+							strokeWidth={sizes.place * 0.3}
+						>
+							{p.name}
+						</text>
+					</g>
+				))}
+			</g>
+			<g>
+				{sheet.peaks.map((p) => (
+					<path
+						key={p.name}
+						d={paintPolygon(
+							[
+								[p.x, p.y - 11],
+								[p.x + 9, p.y + 5],
+								[p.x - 9, p.y + 5],
+							],
+							`peak-${p.name}`,
+							1.2,
+						)}
+						fill="var(--gb-ink)"
+					/>
+				))}
+				{placed.peaks.map((p) => {
+					const x = p.x + (p.flip ? -15 : 15);
+					return (
+						<g
+							key={p.name}
+							textAnchor={p.flip ? "end" : "start"}
+							fill="var(--gb-navy)"
+						>
+							<text
+								x={x}
+								y={p.y - 7}
+								style={{
+									fontSize: sizes.peak,
+									fontWeight: 500,
+									...HALO,
+									strokeWidth: sizes.peak * 0.26,
+								}}
+							>
+								{p.name}
+							</text>
+							<text
+								x={x}
+								y={p.y - 7 + sizes.spot * 1.1}
+								className="gb-coord"
+								style={{
+									fontSize: sizes.spot,
+									...HALO,
+									strokeWidth: sizes.spot * 0.3,
+								}}
+							>
+								{p.ele}
+							</text>
+						</g>
+					);
+				})}
+			</g>
+			{showViewpoints && (
+				<g>
+					{sheet.viewpoints.map((v) => {
+						const on = v.id === highlight;
+						const a0 = v.yaw - v.hfov / 2;
+						const a1 = v.yaw + v.hfov / 2;
+						const r = on ? 260 : 340;
+						return (
+							<g key={v.id} opacity={highlight && !on ? 0.45 : 1}>
+								<path
+									d={`M${v.x} ${v.y}L${polar(v.x, v.y, a0, r)}A${r} ${r} 0 0 1 ${polar(v.x, v.y, a1, r)}z`}
+									fill="var(--gb-red)"
+									fillOpacity={on ? 0.24 : 0}
+								/>
+								{on && (
+									<SketchPath
+										d={`M${v.x} ${v.y}L${polar(v.x, v.y, a0, r)}A${r} ${r} 0 0 1 ${polar(v.x, v.y, a1, r)}z`}
+										seed={`cone-${v.id}`}
+										color="red"
+										width={1.6}
+										opacity={0.85}
+										dash={v.solved ? undefined : "6 5"}
+										tolerance={1.5}
+									/>
+								)}
+								<PenLine
+									from={[v.x, v.y]}
+									to={
+										polar(v.x, v.y, v.yaw, r + 14)
+											.split(" ")
+											.map(Number) as [number, number]
+									}
+									seed={`ray-${v.id}`}
+									color="red"
+									width={on ? 3 : 2.6}
+									dash={v.solved ? undefined : "6 5"}
+								/>
+								<HandDot
+									x={v.x}
+									y={v.y}
+									r={on ? 12 : 9}
+									seed={`vp-halo-${v.id}`}
+									color="var(--gb-paper)"
+									opacity={1}
+								/>
+								<HandDot
+									x={v.x}
+									y={v.y}
+									r={on ? 8 : 5.5}
+									seed={`vp-${v.id}`}
+									color="red"
+									opacity={1}
+								/>
+								{on && (
+									<HandText x={v.x + 16} y={v.y - 14} color="red" size={32}>
+										{v.id.replace("demo-", "№ ")}
+									</HandText>
+								)}
+							</g>
+						);
+					})}
+					{!highlight && sheet.viewpoints.length > 0 && (
+						<ViewpointCallout points={sheet.viewpoints} />
+					)}
+				</g>
+			)}
+			<text
+				x={W - 14}
+				y={H - 14}
+				textAnchor="end"
+				fill="var(--gb-ink)"
+				opacity={0.32}
+				style={{ fontSize: sizes.credit, ...HALO, strokeWidth: 5 }}
+			>
+				{sheet.credit}
+			</text>
+		</svg>
+	);
+}
+
+/** Index-page hero: the Niederhorn / Thunersee sheet with contours, relief, peaks and the demo viewpoints. */
+export function SheetMap({
+	className,
+	highlight,
+	showViewpoints = true,
+}: SheetMapProps) {
+	const state = useSheet();
+	const ref = useRef<HTMLDivElement>(null);
+	const width = useElementWidth(ref);
+	const title =
+		"Map sheet of Niederhorn and Lake Thun with 20 metre contours, shaded relief, named summits and the camera positions of the demo photographs";
+	const box = { aspectRatio: String(SHEET_ASPECT), width: "100%" } as const;
+	if (state.status === "ready")
+		return (
+			<div className={className} ref={ref}>
+				<Sheet
+					scale={width / state.sheet.width}
+					sheet={state.sheet}
+					highlight={highlight}
+					showViewpoints={showViewpoints}
+					title={title}
+				/>
+			</div>
+		);
+	return (
+		<div className={className} ref={ref}>
+			<div
+				role="img"
+				aria-label={
+					state.status === "error"
+						? "Map sheet unavailable"
+						: "Loading map sheet"
+				}
+				style={{
+					...box,
+					background: "var(--gb-paper-deep)",
+					opacity: state.status === "loading" ? 0.6 : 1,
+				}}
+			/>
+		</div>
+	);
+}
+
+/** One label for the cluster of demo cameras, with a leader out to open ground. */
+function ViewpointCallout({ points }: { points: { x: number; y: number }[] }) {
+	const cx = points.reduce((t, p) => t + p.x, 0) / points.length;
+	const cy = points.reduce((t, p) => t + p.y, 0) / points.length;
+	const lx = cx - 150;
+	const ly = cy - 190;
+	return (
+		<g>
+			<SketchPolyline
+				points={[
+					[cx, cy],
+					[lx, ly],
+					[lx - 230, ly],
+				]}
+				seed="standorte-leader"
+				color="red"
+				width={2.4}
+				tolerance={1.5}
+			/>
+			<HandText x={lx - 230} y={ly - 12} color="red" size={40} halo>
+				{points.length} Standorte
+			</HandText>
+		</g>
+	);
+}

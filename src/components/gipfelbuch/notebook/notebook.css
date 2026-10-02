@@ -1,0 +1,263 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+/* The Gipfelbuch field notebook: graph paper, a margin rule, pencil and two inks. The page is a
+ * paper object, so it stays light on both the dark site ground and the Swiss sheet theme; inks
+ * borrow the sheet's --gb-* separations when they are in scope. */
+
+/* Ink tokens: available anywhere on the Gipfelbuch (sheet pages and the notebook). */
+.gb-swiss,
+.nb-book {
+	/* One paper: inside .gb-swiss these are the sheet's own paper; standalone .nb-book falls back. */
+	--nb-paper: var(--gb-paper, #f3efe4);
+	--nb-paper-deep: var(
+		--gb-paper-deep,
+		color-mix(in srgb, var(--nb-paper) 80%, #baaf96)
+	);
+	--nb-ink: var(--gb-ink, #2c3337 /* LC */);
+	--nb-pencil: var(--gb-pencil, #49423d); /* GR */
+	--nb-faint: color-mix(in srgb, var(--nb-ink) 52%, var(--nb-paper));
+	--nb-red: var(--gb-red, #bf2233);
+	--nb-blue: var(--gb-water, #30626b);
+	--nb-brown: var(--gb-contour, #95500c);
+	--nb-forest: var(--gb-forest, #575e4e);
+	--nb-navy: var(--gb-navy, #002f55);
+	--nb-highlight: color-mix(
+		in srgb,
+		var(--gb-sign-light, #ffdb8b) 75%,
+		transparent
+	);
+	/* Soft grid: a quiet baseline guide, not a printed pad. The index ruling is barely heavier. */
+	--nb-grid: color-mix(in srgb, var(--nb-blue) 6%, transparent);
+	--nb-grid-index: color-mix(in srgb, var(--nb-blue) 8%, transparent);
+	--nb-hand: var(--gb-font-hand);
+}
+
+.nb-book {
+	color: var(--nb-ink);
+	background-color: var(--nb-paper);
+	/* The graph paper is the baseline grid: one cell is one 24px line (--gb-line). */
+	background-image:
+		linear-gradient(var(--nb-grid-index) 1px, transparent 1px),
+		linear-gradient(90deg, var(--nb-grid-index) 1px, transparent 1px),
+		linear-gradient(var(--nb-grid) 1px, transparent 1px),
+		linear-gradient(90deg, var(--nb-grid) 1px, transparent 1px);
+	background-size:
+		120px 120px,
+		120px 120px,
+		24px 24px,
+		24px 24px;
+	background-position: -1px -1px;
+	font-family: var(--gb-font-sans);
+}
+
+.nb-hand {
+	font-family: var(--nb-hand);
+	font-weight: 500;
+	font-feature-settings:
+		"calt" 1,
+		"liga" 1;
+	letter-spacing: 0.005em;
+}
+
+.nb-hand-small {
+	font-family: var(--gb-font-hand-small);
+	font-weight: 450;
+	font-variation-settings:
+		"INFM" 35,
+		"BNCE" 0,
+		"SPAC" 10;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Same label as .gb-caps (design book T7): condensed 500, +0.12em, case-sensitive forms. */
+.nb-label {
+	font-family: var(--gb-font-condensed);
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	font-feature-settings: "case" 1;
+}
+
+.nb-num {
+	font-family: var(--gb-font-mono);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Highlighter stroke behind a phrase: a slightly tilted band, not a box. */
+.nb-mark {
+	background-image: linear-gradient(
+		100deg,
+		transparent 0.2em,
+		var(--nb-highlight) 0.4em,
+		var(--nb-highlight) calc(100% - 0.3em),
+		transparent 100%
+	);
+	background-size: 100% 0.62em;
+	background-position: 0 72%;
+	background-repeat: no-repeat;
+	padding: 0 0.15em;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+/* A concept name in the notebook: inked, with a wavy pen underline. */
+.nb-term {
+	color: var(--nb-ink);
+	text-decoration-line: underline;
+	text-decoration-style: solid;
+	text-decoration-color: color-mix(in srgb, var(--nb-red) 35%, transparent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 4px;
+	transition: text-decoration-color 160ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nb-term {
+		transition: none;
+	}
+}
+
+.nb-term:hover,
+.nb-term:focus-visible {
+	text-decoration-color: var(--nb-red);
+}
+
+.nb-book :focus-visible {
+	outline: 2px solid var(--nb-red);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/* Strokes drawn on when their entry scrolls into view. Entries only arm the effect on the client
+ * outside automation, so a static render (or a screenshot) always shows every stroke. */
+.nb-armed .nb-draw {
+	stroke-dasharray: 1;
+	stroke-dashoffset: 1;
+}
+
+.nb-armed.nb-on .nb-draw {
+	animation: nb-draw 900ms cubic-bezier(0.55, 0.1, 0.3, 1) forwards;
+	animation-delay: var(--nb-delay, 0ms);
+}
+
+@keyframes nb-draw {
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+/* Draw-on substitute for filled strokes. */
+.nb-armed .nb-fade {
+	opacity: 0;
+}
+
+.nb-armed.nb-on .nb-fade {
+	animation: nb-fade 600ms ease-out forwards;
+	animation-delay: var(--nb-delay, 0ms);
+}
+
+@keyframes nb-fade {
+	to {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nb-armed .nb-draw,
+	.nb-armed.nb-on .nb-draw {
+		animation: none;
+		stroke-dasharray: none;
+		stroke-dashoffset: 0;
+	}
+
+	.nb-armed .nb-fade,
+	.nb-armed.nb-on .nb-fade {
+		animation: none;
+		opacity: 1;
+	}
+}
+
+/* A pasted print: real photographs are never tinted or filtered. */
+.nb-print {
+	background: var(--gb-white, #f4f4f4); /* W */
+	padding: 4px 4px 22px;
+}
+
+/* Tape is retired (the soft look has no paper props); the span stays for layout compatibility. */
+
+/* Native range inputs anywhere in the Gipfelbuch: a solid 4px track in the paper-deep tone, a
+ * 16px ink thumb with a paper ring (regression R8: the pen hairline read as no control at all).
+ * Keyboard and ARIA stay native; only the drawing changes. */
+.gb-swiss input[type="range"],
+.nb-book input[type="range"] {
+	appearance: none;
+	-webkit-appearance: none;
+	height: 20px;
+	background: transparent;
+	cursor: pointer;
+}
+
+.gb-swiss input[type="range"]::-webkit-slider-runnable-track,
+.nb-book input[type="range"]::-webkit-slider-runnable-track {
+	height: 4px;
+	border-radius: 2px;
+	background: color-mix(
+		in srgb,
+		var(--gb-ink, #131313) 22%,
+		var(--gb-paper, #f6f4ee)
+	);
+}
+
+.gb-swiss input[type="range"]::-moz-range-track,
+.nb-book input[type="range"]::-moz-range-track {
+	height: 4px;
+	border-radius: 2px;
+	background: color-mix(
+		in srgb,
+		var(--gb-ink, #131313) 22%,
+		var(--gb-paper, #f6f4ee)
+	);
+}
+
+.gb-swiss input[type="range"]::-moz-range-progress,
+.nb-book input[type="range"]::-moz-range-progress {
+	height: 4px;
+	border-radius: 2px;
+	background: var(--gb-red, #bf2233);
+}
+
+.gb-swiss input[type="range"]::-webkit-slider-thumb,
+.nb-book input[type="range"]::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	width: 16px;
+	height: 16px;
+	margin-top: -6px;
+	border-radius: 50%;
+	background: var(--gb-ink, #131313);
+	box-shadow: 0 0 0 2px var(--gb-paper, #f6f4ee);
+}
+
+.gb-swiss input[type="range"]::-moz-range-thumb,
+.nb-book input[type="range"]::-moz-range-thumb {
+	width: 16px;
+	height: 16px;
+	border: 0;
+	border-radius: 50%;
+	background: var(--gb-ink, #131313);
+	box-shadow: 0 0 0 2px var(--gb-paper, #f6f4ee);
+}
+
+.gb-swiss input[type="range"]:focus-visible,
+.nb-book input[type="range"]:focus-visible {
+	outline: 2px solid var(--nb-red);
+	outline-offset: 3px;
+}
+
+@media (forced-colors: active) {
+	.nb-book {
+		background-image: none;
+	}
+}

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blattübersicht rig</title>
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Manrope:wght@600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+<style>
+header.ix { padding: 36px 0 24px; max-width: 760px; }
+header.ix h1 { margin: 18px 0 0; font-size: 56px; line-height: 60px; }
+header.ix p { margin: 18px 0 0; color: var(--gb-secondary); }
+.chapter { padding-top: 72px; }
+.chapter .ch { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 48px; align-items: end; }
+.chapter .ch h2 { margin: 6px 0 0; }
+.chapter .ch p { margin: 0; color: var(--gb-secondary); }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 24px; padding-top: 24px; }
+.card { display: block; color: inherit; text-decoration: none; }
+.card svg { display: block; width: 100%; height: auto; border-radius: 2px; }
+.card .row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.card .no { position: relative; width: 30px; height: 30px; flex: none; display: grid; place-items: center; color: var(--gb-route); }
+.card .no svg { position: absolute; inset: 0; }
+.card .title { font: 600 16px/24px "GB Sans", sans-serif; }
+.card .sub { margin: 2px 0 0 40px; }
+.card .val { margin: 4px 0 0 40px; color: var(--gb-ink); }
+body { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; --grid: color-mix(in srgb, #30626b 8%, transparent); }
+.card { position: relative; }
+.card::before { content: ""; position: absolute; top: -14px; left: 0; right: -24px; height: 3px; background: repeating-linear-gradient(90deg, var(--gb-route) 0 14px, #fff 14px 20px, var(--gb-route) 20px 34px, transparent 34px 42px); opacity: .85; }
+.grid > .card:nth-child(3n)::before, .grid > .card:last-child::before { right: 0; }
+.picker { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 24px; align-items: center; }
+.picker button { all: unset; cursor: pointer; display: grid; gap: 2px; justify-items: center; }
+.picker img { width: 48px; height: 36px; object-fit: cover; border-radius: 2px; opacity: .75; }
+.picker button[aria-pressed="true"] img { opacity: 1; outline: 2px solid var(--gb-route); outline-offset: 2px; }
+.tagebuch { margin-top: 10px; font-size: 16px; color: var(--gb-measure); }
+.tagebuch .mono { color: var(--gb-ink); font-size: 13px; }
+.card .step { font: 500 13px/18px "GB Mono", monospace; color: var(--gb-route); }
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chapter .ch { grid-template-columns: 1fr; gap: 6px; } }
+@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } header.ix h1 { font-size: 40px; line-height: 48px; } }
+</style>
+</head>
+<body>
+<div class="col">
+  <nav class="site"><span class="brand">Rigi</span><span class="links"><span>How it works</span><span>My library</span><b>Gipfelbuch</b></span></nav>
+  <header class="ix">
+    <div class="kicker" style="color:var(--gb-terrain)">Topographisches Gipfelbuch der Rigi · Blatt 1–19</div>
+    <h1 class="serif">How a photograph finds its place on the earth.</h1>
+    <p class="lead">Nineteen sheets, three chapters, one day on Niederhorn. Pick a photo: every band below is re-drawn from its measured run.</p><div class="picker" id="picker"></div>
+  </header>
+  <div id="chapters"></div>
+</div>
+<script src="data-v4.js"></script>
+<script src="common.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+let mode = q.get("photo") || "follow"; let followed = q.get("id") || "demo-01";
+const N = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+const CHAPTERS = [
+  { t: "Which way was it pointing?", p: "The phone's compass is often wrong by degrees. These sheets read the photo, predict the terrain and slide one onto the other.",
+    ids: ["photo", "camera-prior", "skyline", "dem-horizon", "viewport-inference", "pose-estimate", "accept-rule", "tap-a-peak", "baseline-pipeline"] },
+  { t: "Where is the ground, really?", p: "GPS and maps disagree with the ground. These sheets pin the eye, the summits and the depth to the terrain model.",
+    ids: ["dem-source", "terrain-sampler", "eye-rule", "peak", "terrain-snapping", "dem-anchoring"] },
+  { t: "What the pose makes possible", p: "With the camera known, the photo becomes a window onto the map, a place in a roll, a scene you can step into.",
+    ids: ["rigi", "photo-workspace", "camera-roll", "step-inside"] },
+];
+const OWN = { photo: "demo-03", "camera-prior": "demo-09", skyline: "demo-01", "dem-horizon": "demo-06", "viewport-inference": "demo-09", "pose-estimate": "demo-02", "accept-rule": "demo-11", "tap-a-peak": "demo-04", "baseline-pipeline": "demo-01", "peak": "demo-06", rigi: "demo-01", "photo-workspace": "demo-01" };
+const photoFor = (id) => (mode === "follow" ? followed : OWN[id] || "demo-01");
+
+const W = 400, H = 150;
+function band(svg, id, P, opts = {}) {
+  const [a, b] = opts.rows || bandOf(P, 0.18, 150); const s = W / P.w, sy = H / ((b - a) * s); const k = Math.max(s, s * sy);
+  const off = -a * k + (H - (b - a) * k) / 2;
+  el("image", { href: `/demo/photos/${opts.id}.jpg`, x: (W - P.w * k) / 2, y: off, width: P.w * k, height: P.h * k, preserveAspectRatio: "none" }, svg);
+  return { k, ox: (W - P.w * k) / 2, oy: off };
+}
+const line = (P, rows, g, k, ox, oy, attrs, step = 1) => { let d = "", on = false; for (let c = 0; c < 800; c += step) { const r = rows[c]; if (r == null || (attrs.voted && P.weight[c] <= 0)) { on = false; continue; } d += (on ? "L" : "M") + (ox + (c + .5) * k).toFixed(1) + " " + (oy + r * k).toFixed(1); on = true; } const { voted, ...rest } = attrs; return el("path", { d, fill: "none", "stroke-linejoin": "round", ...rest }, g); };
+const halo = (P, rows, g, k, ox, oy, color, extra = {}) => { line(P, rows, g, k, ox, oy, { stroke: "#fff", "stroke-opacity": .75, "stroke-width": 4, voted: extra.voted }); line(P, rows, g, k, ox, oy, { stroke: color, "stroke-width": 2, ...extra }); };
+function demPatch(svg, P, ink) {
+  el("image", { href: P.dem.src, x: 0, y: (H - W) / 2, width: W, height: W, preserveAspectRatio: "none" }, svg);
+  const cx = W / 2, cy = H / 2, R = 180; const yaw = P.solved.yaw * RAD, hf = P.solved.hfov / 2 * RAD;
+  const p1 = [cx + Math.sin(yaw - hf) * R, cy - Math.cos(yaw - hf) * R], p2 = [cx + Math.sin(yaw + hf) * R, cy - Math.cos(yaw + hf) * R];
+  return { cx, cy, p1, p2 };
+}
+const LAYERS = {
+  photo(svg, P, id, ink) { band(svg, id, P, { id, rows: [0, P.h] }); const g = el("g", {}, svg); const t = new Date(P.takenAt);
+    [`${P.w * 2.56 | 0}×${P.h * 2.56 | 0}`, `${P.gps.lat.toFixed(4)}, ${P.gps.lon.toFixed(4)}`, `alt ${Math.round(P.gps.alt)} m ±${Math.round(P.gps.hAccuracy)}`, `compass ${P.sensor.heading.toFixed(1)}°`].forEach((s, i) => text(g, 10, 20 + i * 15, s, { class: "micro", fill: "#fff", style: "text-shadow:0 1px 2px rgba(0,0,0,.8)" })); },
+  "camera-prior"(svg, P, id, ink) { const { k, ox, oy } = band(svg, id, P, { id }); halo(P, P.priorRows, svg, k, ox, oy, "#bf2233", { "stroke-dasharray": "6 4" }); },
+  skyline(svg, P, id) { const { k, ox, oy } = band(svg, id, P, { id }); let d = ""; for (let c = 0; c < 800; c += 3) if (P.weight[c] > 0) d += `M${(ox + c * k).toFixed(1)} ${(oy + P.rows[c] * k + 2).toFixed(1)}v${(P.weight[c] * 9).toFixed(1)}`; el("path", { d, stroke: "#e59e1f", "stroke-width": 1.2 }, svg); halo(P, P.rows, svg, k, ox, oy, "#30626b", { voted: true }); },
+  "dem-horizon"(svg, P, id, ink) { // no photo: the terrain's own panorama, depth-faded
+    const az0 = P.profile[0].az, az1 = P.profile.at(-1).az; const X = (az) => (az - az0) / (az1 - az0) * W; const Y = (e) => H * .55 - e * 14;
+    for (const smp of P.profile) for (const [e, d] of smp.ridges) { if (d < 900) continue; const t = Math.min(1, Math.log(d / 900) / Math.log(60)); el("circle", { cx: X(smp.az), cy: Y(e), r: 1.4 - .6 * t, fill: ink("--gb-terrain"), "fill-opacity": .9 - .55 * t }, svg); }
+    el("path", { d: polyline(P.profile.map((p) => [X(p.az), Y(p.el)])), stroke: ink("--gb-ink"), "stroke-width": 1.6, fill: "none" }, svg); },
+  "viewport-inference"(svg, P, id) { const { k, ox, oy } = band(svg, id, P, { id }); halo(P, P.priorRows, svg, k, ox, oy, "#bf2233", { "stroke-dasharray": "6 4" }); halo(P, P.rows, svg, k, ox, oy, "#30626b", { voted: true }); },
+  "pose-estimate"(svg, P, id) { const { k, ox, oy } = band(svg, id, P, { id }); let d = ""; for (let c = 0; c < 800; c += 4) if (P.weight[c] > 0) { const x = ox + c * k; d += `M${x.toFixed(1)} ${(oy + P.rows[c] * k).toFixed(1)}L${x.toFixed(1)} ${(oy + P.solvedRows[c] * k).toFixed(1)}`; } halo(P, P.solvedRows, svg, k, ox, oy, "#e0626d"); el("path", { d, stroke: "#fff", "stroke-width": 1.2 }, svg); },
+  "accept-rule"(svg, P, id, ink) { const { k, ox, oy } = band(svg, id, P, { id }); halo(P, P.solvedRows, svg, k, ox, oy, "#bf2233", { "stroke-dasharray": "3 4" }); el("path", { d: `M${W - 60} ${H / 2 - 16}l32 32M${W - 28} ${H / 2 - 16}l-32 32`, stroke: "#fff", "stroke-width": 2.4, style: "filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))" }, svg); },
+  "tap-a-peak"(svg, P, id) { const { k, ox, oy } = band(svg, id, P, { id }); P.peaks.filter((p) => p.labelled && p.solved && oy + p.solved[1] * k > 16).slice(0, 3).forEach((p, i) => { const x = ox + p.solved[0] * k, y = oy + p.solved[1] * k; el("path", { d: penCircle(x, y, 11, 11, "tap" + i), stroke: "#fff", "stroke-width": 1.6, fill: "none" }, svg); el("circle", { cx: x, cy: y, r: 2.4, fill: "#fff" }, svg); }); },
+  "baseline-pipeline"(svg, P, id, ink) { const w3 = W / 3; const cl = (i) => { const c = el("clipPath", { id: `bp${i}` }, svg); el("rect", { x: i * w3 + 2, y: 0, width: w3 - 4, height: H }, c); return `url(#bp${i})`; };
+    const g0 = el("g", { "clip-path": cl(0) }, svg); el("image", { href: `/demo/photos/${id}.jpg`, x: -40, y: -30, width: 260, height: 195 }, g0);
+    const g1 = el("g", { "clip-path": cl(1) }, svg); el("image", { href: `/demo/gipfelbuch/${id}-sky.jpg`, x: w3 - 40, y: -30, width: 260, height: 195 }, g1);
+    const g2 = el("g", { "clip-path": cl(2) }, svg); el("image", { href: `/demo/photos/${id}.jpg`, x: 2 * w3 - 40, y: -30, width: 260, height: 195 }, g2);
+    const k = 260 / 800; let d = ""; for (let c = 0; c < 800; c++) { const x = 2 * w3 - 40 + c * k; if (x < 2 * w3 + 2) continue; d += (d ? "L" : "M") + x.toFixed(1) + " " + (-30 + P.solvedRows[c] * k).toFixed(1); } el("path", { d, stroke: "#30626b", "stroke-width": 2, fill: "none" }, g2); },
+  "dem-source"(svg, P, id, ink) { demPatch(svg, P, ink); },
+  "terrain-sampler"(svg, P, id, ink) { const { cx, cy } = demPatch(svg, P, ink); el("path", { d: `M${cx - 14} ${cy}h28M${cx} ${cy - 14}v28`, stroke: "#fff", "stroke-width": 1.4 }, svg); el("path", { d: penCircle(cx, cy, 8, 8, "ts"), stroke: "#fff", "stroke-width": 1.4, fill: "none" }, svg); },
+  "eye-rule"(svg, P, id, ink) { const pts = P.terrain.points.filter((p) => p[0] < 2500); const e0 = P.gps.eye; const xs = (d) => 20 + d / 2500 * (W - 40), ymin = Math.min(...pts.map((p) => p[1])) - 20, ymax = e0 + 40; const ys = (e) => H - 16 - (e - ymin) / (ymax - ymin) * (H - 30);
+    const d = polyline(pts.map((p) => [xs(p[0]), ys(p[1])])); el("path", { d: d + `L${xs(pts.at(-1)[0])} ${H}L${xs(0)} ${H}Z`, fill: ink("--gb-paper-deep") }, svg); el("path", { d, stroke: ink("--gb-terrain"), "stroke-width": 1.6, fill: "none" }, svg);
+    el("line", { x1: xs(0), x2: xs(0), y1: ys(pts[0][1]), y2: ys(e0), stroke: ink("--gb-route"), "stroke-width": 2 }, svg); el("circle", { cx: xs(0), cy: ys(e0), r: 3.5, fill: ink("--gb-route") }, svg); },
+  peak(svg, P, id) { const { k, ox, oy } = band(svg, id, P, { id }); P.peaks.filter((p) => p.labelled && p.solved && oy + p.solved[1] * k > 40 && ox + p.solved[0] * k > 30 && ox + p.solved[0] * k < W - 30).slice(0, 4).forEach((p) => { const x = ox + p.solved[0] * k, y = oy + p.solved[1] * k; el("line", { x1: x, x2: x, y1: y - 18, y2: y - 3, stroke: "#fff", "stroke-width": .8 }, svg); el("circle", { cx: x, cy: y, r: 2.2, fill: "#fff" }, svg); text(svg, x, y - 22, p.name, { "text-anchor": "middle", "font-size": 11, "font-weight": 600, fill: "#fff", style: "text-shadow:0 1px 2px rgba(0,0,0,.7)", "font-family": "GB Sans" }); }); },
+  "terrain-snapping"(svg, P, id, ink) { const { cx, cy, p1, p2 } = demPatch(svg, P, ink); el("path", { d: `M${cx} ${cy}L${p1[0]} ${p1[1]}L${p2[0]} ${p2[1]}Z`, fill: "#bf2233", "fill-opacity": .25, stroke: "#bf2233", "stroke-width": 1.4 }, svg); el("circle", { cx, cy, r: 3.5, fill: "#bf2233" }, svg); },
+  "dem-anchoring"(svg, P, id, ink) { const pts = P.terrain.points; const dmax = pts.at(-1)[0]; const xs = (d) => 12 + Math.log1p(d / 50) / Math.log1p(dmax / 50) * (W - 24); const lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1])); const ys = (e) => H - 12 - (e - lo) / (hi - lo) * (H - 28);
+    const d = polyline(pts.map((p) => [xs(p[0]), ys(p[1])])); el("path", { d, stroke: ink("--gb-terrain"), "stroke-width": 1.6, fill: "none" }, svg); [100, 1000, 10000].forEach((m) => { if (m > dmax) return; el("line", { x1: xs(m), x2: xs(m), y1: H - 10, y2: H - 4, stroke: ink("--gb-secondary") }, svg); text(svg, xs(m), H - 14, m >= 1000 ? `${m / 1000} km` : `${m} m`, { "text-anchor": "middle", class: "micro", fill: ink("--gb-secondary") }); }); },
+  rigi(svg, P, id) { el("image", { href: "/demo/shots/demo-01-overlay.jpg", x: 0, y: -90, width: W, height: 300, preserveAspectRatio: "none" }, svg); },
+  "photo-workspace"(svg, P, id) { el("image", { href: "/demo/shots/hero.jpg", x: 0, y: -80, width: W, height: 300, preserveAspectRatio: "none" }, svg); },
+  "camera-roll"(svg, P, id, ink) { const ids = Object.keys(DATA.photos); const X = (yaw) => ((yaw - 100 + 360) % 360) / 360 * (W - 40) + 20;
+    el("line", { x1: 0, x2: W, y1: 22, y2: 22, stroke: ink("--gb-hairline") }, svg); ["S", "W", "N", "E"].forEach((c, i) => text(svg, X([180, 270, 0, 90][i]), 16, c, { "text-anchor": "middle", class: "micro", fill: ink("--gb-route") }));
+    ids.forEach((pid, i) => { const Q = DATA.photos[pid]; const x = X(Q.solved.yaw); const w = 40, h = Q.h / Q.w * w; el("image", { href: `/demo/thumbs/${pid}.jpg`, x: x - w / 2, y: 34 + (i % 3) * 30, width: w, height: h, preserveAspectRatio: "xMidYMid slice", opacity: Q.solved.accepted ? 1 : .45 }, svg); el("line", { x1: x, x2: x, y1: 22, y2: 34 + (i % 3) * 30, stroke: ink("--gb-secondary"), "stroke-width": .8 }, svg); }); },
+  "step-inside"(svg, P, id) { el("rect", { width: W, height: H, fill: "#131313" }, svg); el("image", { href: "/demo/shots/drape.jpg", x: 0, y: -60, width: W, height: 270, preserveAspectRatio: "none", opacity: .9 }, svg); },
+};
+const VALUE = {
+  photo: (P) => `${P.gps.lat.toFixed(3)}, ${P.gps.lon.toFixed(3)} · ±${Math.round(P.gps.hAccuracy)} m`,
+  "camera-prior": (P) => `compass ${P.sensor.heading.toFixed(1)}° · solved ${P.solved.yaw.toFixed(1)}°`,
+  skyline: (P) => `${P.weight.filter((w) => w > 0).length}/800 columns · ${P.ms.skyline} ms`,
+  "dem-horizon": (P) => `${P.profile.length} azimuths · ${P.ms.horizon} ms`,
+  "viewport-inference": (P) => `Δyaw ${P.solved.delta.yaw > 0 ? "+" : ""}${P.solved.delta.yaw.toFixed(1)}° · ${P.residual.prior.median.toFixed(1)} → ${P.residual.solved.median.toFixed(1)} px`,
+  "pose-estimate": (P) => `residual ${P.solved.residualPx.toFixed(1)} px · ${Math.round(P.solved.inlierFraction * 100)}% inliers`,
+  "accept-rule": (P) => `confidence ${P.solved.confidence.toFixed(2)} · ${P.solved.accepted ? "accepted" : "refused"}`,
+  "tap-a-peak": (P) => `${P.peaks.filter((p) => p.labelled).length} named peaks in view`,
+  "baseline-pipeline": (P) => `${P.ms.horizon + P.ms.skyline + P.ms.solve} ms end to end`,
+  "dem-source": (P) => `±${P.dem.halfKm} km · ${P.dem.min}–${P.dem.max} m`,
+  "terrain-sampler": (P) => `ground ${P.gps.ground.toFixed(1)} m under the camera`,
+  "eye-rule": (P) => `eye ${P.gps.eye.toFixed(1)} m · ground ${P.gps.ground.toFixed(1)} m`,
+  peak: (P) => `${P.peaks.length} visible summits`,
+  "terrain-snapping": (P) => `view cone ${P.solved.hfov.toFixed(0)}° at ${P.solved.yaw.toFixed(0)}°`,
+  "dem-anchoring": (P) => `depth to ${(P.terrain.points.at(-1)[0] / 1000).toFixed(0)} km along the view`,
+  rigi: () => `10 of 12 demo photos aligned`,
+  "photo-workspace": () => `overlay · align · pin · export`,
+  "camera-roll": () => `12 photos · one viewpoint`,
+  "step-inside": () => `splats on the DEM`,
+};
+</script><script src="layers2.js"></script><script>
+const host = document.getElementById("chapters");
+function render() {
+  host.innerHTML = "";
+  CHAPTERS.forEach((ch, ci) => {
+    const sec = document.createElement("section"); sec.className = "chapter";
+    sec.innerHTML = `<div class="ch"><div><div class="kicker" style="color:var(--gb-terrain)">Kapitel ${["I", "II", "III"][ci]} · Blatt ${ch.ids.map((i) => N[i].i).sort((a, b) => a - b).join(", ")}</div><h2 class="h2">${ch.t}</h2></div><div><p>${ch.p}</p><p class="tagebuch hand">${TAGEBUCH[ci](DATA.photos[followed])}</p></div></div><div class="grid"></div>`;
+    const grid = sec.querySelector(".grid");
+    for (const id of ch.ids) {
+      const n = N[id], pid = photoFor(id), P = DATA.photos[pid];
+      const a = document.createElement("a"); a.className = "card"; a.href = "#";
+      const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": n.title });
+      const cp = el("clipPath", { id: `c-${id}` }, svg); el("rect", { width: W, height: H, rx: 2 }, cp);
+      const g = el("g", { "clip-path": `url(#c-${id})` }, svg);
+      a.appendChild(svg); grid.appendChild(a); // in DOM so tokens resolve
+      if (!["rigi", "photo-workspace", "step-inside", "photo"].includes(id) && !LAYERS[id].length) {}
+      if (["dem-horizon", "eye-rule", "dem-anchoring", "camera-roll"].includes(id)) el("rect", { width: W, height: H, fill: tok(a, "--gb-paper") }, g);
+      LAYERS[id](g, P, pid, (v) => tok(a, v));
+      const no = String(n.i).padStart(2, "0");
+      a.insertAdjacentHTML("beforeend", `<div class="row"><span class="no micro">${no}<svg viewBox="0 0 30 30"><path d="${penCircle(15, 15, 13, 12, "n" + id)}" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></span><span class="title">${n.title}</span><span class="step" style="margin-left:auto">${["I", "II", "III"][ci]}.${ch.ids.indexOf(id) + 1}</span></div><div class="sub caption">${n.tagline}</div><div class="val micro">${VALUE[id](P)}</div>`);
+    }
+    host.appendChild(sec);
+  });
+}
+const pk = document.getElementById("picker");
+for (const pid of Object.keys(DATA.photos)) { const b = document.createElement("button"); b.innerHTML = `<img src="/demo/thumbs/${pid}.jpg" alt=""><span class="micro">${pid.slice(5)} ${DATA.photos[pid].solved.accepted ? "✓" : "✗"}</span>`; b.setAttribute("aria-pressed", String(pid === followed)); b.onclick = () => { followed = pid; mode = "follow"; for (const o of pk.children) o.setAttribute("aria-pressed", "false"); b.setAttribute("aria-pressed", "true"); render(); }; pk.appendChild(b); }
+document.fonts.ready.then(render);
+</script>
+</body>
+</html>

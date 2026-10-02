@@ -1,0 +1,59 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+/* MarginNote (design book H6). Narrow: an indented inline note. Wide (>= 1024px): the note sits in
+ * the page's margin lane, columns 11-12 of ConceptPage's 12-column grid, level with its mark.
+ * Percentages refer to the prose column (columns 3-8, 24px gaps): the lane starts at
+ * 133.333% + 32px and is 33.333% - 16px wide. The rail owns columns 9-10. */
+
+.gb-mn-mark {
+	margin-inline-start: 1px;
+	font-size: 11px;
+	line-height: 0;
+	vertical-align: super;
+	color: var(--gb-red);
+}
+
+.gb-mn-note {
+	display: block;
+	margin: 6px 0 6px 24px;
+}
+
+.gb-mn-note > .gb-mn-ref {
+	margin-inline-end: 6px;
+	color: var(--gb-red);
+}
+
+@media (min-width: 1024px) {
+	/* Tufte fallback: float into the right margin; stacks with clear: right. */
+	.gb-mn-note {
+		float: right;
+		clear: right;
+		width: calc(33.333% - 16px);
+		margin: 0 calc(-66.667% - 16px) 0 0;
+	}
+
+	/* Gwern/Baseline path: pin the note to its mark. Needs a positioned prose column. */
+	@supports (anchor-name: --a) {
+		.gb-mn-note {
+			float: none;
+			position: absolute;
+			position-anchor: var(--gb-mn-anchor);
+			top: anchor(top);
+			left: calc(133.333% + 32px);
+			margin: 0;
+		}
+	}
+}
+
+@media print {
+	.gb-mn-note,
+	.gb-mn-note:where(*) {
+		position: static;
+		float: none;
+		width: auto;
+		margin: 6px 0 6px 24px;
+	}
+}

@@ -1,0 +1,354 @@
+<!doctype html>
+<!-- Rigi
+     SPDX-License-Identifier: MIT
+     SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+     Peak-notebook design prototype (v3). Not app code: see ../../peak-notebook-plan.md. -->
+<html lang="en" data-theme="day">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Peak notebook prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Fira+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Fira+Sans+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=Architects+Daughter&family=Manrope:wght@500;600&display=swap" rel="stylesheet" />
+<script>
+  const q = new URLSearchParams(location.search);
+  document.documentElement.dataset.theme = q.get("theme") || "day";
+  document.documentElement.dataset.v = q.get("v") || "1";
+</script>
+<style>
+/* ---- tokens: one set of roles, two sheets ---- */
+:root, [data-theme="day"] {
+  --paper: color-mix(in srgb, #f4f4f4 90%, #ffdb8b);         /* W 90 + YY 10 */
+  --paper-deep: color-mix(in srgb, var(--paper) 82%, #baaf96); /* + LG */
+  --ink: #131313;          /* LK */
+  --ink-2: #4a545c;        /* BG secondary */
+  --ink-3: color-mix(in srgb, #4a545c 70%, var(--paper));
+  --terrain: #95500c;      /* NB contour */
+  --terrain-soft: color-mix(in srgb, #95500c 55%, var(--paper));
+  --measure: #30626b;      /* GL water = image-measured */
+  --route: #bf2233;        /* SR */
+  --peak: #002f55;         /* PB */
+  --result: #575e4e;       /* GG */
+  --sign: #e59e1f;         /* SY */
+  --halo: var(--paper);
+  --grain: .05;
+  --grid: color-mix(in srgb, #30626b 10%, transparent);
+}
+[data-theme="night"], [data-theme="split"] .heroZone {
+  --paper: #131313;        /* LK — the landing ground */
+  --paper-deep: color-mix(in srgb, #131313 88%, #2c3337); /* + LC */
+  --ink: #f4f4f4;          /* W */
+  --ink-2: color-mix(in srgb, #f4f4f4 62%, #131313);
+  --ink-3: color-mix(in srgb, #f4f4f4 40%, #131313);
+  --terrain: #bb8b54;      /* YB — the landing's glow is the night contour ink */
+  --terrain-soft: color-mix(in srgb, #bb8b54 55%, #131313);
+  --measure: color-mix(in srgb, #30626b 45%, #f4f4f4); /* GL lifted */
+  --route: color-mix(in srgb, #bf2233 75%, #f4f4f4);
+  --peak: #f4f4f4;
+  --result: #8d917a;       /* PG */
+  --sign: #e59e1f;
+  --halo: #131313;
+  --grain: .035;
+  --grid: color-mix(in srgb, #f4f4f4 5%, transparent);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper); color: var(--ink);
+  font: 16.5px/1.6 "Fira Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+body::before { /* paper grain */
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50; opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+[data-theme="night"] body::before { mix-blend-mode: screen; }
+.heroZone { background: var(--paper); color: var(--ink); padding-bottom: 56px; }
+[data-theme="split"] .heroZone + .col { padding-top: 24px; }
+.col { max-width: 1152px; margin: 0 auto; padding: 0 32px; }
+.caps { font: 600 11px/1 "Fira Sans Condensed", sans-serif; letter-spacing: .16em; text-transform: uppercase; }
+.mono { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+.hand { font-family: "Architects Daughter", cursive; }
+.serif { font-family: Fraunces, Georgia, serif; font-optical-sizing: auto; font-variation-settings: "opsz" 144; }
+
+nav { display: flex; justify-content: space-between; align-items: center; height: 72px; }
+nav .brand { font: 600 17px Manrope, sans-serif; letter-spacing: -.01em; }
+nav .links { display: flex; gap: 24px; font-size: 13px; color: var(--ink-2); }
+nav .links b { color: var(--ink); font-weight: 500; }
+
+/* ---- hero ---- */
+@media (max-width: 720px) { .hero, .beat { grid-template-columns: 1fr !important; gap: 28px !important; } h1 { font-size: 44px !important; } .beat .text { position: static !important; } .multiples { grid-template-columns: 1fr !important; } .posts { grid-template-columns: 1fr !important; } .col { padding: 0 16px !important; } .tafel figcaption { flex-direction: column; padding: 0 16px; } nav .links { display: none; } }
+.hero { padding: 40px 0 8px; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 48px; align-items: end; }
+.eyebrow { color: var(--terrain); display: flex; gap: 14px; align-items: center; }
+.eyebrow .sheetno { color: var(--route); }
+h1 { margin: 18px 0 0; font-size: 76px; line-height: .98; font-weight: 600; letter-spacing: -.012em; text-wrap: balance; }
+.claim { margin: 22px 0 0; max-width: 34em; font-size: 19px; line-height: 1.5; color: var(--ink-2); }
+.claim b { color: var(--ink); font-weight: 500; }
+.ledger { display: grid; gap: 18px; padding-bottom: 6px; }
+.ledger .row { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: baseline; }
+.ledger .n { font: 500 30px/1 "IBM Plex Mono", monospace; letter-spacing: -.02em; }
+.ledger .n small { font-size: 15px; color: var(--ink-3); }
+.ledger .l { color: var(--ink-2); font-size: 13px; line-height: 1.35; }
+.ledger .h { grid-column: 1 / -1; font-size: 15px; color: var(--measure); margin-top: -2px; }
+
+/* ---- the Tafel: full-bleed panorama table ---- */
+.tafel { position: relative; margin: 36px 0 0; width: 100vw; left: 50%; transform: translateX(-50%); }
+.tafel svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tafel figcaption { margin: 10px auto 0; max-width: 1152px; padding: 0 32px; display: flex; justify-content: space-between; gap: 24px; font-size: 12px; color: var(--ink-3); }
+.tafel figcaption .mono { font-size: 11px; }
+
+/* ---- beats ---- */
+.beat { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 56px; padding: 120px 0 0; }
+.beat .text { position: sticky; top: 96px; align-self: start; }
+.beat h2 { margin: 12px 0 0; font-variation-settings: normal; font-size: 40px; line-height: 1.06; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+.beat p { color: var(--ink-2); margin: 16px 0 0; }
+.beat p b { color: var(--ink); font-weight: 500; }
+.kicker { color: var(--terrain); }
+.fig { position: relative; }
+.fig svg { width: 100%; height: auto; display: block; overflow: visible; }
+.figcap { margin-top: 10px; font-size: 12px; color: var(--ink-3); display: flex; gap: 12px; }
+.figcap .no { color: var(--terrain); }
+
+/* small multiples */
+.multiples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px 24px; padding-top: 28px; }
+.multiples .m svg { width: 100%; height: auto; display: block; }
+.multiples .m .t { margin-top: 8px; font-size: 12.5px; color: var(--ink-2); line-height: 1.4; }
+.multiples .m .t .mono { color: var(--ink); }
+
+/* signposts */
+.posts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 140px 0 40px; }
+.post { background: var(--paper-deep); padding: 22px 26px 26px; }
+.post .caps { color: var(--ink-3); }
+.post .serif { font-size: 30px; font-weight: 600; margin-top: 10px; }
+.post p { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); }
+.post.next { text-align: right; }
+.colophon { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 18px 0 60px; font-size: 11px; color: var(--ink-3); }
+.colophon .mono { color: var(--ink-2); }
+
+/* draw-on (scroll-driven where supported) */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+  }
+}
+</style>
+</head>
+<body>
+<div class="heroZone"><div class="col">
+  <nav><span class="brand">Rigi</span><span class="links"><span>How it works</span><span>My library</span><b>Gipfelbuch</b></span></nav>
+
+  <header class="hero">
+    <div>
+      <div class="eyebrow caps"><span class="sheetno">Blatt 10 / 19</span><span>Evidence</span><span style="color:var(--ink-3)">Skyline</span></div>
+      <h1 class="serif">Where the mountain meets the sky.</h1>
+      <p class="claim">The skyline is the one line a phone photo reliably shows. Rigi traces it <b>column by column</b>, and says how sure it is of each, so the pose search can trust the crests and ignore the glare.</p>
+    </div>
+    <div class="ledger" id="ledger"></div>
+  </header>
+</div>
+
+<figure class="tafel" id="tafel"><svg id="tafelSvg"></svg>
+  <figcaption><span>Niederhorn, 7 Sept 2026, 15:28 · the detected skyline (blue) continues into the elevation model's horizon past the frame; peak names from the solved pose.</span><span class="mono">demo-01 · scripts/gipfelbuch/build-data.ts</span></figcaption>
+</figure></div>
+
+<div class="col">
+  <section class="beat">
+    <div class="text">
+      <div class="kicker caps">01 · The idea</div>
+      <h2 class="serif">Every column casts one vote, with a confidence.</h2>
+      <p>The pose search never sees the photo. It gets <b>one number per column</b>: the height of the skyline, plus how much to trust it.</p>
+      <p>A good detector is honest per column: sure on a clean crest, silent behind a roof.</p>
+    </div>
+    <div class="fig"><svg id="votes"></svg><div class="figcap"><span class="no caps">Fig. 1</span><span>Each tick is one of 800 columns; its height is the weight it gets in the solve. Gaps are columns that abstain.</span></div></div>
+  </section>
+
+  <section class="beat">
+    <div class="text">
+      <div class="kicker caps">02 · Where it fails</div>
+      <h2 class="serif">Unsure columns abstain. Occluders are the real enemy.</h2>
+      <p>Glare and dark foregrounds only remove votes. A person on the ridge is worse: <b>it looks like a real edge</b>.</p>
+    </div>
+    <div class="fig"><div class="multiples" id="multiples"></div></div>
+  </section>
+
+  <div class="posts">
+    <div class="post"><div class="caps">← Blatt 09</div><div class="serif">The photo</div><p>What a phone file carries before any terrain is involved.</p></div>
+    <div class="post next"><div class="caps">Blatt 11 →</div><div class="serif">DEM horizon</div><p>The skyline the terrain predicts, for any camera.</p></div>
+  </div>
+  <div class="colophon"><span>Code <span class="mono">src/lib/geo/skyline.ts</span></span><span><span class="mono">src/lib/refine/skyline-clean.ts</span></span><span>Reports <span class="mono">reports/leaderboard.md</span></span><span>Measured 2026-10-01 · terrarium DEM</span></div>
+</div>
+
+<script src="data.js"></script>
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const R = Math.PI / 180;
+let tokenEl = document.documentElement;
+const css = (v) => getComputedStyle(tokenEl).getPropertyValue(v).trim();
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+function rng(seed) { let s = 0; for (const c of seed) s = (s * 31 + c.charCodeAt(0)) | 0; return () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function penLine(x1, y1, x2, y2, seed, j = 0.8) { const r = rng(seed); const n = Math.max(2, Math.round(Math.hypot(x2 - x1, y2 - y1) / 18)); let d = ""; for (let i = 0; i <= n; i++) { const t = i / n; const k = i && i < n ? 1 : .3; d += (i ? "L" : "M") + (x1 + (x2 - x1) * t + (r() - .5) * j * k).toFixed(1) + " " + (y1 + (y2 - y1) * t + (r() - .5) * j * k).toFixed(1); } return d; }
+function penCircle(cx, cy, rx, ry, seed) { const r = rng(seed); let d = ""; const a0 = r() * 6; for (let i = 0; i <= 26; i++) { const a = a0 + i / 24 * Math.PI * 2.08; const k = 1 + (r() - .5) * .06; d += (i ? "L" : "M") + (cx + Math.cos(a) * rx * k).toFixed(1) + " " + (cy + Math.sin(a) * ry * k).toFixed(1); } return d; }
+function penArrow(x1, y1, x2, y2, seed, bend = 18) { const L = Math.hypot(x2 - x1, y2 - y1); const mx = (x1 + x2) / 2 - (y2 - y1) / L * bend, my = (y1 + y2) / 2 + (x2 - x1) / L * bend; const a = Math.atan2(y2 - my, x2 - mx); const h = 8; return `M${x1} ${y1}Q${mx} ${my} ${x2} ${y2}M${x2 - h * Math.cos(a - .45)} ${y2 - h * Math.sin(a - .45)}L${x2} ${y2}L${x2 - h * Math.cos(a + .45)} ${y2 - h * Math.sin(a + .45)}`; }
+const text = (parent, x, y, str, attrs = {}) => { const t = el("text", { x, y, ...attrs }, parent); t.textContent = str; return t; };
+
+const D = DATA["demo-01"], S = D.solved;
+function projector(Sv) { return (az, elv) => {
+  const daz = ((az - Sv.yaw + 540) % 360 - 180) * R, e = elv * R, p = Sv.pitch * R, r = -Sv.roll * R;
+  const x = Math.cos(e) * Math.sin(daz), z = Math.cos(e) * Math.cos(daz), y = Math.sin(e);
+  const z2 = z * Math.cos(p) + y * Math.sin(p), y2 = y * Math.cos(p) - z * Math.sin(p);
+  const u = Sv.f * x / z2, v = -Sv.f * y2 / z2;
+  return [400 + u * Math.cos(r) - v * Math.sin(r), 300 + u * Math.sin(r) + v * Math.cos(r)]; }; }
+const project = projector(S);
+const gapsOf = (w, min = 12) => { const g = []; let st = -1; for (let c = 0; c <= w.length; c++) { const off = c < w.length && w[c] <= 0; if (off && st < 0) st = c; if (!off && st >= 0) { if (c - st > min) g.push([st, c]); st = -1; } } return g; };
+
+const voted = D.skyline.weight.filter((w) => w > 0).length;
+document.getElementById("ledger").innerHTML = `
+  <div class="row"><span class="n">${voted}<small> / 800</small></span><span class="l">columns vote<br>the rest abstain</span></div>
+  <div class="row"><span class="n">${D.residual.solved.median.toFixed(1)}<small> px</small></span><span class="l">median miss against<br>the terrain, once solved</span></div>
+  <div class="row"><span class="n">${D.ms.skyline}<small> ms</small></span><span class="l">on a laptop CPU<br>at 800 px wide</span></div>
+  <div class="row"><span class="h hand">re-read from the run on this photo ↓</span></div>`;
+
+function drawTafel() {
+  const svg = document.getElementById("tafelSvg"); svg.innerHTML = "";
+  tokenEl = svg;
+  const W = innerWidth, phone = W < 720, photoW = phone ? W - 32 : Math.min(1000, W * 0.64), s = photoW / 800;
+  const crop0 = 120, crop1 = 455, bandH = (crop1 - crop0) * s;
+  const top = 92, ox = (W - photoW) / 2, oy = top, H = top + bandH + 64;
+  const fy = oy - crop0 * s; // y of the full photo's top
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.style.height = H + "px";
+  const P = (az, e) => { const [x, y] = project(az, e); return [ox + x * s, fy + y * s]; };
+  const defs = el("defs", {}, svg);
+  const lg = el("linearGradient", { id: "hf", x1: 0, x2: 1 }, defs);
+  [[0, 0], [0.12, 1], [0.88, 1], [1, 0]].forEach(([o, a]) => el("stop", { offset: o, "stop-color": "#fff", "stop-opacity": a }, lg));
+  const vg = el("linearGradient", { id: "vf", x1: 0, x2: 0, y1: 0, y2: 1 }, defs);
+  [[0, 1], [0.7, 1], [1, 0]].forEach(([o, a]) => el("stop", { offset: o, "stop-color": "#fff", "stop-opacity": a }, vg));
+  // spill = the landing's baked ridge strokes (a luminance mask) re-inked in the terrain ink
+  const SB = DATA.surround, imgW = photoW / SB.photo.w, imgH = imgW * SB.height / SB.width;
+  const ix = ox - SB.photo.x * imgW, iy = fy - SB.photo.y * imgH;
+  const strokes = el("mask", { id: "strokes", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: W, height: H }, defs);
+  for (let k = 0; k < 2; k++) el("image", { href: SB.src, x: ix, y: iy, width: imgW, height: imgH, preserveAspectRatio: "none" }, strokes);
+  const fade = el("mask", { id: "fade", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: W, height: H }, defs);
+  el("rect", { x: 0, y: 0, width: W, height: H, fill: "url(#hf)" }, fade);
+  const g0 = el("g", { mask: "url(#fade)" }, svg);
+  el("rect", { x: 0, y: 0, width: W, height: H - 30, fill: css("--terrain"), mask: "url(#strokes)" }, g0);
+
+  // compass ruler: the sheet's graticule
+  const card = { 180: "S", 225: "SW", 270: "W", 315: "NW", 0: "N", 90: "E", 135: "SE", 45: "NE" };
+  const azAt = (x) => S.yaw + Math.atan((x - ox - photoW / 2) / (S.f * s)) / R;
+  const ry = 36;
+  el("path", { d: penLine(0, ry, W, ry, "rule", .35), stroke: css("--ink-3"), "stroke-width": .8, fill: "none" }, g0);
+  for (let a = Math.ceil(azAt(0) / 5) * 5; a <= azAt(W); a += 5) {
+    const [x] = P(a, 0); const lab = a % 15 === 0, c = card[(a + 360) % 360];
+    el("line", { x1: x, x2: x, y1: ry, y2: ry + (lab ? 9 : 5), stroke: css("--ink-3"), "stroke-width": lab ? 1 : .7 }, g0);
+    if (lab || c) text(g0, x, ry - 9, c || `${(a + 360) % 360}°`, { "text-anchor": "middle", class: "mono", "font-size": 11, fill: c ? css("--route") : css("--ink-3"), "font-weight": c ? 600 : 400 });
+  }
+
+  // the photo band
+  const clip = el("clipPath", { id: "pc" }, defs); el("rect", { x: ox, y: oy, width: photoW, height: bandH, rx: 2 }, clip);
+  const g = el("g", { "clip-path": "url(#pc)" }, svg);
+  el("image", { href: "/demo/photos/demo-01.jpg", x: ox, y: fy, width: photoW, height: 600 * s, preserveAspectRatio: "none" }, g);
+  const rows = D.skyline.rows, w = D.skyline.weight;
+  // confidence ticks under the line, then the traced line with a paper halo
+  let ticks = ""; for (let c = 0; c < 800; c += 2) if (w[c] > 0) ticks += `M${(ox + (c + .5) * s).toFixed(1)} ${(fy + rows[c] * s + 2).toFixed(1)}v${(w[c] * 16).toFixed(1)}`;
+  el("path", { d: ticks, stroke: "#e59e1f", "stroke-width": 1.1, "stroke-opacity": .85 }, g);
+  let dd = "", on = false; for (let c = 0; c < 800; c++) { if (w[c] <= 0) { on = false; continue; } dd += (on ? "L" : "M") + (ox + (c + .5) * s).toFixed(1) + " " + (fy + rows[c] * s).toFixed(1); on = true; }
+  el("path", { d: dd, fill: "none", stroke: "#fff", "stroke-opacity": .75, "stroke-width": 4.5, "stroke-linejoin": "round" }, g);
+  el("path", { d: dd, fill: "none", stroke: "#30626b", "stroke-width": 2, "stroke-linejoin": "round" }, g);
+
+  // peak names, two tiers, collision on the wider of name and sub line
+  const peaks = D.peaks.filter((p) => p.distance > 1500).sort((a, b) => b.ele - a.ele);
+  const placed = [];
+  for (const p of peaks) {
+    const [x, y] = P(p.az, p.el); if (x < 40 || x > W - 40 || y < oy - 30) continue;
+    const inP = x > ox + 6 && x < ox + photoW - 6; if (inP && !p.labelled) continue; if (phone && !inP) continue; if (inP && placed.filter((q) => q.inP).length >= (phone ? 3 : 6)) continue;
+    const wd = Math.max(p.name.length * 6.8, 92) + 18;
+    let tier = [0, 1].find((t) => !placed.some((q) => q.tier === t && Math.abs(q.x - x) < (q.w + wd) / 2));
+    if (tier === undefined) continue;
+    placed.push({ x, y, p, w: wd, tier, inP }); if (placed.length > 14) break;
+  }
+  const lab = el("g", {}, svg);
+  for (const { x, y, p, tier, inP } of placed) {
+    const ly = y - 22 - tier * 28;
+    const ink = inP ? "#fff" : css("--peak"), sub = inP ? "rgba(255,255,255,.75)" : css("--ink-3");
+    el("line", { x1: x, x2: x, y1: ly + 4, y2: y - 3, stroke: ink, "stroke-opacity": .6, "stroke-width": .8 }, lab);
+    el("circle", { cx: x, cy: y, r: 2.2, fill: ink }, lab);
+    const halo = inP ? { style: "text-shadow: 0 1px 3px rgba(0,0,0,.55)" } : { stroke: css("--paper"), "stroke-width": 3, "paint-order": "stroke" };
+    text(lab, x, ly - 10, p.name, { "text-anchor": "middle", "font-size": 12, "font-weight": 600, fill: ink, "font-family": "Fira Sans", ...halo });
+    text(lab, x, ly + 1, `${Math.round(p.ele)} m · ${(p.distance / 1000).toFixed(p.distance < 10000 ? 1 : 0)} km`, { "text-anchor": "middle", "font-size": 9.5, fill: sub, class: "mono", ...(inP ? halo : {}) });
+  }
+
+  // the observer's notes
+  const notes = el("g", {}, svg);
+  const gaps = gapsOf(w); if (gaps.length) {
+    const [a, b] = gaps.reduce((m, q) => (q[1] - q[0] > m[1] - m[0] ? q : m));
+    const x1 = ox + a * s, x2 = ox + b * s, yb = fy + Math.max(rows[a - 1] ?? 0, rows[b] ?? 0) * s + 34;
+    el("path", { d: penCircle((x1 + x2) / 2, yb - 26, (x2 - x1) / 2 + 12, 20, "gapc"), stroke: css("--route"), "stroke-width": 1.6, fill: "none" }, notes);
+    const tx = (x1 + x2) / 2 + 40, ty = yb + 46;
+    text(notes, tx, ty, `glare: ${b - a} columns abstain`, { class: "hand", "font-size": 16, fill: "#fff", style: "text-shadow: 0 1px 3px rgba(0,0,0,.6)" });
+    el("path", { d: penArrow(tx - 4, ty - 14, (x1 + x2) / 2 + 8, yb - 8, "ga", -10), stroke: "#fff", "stroke-width": 1.3, fill: "none" }, notes);
+  }
+  if (!phone) { const nx = ox + photoW + 26, ny = fy + rows[790] * s + 60;
+  text(notes, nx, ny, "traced in the photo", { class: "hand", "font-size": 16, fill: css("--measure") });
+  text(notes, nx, ny + 21, "carried on by the terrain →", { class: "hand", "font-size": 16, fill: css("--terrain") });
+  el("path", { d: penArrow(nx + 10, ny - 16, ox + photoW - 18, fy + rows[780] * s + 8, "arrow1", 16), stroke: css("--measure"), "stroke-width": 1.3, fill: "none" }, notes); }
+  tokenEl = document.documentElement;
+}
+
+function drawVotes() {
+  const svg = document.getElementById("votes"); svg.innerHTML = "";
+  const W = 760, s = W / 800, rows = D.skyline.rows, w = D.skyline.weight;
+  const c0 = 150, bandH = (420 - c0) * s, y0 = bandH + 86, hh = 56, H = y0 + 52;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const defs = el("defs", {}, svg); const cp = el("clipPath", { id: "vc" }, defs); el("rect", { x: 0, y: 0, width: W, height: bandH, rx: 2 }, cp);
+  const g = el("g", { "clip-path": "url(#vc)" }, svg);
+  el("image", { href: "/demo/photos/demo-01.jpg", x: 0, y: -c0 * s, width: W, height: 600 * s, preserveAspectRatio: "none" }, g);
+  let d = ""; for (let c = 0; c < 800; c++) { if (w[c] <= 0) continue; d += `M${((c + .5) * s).toFixed(1)} ${((rows[c] - c0) * s).toFixed(1)}v${(-w[c] * 24).toFixed(1)}`; }
+  el("path", { d, stroke: "#e59e1f", "stroke-width": .9 }, g);
+  // column-aligned leader rules from photo to strip (every 100 columns)
+  for (let c = 0; c <= 800; c += 100) el("line", { x1: c * s, x2: c * s, y1: bandH + 6, y2: y0 + 4, stroke: css("--grid"), "stroke-width": 1 }, svg);
+  const hp = el("pattern", { id: "hach", width: 5, height: 5, patternUnits: "userSpaceOnUse", patternTransform: "rotate(-45)" }, defs);
+  el("line", { x1: 0, y1: 0, x2: 0, y2: 5, stroke: css("--terrain"), "stroke-width": 1 }, hp);
+  let area = `M0 ${y0}`; for (let c = 0; c < 800; c++) area += `L${((c + .5) * s).toFixed(1)} ${(y0 - w[c] * hh).toFixed(1)}`; area += `L${W} ${y0}Z`;
+  el("path", { d: area, fill: "url(#hach)" }, svg);
+  let line = ""; for (let c = 0; c < 800; c++) line += (c ? "L" : "M") + ((c + .5) * s).toFixed(1) + " " + (y0 - w[c] * hh).toFixed(1);
+  el("path", { d: line, fill: "none", stroke: css("--terrain"), "stroke-width": 1.4, class: "draw", pathLength: 1 }, svg);
+  el("path", { d: penLine(0, y0, W, y0, "axis", .3), stroke: css("--ink-3"), "stroke-width": 1, fill: "none" }, svg);
+  text(svg, 0, y0 + 18, "column 0", { class: "mono", "font-size": 11, fill: css("--ink-3") });
+  text(svg, W, y0 + 18, "799", { "text-anchor": "end", class: "mono", "font-size": 11, fill: css("--ink-3") });
+  text(svg, 0, y0 - hh - 8, "weight 1.0", { class: "mono", "font-size": 11, fill: css("--ink-3") });
+  const best = gapsOf(w).reduce((m, q) => (q[1] - q[0] > m[1] - m[0] ? q : m));
+  const cx = (best[0] + best[1]) / 2 * s;
+  el("path", { d: penCircle(cx, y0 - 10, (best[1] - best[0]) * s / 2 + 12, 20, "gapc"), stroke: css("--route"), "stroke-width": 1.5, fill: "none" }, svg);
+  text(svg, cx + (best[1] - best[0]) * s / 2 + 20, y0 + 36, `silent: ${best[1] - best[0]} columns of glare`, { class: "hand", "font-size": 15, fill: css("--route") });
+}
+
+function drawMultiples() {
+  const host = document.getElementById("multiples"); host.innerHTML = "";
+  const cases = [
+    ["demo-09", "Haze", "far ridges fade, so fewer columns are sure"],
+    ["demo-07", "Rejected", "too few clean crests: the gate says no"],
+    ["demo-11", "Occluder", "hair on the ridge looks like an edge"],
+    ["demo-12", "Rescued", "only the refine stage accepts it"],
+  ];
+  cases.forEach(([id, tag, note], i) => {
+    const d = DATA[id]; const w = d.skyline.weight; const v = w.filter((x) => x > 0).length;
+    const pw = d.photo.width, ph = d.photo.height; const Wv = 560, s = Wv / pw, Hb = 200;
+    const ys = d.skyline.rows.filter((_, k) => w[k] > 0).sort((a, b) => a - b); const mid = (ys[ys.length >> 1] ?? ph / 2) * s;
+    const off = Math.min(0, Math.max(Hb - ph * s, Hb * 0.55 - mid));
+    let tk = ""; d.skyline.rows.forEach((r, c) => { if (w[c] > 0 && c % 2 === 0) tk += `M${((c + .5) * s).toFixed(1)} ${(r * s + off + 1).toFixed(1)}v${(w[c] * 12).toFixed(1)}`; });
+    const acc = d.solved.accepted;
+    const m = document.createElement("div"); m.className = "m";
+    m.innerHTML = `<svg viewBox="0 0 ${Wv} ${Hb}"><defs><clipPath id="mc${i}"><rect width="${Wv}" height="${Hb}" rx="2"/></clipPath></defs><g clip-path="url(#mc${i})"><image href="/demo/photos/${id}.jpg" x="0" y="${off}" width="${Wv}" height="${ph * s}" preserveAspectRatio="none"/><path d="${tk}" stroke="#e59e1f" stroke-width="1"/></g></svg>
+      <div class="t"><span class="caps" style="color:${acc ? "var(--result)" : "var(--route)"}">${tag}</span> &nbsp;<span class="mono">${v}/800</span> vote · <span class="mono">${d.residual.solved.median.toFixed(1)} px</span> miss<br><span class="hand" style="color:var(--measure);font-size:15px">${note}</span></div>`;
+    host.appendChild(m);
+  });
+}
+
+function draw() { drawTafel(); drawVotes(); drawMultiples(); }
+document.fonts.ready.then(draw); addEventListener("resize", draw);
+</script>
+</body>
+</html>

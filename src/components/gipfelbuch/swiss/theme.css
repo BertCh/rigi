@@ -1,0 +1,305 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+@import "./fonts.css";
+@import "./print.css";
+
+/* Gipfelbuch map-sheet theme, scoped to `.gb-swiss`. Inks are Brezine chart swatches
+ * (Ascher codes in comments); keep in step with ./palette.ts. */
+
+.gb-swiss {
+	/* Soft map paper: W with a breath of YY, so the sheet reads as warm white, not cream. Panels add
+	 * a little LG; separation is by tone, never by texture. */
+	--gb-paper: color-mix(in srgb, #f4f4f4 96%, #ffdb8b); /* W 96% + YY 4% */
+	--gb-paper-deep: color-mix(
+		in srgb,
+		var(--gb-paper) 91%,
+		#baaf96
+	); /* paper 91% + LG 9% */
+	--gb-ink: #131313; /* LK */
+	--gb-contour: #95500c; /* NB */
+	--gb-water: #30626b; /* GL */
+	--gb-forest: #575e4e; /* GG */
+	--gb-relief: #919192; /* BL */
+	--gb-red: #bf2233; /* SR */
+	--gb-sign: #e59e1f; /* SY */
+	--gb-sign-light: #ffdb8b; /* YY */
+	--gb-navy: #002f55; /* PB */
+	--gb-unit: 6px;
+	--gb-line: 24px;
+	--gb-secondary: #4a545c; /* BG, 6.9:1 on paper: secondary text */
+	--gb-pencil: #49423d; /* GR */
+	--gb-white: #f4f4f4; /* W */
+	/* No paper texture: the ground is flat. Kept as a token so print.css and the media queries agree. */
+	--gb-grain: none;
+
+	/* Re-ink Tailwind: text-white/70 compiles to color-mix(var(--color-white) 70%, transparent). */
+	--color-white: var(--gb-ink);
+	--color-black: var(--gb-paper);
+
+	/* Rigi tokens, flipped for a light ground. */
+	--rigi-ink: var(--gb-paper);
+	--rigi-paper: var(--gb-ink);
+	--rigi-slate: var(--gb-paper-deep);
+	--rigi-glow: #95500c; /* NB, readable on paper */
+	--rigi-ember: #bf2233; /* SR */
+	--rigi-umber: #131313; /* LK */
+	--rigi-lesson: #95500c; /* NB */
+	--rigi-trap: #ab343a; /* RM */
+	--rigi-result: #575e4e; /* GG */
+	--rigi-negative: #817066; /* MG */
+
+	--font-mono: var(--gb-font-mono);
+
+	position: relative;
+	color: var(--gb-ink);
+	background-color: var(--gb-paper);
+	font-family: var(--gb-font-sans);
+	-webkit-font-smoothing: auto;
+}
+
+/* `@theme inline` bakes Manrope into font-sans, so override the utilities here. */
+.gb-swiss .font-sans {
+	font-family: var(--gb-font-sans);
+}
+
+.gb-swiss .font-mono,
+.gb-swiss code,
+.gb-swiss kbd,
+.gb-swiss pre {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+}
+
+.gb-swiss .display-title {
+	font-family: var(--gb-font-serif);
+	font-optical-sizing: auto;
+	font-weight: 600;
+	text-wrap: balance;
+	letter-spacing: -0.005em;
+	color: var(--gb-ink);
+}
+
+/* Spaced condensed caps for kickers and regions. */
+.gb-swiss .gb-caps {
+	font-family: var(--gb-font-condensed);
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	font-feature-settings: "case" 1;
+}
+
+/* Hydrological names are set in italic water ink. */
+.gb-swiss .gb-water {
+	font-style: italic;
+	color: var(--gb-water);
+}
+
+@layer components {
+	.gb-swiss .gb-coord {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		font-size: 0.6875rem;
+		letter-spacing: 0.02em;
+		/* BL (#919192) is 2.8:1 on paper and fails WCAG: it is reserved for hairlines and hachure. */
+		color: var(--gb-secondary);
+	}
+}
+
+@layer base {
+	/* Inline code chip: the global one is tuned for dark grounds. */
+	.gb-swiss code {
+		border-color: color-mix(in srgb, var(--gb-ink) 14%, transparent);
+		background: color-mix(in srgb, var(--gb-ink) 6%, transparent);
+	}
+
+	.gb-swiss pre code {
+		border: 0;
+		background: transparent;
+	}
+
+	.gb-swiss a {
+		text-decoration-color: color-mix(in srgb, var(--gb-water) 55%, transparent);
+		text-underline-offset: 3px;
+	}
+
+	.gb-swiss .prose a,
+	.gb-swiss p a,
+	.gb-swiss li a {
+		color: var(--gb-water);
+	}
+
+	.gb-swiss ::selection {
+		background: color-mix(in srgb, var(--gb-sign-light) 80%, transparent);
+		color: var(--gb-ink);
+	}
+
+	.gb-swiss :focus-visible {
+		outline: 2px solid var(--gb-red);
+		outline-offset: 2px;
+	}
+
+	.gb-swiss {
+		scrollbar-color: color-mix(in srgb, var(--gb-ink) 30%, transparent)
+			transparent;
+	}
+}
+
+/* Photographs are never tinted. */
+.gb-swiss img,
+.gb-swiss video,
+.gb-swiss canvas {
+	filter: none;
+}
+
+.gb-swiss h1,
+.gb-swiss h2,
+.gb-swiss h3 {
+	text-wrap: balance;
+}
+
+.gb-swiss p,
+.gb-swiss li {
+	text-wrap: pretty;
+}
+
+@layer components {
+	.gb-swiss .gb-num {
+		font-family: var(--gb-font-sans);
+		font-variant-numeric: tabular-nums lining-nums;
+	}
+}
+
+@layer components {
+	.gb-swiss .gb-secondary {
+		color: var(--gb-secondary);
+	}
+}
+
+/* Primary text ink. With .gb-secondary and the semantic inks it replaces the text-white/NN alpha
+ * ladder: text is ink, secondary or a semantic ink, never a translucent ink. */
+@layer components {
+	.gb-swiss .gb-ink {
+		color: var(--gb-ink);
+	}
+}
+
+/* Italic marks a derived or estimated value (LK lettering rule). */
+.gb-swiss .gb-derived {
+	font-style: italic;
+}
+
+/* Swiss table: one header rule, 24px rows, separation by paper. */
+.gb-swiss .gb-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+	line-height: 18px;
+}
+
+.gb-swiss .gb-table th {
+	font-family: var(--gb-font-condensed);
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	font-feature-settings: "case" 1;
+	font-size: 11px;
+	text-align: left;
+	padding-block: 6px;
+	border-bottom: 1px solid var(--gb-ink);
+}
+
+.gb-swiss .gb-table td {
+	padding-block: 3px;
+	border: 0;
+}
+
+.gb-swiss .gb-table td.num,
+.gb-swiss .gb-table th.num {
+	text-align: right;
+	font-variant-numeric: tabular-nums lining-nums;
+}
+
+.gb-swiss .gb-table tbody + tbody {
+	border-top: 12px solid transparent;
+}
+
+/* 4, 8 and 12 column grid. */
+.gb-swiss .gb-grid {
+	display: grid;
+	grid-template-columns: repeat(var(--gb-cols, 4), minmax(0, 1fr));
+	column-gap: var(--gb-gutter, 12px);
+}
+
+@media (min-width: 768px) {
+	.gb-swiss .gb-grid {
+		--gb-cols: 8;
+		--gb-gutter: 24px;
+	}
+}
+
+@media (min-width: 1024px) {
+	.gb-swiss .gb-grid {
+		--gb-cols: 12;
+	}
+}
+
+@media (forced-colors: active) {
+	.gb-swiss [filter],
+	.nb-book [filter] {
+		filter: none;
+	}
+
+	.gb-swiss {
+		--gb-ink: CanvasText;
+		--gb-secondary: CanvasText;
+		--gb-grain: none;
+	}
+
+	/* Figures that draw with tokens fall back to the system text colour. */
+	.gb-swiss svg [stroke]:not([stroke="none"]) {
+		stroke: currentColor;
+	}
+
+	.gb-swiss svg [fill]:not([fill="none"]) {
+		fill: currentColor;
+	}
+}
+
+/* More contrast: no grain, secondary text becomes ink, hairlines get stronger. */
+@media (prefers-contrast: more) {
+	.gb-swiss {
+		--gb-grain: none;
+		--gb-secondary: var(--gb-ink);
+		--gb-relief: color-mix(in srgb, var(--gb-ink) 70%, var(--gb-paper));
+	}
+
+	.gb-swiss .gb-table th {
+		border-bottom-width: 2px;
+	}
+}
+
+/* Leading trim (design book G3): blocks start at cap height and end at the baseline. Opt-in, so
+ * existing paddings keep their meaning; add `gb-trim` to a heading, kicker or caption and drop
+ * its compensating padding. */
+@supports (text-box: trim-both cap alphabetic) {
+	.gb-swiss .gb-trim {
+		text-box: trim-both cap alphabetic;
+	}
+}
+
+/* Sheet-to-sheet navigation (A3): the sheet frame persists while the entry cross-fades. Links opt
+ * in through sheetTransition() in viz/hooks.ts, which is off under reduced motion and automation. */
+@media (prefers-reduced-motion: no-preference) {
+	::view-transition-old(root),
+	::view-transition-new(root) {
+		animation-duration: 220ms;
+		animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	::view-transition-group(gb-sheet) {
+		animation-duration: 260ms;
+	}
+}

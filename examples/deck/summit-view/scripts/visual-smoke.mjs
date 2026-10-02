@@ -16,7 +16,7 @@ const screenshotDirectory = process.env.SUMMIT_VIEW_SCREENSHOTS || join(tmpdir()
 mkdirSync(screenshotDirectory, {recursive: true});
 
 // Where Rigi's own renderer places these summits in the 800 × 600 photo at the solved pose
-// (public/demo/atlas/demo-01.json `peaks[].solved`): an independent check of the camera model.
+// (public/demo/gipfelbuch/demo-01.json `peaks[].solved`): an independent check of the camera model.
 const REFERENCE_LABELS = {
   Niesen: [72.1, 221.9],
   Kaiseregg: [390.8, 258.5],

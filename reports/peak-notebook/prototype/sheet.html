@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sheet decision rig</title>
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Manrope:wght@600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+<style>
+.hero { padding: 36px 0 0; display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: 48px; align-items: end; }
+.eyebrow { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--gb-terrain); }
+.eyebrow .no { color: var(--gb-route); }
+.eyebrow .name { color: var(--gb-ink); }
+h1 { margin: 18px 0 0; }
+.t40 h1 { font-size: 40px; line-height: 48px; }
+.t56 h1 { font-size: 56px; line-height: 60px; }
+.t72 h1 { font-size: 72px; line-height: 78px; }
+.tagline { margin: 12px 0 0; font-style: italic; color: var(--gb-secondary); }
+.claim { margin: 18px 0 0; max-width: 36em; color: var(--gb-secondary); }
+.claim b { color: var(--gb-ink); font-weight: 500; }
+.ledger { display: grid; gap: 14px; padding-bottom: 6px; }
+.ledger .row { display: grid; grid-template-columns: 120px 1fr; gap: 0 12px; align-items: baseline; }
+.ledger .stat small { font-size: 16px; color: var(--gb-secondary); font-weight: 400; margin-left: 4px; }
+.ledger .h { grid-column: 1 / -1; color: var(--gb-measure); font-size: 16px; }
+.tafel { position: relative; padding: 28px 0 24px; }
+.tafel svg { display: block; width: 100%; overflow: visible; }
+.tafel figcaption { display: flex; justify-content: space-between; gap: 24px; margin-top: 12px; }
+.body { padding-top: 24px; }
+.beat { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 48px; padding-top: 96px; }
+.beat .text { position: sticky; top: 96px; align-self: start; }
+.beat h2 { margin: 12px 0 0; font-size: 24px; line-height: 30px; }
+.beat p { margin: 12px 0 0; color: var(--gb-secondary); }
+.beat p b { color: var(--gb-ink); font-weight: 500; }
+.fig svg { width: 100%; height: auto; display: block; overflow: visible; }
+.figcap { display: flex; gap: 12px; margin-top: 12px; }
+.multiples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px 24px; }
+.multiples svg { width: 100%; height: auto; display: block; }
+.multiples .t { margin-top: 6px; }
+.posts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 120px 0 24px; }
+.post { background: var(--gb-paper-deep); padding: 18px 24px 24px; }
+.post .serif { font-size: 24px; line-height: 30px; margin-top: 6px; }
+.post.next { text-align: right; }
+.colophon { display: flex; flex-wrap: wrap; gap: 6px 24px; padding: 12px 0 72px; }
+@media (max-width: 720px) {
+  .hero, .beat { grid-template-columns: 1fr; gap: 24px; }
+  .t56 h1, .t72 h1 { font-size: 40px; line-height: 48px; }
+  .t40 h1 { font-size: 30px; line-height: 36px; }
+  .beat .text { position: static; }
+  .multiples, .posts { grid-template-columns: 1fr; }
+  .tafel figcaption { flex-direction: column; gap: 6px; }
+}
+</style>
+</head>
+<body>
+<div id="top"><div class="col">
+  <nav class="site"><span class="brand">Rigi</span><span class="links"><span>How it works</span><span>My library</span><b>Gipfelbuch</b></span></nav>
+  <header class="hero">
+    <div id="head"></div>
+    <div class="ledger" id="ledger"></div>
+  </header>
+</div></div>
+<figure class="tafel" id="tafelZone" style="margin:0"><svg id="tafel" aria-label="Skyline detected in the photo and carried on by the terrain"></svg>
+  <div class="col"><figcaption><span class="caption">Niederhorn, 7 Sept 2026, 15:28. The detected skyline (teal, with confidence ticks) carries on into the terrain model's horizon past the frame; peak names from the solved pose.</span><span class="micro sec">Aufnahme demo-01 · Revision build-data.ts 2026-10-01</span></figcaption></div>
+</figure>
+<div class="body" id="body"><div class="col">
+  <section class="beat">
+    <div class="text"><div class="kicker" style="color:var(--gb-terrain)">01 · The idea</div>
+      <h2 class="h2">Every column casts one vote, with a confidence.</h2>
+      <p>The pose search never sees the photo. It gets <b>one number per column</b>: the height of the skyline, plus how much to trust it.</p>
+      <p>A good detector is honest per column: sure on a clean crest, silent behind a roof.</p></div>
+    <div class="fig"><svg id="votes"></svg><div class="figcap"><span class="kicker" style="color:var(--gb-terrain)">Fig. 1</span><span class="caption">Each tick is one of 800 columns; its height is the weight it gets in the solve.</span></div></div>
+  </section>
+  <section class="beat">
+    <div class="text"><div class="kicker" style="color:var(--gb-terrain)">02 · Where it fails</div>
+      <h2 class="h2">Unsure columns abstain. Occluders are the real enemy.</h2>
+      <p>Glare and dark foregrounds only remove votes. A person on the ridge is worse: <b>it looks like a real edge</b>.</p></div>
+    <div class="fig"><div class="multiples" id="multiples"></div></div>
+  </section>
+  <div class="posts"><div class="post"><div class="kicker sec">← Blatt 09</div><div class="serif">Peak</div><div class="caption">A named summit with elevation and prominence.</div></div>
+    <div class="post next"><div class="kicker sec">Blatt 11 →</div><div class="serif">DEM Horizon</div><div class="caption">The silhouette the terrain would draw.</div></div></div>
+  <div class="colophon micro sec"><span>Live · shipping in the app</span><span>src/lib/geo/skyline.ts</span><span>src/lib/refine/skyline-clean.ts</span><span>reports/leaderboard.md</span><span>LV95 2 621 150 / 1 178 400</span></div>
+</div></div>
+<script src="data-v4.js"></script>
+<script src="common.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const theme = q.get("theme") || "day", titleMode = q.get("title") || "claim", size = q.get("size") || "56";
+document.body.classList.add("t" + size);
+const night = { day: [], day2: [], plate: [], split: ["top", "tafelZone"], band: ["tafelZone"], band2: ["tafelZone"], night: ["top", "tafelZone", "body"] }[theme];
+document.body.dataset.theme = theme;
+if (theme === "plate") document.getElementById("tafelZone").setAttribute("data-plate", "");
+for (const id of night) document.getElementById(id).setAttribute("data-night", "");
+if (theme === "night") document.body.setAttribute("data-night", "");
+
+const P = DATA.photos["demo-01"], S = P.solved, project = projector(S, P.w, P.h);
+const voted = P.weight.filter((w) => w > 0).length;
+document.getElementById("head").innerHTML = titleMode === "namedek"
+  ? `<div class="eyebrow kicker"><span class="no">Blatt <span class="circ">10</span> / 19</span><span>Evidence</span></div>
+     <h1 class="serif">Skyline Detection</h1>
+     <p class="dek serif">Where the mountain meets the sky.</p>
+     <p class="claim">The skyline is the one line a phone photo reliably shows. Rigi traces it <b>column by column</b> and says how sure it is of each, so the pose search trusts the crests and ignores the glare.</p>`
+  : titleMode === "claim"
+  ? `<div class="eyebrow kicker"><span class="no">Blatt <span class="circ">10</span> / 19</span><span>Evidence</span><span class="name">Skyline detection</span></div>
+     <h1 class="serif">Where the mountain meets the sky.</h1>
+     <p class="claim lead">The skyline is the one line a phone photo reliably shows. Rigi traces it <b>column by column</b> and says how sure it is of each, so the pose search trusts the crests and ignores the glare.</p>`
+  : `<div class="eyebrow kicker"><span class="no">Blatt 10 / 19</span><span>Evidence</span></div>
+     <h1 class="serif">Skyline Detection</h1>
+     <p class="tagline lead">Find the line where mountain meets sky, one column at a time.</p>
+     <p class="claim">The edge between mountain and sky is the one line a photo reliably shows. Rigi traces it column by column and says how sure it is of each part.</p>`;
+document.getElementById("ledger").innerHTML = `
+  <div class="row"><span class="stat">${voted}<small>/ 800</small></span><span class="caption">columns vote;<br>the rest abstain</span></div>
+  <div class="row"><span class="stat">${P.residual.solved.median.toFixed(1)}<small>px</small></span><span class="caption">median miss against<br>the terrain, once solved</span></div>
+  <div class="row"><span class="stat">${P.ms.skyline}<small>ms</small></span><span class="caption">on a laptop CPU,<br>800 px wide</span></div>
+  <div class="row"><span class="h hand">re-read from this photo's run ↓</span></div>`;
+
+function drawTafel() {
+  const svg = document.getElementById("tafel"); svg.innerHTML = "";
+  const ink = (v) => tok(svg, v);
+  const W = innerWidth, phone = W < 720, photoW = phone ? W - 32 : Math.min(1000, W * 0.64), s = photoW / 800;
+  const [c0, c1] = [120, 455], bandH = (c1 - c0) * s, top = phone ? 96 : 84, ox = (W - photoW) / 2, oy = top, fy = oy - c0 * s, H = top + bandH + 40;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.style.height = H + "px";
+  const P2 = (az, e) => { const [x, y] = project(az, e); return [ox + x * s, fy + y * s]; };
+  const defs = el("defs", {}, svg);
+  const lg = el("linearGradient", { id: "hf", x1: 0, x2: 1 }, defs);
+  [[0, 0], [0.12, 1], [0.88, 1], [1, 0]].forEach(([o, a]) => el("stop", { offset: o, "stop-color": "#fff", "stop-opacity": a }, lg));
+  const SB = DATA.surround, iw = photoW / SB.photo.w, ih = iw * SB.height / SB.width;
+  const mk = el("mask", { id: "strokes", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: W, height: H }, defs);
+  for (let k = 0; k < (["day2", "plate"].includes(theme) ? 4 : 2); k++) el("image", { href: SB.src, x: ox - SB.photo.x * iw, y: fy - SB.photo.y * ih, width: iw, height: ih, preserveAspectRatio: "none" }, mk);
+  const fm = el("mask", { id: "fade", maskUnits: "userSpaceOnUse", x: 0, y: 0, width: W, height: H }, defs);
+  el("rect", { x: 0, y: 0, width: W, height: H, fill: "url(#hf)" }, fm);
+  const g0 = el("g", { mask: "url(#fade)" }, svg);
+  if (!phone) el("rect", { x: 0, y: 0, width: W, height: H - 20, fill: ink("--gb-terrain"), mask: "url(#strokes)" }, g0);
+  // compass ruler
+  const card = { 180: "S", 225: "SW", 270: "W", 315: "NW", 0: "N", 90: "E", 135: "SE", 45: "NE" };
+  const azAt = (x) => S.yaw + Math.atan((x - ox - photoW / 2) / (S.f * s)) / RAD;
+  const ry = phone ? 24 : 32, every = phone ? 30 : 15;
+  el("path", { d: penLine(0, ry, W, ry, "rule", .35), stroke: ink("--gb-hairline"), "stroke-width": 1, fill: "none" }, g0);
+  for (let a = Math.ceil(azAt(0) / 5) * 5; a <= azAt(W); a += 5) {
+    const [x] = P2(a, 0); const lab = a % every === 0, c = card[(a + 360) % 360];
+    el("line", { x1: x, x2: x, y1: ry, y2: ry + (lab || c ? 8 : 4), stroke: ink("--gb-secondary"), "stroke-width": 1 }, g0);
+    if (lab || c) text(g0, x, ry - 8, c || `${(a + 360) % 360}°`, { "text-anchor": "middle", class: "micro", fill: c ? ink("--gb-route") : ink("--gb-secondary"), "font-weight": c ? 500 : 400 });
+  }
+  // photo band + measured layer
+  const clip = el("clipPath", { id: "pc" }, defs); el("rect", { x: ox, y: oy, width: photoW, height: bandH, rx: 2 }, clip);
+  const g = el("g", { "clip-path": "url(#pc)" }, svg);
+  el("image", { href: "/demo/photos/demo-01.jpg", x: ox, y: fy, width: photoW, height: P.h * s, preserveAspectRatio: "none" }, g);
+  let ticks = ""; for (let c = 0; c < 800; c += 2) if (P.weight[c] > 0) ticks += `M${(ox + (c + .5) * s).toFixed(1)} ${(fy + P.rows[c] * s + 2).toFixed(1)}v${(P.weight[c] * 16 * Math.min(1, s * 1.2)).toFixed(1)}`;
+  el("path", { d: ticks, stroke: "#e59e1f", "stroke-width": 1.2, "stroke-opacity": .85 }, g);
+  let dd = "", on = false; for (let c = 0; c < 800; c++) { if (P.weight[c] <= 0) { on = false; continue; } dd += (on ? "L" : "M") + (ox + (c + .5) * s).toFixed(1) + " " + (fy + P.rows[c] * s).toFixed(1); on = true; }
+  el("path", { d: dd, fill: "none", stroke: "#fff", "stroke-opacity": .75, "stroke-width": 4.5, "stroke-linejoin": "round" }, g);
+  el("path", { d: dd, fill: "none", stroke: "#30626b", "stroke-width": 2, "stroke-linejoin": "round" }, g);
+  // peaks
+  const placed = [];
+  for (const p of [...P.peaks].sort((a, b) => b.ele - a.ele)) {
+    const [x, y] = P2(p.az, p.el); const half = Math.max(p.name.length * 3.6, 50); if (x - half < 8 || x + half > W - 8 || y < oy - 40) continue;
+    const inP = x > ox + 6 && x < ox + photoW - 6; if (inP && !p.labelled) continue; if (phone && !inP) continue;
+    if (inP && placed.filter((q) => q.inP).length >= (phone ? 3 : 6)) continue;
+    const wd = Math.max(p.name.length * 7.2, 96) + 16;
+    const tier = [0, 1].find((t) => !placed.some((q) => q.tier === t && Math.abs(q.x - x) < (q.w + wd) / 2)); if (tier === undefined) continue;
+    placed.push({ x, y, p, w: wd, tier, inP }); if (placed.length > 14) break;
+  }
+  const lab = el("g", {}, svg);
+  for (const { x, y, p, tier, inP } of placed) {
+    const ly = y - 24 - tier * 30, fill = inP ? "#fff" : ink("--gb-peak"), sub = inP ? "#fff" : ink("--gb-secondary");
+    const sh = inP ? { style: "text-shadow:0 1px 3px rgba(0,0,0,.6)" } : { stroke: ink("--gb-paper"), "stroke-width": 3, "stroke-linejoin": "round", "paint-order": "stroke" };
+    el("line", { x1: x, x2: x, y1: ly + 4, y2: y - 3, stroke: fill, "stroke-opacity": .7, "stroke-width": .8 }, lab);
+    el("circle", { cx: x, cy: y, r: 2.4, fill }, lab);
+    text(lab, x, ly - 11, p.name, { "text-anchor": "middle", "font-size": 13, "font-weight": 600, fill, "font-family": "GB Sans", ...sh });
+    text(lab, x, ly + 1, `${Math.round(p.ele)} m · ${(p.distance / 1000).toFixed(p.distance < 10000 ? 1 : 0)} km`, { "text-anchor": "middle", class: "micro", fill: sub, ...sh });
+  }
+  // observer notes
+  const [a, b] = gapsOf(P.weight).reduce((m, q) => (q[1] - q[0] > m[1] - m[0] ? q : m));
+  const x1 = ox + a * s, x2 = ox + b * s, yb = fy + Math.max(P.rows[a - 1], P.rows[b]) * s + 30;
+  el("path", { d: penCircle((x1 + x2) / 2, yb - 22, (x2 - x1) / 2 + 12, 18 * Math.min(1, s * 1.3), "gapc"), stroke: "#e0626d", "stroke-width": 1.6, fill: "none" }, svg);
+  const tx = (x1 + x2) / 2 + (phone ? -60 : 40), ty = yb + (phone ? 40 : 46);
+  text(svg, tx, ty, `glare: ${b - a} columns abstain`, { class: "hand", "font-size": 16, fill: "#fff", style: "text-shadow:0 1px 3px rgba(0,0,0,.7)" });
+  el("path", { d: penArrow(tx + 30, ty - 16, (x1 + x2) / 2 + 6, yb - 6, -10), stroke: "#fff", "stroke-width": 1.4, fill: "none" }, svg);
+  if (!phone) {
+    const nx = ox + photoW + 24, ny = fy + P.rows[790] * s + 56;
+    text(svg, nx, ny, "traced in the photo", { class: "hand", "font-size": 16, fill: ink("--gb-measure") });
+    text(svg, nx, ny + 22, "carried on by the terrain →", { class: "hand", "font-size": 16, fill: ink("--gb-terrain") });
+    el("path", { d: penArrow(nx + 10, ny - 16, ox + photoW - 18, fy + P.rows[780] * s + 8, 16), stroke: ink("--gb-measure"), "stroke-width": 1.4, fill: "none" }, svg);
+  }
+}
+
+function drawVotes() {
+  const svg = document.getElementById("votes"); svg.innerHTML = ""; const ink = (v) => tok(svg, v);
+  const W = 760, s = W / 800, c0 = 150, bandH = (420 - c0) * s, y0 = bandH + 84, hh = 56, H = y0 + 48;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const defs = el("defs", {}, svg); const cp = el("clipPath", { id: "vc" }, defs); el("rect", { width: W, height: bandH, rx: 2 }, cp);
+  const g = el("g", { "clip-path": "url(#vc)" }, svg);
+  el("image", { href: "/demo/photos/demo-01.jpg", x: 0, y: -c0 * s, width: W, height: P.h * s, preserveAspectRatio: "none" }, g);
+  let d = ""; for (let c = 0; c < 800; c++) if (P.weight[c] > 0) d += `M${((c + .5) * s).toFixed(1)} ${((P.rows[c] - c0) * s).toFixed(1)}v${(-P.weight[c] * 24).toFixed(1)}`;
+  el("path", { d, stroke: "#e59e1f", "stroke-width": 1 }, g);
+  const hp = el("pattern", { id: "hach", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(-45)" }, defs);
+  el("line", { x1: 0, y1: 0, x2: 0, y2: 6, stroke: ink("--gb-terrain"), "stroke-width": 1 }, hp);
+  let area = `M0 ${y0}`; for (let c = 0; c < 800; c++) area += `L${((c + .5) * s).toFixed(1)} ${(y0 - P.weight[c] * hh).toFixed(1)}`;
+  el("path", { d: area + `L${W} ${y0}Z`, fill: "url(#hach)" }, svg);
+  el("path", { d: area.replace(`M0 ${y0}L`, "M"), fill: "none", stroke: ink("--gb-terrain"), "stroke-width": 1.4 }, svg);
+  el("path", { d: penLine(0, y0, W, y0, "axis", .3), stroke: ink("--gb-secondary"), "stroke-width": 1, fill: "none" }, svg);
+  text(svg, 0, y0 + 18, "column 0", { class: "micro", fill: ink("--gb-secondary") });
+  text(svg, W, y0 + 18, "799", { "text-anchor": "end", class: "micro", fill: ink("--gb-secondary") });
+  text(svg, 0, y0 - hh - 8, "weight 1.0", { class: "micro", fill: ink("--gb-secondary") });
+  const best = gapsOf(P.weight).reduce((m, q) => (q[1] - q[0] > m[1] - m[0] ? q : m)); const cx = (best[0] + best[1]) / 2 * s;
+  el("path", { d: penCircle(cx, y0 - 10, (best[1] - best[0]) * s / 2 + 12, 20, "gapc"), stroke: ink("--gb-route"), "stroke-width": 1.6, fill: "none" }, svg);
+  text(svg, cx + (best[1] - best[0]) * s / 2 + 20, y0 + 36, `silent: ${best[1] - best[0]} columns of glare`, { class: "hand", "font-size": 16, fill: ink("--gb-route") });
+}
+
+function drawMultiples() {
+  const host = document.getElementById("multiples"); host.innerHTML = "";
+  [["demo-09", "Haze", "far ridges fade, so fewer columns are sure"], ["demo-07", "Rejected", "too few clean crests: the gate says no"],
+   ["demo-11", "Occluder", "hair on the ridge looks like an edge"], ["demo-12", "Rescued", "only the refine stage accepts it"]].forEach(([id, tag, note], i) => {
+    const d = DATA.photos[id]; const v = d.weight.filter((x) => x > 0).length; const Wv = 560, s = Wv / d.w, Hb = 200;
+    const ys = d.rows.filter((_, k) => d.weight[k] > 0).sort((a, b) => a - b); const mid = ys[ys.length >> 1] * s;
+    const off = Math.min(0, Math.max(Hb - d.h * s, Hb * .55 - mid));
+    let tk = ""; d.rows.forEach((r, c) => { if (d.weight[c] > 0 && c % 2 === 0) tk += `M${((c + .5) * s).toFixed(1)} ${(r * s + off + 1).toFixed(1)}v${(d.weight[c] * 12).toFixed(1)}`; });
+    const m = document.createElement("div");
+    m.innerHTML = `<svg viewBox="0 0 ${Wv} ${Hb}"><defs><clipPath id="mc${i}"><rect width="${Wv}" height="${Hb}" rx="2"/></clipPath></defs><g clip-path="url(#mc${i})"><image href="/demo/photos/${id}.jpg" y="${off}" width="${Wv}" height="${d.h * s}" preserveAspectRatio="none"/><path d="${tk}" stroke="#e59e1f" stroke-width="1.2"/></g></svg>
+      <div class="t"><span class="kicker" style="color:${d.solved.accepted ? "var(--gb-result)" : "var(--gb-route)"}">${tag}</span>&nbsp; <span class="micro">${v}/800 vote · ${d.residual.solved.median.toFixed(1)} px miss</span><br><span class="hand" style="color:var(--gb-measure)">${note}</span></div>`;
+    host.appendChild(m);
+  });
+}
+function draw() { drawTafel(); drawVotes(); drawMultiples(); }
+document.fonts.ready.then(draw); addEventListener("resize", draw);
+</script>
+</body>
+</html>

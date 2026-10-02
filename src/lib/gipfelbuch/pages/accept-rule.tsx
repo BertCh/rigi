@@ -1,0 +1,1883 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
+import { Link } from "@tanstack/react-router";
+import { memo, useMemo, useState } from "react";
+import {
+	Hachure,
+	HandDot,
+	HandText,
+	PenCircle,
+	PenCross,
+	PenLine,
+	SketchPath,
+	SketchPolyline,
+} from "#/components/gipfelbuch/notebook/Ink";
+import { SWISS } from "#/components/gipfelbuch/swiss/palette";
+import { TYPE } from "#/components/gipfelbuch/swiss/type";
+import {
+	Callout,
+	CodeRef,
+	Eq,
+	Figure,
+	Frac,
+	type GipfelbuchIndex,
+	type GipfelbuchPhotoData,
+	type GipfelbuchPhotoId,
+	Measured,
+	PhotoPicker,
+	Plot,
+	PrintLabel,
+	RealPhoto,
+	Section,
+	Stat,
+	Steps,
+	Sym,
+	useGipfelbuchIndex,
+	useGipfelbuchPhoto,
+	useTime,
+} from "#/components/gipfelbuch/viz";
+import {
+	Beat,
+	Details,
+	Gallery,
+	Mark,
+	MarkList,
+	Numbers,
+	skylineBand,
+	Trio,
+} from "#/components/gipfelbuch/viz/explain";
+import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
+import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+
+// Accept rule: precision first, fail closed. Every number is from code or reports:
+//  - rule ladder counts: reports/bench-wild.md (100 blind-verified Commons photos; cascade re-run on Mapterhorn
+//    for rows 2, 3 and the 20/20 product rule; fused rows from the v2 verification)
+//  - gates: src/lib/geo/solve.ts (FULL_SEARCH_CONFIDENCE 0.75), src/lib/integration/unknown-pose.worker.ts
+//    (YAW/FOCAL_UNKNOWN_MIN_CONFIDENCE 0.75), src/lib/refine/confidence.ts, src/lib/concord/app/confidence.ts,
+//    src/lib/integration/second-opinion.ts (AGREE_DEG 1, CASCADE_TIMEOUT_MS 20 000),
+//    src/lib/matcher-client.ts (MATCH_AGREE_DEG 0.5, matchAccepted, shouldEscalate), src/lib/picker/candidates.ts.
+
+const BAD = "var(--gb-red)";
+
+// ---------------------------------------------------------------------------------------------
+// Fig. 2: twelve real decisions (scripts/gipfelbuch/build-data.ts on the Niederhorn demo photos)
+// ---------------------------------------------------------------------------------------------
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+/** The factors of solvePose's confidence (src/lib/geo/solve.ts fineStage), recomputed from the stored fields. */
+function solveFactors(d: GipfelbuchPhotoData) {
+	const s = d.solved;
+	const tilt =
+		Math.abs(s.delta.pitch) > 3 || Math.abs(s.delta.roll) > 3 ? 0 : 1;
+	const f = [
+		{
+			k: "inlier fraction",
+			v: clamp01((s.inlierFraction - 0.3) / 0.5),
+			raw: `${(100 * s.inlierFraction).toFixed(0)}% of columns within 4 px`,
+		},
+		{
+			k: "coverage",
+			v: clamp01(s.coverage / 0.4),
+			raw: `${(100 * s.coverage).toFixed(0)}% of the frame has a skyline`,
+		},
+		{
+			k: "ambiguity",
+			v: clamp01((1 - s.ambiguity) / 0.4 + 0.1),
+			raw: `rival dip ${s.ambiguity.toFixed(2)} (0 = clear winner; bites above 0.64)`,
+		},
+		{
+			k: "horizon relief",
+			v: clamp01(s.horizonRelief / 0.5),
+			raw: `skyline varies ${s.horizonRelief.toFixed(2)}° (needs 0.5° to pin yaw)`,
+		},
+	];
+	return { tilt, f, product: tilt * f.reduce((a, b) => a * b.v, 1) };
+}
+
+const PEOPLE_FREE = new Set(["demo-01", "demo-02", "demo-03", "demo-06"]);
+/** Occlusion is the point on the rejected photos; the others are cropped to the skyline band. */
+const FULL_FRAME = new Set(["demo-07", "demo-11", "demo-12"]);
+function bandCrop(d: GipfelbuchPhotoData): [number, number, number, number] {
+	const ys = d.skyline.rows.filter((v): v is number => v != null);
+	const W = d.photo.width;
+	const y0 = Math.max(0, Math.min(...ys) - 60);
+	const y1 = Math.min(d.photo.height, Math.max(...ys) + 60);
+	return [0, y0, W, Math.max(y1, y0 + W * 0.4)];
+}
+
+/** Pill-less hand button: selected is a paper tint with a wavy red underline (state only). */
+const handButton = (on: boolean) =>
+	`nb-hand ${TYPE.body} px-3 py-0.5 transition ${on ? "bg-[var(--gb-paper-deep)] text-[var(--gb-ink)] underline decoration-[var(--gb-red)] decoration-wavy underline-offset-4" : "gb-secondary hover:text-[var(--gb-ink)]"}`;
+
+/** Solid ink fills for value-carrying bars; hatch rides on top as decoration only. */
+const INK_FILL = {
+	forest: "var(--gb-forest)",
+	red: "var(--gb-red)",
+	blue: "var(--gb-water)",
+	brown: "var(--gb-sign)",
+} as const;
+
+/** A solid bar with a light hatch on top. The width is a clip-path transition, so the strokes never re-roll while it animates. */
+function HandBar({
+	fraction,
+	color,
+	seed,
+	opacity = 0.75,
+	className = "h-3",
+}: {
+	fraction: number;
+	color: "forest" | "red" | "blue" | "brown";
+	seed: string;
+	opacity?: number;
+	className?: string;
+}) {
+	return (
+		<div className={`relative ${className}`} aria-hidden>
+			<svg
+				className="absolute inset-0 block h-full w-full"
+				viewBox="0 0 200 12"
+				preserveAspectRatio="none"
+				aria-hidden="true"
+				role="presentation"
+			>
+				<PenLine
+					seed={`${seed}-track`}
+					from={[0, 11]}
+					to={[200, 11]}
+					color="faint"
+					width={0.9}
+				/>
+			</svg>
+			<div
+				className="absolute inset-0 transition-[clip-path] duration-700 ease-out motion-reduce:transition-none"
+				style={{
+					clipPath: `inset(0 ${(100 - clamp01(fraction) * 100).toFixed(1)}% 0 0)`,
+				}}
+			>
+				<svg
+					className="block h-full w-full"
+					viewBox="0 0 200 12"
+					preserveAspectRatio="none"
+					aria-hidden="true"
+					role="presentation"
+				>
+					<rect
+						x={0}
+						y={1}
+						width={200}
+						height={9}
+						style={{ fill: INK_FILL[color], opacity: Math.max(0.7, opacity) }}
+					/>
+					<Hachure
+						d="M0 1H200V10H0Z"
+						seed={seed}
+						color="ink"
+						gap={3.4}
+						opacity={0.14}
+					/>
+				</svg>
+			</div>
+		</div>
+	);
+}
+
+function Bar({
+	p,
+	sel,
+	onPick,
+}: {
+	p: GipfelbuchIndex["photos"][number];
+	sel: boolean;
+	onPick: () => void;
+}) {
+	const refine = p.stage === "refine";
+	const inkName = !p.accepted ? "red" : refine ? "brown" : "blue";
+	const col = INK_FILL[inkName];
+	return (
+		<button
+			type="button"
+			onClick={onPick}
+			aria-pressed={sel}
+			aria-label={`${p.id}: confidence ${p.confidence}`}
+			className="group flex min-w-0 flex-col items-stretch gap-1"
+		>
+			<div className="relative h-[110px]">
+				<svg
+					className="absolute inset-x-[12%] bottom-0 block w-[76%] transition-opacity"
+					style={{ height: `${p.confidence * 100}%`, opacity: sel ? 1 : 0.55 }}
+					viewBox="0 0 40 100"
+					preserveAspectRatio="none"
+					aria-hidden="true"
+					role="presentation"
+				>
+					<rect
+						x={1}
+						y={2}
+						width={38}
+						height={98}
+						style={{ fill: INK_FILL[inkName] }}
+					/>
+					<Hachure
+						d="M1 2H39V100H1Z"
+						seed={`ar-bar-${p.id}`}
+						color="ink"
+						gap={4}
+						opacity={0.14}
+					/>
+				</svg>
+				<div
+					className={`absolute inset-x-0 -top-4 text-center font-mono ${TYPE.micro} gb-secondary`}
+				>
+					{p.confidence.toFixed(2)}
+				</div>
+			</div>
+			<div
+				className="overflow-hidden transition"
+				style={{
+					boxShadow: sel ? `0 0 0 2px ${col}` : "none",
+					opacity: sel ? 1 : 0.7,
+				}}
+			>
+				<img
+					src={p.thumb}
+					alt=""
+					className="block aspect-[4/3] w-full object-cover"
+				/>
+			</div>
+			<div className={`text-center font-mono ${TYPE.micro} gb-secondary`}>
+				{p.id.slice(5)}
+			</div>
+		</button>
+	);
+}
+
+function RealDecisions() {
+	const index = useGipfelbuchIndex();
+	const [id, setId] = useState<GipfelbuchPhotoId>("demo-11");
+	const d = useGipfelbuchPhoto(id);
+	const fx = d ? solveFactors(d) : null;
+	const crop =
+		d && !PEOPLE_FREE.has(id) && !FULL_FRAME.has(id) ? bandCrop(d) : undefined;
+	return (
+		<Figure
+			label="Fig. 2"
+			caption={
+				<>
+					The accept decision on 12 real photos: the CPU solve at the app's
+					local bar of 0.5 (src/lib/geo/solve.ts, acceptConfidence ). Bars are
+					the confidence of the accepted pose (amber: rejected by solvePose,
+					rescued by refinePose) or of the rejected one (red). Tap one. Photos
+					07, 11 and 12 are shown whole because the person in the frame is the
+					reason the skyline fit is weak. <Measured data={d ?? index} />
+				</>
+			}
+			bleed
+		>
+			<div className="relative mt-5 pl-8">
+				<svg
+					className="pointer-events-none absolute inset-x-0 z-10 block h-2 w-full"
+					style={{ top: `${110 * 0.5 - 4}px` }}
+					viewBox="0 0 400 8"
+					preserveAspectRatio="none"
+					aria-hidden="true"
+					role="presentation"
+				>
+					<line
+						x1={0}
+						x2={400}
+						y1={4}
+						y2={4}
+						style={{ stroke: "var(--gb-ink)" }}
+						strokeWidth={1.2}
+						strokeDasharray="6 5"
+						vectorEffect="non-scaling-stroke"
+					/>
+				</svg>
+				<div
+					className={`pointer-events-none absolute left-0 z-10 -translate-y-1/2 font-mono ${TYPE.micro} gb-secondary`}
+					style={{ top: `${110 * 0.5}px` }}
+				>
+					0.5
+				</div>
+				<div className="grid grid-cols-12 gap-1">
+					{index?.photos.map((p) => (
+						<Bar
+							key={p.id}
+							p={p}
+							sel={p.id === id}
+							onPick={() => setId(p.id)}
+						/>
+					))}
+				</div>
+			</div>
+			<div className="mt-6 grid gap-5 sm:grid-cols-[1.35fr_1fr]">
+				<RealPhoto
+					data={d}
+					layers={["skyline", "solved"]}
+					toggles={["skyline", "solved", "prior"]}
+					crop={crop}
+					className={
+						d && d.photo.height > d.photo.width
+							? "mx-auto w-full max-w-[300px]"
+							: undefined
+					}
+					key={id}
+				/>
+				{d && fx && (
+					<div className={`min-w-0 ${TYPE.caption}`}>
+						<div className="flex items-baseline gap-2">
+							<span
+								className="font-semibold text-2xl"
+								style={{ color: d.solved.accepted ? "var(--nb-forest)" : BAD }}
+							>
+								{d.solved.accepted
+									? d.solved.stage === "refine"
+										? "accepted by refine"
+										: "accepted"
+									: "rejected"}
+							</span>
+							<span className={`font-mono ${TYPE.micro} gb-secondary`}>
+								{d.id}
+							</span>
+						</div>
+						<div className="mt-3 space-y-1.5">
+							{fx.f.map((x) => (
+								<div key={x.k}>
+									<div
+										className={`flex justify-between font-mono ${TYPE.micro} gb-secondary`}
+									>
+										<span>{x.k}</span>
+										<span>{x.v.toFixed(2)}</span>
+									</div>
+									<HandBar
+										fraction={x.v}
+										color={x.v < 1 ? "red" : "forest"}
+										seed={`ar-factor-${x.k}`}
+										opacity={x.v < 1 ? 0.85 : 0.55}
+										className="h-2"
+									/>
+								</div>
+							))}
+						</div>
+						<p className={`mt-3 ${TYPE.caption} gb-secondary`}>
+							{id === "demo-12" ? (
+								<>
+									solvePose multiplies these to {fx.product.toFixed(2)}: only{" "}
+									{(100 * d.solved.inlierFraction).toFixed(0)}% of the skyline
+									columns fit, because hair crosses the ridge. So it rejects.
+									The fallback refinePose scores the same skyline{" "}
+									{d.solved.confidence.toFixed(3)} (bar 0.5, inlier floor 0.3)
+									and accepts. Two solvers, one photo, a verdict that flips on a
+									different weighting: that is why the pose is not shown as
+									certain on this evidence alone.
+								</>
+							) : d.solved.accepted ? (
+								<>
+									Product {fx.product.toFixed(2)} clears 0.5. Skyline residual{" "}
+									falls from {d.residual.prior.median.toFixed(1)} px at the
+									sensor prior to {d.residual.solved.median.toFixed(1)} px
+									(median) at the solved pose.
+								</>
+							) : (
+								<>
+									Product {fx.product.toFixed(2)} &lt; 0.5, and the whole gap is
+									the inlier fraction:{" "}
+									{(100 * d.solved.inlierFraction).toFixed(0)}% of columns
+									within 4 px. A head and hair are not terrain. The pose stays
+									unconfirmed and the user is asked.
+									{d.app && (
+										<>
+											{" "}
+											Rejected is not the same as wrong: the live app's saved
+											pose for this photo has yaw {d.app.yaw.toFixed(1)}°
+											against {d.solved.yaw.toFixed(1)}° here. The rule only
+											refuses to call it certain.
+										</>
+									)}
+								</>
+							)}
+						</p>
+					</div>
+				)}
+			</div>
+		</Figure>
+	);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fig. 3: why a bar at all: confidence against the real yaw error on hand-registered photos
+// ---------------------------------------------------------------------------------------------
+type GtRow = {
+	name: string;
+	gtQuality: string;
+	confidence: number;
+	accepted: boolean;
+	solvedError?: { yaw: number };
+};
+function ConfidenceVsError() {
+	const index = useGipfelbuchIndex();
+	const rows = ((index?.groundTruthEval.cascade ?? []) as GtRow[]).filter(
+		(r) => r.solvedError,
+	);
+	const [hover, setHover] = useState<string | null>(null);
+	const hov = rows.find((r) => r.name === hover);
+	return (
+		<Figure
+			label="Fig. 3"
+			caption={
+				<>
+					Why the bar sits at 0.5: confidence of the CPU cascade against its yaw
+					error from a hand-registered pose, {rows.length} photos of the 19 in
+					data/ground-truth.json that have a registration
+					(out/eval-classic-cascade/report.json, via
+					scripts/gipfelbuch/build-data.ts). Filled: accepted. Hollow: rejected,
+					plotted at the pose the solver would have shown. Every accepted pose
+					is within 0.5°; the rejected ones include 6.8° and 19.8° errors, and
+					one correct pose (IMG_7063, 0.48) that the bar costs.
+				</>
+			}
+		>
+			<Plot
+				x={[0, 1]}
+				y={[0, 20]}
+				xLabel="solve confidence"
+				yLabel="|yaw error| (°)"
+				fmtX={(v) => v.toFixed(1)}
+				fmtY={(v) => `${v}`}
+			>
+				{(s) => (
+					<>
+						<rect
+							x={s.x(0.5)}
+							y={s.box.y0}
+							width={s.x(1) - s.x(0.5)}
+							height={s.box.y1 - s.box.y0}
+							style={{
+								fill: "color-mix(in srgb, var(--gb-forest) 16%, var(--gb-paper))",
+							}}
+						/>
+						<Hachure
+							d={`M${s.x(0.5)} ${s.box.y0}H${s.x(1)}V${s.box.y1}H${s.x(0.5)}Z`}
+							seed="ar-accept-zone"
+							color="forest"
+							gap={9}
+							opacity={0.2}
+						/>
+						<SketchPath
+							d={`M${s.x(0.5)} ${s.box.y0}V${s.box.y1}`}
+							seed="ar-accept-line"
+							width={1.4}
+							dash="5 4"
+							passes={1}
+						/>
+						<PrintLabel x={s.x(0.5) + 8} y={s.box.y0 + 16} color={SWISS.forest}>
+							accept ≥ 0.5
+						</PrintLabel>
+						{rows.map((r) => {
+							const cx = s.x(r.confidence);
+							const cy = s.y(Math.abs(r.solvedError?.yaw ?? 0));
+							const rad = hover === r.name ? 6.5 : 4.8;
+							return (
+								// biome-ignore lint/a11y/useSemanticElements: SVG mark, no semantic equivalent
+								<g
+									key={r.name}
+									role="button"
+									tabIndex={0}
+									aria-label={r.name}
+									onFocus={() => setHover(r.name)}
+									onBlur={() => setHover(null)}
+									onMouseEnter={() => setHover(r.name)}
+									onMouseLeave={() => setHover(null)}
+								>
+									<circle cx={cx} cy={cy} r={10} fill="transparent" />
+									{r.accepted ? (
+										<HandDot
+											x={cx}
+											y={cy}
+											r={rad}
+											seed={`ar-gt-${r.name}`}
+											color="forest"
+										/>
+									) : (
+										<PenCircle
+											center={[cx, cy]}
+											radiusX={rad}
+											seed={`ar-gt-${r.name}`}
+											color="red"
+											width={1.8}
+										/>
+									)}
+								</g>
+							);
+						})}
+					</>
+				)}
+			</Plot>
+			<div className={`mt-2 h-4 font-mono ${TYPE.micro} gb-secondary`}>
+				{hov
+					? `${hov.name}: confidence ${hov.confidence}, yaw error ${Math.abs(hov.solvedError?.yaw ?? 0).toFixed(2)}°, ${hov.accepted ? "accepted" : "rejected"} (ground truth: ${hov.gtQuality})`
+					: "hover a point"}
+			</div>
+		</Figure>
+	);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fig. 5: the precision ladder
+// ---------------------------------------------------------------------------------------------
+type Rule = {
+	id: string;
+	name: string;
+	rule: string;
+	right: number | null;
+	wrong: number;
+	unsure?: number;
+	precision: string;
+	note: string;
+};
+const RULES: Rule[] = [
+	{
+		id: "app",
+		name: "App aligner",
+		rule: "autoAlign accepts",
+		right: 39,
+		wrong: 19,
+		unsure: 2,
+		precision: "0.64",
+		note: "60 accepted poses on the 100-photo wild set: 39 correct, 19 confidently wrong, 2 unsure (grey). Precision is correct over accepted. This is the baseline the later rules are measured against.",
+	},
+	{
+		id: "c50",
+		name: "Cascade ≥ 0.5",
+		rule: "local-search bar",
+		right: 25,
+		wrong: 2,
+		precision: "0.93",
+		note: "Fine around a trusted compass; too loose once yaw is unknown.",
+	},
+	{
+		id: "c75",
+		name: "Cascade ≥ 0.75",
+		rule: "yaw-unknown gate",
+		right: 22,
+		wrong: 0,
+		precision: "1.00",
+		note: "The two wrong accepts sat in the 0.5 to 0.75 band. Raising the bar removes them and costs 3 correct poses; escalation recovers 2 of those 3.",
+	},
+	{
+		id: "fused",
+		name: "Fused HIGH",
+		rule: "render-and-match, HIGH",
+		right: 30,
+		wrong: 1,
+		precision: "0.97",
+		note: "One gross error in 31 HIGH poses, and it had no GPS fix and no independent agreement.",
+	},
+	{
+		id: "product",
+		name: "Product rule",
+		rule: "HIGH and (GPS or cascade within 0.5°)",
+		right: 20,
+		wrong: 0,
+		precision: "1.00",
+		note: "20 of 20 correct (16 of 16 before the cascade re-run on Mapterhorn). Recall is the price: fused HIGH alone had 30 correct against 1 wrong, and the rule gives up 10 of those correct accepts (14 in the first v2 run) to avoid the one wrong one. Everything else becomes “please confirm”.",
+	},
+];
+
+function Dots({ r }: { r: Rule }) {
+	const dots: { bad: boolean; grey?: boolean }[] = [
+		...Array.from({ length: r.right ?? 0 }, () => ({ bad: false })),
+		...Array.from({ length: r.wrong }, () => ({ bad: true })),
+		...Array.from({ length: r.unsure ?? 0 }, () => ({
+			bad: false,
+			grey: true,
+		})),
+	];
+	return (
+		<div className="flex flex-wrap gap-[4px]" aria-hidden>
+			{dots.map((d, i) => (
+				<svg
+					// biome-ignore lint/suspicious/noArrayIndexKey: positional dots
+					key={`${r.id}${i}`}
+					className="atl-dot block size-[18px]"
+					viewBox="0 0 18 18"
+					aria-hidden="true"
+					role="presentation"
+					style={{ animationDelay: `${i * 18}ms` }}
+				>
+					{d.bad ? (
+						<PenCross
+							center={[9, 9]}
+							size={5.5}
+							seed={`ar-dot-${r.id}-${i}`}
+							color="red"
+							width={2}
+						/>
+					) : d.grey ? (
+						<PenCircle
+							center={[9, 9]}
+							radiusX={5}
+							seed={`ar-dot-${r.id}-${i}`}
+							color="pencil"
+							width={1.8}
+						/>
+					) : (
+						<HandDot
+							x={9}
+							y={9}
+							r={5.6}
+							seed={`ar-dot-${r.id}-${i}`}
+							color="forest"
+						/>
+					)}
+				</svg>
+			))}
+		</div>
+	);
+}
+
+function PrecisionLadder() {
+	const [ref, t] = useTime<HTMLDivElement>(0);
+	const [manual, setManual] = useState<number | null>(null);
+	const idx = manual ?? Math.floor(t / 4.5) % RULES.length;
+	const r = RULES[idx];
+	const p = Number(r.precision);
+	return (
+		<Figure
+			label="Fig. 5"
+			bleed
+			caption="Five accept rules on the same 100 blind-verified photos (reports/bench-wild.md; rows come from the v2 verification and the Mapterhorn cascade re-run, so each is a count of accepted poses under that rule). Accent dots are correct accepts, red are confident wrong ones, grey are unsure. Tighten the rule and the red disappears; the cost is how many dots remain."
+		>
+			<div ref={ref}>
+				<style>{`
+					@keyframes atl-pop { from { transform: scale(0); opacity: 0 } to { transform: scale(1) } }
+					.atl-dot { animation: atl-pop .35s cubic-bezier(.2,.9,.3,1.3) both; transform-origin: center }
+					@media (prefers-reduced-motion: reduce) { .atl-dot { animation: none } }
+				`}</style>
+				<div className="flex flex-wrap gap-2">
+					{RULES.map((x, i) => (
+						<button
+							key={x.id}
+							type="button"
+							onClick={() => setManual(i)}
+							aria-pressed={i === idx}
+							className={handButton(i === idx)}
+						>
+							{i + 1}. {x.name}
+						</button>
+					))}
+					{manual !== null && (
+						<button
+							type="button"
+							onClick={() => setManual(null)}
+							className={`nb-hand px-2 py-0.5 ${TYPE.body} gb-secondary underline decoration-dotted`}
+						>
+							autoplay
+						</button>
+					)}
+				</div>
+
+				<div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-6 sm:grid-cols-[minmax(0,1fr)_190px]">
+					<div className="min-h-[120px]">
+						<div
+							className={`mb-3 font-mono ${TYPE.micro} uppercase tracking-wider gb-secondary`}
+						>
+							{r.rule}
+						</div>
+						<Dots key={r.id} r={r} />
+						<p className={`mt-4 ${TYPE.caption} gb-secondary`}>{r.note}</p>
+					</div>
+					<div className="flex flex-row items-end gap-6 sm:flex-col sm:items-start sm:gap-4">
+						<Stat value={r.precision} label="precision" />
+						<Stat value={String(r.wrong)} label="wrong accepts" />
+						<div className="w-full min-w-[110px]">
+							<HandBar
+								fraction={p}
+								color={p >= 1 ? "forest" : "red"}
+								seed="ar-precision"
+								className="h-3"
+							/>
+						</div>
+					</div>
+				</div>
+			</div>
+		</Figure>
+	);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fig. D1: the verdict tree of integration/second-opinion.ts, with the matcher's product rule
+// ---------------------------------------------------------------------------------------------
+type Inp = {
+	cascade: boolean; // the unknown-pose cascade accepted (confidence ≥ its gate)
+	agree: boolean; // app accepted AND |Δyaw| ≤ 1°
+	escalate: boolean; // shouldEscalate(): conf < 0.5, missing, or solvers disagree > 1°
+	high: boolean; // matcher confidenceLevel HIGH
+	gps: boolean; // positionTrusted (EXIF GPS fix)
+	near: boolean; // cascade pose within 0.5° yaw and pitch of the match
+};
+type Verdict = "verified" | "refined" | "kept" | "unverified" | "matched";
+
+function decide(i: Inp): { path: string[]; verdict: Verdict } {
+	if (i.cascade) {
+		return i.agree
+			? { path: ["q1", "q2", "verified"], verdict: "verified" }
+			: { path: ["q1", "q2n", "refined"], verdict: "refined" };
+	}
+	if (!i.escalate) return { path: ["q1n", "q3n", "kept"], verdict: "kept" };
+	if (!i.high)
+		return { path: ["q1n", "q3", "q4n", "unverified"], verdict: "unverified" };
+	if (i.gps || i.near)
+		return { path: ["q1n", "q3", "q4", "q5", "matched"], verdict: "matched" };
+	return {
+		path: ["q1n", "q3", "q4", "q5n", "unverified"],
+		verdict: "unverified",
+	};
+}
+
+const SCENARIOS: { name: string; inp: Inp }[] = [
+	{
+		name: "Both agree",
+		inp: {
+			cascade: true,
+			agree: true,
+			escalate: false,
+			high: false,
+			gps: false,
+			near: false,
+		},
+	},
+	{
+		name: "Cascade overrules",
+		inp: {
+			cascade: true,
+			agree: false,
+			escalate: false,
+			high: false,
+			gps: false,
+			near: false,
+		},
+	},
+	{
+		name: "Match, GPS fix",
+		inp: {
+			cascade: false,
+			agree: false,
+			escalate: true,
+			high: true,
+			gps: true,
+			near: false,
+		},
+	},
+	{
+		name: "Match, no GPS, no agreement",
+		inp: {
+			cascade: false,
+			agree: false,
+			escalate: true,
+			high: true,
+			gps: false,
+			near: false,
+		},
+	},
+	{
+		name: "Match, cascade within 0.5°",
+		inp: {
+			cascade: false,
+			agree: false,
+			escalate: true,
+			high: true,
+			gps: false,
+			near: true,
+		},
+	},
+	{
+		name: "Matcher not HIGH",
+		inp: {
+			cascade: false,
+			agree: false,
+			escalate: true,
+			high: false,
+			gps: true,
+			near: true,
+		},
+	},
+	{
+		name: "Skyline fine, cascade quiet",
+		inp: {
+			cascade: false,
+			agree: false,
+			escalate: false,
+			high: false,
+			gps: false,
+			near: false,
+		},
+	},
+];
+
+const TOGGLES: { k: keyof Inp; label: string }[] = [
+	{ k: "cascade", label: "cascade accepted" },
+	{ k: "agree", label: "app accepted, Δyaw ≤ 1°" },
+	{ k: "escalate", label: "shouldEscalate" },
+	{ k: "high", label: "matcher HIGH" },
+	{ k: "gps", label: "EXIF GPS trusted" },
+	{ k: "near", label: "cascade within 0.5°" },
+];
+
+type NodeDef = {
+	id: string;
+	x: number;
+	y: number;
+	w: number;
+	text: string;
+	sub?: string;
+};
+const QW = 176;
+const NODES: NodeDef[] = [
+	{
+		id: "q1",
+		x: 14,
+		y: 58,
+		w: QW,
+		text: "cascade accepted?",
+		sub: "re-solve from compass + gravity",
+	},
+	{ id: "q2", x: 232, y: 58, w: QW, text: "app accepted and |Δyaw| ≤ 1°?" },
+	{
+		id: "q3",
+		x: 14,
+		y: 150,
+		w: QW,
+		text: "shouldEscalate?",
+		sub: "skyline < 0.5, or solvers differ",
+	},
+	{ id: "q4", x: 14, y: 232, w: QW, text: "matcher confidence HIGH?" },
+	{
+		id: "q5",
+		x: 232,
+		y: 232,
+		w: QW,
+		text: "GPS trusted or cascade within 0.5°?",
+	},
+];
+const OUT: {
+	id: Verdict | string;
+	v: Verdict;
+	x: number;
+	y: number;
+	label: string;
+}[] = [
+	{ id: "verified", v: "verified", x: 470, y: 22, label: "verified" },
+	{
+		id: "refined",
+		v: "refined",
+		x: 470,
+		y: 86,
+		label: "refined: cascade pose",
+	},
+	{ id: "kept", v: "kept", x: 232, y: 150, label: "kept: app pose, no badge" },
+	{
+		id: "matched",
+		v: "matched",
+		x: 470,
+		y: 232,
+		label: "matched: HIGH, applied",
+	},
+	{
+		id: "unverified",
+		v: "unverified",
+		x: 232,
+		y: 304,
+		label: "unverified: “please confirm”",
+	},
+];
+// Label size: 11 px rendered at the text column (~720 px) for this 640-wide viewBox.
+// 10 units: about 13 px at the wide figure track (viewBox 640 shown at ~860 px).
+const LABEL = 10;
+const NH = 44;
+const OW = 160;
+
+type Edge = {
+	id: string;
+	pts: [number, number][];
+	label?: string;
+	lx?: number;
+	ly?: number;
+};
+const EDGES: Edge[] = [
+	{
+		id: "q1",
+		pts: [
+			[190, 80],
+			[232, 80],
+		],
+		label: "yes",
+		lx: 211,
+		ly: 73,
+	},
+	{
+		id: "q2",
+		pts: [
+			[408, 80],
+			[440, 80],
+			[440, 44],
+			[470, 44],
+		],
+		label: "yes",
+		lx: 424,
+		ly: 60,
+	},
+	{
+		id: "q2n",
+		pts: [
+			[408, 80],
+			[440, 80],
+			[440, 108],
+			[470, 108],
+		],
+		label: "no",
+		lx: 424,
+		ly: 100,
+	},
+	{
+		id: "q1n",
+		pts: [
+			[102, 102],
+			[102, 150],
+		],
+		label: "no",
+		lx: 110,
+		ly: 130,
+	},
+	{
+		id: "q3n",
+		pts: [
+			[190, 172],
+			[232, 172],
+		],
+		label: "no",
+		lx: 211,
+		ly: 165,
+	},
+	{
+		id: "q3",
+		pts: [
+			[102, 194],
+			[102, 232],
+		],
+		label: "yes",
+		lx: 112,
+		ly: 216,
+	},
+	{
+		id: "q4",
+		pts: [
+			[190, 254],
+			[232, 254],
+		],
+		label: "yes",
+		lx: 211,
+		ly: 247,
+	},
+	{
+		id: "q5",
+		pts: [
+			[408, 254],
+			[470, 254],
+		],
+		label: "yes",
+		lx: 439,
+		ly: 247,
+	},
+	{
+		id: "q4n",
+		pts: [
+			[102, 276],
+			[102, 326],
+			[232, 326],
+		],
+		label: "no",
+		lx: 112,
+		ly: 296,
+	},
+	{
+		id: "q5n",
+		pts: [
+			[320, 276],
+			[320, 304],
+		],
+		label: "no",
+		lx: 330,
+		ly: 294,
+	},
+];
+
+function VerdictTree() {
+	const [ref, t] = useTime<HTMLDivElement>(0);
+	const [custom, setCustom] = useState<Inp | null>(null);
+	const sc = Math.floor(t / 3.6) % SCENARIOS.length;
+	const inp = custom ?? SCENARIOS[sc].inp;
+	const res = decide(inp);
+	const on = new Set(res.path);
+	const flip = (k: keyof Inp) => setCustom({ ...inp, [k]: !inp[k] });
+	// moving pulse along the active path's final edge
+	const pulse = (t * 0.9) % 1;
+	return (
+		<Figure
+			label="Fig. D1"
+			bleed
+			caption="The verdict table at the top of src/lib/integration/second-opinion.ts, with the matcher branch from matchAccepted() in src/lib/matcher-client.ts. It cycles through typical cases; switch any input to trace your own path. Only matched and verified poses are shown as certain: every other branch ends in a pose the user is asked to confirm, or the app pose with no badge. (A cascade that has not finished within 20 s also keeps the app pose, with no badge.)"
+		>
+			<div ref={ref}>
+				<div className="mb-4 flex flex-wrap gap-2">
+					{TOGGLES.map((tg) => (
+						<button
+							key={tg.k}
+							type="button"
+							onClick={() => flip(tg.k)}
+							aria-pressed={inp[tg.k]}
+							className={handButton(inp[tg.k])}
+						>
+							{tg.label}
+						</button>
+					))}
+					{custom && (
+						<button
+							type="button"
+							onClick={() => setCustom(null)}
+							className={`nb-hand px-2 py-0.5 ${TYPE.body} gb-secondary underline decoration-dotted`}
+						>
+							autoplay
+						</button>
+					)}
+				</div>
+				<svg
+					viewBox="0 0 640 360"
+					className="block h-auto w-full"
+					role="img"
+					aria-label={`Verdict ${res.verdict}`}
+				>
+					{EDGES.map((e) => {
+						const act = on.has(e.id);
+						return (
+							<g key={e.id}>
+								<SketchPolyline
+									points={e.pts}
+									seed={`ar-edge-${e.id}`}
+									color={act ? "ink" : "faint"}
+									width={act ? 2.4 : 1.1}
+									passes={act ? 2 : 1}
+								/>
+								{e.label && (
+									<text
+										x={e.lx ?? 0}
+										y={e.ly ?? 0}
+										textAnchor="middle"
+										fontSize={LABEL}
+										fill="var(--gb-ink)"
+										fillOpacity={act ? 1 : 0.6}
+										paintOrder="stroke"
+										stroke="var(--gb-paper)"
+										strokeWidth={3}
+										strokeLinejoin="round"
+									>
+										{e.label}
+									</text>
+								)}
+							</g>
+						);
+					})}
+					{NODES.map((n) => {
+						const act =
+							res.path.includes(n.id) || res.path.includes(`${n.id}n`);
+						return (
+							<g key={n.id}>
+								<rect
+									x={n.x}
+									y={n.y}
+									width={n.w}
+									height={NH}
+									style={{
+										fill: act
+											? "color-mix(in srgb, var(--gb-sign) 38%, var(--gb-paper))"
+											: "var(--gb-paper-deep)",
+									}}
+								/>
+								<text
+									x={n.x + 4}
+									y={n.y + (n.sub ? 18 : 26)}
+									fontSize={LABEL}
+									fill="var(--gb-ink)"
+									fillOpacity={act ? 1 : 0.6}
+								>
+									{n.text}
+								</text>
+								{n.sub && (
+									<text
+										x={n.x + 4}
+										y={n.y + 33}
+										fontSize={LABEL - 1}
+										fill="var(--gb-ink)"
+										fillOpacity={act ? 0.8 : 0.55}
+									>
+										{n.sub}
+									</text>
+								)}
+								<PenLine
+									seed={`ar-node-${n.id}`}
+									from={[n.x, n.y + NH - 2]}
+									to={[n.x + n.w, n.y + NH - 2]}
+									color={act ? "ink" : "faint"}
+									width={act ? 1.6 : 0.9}
+								/>
+							</g>
+						);
+					})}
+					{OUT.map((o) => {
+						const act = res.verdict === o.v && on.has(o.id);
+						const good = o.v === "verified" || o.v === "matched";
+						return (
+							<g key={o.id}>
+								{act ? (
+									<PenCircle
+										center={[o.x + OW / 2, o.y + 18]}
+										radiusX={OW / 2 + 6}
+										radiusY={18}
+										seed={`ar-out-${o.id}`}
+										color={good ? "forest" : "red"}
+										width={2}
+									/>
+								) : (
+									<PenLine
+										seed={`ar-out-line-${o.id}`}
+										from={[o.x + 6, o.y + 30]}
+										to={[o.x + OW - 6, o.y + 30]}
+										color="faint"
+										width={0.9}
+									/>
+								)}
+								<text
+									x={o.x + OW / 2}
+									y={o.y + 22}
+									textAnchor="middle"
+									fontSize={LABEL}
+									fontWeight={act ? 600 : 400}
+									fill="var(--gb-ink)"
+									fillOpacity={act ? 1 : 0.5}
+								>
+									{o.label}
+								</text>
+							</g>
+						);
+					})}
+					{/* travelling pulse along the active edges */}
+					{(() => {
+						const act = EDGES.filter((e) => on.has(e.id));
+						if (!act.length) return null;
+						const seg = Math.min(
+							act.length - 1,
+							Math.floor(pulse * act.length),
+						);
+						const e = act[seg];
+						const f = pulse * act.length - seg;
+						const L = e.pts.reduce(
+							(s, p, i) =>
+								i
+									? s +
+										Math.hypot(p[0] - e.pts[i - 1][0], p[1] - e.pts[i - 1][1])
+									: 0,
+							0,
+						);
+						let d = f * L;
+						let pos = e.pts[0];
+						for (let i = 1; i < e.pts.length; i++) {
+							const a = e.pts[i - 1];
+							const b = e.pts[i];
+							const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+							if (d <= l) {
+								pos = [
+									a[0] + ((b[0] - a[0]) * d) / l,
+									a[1] + ((b[1] - a[1]) * d) / l,
+								];
+								break;
+							}
+							d -= l;
+							pos = b;
+						}
+						return (
+							<HandDot
+								x={pos[0]}
+								y={pos[1]}
+								r={4.2}
+								seed="ar-pulse"
+								color="red"
+							/>
+						);
+					})()}
+					<HandText x={14} y={30} color="pencil" size={15}>
+						after first paint: second opinion
+					</HandText>
+				</svg>
+			</div>
+		</Figure>
+	);
+}
+
+// ---------------------------------------------------------------------------------------------
+
+const GATES: [string, string, string][] = [
+	["acceptConfidence 0.5", "src/lib/geo/solve.ts", "local ±yaw search"],
+	["FULL_SEARCH_CONFIDENCE 0.75", "src/lib/geo/solve.ts", "360° retry bar"],
+	[
+		"YAW_UNKNOWN / FOCAL_UNKNOWN 0.75",
+		"src/lib/integration/unknown-pose.worker.ts",
+		"cascade when heading or focal unknown",
+	],
+	[
+		"score ≥ 0.5, inlier ≥ 0.3, slope ≥ 0.015",
+		"src/lib/refine/confidence.ts",
+		"product of six ramps, two hard gates",
+	],
+	[
+		"MIN_CONFIDENCE 0.5",
+		"src/lib/concord/app/confidence.ts",
+		"LOW unless explicitly accepted",
+	],
+	[
+		"AGREE_DEG 1°, MATCH_AGREE_DEG 0.5°",
+		"src/lib/integration/second-opinion.ts",
+		"verified vs refined; match vs cascade",
+	],
+	[
+		"isAutoHigh()",
+		"src/lib/picker/candidates.ts",
+		"user picks and pins are never HIGH",
+	],
+	[
+		"TAP_MAX_PX 12, DEDUPE_DEG 0.5°",
+		"src/lib/picker/candidates.ts",
+		"tap-consistent ranking, same-basin merge",
+	],
+];
+
+function Legacy() {
+	return (
+		<>
+			<Section title="Fail closed" kicker="The rule">
+				<p>
+					A pose that is wrong and shown as certain is worse than no pose at
+					all: it draws a confident overlay on the wrong mountains. So the
+					product has one policy, applied at every layer: a pose is HIGH only if
+					something <em>explicitly</em> accepted it and its confidence clears a
+					bar, and every other state (missing, rejected, suggested, picked by
+					hand) falls to LOW. The solver’s own gating is on{" "}
+					<Link
+						to={gipfelbuchHref("viewport-inference")}
+						className="underline decoration-[var(--gb-red)]"
+					>
+						Viewport Inference
+					</Link>
+					; this page is the layer above it, which decides what the user is
+					allowed to see as certain.
+				</p>
+			</Section>
+
+			<Section title="How it works" kicker="Mechanism">
+				<Steps
+					steps={[
+						{
+							title: "Soft evidence, hard gates",
+							body: (
+								<>
+									The refine confidence is six smoothstep ramps (yaw-correlation
+									peak, runner-up mode ratio, inlier fraction,
+									correlation-inflated σ, skyline slope, RMS residual)
+									multiplied together. One weak term drags the product down;
+									accept needs <code>score ≥ 0.5</code> and two hard floors
+									(inlier ≥ 0.3, slope ≥ 0.015). Each rejection carries a human
+									reason string.
+								</>
+							),
+						},
+						{
+							title: "A higher bar when less is known",
+							body: (
+								<>
+									With a trusted compass the search is ±25° and 0.5 suffices.
+									When yaw or focal is unknown, the search is over every
+									heading, wrong basins are far likelier, and the bar becomes
+									0.75. On the wild set that single change took the cascade from
+									25 correct and 2 wrong accepts to 22 and 0 (Fig. 5).
+								</>
+							),
+						},
+						{
+							title: "Two solvers must not disagree",
+							body: (
+								<>
+									After first paint, the CPU cascade re-solves independently of
+									the GPU aligner. Agreement within 1° keeps the pose
+									(“verified”); a confident cascade that disagrees wins
+									(“refined”). The aligner alone made one confident wrong accept
+									on the ground-truth set; the cascade made none.
+								</>
+							),
+						},
+						{
+							title: "Escalate, then demand independent evidence",
+							body: (
+								<>
+									If the skyline is weak, <code>shouldEscalate()</code> sends
+									the photo to render-and-match. Even a HIGH match is applied
+									only when the position is a trusted EXIF GPS fix or the
+									cascade lands within 0.5° (<code>matchAccepted</code>). A
+									match that stands alone becomes “unverified”, and the user is
+									asked.
+								</>
+							),
+						},
+						{
+							title: "Suggestions are not accepts",
+							body: (
+								<>
+									The top-3 picker and tapped peaks produce candidates, never
+									acceptance: <code>isAutoHigh</code> is true only for an
+									automatic, verified accept. A pose the user picks (“manual”)
+									or pins is never HIGH, and re-solving from taps is the{" "}
+									<Link
+										to={gipfelbuchHref("tap-a-peak")}
+										className="underline decoration-[var(--gb-red)]"
+									>
+										tap-a-peak
+									</Link>{" "}
+									fallback.
+								</>
+							),
+						},
+					]}
+				/>
+			</Section>
+
+			<VerdictTree />
+
+			<Section title="In the code" kicker="Gates">
+				<p>
+					About a dozen thresholds, each set by hand against a benchmark and
+					none a likelihood: they are bars chosen so that the measured
+					wrong-accept count on blind-verified photos is zero, not
+					probabilities.
+				</p>
+				<div className="@container my-6">
+					{GATES.map(([gate, path, what]) => (
+						<div
+							key={gate}
+							className="flex flex-col gap-1 px-4 py-3 odd:bg-[var(--gb-paper-deep)] @[640px]:flex-row @[640px]:items-baseline @[640px]:gap-4"
+						>
+							<code
+								className={`shrink-0 ${TYPE.caption} @[640px]:w-[19rem]`}
+								style={{ color: "var(--nb-brown)" }}
+							>
+								{gate}
+							</code>
+							<span className={`flex-1 ${TYPE.caption} gb-secondary`}>
+								{what}
+							</span>
+							<span className="max-w-full break-all">
+								<CodeRef path={path} />
+							</span>
+						</div>
+					))}
+				</div>
+				<Callout tone="lesson">
+					Precision first costs recall on purpose. The product rule leaves 10
+					correct poses on the table (14 in the first v2 run) to avoid one wrong
+					one; they go to “please confirm” rather than being lost.
+				</Callout>
+			</Section>
+
+			<Section title="Where it fits" kicker="Neighbourhood">
+				<p>
+					The accept rule constrains{" "}
+					<Link
+						to={gipfelbuchHref("pose-estimate")}
+						className="underline decoration-[var(--gb-red)]"
+					>
+						Pose Estimate
+					</Link>{" "}
+					and gates{" "}
+					<Link
+						to={gipfelbuchHref("viewport-inference")}
+						className="underline decoration-[var(--gb-red)]"
+					>
+						Viewport Inference
+					</Link>
+					; a rejected solve hands over to{" "}
+					<Link
+						to={gipfelbuchHref("tap-a-peak")}
+						className="underline decoration-[var(--gb-red)]"
+					>
+						Tap a Peak
+					</Link>
+					.
+				</p>
+			</Section>
+		</>
+	);
+}
+
+// ======================================================================================
+// Explainer front page (the figures above are folded into Details, except the precision ladder)
+// ======================================================================================
+/** Tone fills for accepted (forest) and rejected (red) chips. */
+const ACCEPT_C = "var(--gb-forest)";
+const REJECT_C = "var(--gb-red)";
+
+/** One written reason per photo, from the stored solve record. */
+function reason(d: GipfelbuchPhotoData): string {
+	const s = d.solved;
+	const fit = `${(100 * s.inlierFraction).toFixed(0)}% of columns fit`;
+	if (s.stage === "refine")
+		return `solve refused it; the second solver took it at ${s.confidence.toFixed(2)}, ${fit}`;
+	if (!s.accepted)
+		return `confidence ${s.confidence.toFixed(2)}, under 0.5: only ${fit}`;
+	return `confidence ${s.confidence.toFixed(2)}, ${fit}`;
+}
+
+function Verdicts() {
+	const idx = useGipfelbuchIndex();
+	const nOk = idx?.photos.filter((p) => p.accepted).length;
+	return (
+		<Figure
+			label="Fig. 4"
+			bleed
+			caption={
+				<>
+					{nOk == null
+						? "Twelve real photos, twelve decisions."
+						: `Twelve real photos, twelve decisions: ${nOk} shown as certain, ${12 - nOk} kept as guesses.`}{" "}
+					Each tile says why. <Measured data={idx} />
+				</>
+			}
+		>
+			<Gallery
+				cols={4}
+				tile={(d) => (
+					<div className="relative">
+						<RealPhoto
+							data={d}
+							layers={["skyline", "solved"]}
+							crop={skylineBand(d, 260)}
+						/>
+						<span
+							className={`absolute top-1 left-1 px-1 font-mono ${TYPE.micro} text-[var(--gb-paper)]`}
+							style={{ background: "var(--gb-ink)" }}
+						>
+							{d.id.slice(-2)}
+						</span>
+					</div>
+				)}
+				tone={(d) => (d.solved.accepted ? "result" : "failure")}
+				label={(d) => (
+					<>
+						<span className="font-semibold text-[var(--gb-ink)]">
+							{d.solved.accepted ? "accepted" : "rejected"}
+						</span>{" "}
+						{reason(d)}
+					</>
+				)}
+			/>
+		</Figure>
+	);
+}
+
+/** Step 2 visual: the 12 confidences on a vertical scale with the two bars. */
+function BarScale() {
+	const idx = useGipfelbuchIndex();
+	const Hh = 100;
+	const y = (v: number) => 8 + (1 - v) * (Hh - 16);
+	return (
+		<svg
+			viewBox="0 0 160 100"
+			className="block aspect-[8/5] w-full bg-[var(--gb-paper-deep)]"
+			role="img"
+			aria-label="Solve confidence of the 12 demo photos against the 0.5 and 0.75 bars"
+		>
+			{[0.5, 0.75].map((v) => (
+				<g key={v}>
+					<SketchPath
+						d={`M26 ${y(v)}H156`}
+						seed={`ar-scale-${v}`}
+						color="pencil"
+						width={1}
+						dash="4 3"
+						passes={1}
+					/>
+					<PrintLabel
+						x={4}
+						y={y(v) + 3}
+						size={9}
+						color="var(--gb-secondary)"
+						halo={0}
+					>
+						{v.toFixed(2)}
+					</PrintLabel>
+				</g>
+			))}
+			{idx?.photos.map((p, i) => (
+				<HandDot
+					key={p.id}
+					x={36 + i * 10.4}
+					y={y(p.confidence)}
+					r={4}
+					seed={`ar-scale-dot-${p.id}`}
+					color={p.accepted ? "forest" : "red"}
+					opacity={1}
+					data
+				/>
+			))}
+		</svg>
+	);
+}
+
+/** Step 3 visual: two independent solvers on one photo. */
+function TwoSolvers() {
+	const d = useGipfelbuchPhoto("demo-01");
+	return (
+		<div
+			className={`flex aspect-[8/5] flex-col justify-center gap-1 bg-[var(--gb-paper-deep)] p-4 font-mono ${TYPE.micro} gb-secondary`}
+		>
+			{d?.app && (
+				<>
+					<div>
+						app aligner <span className="gb-ink">{d.app.yaw.toFixed(1)}°</span>
+					</div>
+					<div>
+						skyline solve{" "}
+						<span className="gb-ink">{d.solved.yaw.toFixed(1)}°</span>
+					</div>
+					<div className="mt-2 pt-1" style={{ color: "var(--gb-water)" }}>
+						within 1°: keep it
+					</div>
+				</>
+			)}
+		</div>
+	);
+}
+
+/** Columns whose detected skyline sits more than 4 px from the map's, drawn on the photo as red ticks. */
+function ScoreFit() {
+	const index = useGipfelbuchIndex();
+	const [id, setId] = useState<GipfelbuchPhotoId>("demo-11");
+	const d = useGipfelbuchPhoto(id);
+	const fx = d ? solveFactors(d) : null;
+	const crop = d ? skylineBand(d, 300) : undefined;
+	// the confident column where the photo's and the map's skylines are furthest apart, and one where they agree
+	const spots = useMemo(() => {
+		if (!d) return null;
+		const gap = (x: number) => {
+			const a = d.skyline.rows[x];
+			const b = d.solvedRows[x];
+			return a == null || b == null || d.skyline.weight[x] < 0.3
+				? null
+				: Math.abs(a - b);
+		};
+		let best = -1;
+		let bx = 0;
+		for (let x = 0; x < d.skyline.rows.length; x++) {
+			const e = gap(x);
+			if (e != null && e > best) {
+				best = e;
+				bx = x;
+			}
+		}
+		let nx = -1;
+		let ng = Number.POSITIVE_INFINITY;
+		for (
+			let x = Math.round(d.photo.width * 0.6);
+			x < d.skyline.rows.length;
+			x++
+		) {
+			const e = gap(x);
+			if (e != null && e < ng && x !== bx) {
+				ng = e;
+				nx = x;
+			}
+		}
+		if (best < 0 || nx < 0) return null;
+		return {
+			far: { x: bx, y: d.skyline.rows[bx] as number, gap: best },
+			near: { x: nx, y: d.skyline.rows[nx] as number, gap: ng },
+		};
+	}, [d]);
+	const live = (i: number, name: string) =>
+		fx ? (
+			<>
+				{name}{" "}
+				<span style={{ color: fx.f[i].v < 1 ? BAD : undefined }}>
+					{fx.f[i].v.toFixed(2)}
+				</span>
+				<span className="gb-secondary"> · {fx.f[i].raw}</span>
+			</>
+		) : (
+			name
+		);
+	return (
+		<Figure
+			label="Fig. 1"
+			bleed
+			caption={
+				<>
+					Red ticks mark columns where the photo&rsquo;s skyline sits over 4 px
+					from the map&rsquo;s. Hair and heads make them, and they pull the
+					first check below 1. Tap a photo. <Measured data={d ?? index} />
+				</>
+			}
+		>
+			<PhotoPicker
+				value={id}
+				onChange={setId}
+				mark={(i) => {
+					const x = index?.photos.find((p) => p.id === i);
+					return x ? (
+						<span
+							className={`px-1 font-mono ${TYPE.micro} text-[var(--gb-paper)]`}
+							style={{ background: x.accepted ? ACCEPT_C : REJECT_C }}
+						>
+							{x.accepted ? "ok" : "rej"}
+						</span>
+					) : null;
+				}}
+			/>
+			<RealPhoto
+				bleed
+				key={id}
+				data={d}
+				layers={["skyline", "solved"]}
+				crop={crop}
+			>
+				{(dd) => (
+					<g>
+						<g
+							style={{ stroke: "var(--gb-red)" }}
+							strokeWidth={dd.photo.width / 900}
+							opacity={0.9}
+						>
+							{dd.skyline.rows.map((r, x) => {
+								const m = dd.solvedRows[x];
+								const w = dd.skyline.weight[x];
+								return r != null &&
+									m != null &&
+									w > 0.05 &&
+									Math.abs(r - m) > 4 ? (
+									<line
+										// biome-ignore lint/suspicious/noArrayIndexKey: one tick per column
+										key={x}
+										x1={x + 0.5}
+										x2={x + 0.5}
+										y1={r - 4}
+										y2={r + 4}
+									/>
+								) : null;
+							})}
+						</g>
+						{spots && (
+							<>
+								<Mark
+									x={spots.far.x}
+									y={Math.max(30, spots.far.y - 36)}
+									n={1}
+									k={dd.photo.width / 700}
+								/>
+								<Mark
+									x={spots.near.x}
+									y={Math.max(30, spots.near.y - 36)}
+									n={2}
+									k={dd.photo.width / 700}
+								/>
+							</>
+						)}
+					</g>
+				)}
+			</RealPhoto>
+			{spots && (
+				<MarkList
+					items={[
+						<>
+							The photo&rsquo;s skyline and the map&rsquo;s drift up to{" "}
+							{spots.far.gap.toFixed(0)} px apart here.
+						</>,
+						<>
+							Here they agree within {Math.max(1, Math.ceil(spots.near.gap))}{" "}
+							px.
+						</>,
+					]}
+				/>
+			)}
+			{d && fx && (
+				<p className={`mt-3 ${TYPE.caption}`}>
+					<span
+						className={`font-semibold ${TYPE.lead}`}
+						style={{ color: d.solved.accepted ? "var(--nb-forest)" : BAD }}
+					>
+						{d.solved.accepted
+							? d.solved.stage === "refine"
+								? "accepted by the second solver"
+								: "accepted"
+							: "rejected"}
+					</span>{" "}
+					<span className={`font-mono ${TYPE.micro} gb-secondary`}>
+						score {fx.product.toFixed(2)} from the first solver, bar 0.5
+					</span>
+				</p>
+			)}
+			<Eq
+				where={[
+					{
+						sym: "f",
+						c: "var(--gb-water)",
+						text: live(
+							0,
+							"share of columns where the two skylines agree within 4 px",
+						),
+					},
+					{
+						sym: "κ",
+						c: "skyline",
+						text: live(1, "share of the width that has a skyline at all"),
+					},
+					{
+						sym: "a",
+						text: live(2, "how close the nearest rival yaw came to the winner"),
+					},
+					{
+						sym: "σ",
+						c: "var(--gb-water)",
+						text: live(3, "how much the map's skyline varies"),
+					},
+				]}
+			>
+				<Sym>c</Sym> = <Sym upright>tilt</Sym> · ⟨
+				<Frac
+					n={
+						<>
+							<Sym c="var(--gb-water)">f</Sym> − 0.3
+						</>
+					}
+					d="0.5"
+				/>
+				⟩ · ⟨<Frac n={<Sym c="skyline">κ</Sym>} d="0.4" />⟩ · ⟨
+				<Frac
+					n={
+						<>
+							1 − <Sym>a</Sym>
+						</>
+					}
+					d="0.4"
+				/>{" "}
+				+ 0.1⟩ · ⟨<Frac n={<Sym c="var(--gb-water)">σ</Sym>} d="0.5" />⟩
+			</Eq>
+			{fx && id === "demo-12" && (
+				<p className={`mt-2 ${TYPE.caption} gb-secondary`}>
+					The first solver scores this {fx.product.toFixed(2)} and refuses. The
+					second solver weighs the same skyline differently, scores it{" "}
+					{d?.solved.confidence.toFixed(2)} and accepts. Ticks here are drawn at
+					its pose.
+				</p>
+			)}
+		</Figure>
+	);
+}
+
+function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
+	const idx = useGipfelbuchIndex();
+	const acc = idx ? idx.photos.filter((p) => p.accepted).length : null;
+	return (
+		<>
+			<Beat kicker="The idea" title="A wrong pose is worse than no pose.">
+				<p>
+					A wrong pose draws confident names on the wrong mountains. A missing
+					pose just asks the user to tap a peak.
+				</p>
+				<p>
+					So Rigi calls a pose certain only if a solver accepted it and its
+					confidence clears a bar. Everything else is a guess, and says so. Even
+					a pose that looks right can be refused.
+				</p>
+			</Beat>
+
+			<Beat kicker="How it works" title="Four checks multiply into one score.">
+				<p>
+					A weak check drags the whole product down. Heads and hair count
+					against the fit, so a photo with a person on the ridge can be refused.
+				</p>
+			</Beat>
+
+			<ScoreFit />
+
+			<RealDecisions />
+
+			<Beat kicker="Two more guards" title="A bar, then a second opinion.">
+				<Trio
+					className="sm:grid-cols-2"
+					steps={[
+						{
+							title: "Hold it to a bar",
+							body: "0.5 with a trusted compass. 0.75 when the heading is unknown.",
+							visual: <BarScale />,
+						},
+						{
+							title: "Ask a second solver",
+							body: "Two independent methods must agree. A lone answer is unverified.",
+							visual: <TwoSolvers />,
+						},
+					]}
+				/>
+			</Beat>
+
+			<ConfidenceVsError />
+
+			<Beat
+				kicker="Where it fails"
+				title="The price is correct poses we do not show."
+			>
+				<p>
+					Tighter rules throw away good answers on purpose. Each dot below is
+					one of 100 photos with a known right answer.
+				</p>
+			</Beat>
+
+			<Verdicts />
+
+			<PrecisionLadder />
+
+			<Numbers
+				items={[
+					{
+						value: "19 / 60",
+						label: "wrong among the app aligner's accepts, 100 photos",
+					},
+					{
+						value: "0 / 20",
+						label: "wrong among accepts under the product rule",
+					},
+					{
+						value: "30 vs 20",
+						label: "correct poses kept: fused HIGH alone vs product rule",
+					},
+					{
+						value: acc == null ? "…" : `${acc} / 12`,
+						label: "demo photos accepted by the solve cascade",
+					},
+				]}
+				source="First three: reports/bench-wild.md (100 blind-verified photos, 2026-09-25 re-run). Last: measured on the 12 demo photos."
+			/>
+
+			<Details>
+				<Legacy />
+			</Details>
+		</>
+	);
+}
+
+export default memo(AcceptRule);

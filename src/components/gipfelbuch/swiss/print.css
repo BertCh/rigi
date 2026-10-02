@@ -1,0 +1,82 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+/* The printed Gipfelbuch (design book A5): white paper, no grain, no reveal states, an A4 page with
+ * asymmetric Tschichold margins. Margin boxes (page counter) need Chrome 131 or newer and are
+ * ignored elsewhere. */
+
+@page {
+	size: A4;
+	/* top, outer (right), bottom, inner (left): 20 / 24 / 30 / 18 mm, single-sided. */
+	margin: 20mm 24mm 30mm 18mm;
+
+	@bottom-right {
+		content: counter(page);
+		font-family: "GB Mono", "GB Mono Fallback", monospace;
+		font-size: 8pt;
+		color: #4a545c;
+	}
+}
+
+@media print {
+	.gb-swiss,
+	.nb-book {
+		--gb-grain: none;
+		--gb-paper: #fff;
+		--gb-paper-deep: #fff;
+		background-color: #fff;
+		background-image: none;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+
+	/* Sticky and fixed furniture would repeat or overlap on every page. */
+	.gb-swiss [class*="sticky"],
+	.gb-swiss [class*="fixed"] {
+		position: static !important;
+	}
+
+	/* Scroll reveals start hidden; on paper everything is shown. */
+	.gb-swiss [class*="opacity-0"] {
+		opacity: 1 !important;
+		transform: none !important;
+	}
+
+	.nb-armed .nb-draw {
+		stroke-dasharray: none;
+		stroke-dashoffset: 0;
+	}
+
+	.nb-armed .nb-fade {
+		opacity: 1;
+	}
+
+	.gb-swiss figure,
+	.gb-swiss .gb-figure,
+	.gb-swiss .nb-print {
+		break-inside: avoid;
+	}
+
+	.gb-swiss h1,
+	.gb-swiss h2,
+	.gb-swiss h3 {
+		break-after: avoid;
+	}
+
+	/* Links print as ink, without the URL. */
+	.gb-swiss a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.gb-swiss a[href]::after {
+		content: none;
+	}
+
+	nav,
+	[data-site-nav] {
+		display: none !important;
+	}
+}
