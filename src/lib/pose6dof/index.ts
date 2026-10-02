@@ -39,6 +39,8 @@ export {
 	type Target,
 	unproject,
 } from "./project";
+// Robust RANSAC solvers (OpenCV camera axes, world → camera R, t), ported from the Python services
+export * from "./ransac";
 export {
 	type RefineOptions,
 	type RefineResult,

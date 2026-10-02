@@ -206,3 +206,27 @@ Also exported:
 Self-checks (synthetic ridge, exact horizon): `npx tsx src/lib/pose6dof/eye.check.ts`, or call `runEyeChecks()` from it.
 
 **Cost:** about (grid cells + 7 per LM iteration) horizon calls. In node this measured 2–42 s per photo, with 30–210 calls at 30–175 ms each (horizon-fast, sector only). Trim the grid for the UI.
+
+## Robust RANSAC solvers (`ransac/`): the Python services' poselib / opencv / numpy solvers, in the browser
+
+These use the **OpenCV camera convention** (x right, y down, z forward), not the pose conventions above:
+`R` (row-major 3×3) and `t` map world → camera, `p = R X + t`, and image points are pixels with
+`camera = { fx, fy, cx, cy }` (pass `{ fx: 1, fy: 1, cx: 0, cy: 0 }` for normalised coordinates).
+
+| Function | Ports | Model |
+|---|---|---|
+| `absolutePoseRansac(points2d, points3d, camera, opts)` | `poselib.estimate_absolute_pose` (match.py `solve_pnp_exif`, x5 verifier) | P3P (fixed focal) or 6-point DLT (free focal) samples, MSAC score, LO (truncated-loss LM) on every new best, dynamic trials ×3, final Cauchy LM at 0.5 thr |
+| `cameraRotationRansac(points2d, worldDirs, camera, opts)` | `match.solve_rotation` (matcher service `core.solve`, `fuse.py`) | centre fixed at the eye: 2-point TRIAD per focal candidate, 3 rounds of soft_l1 LM (+ log focal with a 5 % prior) |
+| `rotationRansac(bearings0, bearings1, opts)` | `run_propagate.rot_ransac` (relative-rotation service) | pure rotation on unit bearings: 2-point Kabsch, chord threshold, 3 Kabsch re-fits |
+
+Each has an `…Async` twin that scores big batches on the GPU (`src/lib/gpu/ransac/score.ts`: one ComputeGraph,
+K hypotheses × N correspondences in one dispatch, arg-max on the GPU, only the winner read back; f32, the
+winner is re-scored in f64). The RANSAC loops are generators (`…Loop`) that yield hypothesis batches, so the
+sync CPU path and the async GPU path run the same code; the CPU scorer `scoreBatchCpu` is the GPU's twin.
+Without a compute device (WebGL2, `?gpu=off`, node) the async functions score on the CPU.
+
+Sampling uses a seeded mulberry32 stream, not numpy's, so runs agree with Python in outcome, not draw for draw.
+Parity: `tools/matcher/.venv/bin/python scripts/pose6dof/ransac-parity.py OUT.json` then
+`npx tsx scripts/pose6dof/ransac-parity.ts OUT.json` (synthetic sets + recorded ALIKED+LightGlue matches of the
+20 propagation study pairs). GPU vs CPU: `DAWN_DIR=/tmp/dawn npx tsx scripts/gpu/ransac-dawn.ts` (CI row `ransac-dawn`).
+Specs: `ransac/__tests__/ransac.spec.ts`, `src/lib/gpu/ransac/__tests__/score.spec.ts`.
