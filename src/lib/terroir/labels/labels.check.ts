@@ -29,6 +29,11 @@ import {
 	resolvePeakClass,
 	tierHint,
 } from "./peakTiers.ts";
+import {
+	SWISSTOPO_LABELS,
+	SWISSTOPO_NAME_TYPO,
+	SWISSTOPO_WATER,
+} from "./swisstopo.ts";
 
 let fails = 0;
 const ok = (c: unknown, msg: string) => {
@@ -314,6 +319,36 @@ const c0 = cl(1);
 ok(
 	JSON.stringify(c0) === JSON.stringify(c1),
 	"scale 1 is identical to no scale",
+);
+
+// ---- swisstopo preset: only self-hosted faces (upright 300/400/500/600, italic 400)
+const SELF_HOSTED_UPRIGHT = new Set([300, 400, 500, 600]);
+for (const [cls, t] of Object.entries(SWISSTOPO_NAME_TYPO)) {
+	ok(
+		t.italic ? t.weight === 400 : SELF_HOSTED_UPRIGHT.has(t.weight),
+		`swisstopo ${cls} uses a self-hosted weight/style`,
+	);
+}
+ok(
+	SWISSTOPO_NAME_TYPO.lake.italic &&
+		SWISSTOPO_NAME_TYPO.lake.color === SWISSTOPO_WATER,
+	"swisstopo hydrography blue italic",
+);
+ok(
+	SWISSTOPO_NAME_TYPO.region.upper && SWISSTOPO_NAME_TYPO.region.tracking > 0.2,
+	"swisstopo regions letter-spaced capitals",
+);
+ok(
+	!SWISSTOPO_NAME_TYPO.peak.italic && !SWISSTOPO_NAME_TYPO.peak.upper,
+	"swisstopo peaks upright",
+);
+ok(
+	(SWISSTOPO_LABELS.sub?.weight ?? 400) < (SWISSTOPO_LABELS.name?.weight ?? 0),
+	"swisstopo elevation lighter than the name",
+);
+ok(
+	Object.keys(SWISSTOPO_NAME_TYPO).length === Object.keys(NAME_TYPO).length,
+	"swisstopo covers every name class",
 );
 
 if (fails) {
