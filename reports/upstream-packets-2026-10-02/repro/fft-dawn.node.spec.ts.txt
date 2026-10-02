@@ -1,0 +1,86 @@
+// luma.gl
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+
+// Repro / evidence harness (not part of the luma patch): GPUFFT1D forward vs a float64 CPU FFT on a real
+// WebGPU device in node (Dawn). Copy into modules/gpgpu/test/gpu-core/fft-dawn.node.spec.ts of a luma checkout (drop the .txt suffix) and run
+//   DAWN_DIR=/tmp/dawn yarn vitest run --project node modules/gpgpu/test/gpu-core/fft-dawn.node.spec.ts
+// where /tmp/dawn contains `npm i webgpu@0.3.0`. Skips without DAWN_DIR.
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {Buffer, luma, type Device} from '@luma.gl/core';
+import {GPUCommandGraph, GPUFFT1D, GPU_FFT1D_MAX_LENGTH} from '@luma.gl/gpgpu/gpu-core';
+import {webgpuAdapter} from '@luma.gl/webgpu';
+import {expect, it} from 'vitest';
+
+const dawnDirectory = process.env.DAWN_DIR;
+
+async function createDawnDevice(): Promise<Device> {
+  const dawn = await import(pathToFileURL(path.join(dawnDirectory!, 'node_modules/webgpu/index.js')).href);
+  Object.assign(globalThis, dawn.globals);
+  const gpu = dawn.create([]);
+  (globalThis as any).__dawnGpu = gpu; // keep the instance referenced
+  Object.defineProperty(globalThis, 'navigator', {value: {gpu, userAgent: 'node'}, configurable: true});
+  return await luma.createDevice({type: 'webgpu', adapters: [webgpuAdapter], createCanvasContext: false} as any);
+}
+
+/** Float64 recursive radix-2 forward FFT of interleaved complex input. */
+function cpuFFT(input: Float64Array): Float64Array {
+  const n = input.length / 2;
+  if (n === 1) return input.slice();
+  const even = new Float64Array(n), odd = new Float64Array(n);
+  for (let i = 0; i < n / 2; i++) {
+    even.set(input.subarray(4 * i, 4 * i + 2), 2 * i);
+    odd.set(input.subarray(4 * i + 2, 4 * i + 4), 2 * i);
+  }
+  const e = cpuFFT(even.subarray(0, n)), o = cpuFFT(odd.subarray(0, n));
+  const out = new Float64Array(2 * n);
+  for (let k = 0; k < n / 2; k++) {
+    const a = (-2 * Math.PI * k) / n, c = Math.cos(a), s = Math.sin(a);
+    const orr = o[2 * k] * c - o[2 * k + 1] * s, oi = o[2 * k] * s + o[2 * k + 1] * c;
+    out[2 * k] = e[2 * k] + orr; out[2 * k + 1] = e[2 * k + 1] + oi;
+    out[2 * (k + n / 2)] = e[2 * k] - orr; out[2 * (k + n / 2) + 1] = e[2 * k + 1] - oi;
+  }
+  return out;
+}
+
+async function gpuForward(device: Device, input: Float32Array, length: number): Promise<Float32Array> {
+  const inB = device.createBuffer({data: input, usage: Buffer.STORAGE | Buffer.COPY_DST});
+  const outB = device.createBuffer({byteLength: input.byteLength, usage: Buffer.STORAGE | Buffer.COPY_SRC});
+  const graph = new GPUCommandGraph(device);
+  const view = (id: string, b: Buffer) =>
+    graph.createDataView(graph.importBuffer({id, byteLength: b.byteLength, usage: b.usage}, b), {format: 'float32x2', length: length});
+  graph.add(new GPUFFT1D({id: 'f', input: view('in', inB), output: view('out', outB), length, direction: 'forward'}));
+  const compiled = graph.compile();
+  try {
+    const enc = device.createCommandEncoder();
+    compiled.encode(enc, {parameters: undefined});
+    device.submit(enc.finish());
+    const bytes = await outB.readAsync();
+    return new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  } finally {
+    compiled.destroy(); inB.destroy(); outB.destroy();
+  }
+}
+
+it.skipIf(!dawnDirectory)('GPUFFT1D forward matches a float64 FFT at every length on this device', async () => {
+  const device = await createDawnDevice();
+  const lengths = [8, 16, 64, 256, 1024, 2048, 8192, 65536].filter(l => l <= GPU_FFT1D_MAX_LENGTH);
+  const report: string[] = [];
+  let worst = 0;
+  for (const length of lengths) {
+    const input = new Float32Array(length * 2).map((_, i) => Math.sin(i * 0.37) + 0.25 * Math.cos(i * 0.19));
+    const expected = cpuFFT(Float64Array.from(input));
+    const actual = await gpuForward(device, input, length);
+    let maxError = 0, maxMagnitude = 0;
+    for (let i = 0; i < expected.length; i++) {
+      maxError = Math.max(maxError, Math.abs(actual[i] - expected[i]));
+      maxMagnitude = Math.max(maxMagnitude, Math.abs(expected[i]));
+    }
+    const relative = maxError / maxMagnitude;
+    worst = Math.max(worst, relative);
+    report.push(`length ${length}: max relative error ${relative.toExponential(2)}`);
+  }
+  console.log(report.join('\n'));
+  expect(worst).toBeLessThan(1e-4);
+}, 120_000);

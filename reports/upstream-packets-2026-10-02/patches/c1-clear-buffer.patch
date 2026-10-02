@@ -1,0 +1,189 @@
+From d86a1a6aa2d3a5d5a5477daea53b80044a4c049e Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 14:52:40 -0400
+Subject: [PATCH] feat(core): CommandEncoder.clearBuffer(buffer, byteOffset?,
+ byteLength?)
+
+WebGPU records the native clearBuffer; WebGL queues a zero write through the buffer write path, flushed in command order. The null encoder queues it too. Offset and length must be multiples of four.
+---
+ .../src/adapter/resources/command-encoder.ts  |  9 ++++++
+ .../adapter/resources/command-encoder.spec.ts | 31 +++++++++++++++++++
+ .../resources/null-command-encoder.ts         |  5 +++
+ .../adapter/resources/webgl-command-buffer.ts | 14 +++++++++
+ .../resources/webgl-command-encoder.ts        |  7 +++++
+ .../resources/webgpu-command-encoder.ts       |  9 ++++++
+ 6 files changed, 75 insertions(+)
+
+diff --git a/modules/core/src/adapter/resources/command-encoder.ts b/modules/core/src/adapter/resources/command-encoder.ts
+index bb9d62b55..dd7644b9f 100644
+--- a/modules/core/src/adapter/resources/command-encoder.ts
++++ b/modules/core/src/adapter/resources/command-encoder.ts
+@@ -182,6 +182,15 @@ export abstract class CommandEncoder extends Resource<CommandEncoderProps> {
+   /** Add a command that copies data from a sub-region of one or multiple contiguous texture subresources to another sub-region of one or multiple continuous texture subresources. */
+   abstract copyTextureToTexture(options: CopyTextureToTextureOptions): void;
+ 
++  /**
++   * Add a command that fills a sub-region of a Buffer with zeros.
++   * @param buffer Buffer to clear. Requires `Buffer.COPY_DST` usage on WebGPU.
++   * @param byteOffset Offset in bytes of the cleared region (default 0).
++   * @param byteLength Size in bytes of the cleared region (default: the rest of the buffer).
++   * @note On WebGPU, both must be multiples of 4.
++   */
++  abstract clearBuffer(buffer: Buffer, byteOffset?: number, byteLength?: number): void;
++
+   /** Add a command that clears a texture mip level. */
+   // abstract clearTexture(options: ClearTextureOptions): void;
+ 
+diff --git a/modules/core/test/adapter/resources/command-encoder.spec.ts b/modules/core/test/adapter/resources/command-encoder.spec.ts
+index b21fd725a..416247124 100644
+--- a/modules/core/test/adapter/resources/command-encoder.spec.ts
++++ b/modules/core/test/adapter/resources/command-encoder.spec.ts
+@@ -105,6 +105,10 @@ class TestCommandEncoder extends CommandEncoder {
+     throw new Error('not implemented');
+   }
+ 
++  clearBuffer(): void {
++    throw new Error('not implemented');
++  }
++
+   copyBufferToTexture(): void {
+     throw new Error('not implemented');
+   }
+@@ -1133,3 +1137,30 @@ function testBlit(t: Test, device: Device) {
+   t.end();
+ }
+ /* eslint-disable max-statements */
++
++it('CommandEncoder.clearBuffer zeroes a buffer region', async () => {
++  for (const device of await getTestDevices(['webgl', 'webgpu', 'null'])) {
++    const buffer = device.createBuffer({
++      usage: Buffer.COPY_DST | Buffer.COPY_SRC | Buffer.STORAGE,
++      data: new Uint32Array([1, 2, 3, 4])
++    });
++
++    const commandEncoder = device.createCommandEncoder();
++    commandEncoder.clearBuffer(buffer, 4, 8);
++    device.submit(commandEncoder.finish());
++    expect(
++      Array.from(new Uint32Array((await buffer.readAsync()).slice().buffer)),
++      `${device.type} clearBuffer(offset, size) clears only that range`
++    ).toEqual([1, 0, 0, 4]);
++
++    const wholeBufferEncoder = device.createCommandEncoder();
++    wholeBufferEncoder.clearBuffer(buffer);
++    device.submit(wholeBufferEncoder.finish());
++    expect(
++      Array.from(new Uint32Array((await buffer.readAsync()).slice().buffer)),
++      `${device.type} clearBuffer(buffer) clears the whole buffer`
++    ).toEqual([0, 0, 0, 0]);
++
++    buffer.destroy();
++  }
++});
+diff --git a/modules/test-utils/src/null-device/resources/null-command-encoder.ts b/modules/test-utils/src/null-device/resources/null-command-encoder.ts
+index de1748815..fe35bf198 100644
+--- a/modules/test-utils/src/null-device/resources/null-command-encoder.ts
++++ b/modules/test-utils/src/null-device/resources/null-command-encoder.ts
+@@ -8,6 +8,7 @@ import type {
+   ComputePass,
+   ComputePassProps,
+   QuerySet,
++  Buffer,
+   CopyBufferToBufferOptions,
+   CopyBufferToTextureOptions,
+   CopyTextureToBufferOptions,
+@@ -61,6 +62,10 @@ export class NullCommandEncoder extends CommandEncoder {
+     );
+   }
+ 
++  clearBuffer(buffer: Buffer, byteOffset: number = 0, byteLength?: number): void {
++    buffer.write(new Uint8Array(byteLength ?? buffer.byteLength - byteOffset), byteOffset);
++  }
++
+   copyBufferToTexture(_options: CopyBufferToTextureOptions) {
+     throw new Error('copyBufferToTexture is not supported on NullDevice');
+   }
+diff --git a/modules/webgl/src/adapter/resources/webgl-command-buffer.ts b/modules/webgl/src/adapter/resources/webgl-command-buffer.ts
+index 0572b60ce..68f5f586e 100644
+--- a/modules/webgl/src/adapter/resources/webgl-command-buffer.ts
++++ b/modules/webgl/src/adapter/resources/webgl-command-buffer.ts
+@@ -11,6 +11,7 @@ import {
+   type TextureReadOptions,
+   // type ClearTextureOptions,
+   CommandBuffer,
++  Buffer,
+   Texture,
+   Framebuffer,
+   assertDefined
+@@ -43,6 +44,11 @@ type CopyTextureToTextureCommand = {
+   options: CopyTextureToTextureOptions;
+ };
+ 
++type ClearBufferCommand = {
++  name: 'clear-buffer';
++  options: {buffer: Buffer; byteOffset: number; byteLength: number};
++};
++
+ type ClearTextureCommand = {
+   name: 'clear-texture';
+   options: {}; // ClearTextureOptions;
+@@ -58,6 +64,7 @@ type Command =
+   | CopyBufferToTextureCommand
+   | CopyTextureToBufferCommand
+   | CopyTextureToTextureCommand
++  | ClearBufferCommand
+   | ClearTextureCommand
+   | ReadTextureCommand;
+ 
+@@ -86,6 +93,13 @@ export class WEBGLCommandBuffer extends CommandBuffer {
+         case 'copy-texture-to-texture':
+           _copyTextureToTexture(this.device, command.options);
+           break;
++        case 'clear-buffer':
++          // WebGL has no native clearBuffer: write zeros through the buffer write path
++          command.options.buffer.write(
++            new Uint8Array(command.options.byteLength),
++            command.options.byteOffset
++          );
++          break;
+         // case 'clear-texture':
+         //   _clearTexture(this.device, command.options);
+         //   break;
+diff --git a/modules/webgl/src/adapter/resources/webgl-command-encoder.ts b/modules/webgl/src/adapter/resources/webgl-command-encoder.ts
+index bc70c28fc..ccdeb85d2 100644
+--- a/modules/webgl/src/adapter/resources/webgl-command-encoder.ts
++++ b/modules/webgl/src/adapter/resources/webgl-command-encoder.ts
+@@ -58,6 +58,13 @@ export class WEBGLCommandEncoder extends CommandEncoder {
+     this.commandBuffer.commands.push({name: 'copy-buffer-to-buffer', options});
+   }
+ 
++  clearBuffer(buffer: Buffer, byteOffset: number = 0, byteLength?: number): void {
++    this.commandBuffer.commands.push({
++      name: 'clear-buffer',
++      options: {buffer, byteOffset, byteLength: byteLength ?? buffer.byteLength - byteOffset}
++    });
++  }
++
+   copyBufferToTexture(options: CopyBufferToTextureOptions) {
+     this.commandBuffer.commands.push({name: 'copy-buffer-to-texture', options});
+   }
+diff --git a/modules/webgpu/src/adapter/resources/webgpu-command-encoder.ts b/modules/webgpu/src/adapter/resources/webgpu-command-encoder.ts
+index e6492c157..69fbb40c8 100644
+--- a/modules/webgpu/src/adapter/resources/webgpu-command-encoder.ts
++++ b/modules/webgpu/src/adapter/resources/webgpu-command-encoder.ts
+@@ -113,6 +113,15 @@ export class WebGPUCommandEncoder extends CommandEncoder {
+     );
+   }
+ 
++  clearBuffer(buffer: Buffer, byteOffset: number = 0, byteLength?: number): void {
++    const webgpuBuffer = buffer as WebGPUBuffer;
++    this.handle.clearBuffer(
++      webgpuBuffer.handle,
++      byteOffset,
++      byteLength ?? buffer.byteLength - byteOffset
++    );
++  }
++
+   copyBufferToTexture(options: CopyBufferToTextureOptions): void {
+     const webgpuSourceBuffer = options.sourceBuffer as WebGPUBuffer;
+     const webgpuDestinationTexture = options.destinationTexture as WebGPUTexture;

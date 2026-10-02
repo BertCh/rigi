@@ -1,0 +1,444 @@
+From e29d70657b6bb7398c5473a740e9e81febd280ca Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 14:49:48 -0400
+Subject: [PATCH] feat(gpgpu): growable GPUReadbackRing slots and partial-range
+ ticket reads
+
+growable: true lets acquire({byteLength}) / tryAcquire({byteLength}) reserve a slot that holds the request, replacing an idle slot that is too small. GPUReadbackTicket.readPartial() maps a header first and then only the used prefix of a capacity-sized copy.
+---
+ .../gpu-core/gpu-readback-ring.md             |  26 +++
+ .../gpgpu/src/gpu-core/gpu-readback-ring.ts   | 179 ++++++++++++++++--
+ modules/gpgpu/src/gpu-core/index.ts           |   6 +-
+ .../gpu-core/gpu-readback-ring.node.spec.ts   | 118 ++++++++++++
+ 4 files changed, 311 insertions(+), 18 deletions(-)
+ create mode 100644 modules/gpgpu/test/gpu-core/gpu-readback-ring.node.spec.ts
+
+diff --git a/docs/api-reference/experimental/gpu-core/gpu-readback-ring.md b/docs/api-reference/experimental/gpu-core/gpu-readback-ring.md
+index 5655aa25a..fcf27d5cb 100644
+--- a/docs/api-reference/experimental/gpu-core/gpu-readback-ring.md
++++ b/docs/api-reference/experimental/gpu-core/gpu-readback-ring.md
+@@ -71,6 +71,32 @@ if (ticket) {
+ }
+ ```
+ 
++### Variable-size results and partial reads
++
++Pass `growable: true` when result sizes vary per request. `byteLength` is then the initial slot
++capacity, and `tryAcquire({byteLength})` / `acquire({byteLength})` reserve a slot that holds the
++request: the smallest idle slot that fits is reused, otherwise an idle slot is replaced by a
++larger one (rounded up to a power of two). A warm ring does not allocate. Without `growable`, a
++request above `byteLength` throws.
++
++When the useful length of a capacity-sized result is written by the GPU itself (a counter followed
++by that many records), `ticket.readPartial({headerByteLength, getByteLength})` maps the header,
++asks `getByteLength(header)` how much of the encoded range is used, and maps only that prefix. The
++bytes past the used length are copied on the GPU but never mapped.
++
++```ts
++const ring = new GPUReadbackRing(device, {byteLength: 1024, slotCount: 3, growable: true});
++const ticket = ring.tryAcquire({byteLength: results.byteLength});
++if (ticket) {
++  ticket.copyFrom(commandEncoder, results);
++  device.submit(commandEncoder.finish());
++  const {data} = await ticket.readPartial({
++    headerByteLength: 4,
++    getByteLength: header => 4 + new Uint32Array(header.buffer)[0] * 16
++  });
++}
++```
++
+ ### Backpressure, cancellation, and loss
+ 
+ An unused reservation can be cancelled immediately. Once a copy is encoded, its destination cannot
+diff --git a/modules/gpgpu/src/gpu-core/gpu-readback-ring.ts b/modules/gpgpu/src/gpu-core/gpu-readback-ring.ts
+index 39e51a3bc..a4be69e66 100644
+--- a/modules/gpgpu/src/gpu-core/gpu-readback-ring.ts
++++ b/modules/gpgpu/src/gpu-core/gpu-readback-ring.ts
+@@ -8,10 +8,33 @@ import {Buffer, type CommandEncoder, type Device} from '@luma.gl/core';
+ export type GPUReadbackRingProps = {
+   /** Prefix for the staging-buffer IDs. */
+   id?: string;
+-  /** Capacity of every staging buffer, in bytes. Must be a positive multiple of four. */
++  /**
++   * Capacity of every staging buffer, in bytes. Must be a positive multiple of four. With
++   * `growable`, this is the initial capacity.
++   */
+   byteLength: number;
+   /** Number of independently reusable staging buffers. Defaults to three. */
+   slotCount?: number;
++  /**
++   * Lets `tryAcquire({byteLength})` / `acquire({byteLength})` request more than `byteLength`: an idle
++   * slot that is too small is replaced by a larger one (rounded up to a power of two), so no
++   * allocation happens once the ring is warm. Defaults to `false` (fixed-size slots).
++   */
++  growable?: boolean;
++};
++
++/** Options for reserving a ticket. */
++export type GPUReadbackAcquireOptions = {
++  /** Minimum staging capacity the ticket needs, in bytes. Defaults to the ring's `byteLength`. */
++  byteLength?: number;
++};
++
++/** Options for {@link GPUReadbackTicket.readPartial}. */
++export type GPUReadbackPartialOptions = {
++  /** Leading bytes of the encoded range that carry the used length (mapped first). */
++  headerByteLength: number;
++  /** Returns how many bytes of the encoded range to return, from a copy of the header. */
++  getByteLength: (header: Uint8Array) => number;
+ };
+ 
+ type GPUReadbackTicketState = 'reserved' | 'encoded' | 'reading' | 'released';
+@@ -97,6 +120,58 @@ export class GPUReadbackTicket {
+     }
+   }
+ 
++  /**
++   * Like `read()`, but maps only the used prefix of a capacity-sized copy.
++   *
++   * The header (the first `headerByteLength` bytes of the encoded range) is mapped first;
++   * `getByteLength(header)` then says how many bytes of the range hold data (an integer from the
++   * header length through the encoded length), and only those are mapped and returned. Bytes
++   * past the used length are copied on the GPU but never mapped. Resolves the header and the
++   * data (which starts with the header).
++   */
++  async readPartial(
++    options: GPUReadbackPartialOptions
++  ): Promise<{header: Uint8Array; data: Uint8Array}> {
++    if (this.state !== 'encoded') {
++      throw new Error('GPU readback ticket must be encoded before reading');
++    }
++    const {headerByteLength, getByteLength} = options;
++    if (
++      !Number.isSafeInteger(headerByteLength) ||
++      headerByteLength <= 0 ||
++      headerByteLength > this.copiedByteLength
++    ) {
++      throw new Error('GPU readback header must be positive and within the encoded range');
++    }
++    this.state = 'reading';
++    try {
++      const header = (
++        await this.buffer.readAsync(this.copiedByteOffset, alignUp(headerByteLength))
++      ).slice(0, headerByteLength);
++      const byteLength = getByteLength(header.slice());
++      if (
++        !Number.isSafeInteger(byteLength) ||
++        byteLength < headerByteLength ||
++        byteLength > this.copiedByteLength
++      ) {
++        throw new Error('GPU readback partial length must be an integer within the encoded range');
++      }
++      const data =
++        byteLength === headerByteLength
++          ? header
++          : (await this.buffer.readAsync(this.copiedByteOffset, alignUp(byteLength))).slice(
++              0,
++              byteLength
++            );
++      if (this.cancelled) {
++        throw new Error('GPU readback ticket was cancelled');
++      }
++      return {header, data};
++    } finally {
++      this.release();
++    }
++  }
++
+   /**
+    * Cancels an unused reservation, or discards a read already in progress.
+    *
+@@ -144,12 +219,18 @@ export class GPUReadbackRing {
+   /** Total number of staging slots. */
+   readonly slotCount: number;
+ 
+-  private readonly buffers: Buffer[];
++  /** Whether acquisition may request, and replace slots to hold, more than `byteLength`. */
++  readonly growable: boolean;
++
++  private readonly device: Device;
++  private readonly id: string;
+   private readonly availableBuffers: Buffer[];
+   private readonly waiters: Array<{
++    byteLength: number;
+     resolve: (ticket: GPUReadbackTicket) => void;
+     reject: (error: Error) => void;
+   }> = [];
++  private nextSlotIndex = 0;
+   private destroyed = false;
+ 
+   constructor(device: Device, props: GPUReadbackRingProps) {
+@@ -160,15 +241,12 @@ export class GPUReadbackRing {
+     }
+     this.byteLength = props.byteLength;
+     this.slotCount = slotCount;
+-    const id = props.id ?? 'gpu-readback-ring';
+-    this.buffers = Array.from({length: slotCount}, (_, slotIndex) =>
+-      device.createBuffer({
+-        id: `${id}-slot-${slotIndex}`,
+-        byteLength: props.byteLength,
+-        usage: Buffer.COPY_DST | Buffer.MAP_READ
+-      })
++    this.growable = props.growable ?? false;
++    this.device = device;
++    this.id = props.id ?? 'gpu-readback-ring';
++    this.availableBuffers = Array.from({length: slotCount}, () =>
++      this.createSlotBuffer(props.byteLength)
+     );
+-    this.availableBuffers = [...this.buffers];
+     void device.lost.then(() => this.destroy());
+   }
+ 
+@@ -177,25 +255,32 @@ export class GPUReadbackRing {
+     return this.availableBuffers.length;
+   }
+ 
+-  /** Reserves a slot immediately, or returns `null` when the ring is under backpressure. */
+-  tryAcquire(): GPUReadbackTicket | null {
++  /**
++   * Reserves a slot immediately, or returns `null` when the ring is under backpressure.
++   *
++   * With `growable`, the smallest idle slot that holds `options.byteLength` is used, or an idle
++   * slot is replaced by a larger one when none does.
++   */
++  tryAcquire(options: GPUReadbackAcquireOptions = {}): GPUReadbackTicket | null {
+     if (this.destroyed) {
+       return null;
+     }
+-    const buffer = this.availableBuffers.shift();
++    const byteLength = this.getRequestedByteLength(options);
++    const buffer = this.takeAvailableBuffer(byteLength);
+     return buffer ? new GPUReadbackTicket(this, buffer) : null;
+   }
+ 
+   /** Waits for and reserves the next available slot. */
+-  acquire(): Promise<GPUReadbackTicket> {
+-    const ticket = this.tryAcquire();
++  acquire(options: GPUReadbackAcquireOptions = {}): Promise<GPUReadbackTicket> {
++    const ticket = this.tryAcquire(options);
+     if (ticket) {
+       return Promise.resolve(ticket);
+     }
+     if (this.destroyed) {
+       return Promise.reject(new Error('GPUReadbackRing has been destroyed'));
+     }
+-    return new Promise((resolve, reject) => this.waiters.push({resolve, reject}));
++    const byteLength = this.getRequestedByteLength(options);
++    return new Promise((resolve, reject) => this.waiters.push({byteLength, resolve, reject}));
+   }
+ 
+   /** Rejects pending waiters and destroys idle slots; active slots are destroyed on release. */
+@@ -220,11 +305,71 @@ export class GPUReadbackRing {
+     }
+     const waiter = this.waiters.shift();
+     if (waiter) {
+-      waiter.resolve(new GPUReadbackTicket(this, buffer));
++      waiter.resolve(new GPUReadbackTicket(this, this.fitBuffer(buffer, waiter.byteLength)));
+     } else {
+       this.availableBuffers.push(buffer);
+     }
+   }
++
++  private createSlotBuffer(byteLength: number): Buffer {
++    return this.device.createBuffer({
++      id: `${this.id}-slot-${this.nextSlotIndex++}`,
++      byteLength,
++      usage: Buffer.COPY_DST | Buffer.MAP_READ
++    });
++  }
++
++  private getRequestedByteLength(options: GPUReadbackAcquireOptions): number {
++    const byteLength = options.byteLength ?? this.byteLength;
++    validateAlignedRange(Number.MAX_SAFE_INTEGER, 0, byteLength, 'acquire');
++    if (byteLength > this.byteLength && !this.growable) {
++      throw new Error(
++        `GPUReadbackRing slots hold ${this.byteLength} bytes; create the ring with growable: true to request ${byteLength}`
++      );
++    }
++    return byteLength;
++  }
++
++  /** Removes the smallest idle slot that holds `byteLength` (growing the smallest if needed). */
++  private takeAvailableBuffer(byteLength: number): Buffer | undefined {
++    let best = -1;
++    for (const [index, buffer] of this.availableBuffers.entries()) {
++      if (
++        buffer.byteLength >= byteLength &&
++        (best < 0 || buffer.byteLength < this.availableBuffers[best].byteLength)
++      ) {
++        best = index;
++      }
++    }
++    if (best < 0 && this.growable && this.availableBuffers.length > 0) {
++      best = 0;
++      for (const [index, buffer] of this.availableBuffers.entries()) {
++        if (buffer.byteLength < this.availableBuffers[best].byteLength) best = index;
++      }
++    }
++    if (best < 0) {
++      return undefined;
++    }
++    const [buffer] = this.availableBuffers.splice(best, 1);
++    return this.fitBuffer(buffer, byteLength);
++  }
++
++  /** Returns `buffer`, or a larger replacement (destroying `buffer`) when it is too small. */
++  private fitBuffer(buffer: Buffer, byteLength: number): Buffer {
++    if (buffer.byteLength >= byteLength) {
++      return buffer;
++    }
++    buffer.destroy();
++    return this.createSlotBuffer(getNextPowerOfTwo(byteLength));
++  }
++}
++
++function alignUp(byteLength: number): number {
++  return Math.ceil(byteLength / 4) * 4;
++}
++
++function getNextPowerOfTwo(value: number): number {
++  return 2 ** Math.ceil(Math.log2(value));
+ }
+ 
+ function validateCopyRange(
+diff --git a/modules/gpgpu/src/gpu-core/index.ts b/modules/gpgpu/src/gpu-core/index.ts
+index 3594c1779..76e9ea6cf 100644
+--- a/modules/gpgpu/src/gpu-core/index.ts
++++ b/modules/gpgpu/src/gpu-core/index.ts
+@@ -535,7 +535,11 @@ export type {
+ } from './gpu-index-picking-target';
+ 
+ export {GPUReadbackRing, GPUReadbackTicket} from './gpu-readback-ring';
+-export type {GPUReadbackRingProps} from './gpu-readback-ring';
++export type {
++  GPUReadbackAcquireOptions,
++  GPUReadbackPartialOptions,
++  GPUReadbackRingProps
++} from './gpu-readback-ring';
+ 
+ export {DrawCommandBuffer} from './draw-command-buffer';
+ export type {
+diff --git a/modules/gpgpu/test/gpu-core/gpu-readback-ring.node.spec.ts b/modules/gpgpu/test/gpu-core/gpu-readback-ring.node.spec.ts
+new file mode 100644
+index 000000000..73e441f37
+--- /dev/null
++++ b/modules/gpgpu/test/gpu-core/gpu-readback-ring.node.spec.ts
+@@ -0,0 +1,118 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {Buffer, type Device} from '@luma.gl/core';
++import {GPUReadbackRing} from '@luma.gl/gpgpu/gpu-core';
++import {getNullTestDevice} from '@luma.gl/test-utils';
++import {describe, expect, test} from 'vitest';
++
++function makeSource(device: Device, words: number[]): Buffer {
++  return device.createBuffer({
++    data: new Uint32Array(words),
++    usage: Buffer.COPY_SRC | Buffer.COPY_DST
++  });
++}
++
++describe('GPUReadbackRing growable slots', () => {
++  test('fixed rings reject requests above their slot size', async () => {
++    const device = await getNullTestDevice();
++    const ring = new GPUReadbackRing(device, {byteLength: 16, slotCount: 1});
++    expect(() => ring.tryAcquire({byteLength: 32})).toThrow(/growable/);
++    expect(ring.tryAcquire({byteLength: 8})).not.toBe(null);
++    ring.destroy();
++  });
++
++  test('growable rings replace an idle slot that is too small, then reuse it', async () => {
++    const device = await getNullTestDevice();
++    const ring = new GPUReadbackRing(device, {byteLength: 16, slotCount: 2, growable: true});
++    const small = ring.tryAcquire({byteLength: 8})!;
++    const smallBuffer = small.buffer;
++    expect(smallBuffer.byteLength).toBe(16);
++    small.cancel();
++
++    const big = ring.tryAcquire({byteLength: 100})!;
++    expect(big.buffer.byteLength, 'grown to a power of two').toBe(128);
++    const source = makeSource(
++      device,
++      Array.from({length: 25}, (_, index) => index)
++    );
++    const encoder = device.createCommandEncoder();
++    big.copyFrom(encoder, source, {byteLength: 100});
++    device.submit(encoder.finish());
++    const bytes = await big.read();
++    expect(Array.from(new Uint32Array(bytes.buffer, bytes.byteOffset, 25))).toEqual(
++      Array.from({length: 25}, (_, index) => index)
++    );
++
++    const again = ring.tryAcquire({byteLength: 100})!;
++    expect(again.buffer.byteLength, 'the grown slot is reused without a new allocation').toBe(128);
++    again.cancel();
++    source.destroy();
++    ring.destroy();
++  });
++
++  test('a waiter is served with a slot large enough for its request', async () => {
++    const device = await getNullTestDevice();
++    const ring = new GPUReadbackRing(device, {byteLength: 16, slotCount: 1, growable: true});
++    const held = ring.tryAcquire()!;
++    const waiting = ring.acquire({byteLength: 64});
++    held.cancel();
++    const ticket = await waiting;
++    expect(ticket.buffer.byteLength).toBe(64);
++    ticket.cancel();
++    ring.destroy();
++  });
++});
++
++describe('GPUReadbackTicket.readPartial', () => {
++  test('maps the header, then only the used prefix', async () => {
++    const device = await getNullTestDevice();
++    const ring = new GPUReadbackRing(device, {byteLength: 64, slotCount: 1});
++    // header word = number of used words after it; the tail past the used words is garbage
++    const words = [3, 11, 22, 33, 0xdead, 0xdead, 0xdead, 0xdead];
++    const source = makeSource(device, words);
++    const ticket = ring.tryAcquire()!;
++    const encoder = device.createCommandEncoder();
++    ticket.copyFrom(encoder, source, {byteLength: 32});
++    device.submit(encoder.finish());
++    const {header, data} = await ticket.readPartial({
++      headerByteLength: 4,
++      getByteLength: headerBytes => 4 + new Uint32Array(headerBytes.buffer)[0] * 4
++    });
++    expect(new Uint32Array(header.buffer, header.byteOffset, 1)[0]).toBe(3);
++    expect(Array.from(new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4))).toEqual([
++      3, 11, 22, 33
++    ]);
++    expect(ring.availableSlotCount, 'the slot is released after the read').toBe(1);
++    source.destroy();
++    ring.destroy();
++  });
++
++  test('rejects a length outside the encoded range and still releases the slot', async () => {
++    const device = await getNullTestDevice();
++    const ring = new GPUReadbackRing(device, {byteLength: 16, slotCount: 1});
++    const source = makeSource(device, [1, 2, 3, 4]);
++    const ticket = ring.tryAcquire()!;
++    const encoder = device.createCommandEncoder();
++    ticket.copyFrom(encoder, source);
++    device.submit(encoder.finish());
++    await expect(
++      ticket.readPartial({headerByteLength: 4, getByteLength: () => 64})
++    ).rejects.toThrow(/partial length/);
++    expect(ring.availableSlotCount).toBe(1);
++    source.destroy();
++    ring.destroy();
++  });
++
++  test('requires an encoded ticket', async () => {
++    const device = await getNullTestDevice();
++    const ring = new GPUReadbackRing(device, {byteLength: 16, slotCount: 1});
++    const ticket = ring.tryAcquire()!;
++    await expect(ticket.readPartial({headerByteLength: 4, getByteLength: () => 4})).rejects.toThrow(
++      /encoded/
++    );
++    ticket.cancel();
++    ring.destroy();
++  });
++});

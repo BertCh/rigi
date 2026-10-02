@@ -1,0 +1,78 @@
+From b7be01b9838ebda30473fa2db72c13c9a76eebea Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 14:43:30 -0400
+Subject: [PATCH] fix(gpgpu): loop-free FFT bit reversal (reverseBits >> (32 -
+ n))
+
+The data-dependent loop in reverseLowBits gives wrong bit-reversal indices on Apple (Metal) devices for lengths 16 to 2048, so GPUFFT1D, GPUFFT2D and GPUConvolution silently return wrong results there. The WGSL builtin reverseBits shifted right by 32 - bitCount is equivalent and has no loop. A node spec checks the shader source and a CPU twin of the new expression.
+---
+ modules/gpgpu/src/gpu-core/gpu-fft-utils.ts   | 10 ++---
+ .../test/gpu-core/gpu-fft-utils.node.spec.ts  | 38 +++++++++++++++++++
+ 2 files changed, 41 insertions(+), 7 deletions(-)
+ create mode 100644 modules/gpgpu/test/gpu-core/gpu-fft-utils.node.spec.ts
+
+diff --git a/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts b/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts
+index 37596f61a..e5c43bead 100644
+--- a/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts
++++ b/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts
+@@ -21,13 +21,9 @@ export const GPU_FFT_COMMON_SHADER_SOURCE = /* wgsl */ `
+ const GPU_FFT_PI: f32 = 3.14159265358979323846;
+ 
+ fn reverseLowBits(value: u32, bitCount: u32) -> u32 {
+-  var source = value;
+-  var reversed = 0u;
+-  for (var bitIndex = 0u; bitIndex < bitCount; bitIndex++) {
+-    reversed = (reversed << 1u) | (source & 1u);
+-    source = source >> 1u;
+-  }
+-  return reversed;
++  // Loop-free: the data-dependent loop this replaces miscompiled on Apple (Metal) devices,
++  // returning wrong indices for some lengths. bitCount is 1..32 for every FFT plan.
++  return select(0u, reverseBits(value) >> (32u - bitCount), bitCount > 0u);
+ }
+ 
+ fn multiplyComplex(left: vec2f, right: vec2f) -> vec2f {
+diff --git a/modules/gpgpu/test/gpu-core/gpu-fft-utils.node.spec.ts b/modules/gpgpu/test/gpu-core/gpu-fft-utils.node.spec.ts
+new file mode 100644
+index 000000000..3fe7096ea
+--- /dev/null
++++ b/modules/gpgpu/test/gpu-core/gpu-fft-utils.node.spec.ts
+@@ -0,0 +1,38 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {expect, it} from 'vitest';
++import {GPU_FFT_COMMON_SHADER_SOURCE} from '../../src/gpu-core/gpu-fft-utils';
++
++/** CPU twin of the WGSL `reverseLowBits`: `reverseBits(value) >> (32 - bitCount)`. */
++function reverseLowBits(value: number, bitCount: number): number {
++  let reversed = 0;
++  for (let bit = 0; bit < 32; bit++) {
++    reversed = (reversed << 1) | ((value >>> bit) & 1);
++  }
++  return bitCount > 0 ? (reversed >>> 0) >>> (32 - bitCount) : 0;
++}
++
++it('FFT bit reversal is loop-free and reverses the low bits', () => {
++  const body = GPU_FFT_COMMON_SHADER_SOURCE.slice(
++    GPU_FFT_COMMON_SHADER_SOURCE.indexOf('fn reverseLowBits'),
++    GPU_FFT_COMMON_SHADER_SOURCE.indexOf('fn multiplyComplex')
++  );
++  expect(body).toContain('reverseBits(value) >> (32u - bitCount)');
++  expect(body.includes('for ('), 'no data-dependent loop (miscompiled on Metal)').toBe(false);
++  for (let bitCount = 1; bitCount <= 16; bitCount++) {
++    const length = 1 << bitCount;
++    const seen = new Set<number>();
++    for (let index = 0; index < length; index++) {
++      const reversed = reverseLowBits(index, bitCount);
++      let expected = 0;
++      for (let bit = 0; bit < bitCount; bit++) {
++        expected |= ((index >> bit) & 1) << (bitCount - 1 - bit);
++      }
++      expect(reversed).toBe(expected);
++      seen.add(reversed);
++    }
++    expect(seen.size).toBe(length);
++  }
++});

@@ -16,10 +16,12 @@ The version is `10.0.0-alpha.2-rigi.6`, so npm reinstalls over a cached `10.0.0-
 (Re-packing a tarball under the same name also needs its `integrity` in `package-lock.json` updated,
 or npm keeps the cached copy.)
 
-**Swap to npm when luma publishes these fixes** (all of #3313, #3302, #3287, #3328, #3333, #3334,
-#3330, #3345, #3340, #3338, #3332, #3326, #3331, #3286, #3288, #3351, #3346, #3132, #3337 and the
-PipelineFactory compute-hash fix; #3312, #3335 and #3348 are already in luma master; the nine local
-`rigi/compute-api` commits below would be lost and their app users need a replacement):
+**Swap to npm when luma publishes these fixes** (all of #3302, #3287, #3328, #3333, #3334, #3330,
+#3345, #3340, #3338, #3332, #3326, #3331, #3286, #3288, #3346, #3132, #3337 and the PipelineFactory
+compute-hash fix; #3312, #3335 and #3348 are already in luma master, and so are #3313 (merged as
+`6cb33926a`, 2026-10-02) and #3351 (merged as `a2a521ec8`, 2026-10-02): a rebuild on a newer master
+gets those two without merging their PR heads; the nine local `rigi/compute-api` commits below would
+be lost and their app users need a replacement):
 point the nine deps at the published version, delete this directory and re-run `npm install`. If
 the published manifests still carry `patch:` deps or `~9.4` peers, the old workaround (`.npmrc`
 `legacy-peer-deps=true` plus `overrides` for every `@luma.gl/*` and `@math.gl/core`) comes back.
@@ -76,8 +78,12 @@ the published manifests still carry `patch:` deps or `~9.4` peers, the old worka
   #3140 (stale 2026-09-08 base: it would revert master's `getWebGPUAdapterInfo` guard and the
   `typeof navigator` check, and flips the default `powerPreference`). Not taken: #3169 (deck GPUVector
   layer family, `deck-gpu-layers` is not vendored), #3168 / #3141 / #2716 / #2638 / #3084 (old or draft,
-  arrow / docs), #3349 / #3317 (examples, docs). Vendored PR heads re-checked with `gh` on 2026-10-02;
-  none is merged.
+  arrow / docs), #3349 / #3317 (examples, docs). Vendored PR heads re-checked with `gh` on 2026-10-02 (`node scripts/upstream/luma-watch.mjs`):
+  #3313 and #3351 are merged (squash commits `6cb33926a` and `a2a521ec8` on luma master; for #3313 the changed
+  files match the vendored head `44d990fd` except where master moved on, #3312 in `webgpu-adapter.ts` and the
+  lifecycle spec, and `docs/whats-new.md`; for #3351 all five changed files match head `663cfa58`); #3346's head
+  moved to `506222563fd32c7543531370b5591fbccbb4c4e0` (rigi.6 carries `680dc602`, not re-vendored); the others
+  have not moved and are open.
   Evidence (node): luma `vitest --project node` over core, engine, shadertools, gpgpu, webgl, webgpu,
   splats, test-utils and experimental/gpu-tables: 208 files, 1734 tests passed, 9 skipped (before the
   bit-reversal commit; its spec and the FFT specs pass after it). Dawn in node (webgpu@0.3.0, this Mac):
@@ -267,7 +273,7 @@ Sizes: core 162680 B, effects 168133 B, engine 235399 B, experimental 1119675 B,
 git clone https://github.com/visgl/luma.gl luma-build && cd luma-build
 git checkout 7289d961a9cec6fb10bdfcf4afc5286cb30376e3
 # fastest: git fetch <archive>/2026-10-02-rigi6/luma-rigi-vendor-6.bundle arch/rigi-vendor-6 and check it out (bdbc371f);
-# rigi.6 from rigi.5 (a6af71e5): git merge --no-ff 44d990fd (#3313), git apply -3 patches/luma-3345-head-delta-*.patch
+# rigi.6 from rigi.5 (a6af71e5): git merge --no-ff 44d990fd (#3313; skip on a master past 6cb33926a), git apply -3 patches/luma-3345-head-delta-*.patch
 #   and commit, then git merge --no-ff the heads of #3340 #3338 #3332 #3326 #3331 #3286 #3288 #3351 #3346 #3132 #3337
 #   (conflicts: docs/whats-new.md both sides; model.node.spec.ts union of imports + both tests), then
 #   git am patches/luma-fft1d-65536-*.patch patches/luma-fft-bitreverse-*.patch;

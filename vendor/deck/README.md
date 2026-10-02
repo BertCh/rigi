@@ -37,9 +37,14 @@ build commit `0c7f7cdd` plus `--no-ff` merges of
   terrain module (#10751) has no `USE_HEIGHT_MAP_METERS` branch and encodes heights as RGBA8 float bytes,
   so #10783's external terrain (meters in the red channel) works on WebGL only.
 `@deck.gl/extensions` is NOT vendored: nothing in the app imports TerrainExtension (see the coordinator
-README of this wave for why no layer was wired). The other vendored PR heads (#10752, #10780, #10779,
-#10778, #10782, #10753, #10776) had not moved on 2026-10-02 and are all open; deck master is `d1b0ae43`
-(docs only since the base). Not taken: #10627 (worker SplatLayer: an example under
+README of this wave for why no layer was wired). The other vendored PR heads (#10780, #10779, #10778,
+#10782, #10753, #10776, #10751, #10783) had not moved on 2026-10-02 and are all open; #10752's head moved the
+same day to `43a38d6b9b5988c7a84407d5951fdb9a16671f48` (2026-10-02T17:31Z, "Merge master into alpha dependency
+upgrade": it merges deck master `d1b0ae43` into the PR branch; its own six commits, up to `0d8b1664`, are
+unchanged, and the `modules/` differences from the old head are master commits already in our base `35854250`;
+the PR is open, no longer a draft, and now titled "chore: Bump luma.gl, math.gl, and loaders.gl prereleases to
+5.0.0-alpha"; rigi.3 still carries `0d8b1664`, not re-vendored). `node scripts/upstream/luma-watch.mjs` reports
+the live head of every vendored deck PR. Deck master is `d1b0ae43` (docs only since the base). Not taken: #10627 (worker SplatLayer: an example under
 `examples/experimental/gaussian-splats`, not a module); #10682 (device reuse on an external `gl`: Rigi
 never passes `gl`); globe / custom projection / maplibre / pydeck / website PRs (#10670, #10697, #10698,
 #10737, #10740–#10745, #10749, #10750, #10669 …): no Rigi use. Built with `npx yarn@1.22.19 build`

@@ -1,0 +1,52 @@
+From 90ff6759d75d39ca75c8ac917eb690673e9e0317 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 14:45:59 -0400
+Subject: [PATCH] docs(gpgpu): GPUCommandGraph constructor takes (device,
+ props) in the quick starts
+
+The gpu-graph, gpu-dataframe and gpu-raster quick starts called new GPUCommandGraph({device, id}); the constructor is (device, props).
+---
+ docs/api-reference/experimental/gpu-dataframe.md     | 2 +-
+ docs/api-reference/experimental/gpu-graph.md         | 2 +-
+ docs/api-reference/experimental/gpu-raster/README.md | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/docs/api-reference/experimental/gpu-dataframe.md b/docs/api-reference/experimental/gpu-dataframe.md
+index 09c8c2f17..decb54bf4 100644
+--- a/docs/api-reference/experimental/gpu-dataframe.md
++++ b/docs/api-reference/experimental/gpu-dataframe.md
+@@ -24,7 +24,7 @@ implicit downloads.
+ import {GPUCommandGraph} from '@luma.gl/gpgpu/gpu-core';
+ import {GPUDataFrame} from '@luma.gl/experimental/gpu-dataframe';
+ 
+-const graph = new GPUCommandGraph({device, id: 'dataframe-analysis'});
++const graph = new GPUCommandGraph(device, {id: 'dataframe-analysis'});
+ const frame = new GPUDataFrame({device, graph, table});
+ const filtered = frame.filter({column: 'duration', greaterThan: 10});
+ 
+diff --git a/docs/api-reference/experimental/gpu-graph.md b/docs/api-reference/experimental/gpu-graph.md
+index 88a8d8cbb..c88200ccd 100644
+--- a/docs/api-reference/experimental/gpu-graph.md
++++ b/docs/api-reference/experimental/gpu-graph.md
+@@ -26,7 +26,7 @@ algorithm whose result is immediately needed on the CPU, a CPU graph library may
+ import {GPUCommandGraph} from '@luma.gl/gpgpu/gpu-core';
+ import {GPUGraph, GPUGraphPageRank, GPUGraphTopology} from '@luma.gl/gpgpu/gpu-graph';
+ 
+-const graph = new GPUCommandGraph({device, id: 'graph-analysis'});
++const graph = new GPUCommandGraph(device, {id: 'graph-analysis'});
+ const topology = new GPUGraphTopology({device, graph, edges, vertexCount});
+ const pageRank = new GPUGraphPageRank({device, graph, topology});
+ 
+diff --git a/docs/api-reference/experimental/gpu-raster/README.md b/docs/api-reference/experimental/gpu-raster/README.md
+index 679a49df0..14f507c15 100644
+--- a/docs/api-reference/experimental/gpu-raster/README.md
++++ b/docs/api-reference/experimental/gpu-raster/README.md
+@@ -24,7 +24,7 @@ analytical values usually belong in a renderer or shader module instead.
+ import {GPUCommandGraph} from '@luma.gl/gpgpu/gpu-core';
+ import {GPURasterBand, GPURasterStatistics} from '@luma.gl/experimental/gpu-raster';
+ 
+-const graph = new GPUCommandGraph({device, id: 'raster-analysis'});
++const graph = new GPUCommandGraph(device, {id: 'raster-analysis'});
+ const band = new GPURasterBand({device, graph, values, validity, width, height});
+ const statistics = new GPURasterStatistics({device, graph, band});
+ 

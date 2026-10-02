@@ -1,0 +1,57 @@
+From a78642d5844022bc3f3cab976b4a19dc4b437f7c Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 15:00:03 -0400
+Subject: [PATCH] feat(gpgpu): export setGPUComputeDispatchWorkgroups from
+ gpu-core
+
+Application-defined command nodes can annotate their direct dispatch geometry the same way gpgpu operations do, so GPUProgram lowering can put them under a GPU predicate. Also exports the GPUComputeDispatchWorkgroups type.
+---
+ modules/gpgpu/src/gpu-core/index.ts           |  2 ++
+ ...gpu-command-dispatch-metadata.node.spec.ts | 25 +++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 modules/gpgpu/test/gpu-core/gpu-command-dispatch-metadata.node.spec.ts
+
+diff --git a/modules/gpgpu/src/gpu-core/index.ts b/modules/gpgpu/src/gpu-core/index.ts
+index 3594c1779..13a917d41 100644
+--- a/modules/gpgpu/src/gpu-core/index.ts
++++ b/modules/gpgpu/src/gpu-core/index.ts
+@@ -123,6 +123,8 @@ export type {
+   GraphDataViewBinding,
+   GraphDataViewBindingRange
+ } from './graph-data-view-utils';
++export {setGPUComputeDispatchWorkgroups} from './gpu-command-dispatch-metadata';
++export type {GPUComputeDispatchWorkgroups} from './gpu-command-dispatch-metadata';
+ export {
+   getBoundedDispatchLayout,
+   getBoundedInvocationIndexSource,
+diff --git a/modules/gpgpu/test/gpu-core/gpu-command-dispatch-metadata.node.spec.ts b/modules/gpgpu/test/gpu-core/gpu-command-dispatch-metadata.node.spec.ts
+new file mode 100644
+index 000000000..f7574f727
+--- /dev/null
++++ b/modules/gpgpu/test/gpu-core/gpu-command-dispatch-metadata.node.spec.ts
+@@ -0,0 +1,25 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {expect, it} from 'vitest';
++import {setGPUComputeDispatchWorkgroups} from '@luma.gl/gpgpu/gpu-core';
++
++it('setGPUComputeDispatchWorkgroups is exported from gpu-core and annotates a node copy', () => {
++  const node = {id: 'node'};
++  const annotated = setGPUComputeDispatchWorkgroups(node, [4, 2, 1]);
++  expect(annotated).not.toBe(node);
++  expect(annotated).toMatchObject({id: 'node', dispatchWorkgroups: [4, 2, 1]});
++  expect(Object.isFrozen((annotated as {dispatchWorkgroups: unknown}).dispatchWorkgroups)).toBe(
++    true
++  );
++  expect('dispatchWorkgroups' in node).toBe(false);
++});
++
++it('setGPUComputeDispatchWorkgroups rejects negative and non-integer counts', () => {
++  expect(() => setGPUComputeDispatchWorkgroups({}, [-1, 1, 1])).toThrow(/x workgroup count/);
++  expect(() => setGPUComputeDispatchWorkgroups({}, [1, 1.5, 1])).toThrow(/y workgroup count/);
++  expect(() => setGPUComputeDispatchWorkgroups({}, [1, 1, Number.NaN])).toThrow(
++    /z workgroup count/
++  );
++});

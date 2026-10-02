@@ -1,0 +1,351 @@
+From 8469751327d06ff42746b3e5365066354b803e12 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 14:52:41 -0400
+Subject: [PATCH] feat(core): Buffer.readAsync(byteOffset?, byteLength?,
+ {target?})
+
+BufferReadOptions = BufferMapReadOptions & {target?: ArrayBufferView}. With a target the bytes are copied into it (from its byteOffset) and readAsync resolves to a Uint8Array over exactly those bytes, instead of allocating a new array.
+---
+ modules/core/src/adapter/resources/buffer.ts  | 42 ++++++++++++++++++-
+ modules/core/src/index.ts                     |  4 +-
+ .../test/adapter/resources/buffer.spec.ts     | 42 +++++++++++++++++++
+ .../src/dynamic-buffer/dynamic-buffer.ts      |  7 +++-
+ .../src/null-device/resources/null-buffer.ts  | 21 ++++++++--
+ .../null-buffer-read-target.spec.ts           | 37 ++++++++++++++++
+ .../src/adapter/resources/webgl-buffer.ts     | 23 +++++++---
+ .../src/adapter/resources/webgpu-buffer.ts    | 20 +++++++--
+ 8 files changed, 179 insertions(+), 17 deletions(-)
+ create mode 100644 modules/test-utils/test/null-device/null-buffer-read-target.spec.ts
+
+diff --git a/modules/core/src/adapter/resources/buffer.ts b/modules/core/src/adapter/resources/buffer.ts
+index 987abdf38..36eefd7d9 100644
+--- a/modules/core/src/adapter/resources/buffer.ts
++++ b/modules/core/src/adapter/resources/buffer.ts
+@@ -17,6 +17,37 @@ export type BufferMapReadOptions = {
+   waitForSubmittedWork?: boolean;
+ };
+ 
++/** Options for Buffer.readAsync */
++export type BufferReadOptions = BufferMapReadOptions & {
++  /**
++   * Copy the bytes into this view (starting at its `byteOffset`) instead of into a new array.
++   * It must hold at least `byteLength` bytes. `readAsync` then resolves to a `Uint8Array` over
++   * exactly those bytes of `target`'s buffer (no further copy).
++   */
++  target?: ArrayBufferView<ArrayBuffer>;
++};
++
++/**
++ * The `Uint8Array` that a read of `byteLength` bytes writes into: `options.target` (checked to be
++ * large enough) or a new array.
++ * @internal for Buffer implementations
++ */
++export function getBufferReadTarget(
++  byteLength: number,
++  options?: BufferReadOptions
++): Uint8Array<ArrayBuffer> {
++  const target = options?.target;
++  if (!target) {
++    return new Uint8Array(byteLength);
++  }
++  if (target.byteLength < byteLength) {
++    throw new RangeError(
++      `Buffer.readAsync(): target holds ${target.byteLength} bytes, ${byteLength} requested`
++    );
++  }
++  return new Uint8Array(target.buffer, target.byteOffset, byteLength);
++}
++
+ /** Callback for Buffer.mapAndReadAsync */
+ export type BufferMapCallback<T> = (arrayBuffer: ArrayBuffer, lifetime: 'mapped' | 'copied') => T;
+ 
+@@ -115,8 +146,15 @@ export abstract class Buffer extends Resource<BufferProps> {
+     byteLength?: number
+   ): Promise<void>;
+ 
+-  /** Reads data asynchronously, returns a copy of the buffer data */
+-  abstract readAsync(byteOffset?: number, byteLength?: number): Promise<Uint8Array>;
++  /**
++   * Reads data asynchronously, returns a copy of the buffer data
++   * (in `options.target` when given; see {@link BufferReadOptions})
++   */
++  abstract readAsync(
++    byteOffset?: number,
++    byteLength?: number,
++    options?: BufferReadOptions
++  ): Promise<Uint8Array>;
+ 
+   /** Maps buffer data to CPU memory. Mapped memory is only accessible in the callback */
+   abstract mapAndReadAsync<T>(
+diff --git a/modules/core/src/index.ts b/modules/core/src/index.ts
+index c66ba4dd9..0ce740462 100644
+--- a/modules/core/src/index.ts
++++ b/modules/core/src/index.ts
+@@ -34,7 +34,9 @@ export {
+   Buffer,
+   type BufferProps,
+   type BufferMapCallback,
+-  type BufferMapReadOptions
++  type BufferMapReadOptions,
++  type BufferReadOptions,
++  getBufferReadTarget
+ } from './adapter/resources/buffer';
+ 
+ export {Texture, type TextureProps} from './adapter/resources/texture';
+diff --git a/modules/core/test/adapter/resources/buffer.spec.ts b/modules/core/test/adapter/resources/buffer.spec.ts
+index 9d99c2eed..a9d79a9f9 100644
+--- a/modules/core/test/adapter/resources/buffer.spec.ts
++++ b/modules/core/test/adapter/resources/buffer.spec.ts
+@@ -798,3 +798,45 @@ it('Buffer#mapAndReadAsync (waitForSubmittedWork: false)', async () => {
+     buffer.destroy();
+   }
+ });
++
++it('Buffer#readAsync into a caller-provided target', async () => {
++  for (const device of await getTestDevices(DEVICE_TYPES)) {
++    const initialData = new Float32Array([10, 20, 30, 40]);
++    const buffer = device.createBuffer({
++      data: initialData,
++      usage: Buffer.COPY_DST | Buffer.COPY_SRC
++    });
++
++    // full read into a Float32Array: the result views the target's memory, no new allocation
++    const target = new Float32Array(4);
++    const full = await buffer.readAsync(0, 16, {target});
++    expect(full.buffer, `${device.type} result views the target buffer`).toBe(target.buffer);
++    expect(full.byteLength, `${device.type} result length`).toBe(16);
++    expect(target, `${device.type} target holds the data`).toEqual(initialData);
++
++    // partial read into the middle of a larger target (honours the view's byteOffset)
++    const backing = new Uint8Array(32).fill(0xee);
++    const window = new Uint8Array(backing.buffer, 8, 12);
++    const partial = await buffer.readAsync(8, 8, {target: window});
++    expect(partial.byteOffset, `${device.type} result starts at the target offset`).toBe(8);
++    expect(new Float32Array(backing.buffer, 8, 2), `${device.type} partial bytes`).toEqual(
++      new Float32Array([30, 40])
++    );
++    expect(backing[7], `${device.type} bytes before the target untouched`).toBe(0xee);
++    expect(backing[16], `${device.type} bytes after the read untouched`).toBe(0xee);
++
++    // too small a target is rejected
++    await expect(
++      buffer.readAsync(0, 16, {target: new Uint8Array(8)}),
++      `${device.type} small target rejected`
++    ).rejects.toThrow(RangeError);
++
++    // without a target the result is still a fresh copy
++    const copy = await buffer.readAsync();
++    expect(new Float32Array(copy.buffer, copy.byteOffset, 4), `${device.type} copy`).toEqual(
++      initialData
++    );
++
++    buffer.destroy();
++  }
++});
+diff --git a/modules/engine/src/dynamic-buffer/dynamic-buffer.ts b/modules/engine/src/dynamic-buffer/dynamic-buffer.ts
+index 5029b0d6a..e62197906 100644
+--- a/modules/engine/src/dynamic-buffer/dynamic-buffer.ts
++++ b/modules/engine/src/dynamic-buffer/dynamic-buffer.ts
+@@ -6,6 +6,7 @@ import type {
+   BufferMapCallback,
+   BufferMapReadOptions,
+   BufferProps,
++  BufferReadOptions,
+   Device,
+   Binding as CoreBinding
+ } from '@luma.gl/core';
+@@ -217,12 +218,14 @@ export class DynamicBuffer {
+    *
+    * @param byteOffset - Source byte offset in the backing buffer.
+    * @param byteLength - Number of bytes to read.
++   * @param options - Read target and WebGPU wait behaviour, forwarded to the backing buffer.
+    */
+   async readAsync(
+     byteOffset: number = 0,
+-    byteLength = this.byteLength - byteOffset
++    byteLength = this.byteLength - byteOffset,
++    options?: BufferReadOptions
+   ): Promise<Uint8Array> {
+-    const data = await this._buffer.readAsync(byteOffset, byteLength);
++    const data = await this._buffer.readAsync(byteOffset, byteLength, options);
+     if (this._writeDebugData(data, byteOffset)) {
+       this._touch();
+     }
+diff --git a/modules/test-utils/src/null-device/resources/null-buffer.ts b/modules/test-utils/src/null-device/resources/null-buffer.ts
+index ffdf149c4..b95c00b6a 100644
+--- a/modules/test-utils/src/null-device/resources/null-buffer.ts
++++ b/modules/test-utils/src/null-device/resources/null-buffer.ts
+@@ -2,7 +2,13 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+ 
+-import {Buffer, type BufferProps, type BufferMapCallback} from '@luma.gl/core';
++import {
++  Buffer,
++  type BufferProps,
++  type BufferMapCallback,
++  type BufferReadOptions,
++  getBufferReadTarget
++} from '@luma.gl/core';
+ import {type NullDevice} from '../null-device';
+ 
+ export class NullBuffer extends Buffer {
+@@ -82,7 +88,11 @@ export class NullBuffer extends Buffer {
+     this._setDebugData(view, byteOffset, byteLength);
+   }
+ 
+-  async readAsync(byteOffset = 0, byteLength?: number): Promise<Uint8Array> {
++  async readAsync(
++    byteOffset = 0,
++    byteLength?: number,
++    options?: BufferReadOptions
++  ): Promise<Uint8Array> {
+     byteLength = byteLength ?? this.byteLength - byteOffset;
+ 
+     if (byteOffset + byteLength > this.byteLength) {
+@@ -90,7 +100,12 @@ export class NullBuffer extends Buffer {
+     }
+ 
+     const view = new Uint8Array(this._storage, byteOffset, byteLength);
+-    return new Uint8Array(view); // return a copy
++    if (!options?.target) {
++      return new Uint8Array(view); // return a copy
++    }
++    const target = getBufferReadTarget(byteLength, options);
++    target.set(view);
++    return target;
+   }
+ 
+   async mapAndReadAsync<T>(
+diff --git a/modules/test-utils/test/null-device/null-buffer-read-target.spec.ts b/modules/test-utils/test/null-device/null-buffer-read-target.spec.ts
+new file mode 100644
+index 000000000..7f9fe64fb
+--- /dev/null
++++ b/modules/test-utils/test/null-device/null-buffer-read-target.spec.ts
+@@ -0,0 +1,37 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {expect, test} from 'vitest';
++import {Buffer} from '@luma.gl/core';
++
++test('NullBuffer#readAsync reads into a caller-provided target', async () => {
++  const {NullDevice} = await import('../../src/index');
++  const device = new NullDevice({});
++  const buffer = device.createBuffer({
++    data: new Float32Array([1, 2, 3, 4]),
++    usage: Buffer.COPY_DST | Buffer.COPY_SRC
++  });
++
++  const target = new Float32Array(4);
++  const result = await buffer.readAsync(0, 16, {target});
++  expect(result.buffer).toBe(target.buffer);
++  expect(target).toEqual(new Float32Array([1, 2, 3, 4]));
++
++  const backing = new Uint8Array(24).fill(7);
++  const partial = await buffer.readAsync(4, 8, {target: new Uint8Array(backing.buffer, 12, 12)});
++  expect(partial.byteOffset).toBe(12);
++  expect(partial.byteLength).toBe(8);
++  expect(new Float32Array(backing.buffer, 12, 2)).toEqual(new Float32Array([2, 3]));
++  expect(backing[11]).toBe(7);
++  expect(backing[20]).toBe(7);
++
++  await expect(buffer.readAsync(0, 16, {target: new Uint8Array(4)})).rejects.toThrow(RangeError);
++
++  const copy = await buffer.readAsync();
++  expect(copy.buffer).not.toBe(target.buffer);
++  expect(new Float32Array(copy.buffer)).toEqual(new Float32Array([1, 2, 3, 4]));
++
++  buffer.destroy();
++  device.destroy();
++});
+diff --git a/modules/webgl/src/adapter/resources/webgl-buffer.ts b/modules/webgl/src/adapter/resources/webgl-buffer.ts
+index 71d3a115e..27db28449 100644
+--- a/modules/webgl/src/adapter/resources/webgl-buffer.ts
++++ b/modules/webgl/src/adapter/resources/webgl-buffer.ts
+@@ -2,8 +2,8 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+ 
+-import type {BufferMapCallback, BufferProps} from '@luma.gl/core';
+-import {Buffer} from '@luma.gl/core';
++import type {BufferMapCallback, BufferProps, BufferReadOptions} from '@luma.gl/core';
++import {Buffer, getBufferReadTarget} from '@luma.gl/core';
+ import {GL} from '@luma.gl/webgl/constants';
+ import {WebGLDevice} from '../webgl-device';
+ 
+@@ -157,8 +157,13 @@ export class WEBGLBuffer extends Buffer {
+     this.write(arrayBuffer, byteOffset);
+   }
+ 
+-  async readAsync(byteOffset = 0, byteLength?: number): Promise<Uint8Array<ArrayBuffer>> {
+-    return this.readSyncWebGL(byteOffset, byteLength);
++  async readAsync(
++    byteOffset = 0,
++    byteLength?: number,
++    options?: BufferReadOptions
++  ): Promise<Uint8Array<ArrayBuffer>> {
++    byteLength = byteLength ?? this.byteLength - byteOffset;
++    return this._readSyncWebGL(byteOffset, byteLength, getBufferReadTarget(byteLength, options));
+   }
+ 
+   async mapAndReadAsync<T>(
+@@ -173,7 +178,15 @@ export class WEBGLBuffer extends Buffer {
+ 
+   readSyncWebGL(byteOffset = 0, byteLength?: number): Uint8Array<ArrayBuffer> {
+     byteLength = byteLength ?? this.byteLength - byteOffset;
+-    const data = new Uint8Array(byteLength);
++    return this._readSyncWebGL(byteOffset, byteLength, new Uint8Array(byteLength));
++  }
++
++  /** getBufferSubData of `byteLength` bytes at `byteOffset` into `data` (exactly that long). */
++  protected _readSyncWebGL(
++    byteOffset: number,
++    byteLength: number,
++    data: Uint8Array<ArrayBuffer>
++  ): Uint8Array<ArrayBuffer> {
+     const dstOffset = 0;
+ 
+     // Use GL.COPY_READ_BUFFER to avoid disturbing other targets and locking type
+diff --git a/modules/webgpu/src/adapter/resources/webgpu-buffer.ts b/modules/webgpu/src/adapter/resources/webgpu-buffer.ts
+index f787e9de5..624009755 100644
+--- a/modules/webgpu/src/adapter/resources/webgpu-buffer.ts
++++ b/modules/webgpu/src/adapter/resources/webgpu-buffer.ts
+@@ -7,7 +7,9 @@ import {
+   Buffer,
+   type BufferProps,
+   type BufferMapCallback,
+-  type BufferMapReadOptions
++  type BufferMapReadOptions,
++  type BufferReadOptions,
++  getBufferReadTarget
+ } from '@luma.gl/core';
+ import {type WebGPUDevice} from '../webgpu-device';
+ 
+@@ -160,12 +162,22 @@ export class WebGPUBuffer extends Buffer {
+ 
+   async readAsync(
+     byteOffset: number = 0,
+-    byteLength = this.byteLength - byteOffset
++    byteLength = this.byteLength - byteOffset,
++    options?: BufferReadOptions
+   ): Promise<Uint8Array> {
++    // resolve (and size-check) the target before mapping: a throwing callback would leave it mapped
++    const target = options?.target ? getBufferReadTarget(byteLength, options) : null;
+     return this.mapAndReadAsync(
+-      arrayBuffer => new Uint8Array(arrayBuffer.slice(0)),
++      arrayBuffer => {
++        if (!target) {
++          return new Uint8Array(arrayBuffer.slice(0));
++        }
++        target.set(new Uint8Array(arrayBuffer, 0, byteLength));
++        return target;
++      },
+       byteOffset,
+-      byteLength
++      byteLength,
++      options
+     );
+   }
+ 

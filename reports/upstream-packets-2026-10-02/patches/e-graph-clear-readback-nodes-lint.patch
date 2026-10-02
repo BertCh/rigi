@@ -1,0 +1,458 @@
+From ce25831d973d71e027c2c7337cb84286e5f46ef2 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 14:58:03 -0400
+Subject: [PATCH] feat(gpgpu): clear and readback copy-node factories;
+ preflight reports uninitialized transient reads
+
+createGPUClearBufferCommandNode() zeroes a graph buffer range with CommandEncoder.clearBuffer(); createGPUReadbackCommandNode() copies a transient or imported range into a GPUReadbackTicket at its place in the schedule. CompiledGPUCommandGraph.preflight.uninitializedTransientReads lists transient buffers whose first scheduled access is a read.
+---
+ .../gpu-core/gpu-command-graph.md             |  25 ++++
+ .../src/gpu-core/gpu-buffer-command-nodes.ts  | 122 ++++++++++++++++
+ .../gpu-core/gpu-command-graph-compiler.ts    |  37 +++++
+ .../src/gpu-core/gpu-command-graph-types.ts   |  17 +++
+ .../gpgpu/src/gpu-core/gpu-command-graph.ts   |   1 +
+ modules/gpgpu/src/gpu-core/index.ts           |   9 ++
+ .../gpu-buffer-command-nodes.node.spec.ts     | 137 ++++++++++++++++++
+ 7 files changed, 348 insertions(+)
+ create mode 100644 modules/gpgpu/src/gpu-core/gpu-buffer-command-nodes.ts
+ create mode 100644 modules/gpgpu/test/gpu-core/gpu-buffer-command-nodes.node.spec.ts
+
+diff --git a/docs/api-reference/experimental/gpu-core/gpu-command-graph.md b/docs/api-reference/experimental/gpu-core/gpu-command-graph.md
+index d36510ea9..1bc501818 100644
+--- a/docs/api-reference/experimental/gpu-core/gpu-command-graph.md
++++ b/docs/api-reference/experimental/gpu-core/gpu-command-graph.md
+@@ -694,6 +694,31 @@ graph.addCopyPass({
+ });
+ ```
+ 
++### Clearing and reading buffers with ready-made copy nodes
++
++Transient buffers are not zero-initialized, and logical transients with disjoint lifetimes share
++physical bytes, so an operation that accumulates into a transient (atomics, partial writes) needs
++an explicit clear first. `createGPUClearBufferCommandNode()` builds that copy node, and
++`createGPUReadbackCommandNode()` builds a node that copies a transient or imported range into a
++`GPUReadbackTicket` at the point of the schedule where it holds its value:
++
++```ts
++graph.add(createGPUClearBufferCommandNode({id: 'zero-bins', target: binsHandle}));
++// ... nodes that accumulate into binsHandle ...
++graph.add(
++  createGPUReadbackCommandNode({
++    id: 'read-bins',
++    source: binsHandle,
++    getTicket: parameters => parameters.ticket
++  })
++);
++```
++
++`compiled.preflight.uninitializedTransientReads` lists every transient buffer whose first
++scheduled access is a read, so a missing clear shows up before submission. Writes are tracked per
++buffer, not per byte range, so a partially written transient is reported only when nothing wrote it
++at all.
++
+ ### Explicit dependencies and repeated encodings
+ 
+ Prefer declared resource uses because they explain both ordering and transient lifetimes. Add
+diff --git a/modules/gpgpu/src/gpu-core/gpu-buffer-command-nodes.ts b/modules/gpgpu/src/gpu-core/gpu-buffer-command-nodes.ts
+new file mode 100644
+index 000000000..07194be86
+--- /dev/null
++++ b/modules/gpgpu/src/gpu-core/gpu-buffer-command-nodes.ts
+@@ -0,0 +1,122 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {createGPUCopyCommandNode, type GPUCopyCommandNode} from './gpu-command-node';
++import {GraphDataView, type GraphBufferHandle} from './gpu-command-graph-types';
++import type {GPUReadbackTicket} from './gpu-readback-ring';
++
++/** Byte range of a graph buffer or data view. */
++type GraphByteRange = {byteOffset: number; byteLength: number};
++
++/** Properties for {@link createGPUClearBufferCommandNode}. */
++export type GPUClearBufferCommandNodeProps = {
++  /** Node id, unique within the graph. */
++  id: string;
++  /** Whole buffer, or the contiguous byte span covered by a data view. */
++  target: GraphBufferHandle | GraphDataView;
++  /** Start of the cleared range, relative to `target`. Defaults to `0`. Multiple of four. */
++  byteOffset?: number;
++  /** Length of the cleared range. Defaults to the rest of `target`. Multiple of four. */
++  byteLength?: number;
++  /** Ids of nodes that must be scheduled before this one. */
++  dependsOn?: string[];
++};
++
++/**
++ * Creates a copy-pass node that zeroes a graph buffer range with `CommandEncoder.clearBuffer()`.
++ *
++ * Transient buffers are not initialized, and compatible transients with disjoint lifetimes alias
++ * the same bytes, so an operation that accumulates into a transient (atomics, partial writes)
++ * must be preceded by a clear. The node declares `copy-destination` use, so graph hazard
++ * inference orders it before every later use of the range.
++ */
++export function createGPUClearBufferCommandNode<Parameters = void>(
++  props: GPUClearBufferCommandNodeProps
++): GPUCopyCommandNode<Parameters> {
++  const range = getGraphByteRange(props.target, props.byteOffset, props.byteLength, 'clear');
++  return createGPUCopyCommandNode<Parameters>({
++    id: props.id,
++    dependsOn: props.dependsOn,
++    resources: [{buffer: props.target, usage: 'copy-destination'}],
++    compile: () => ({
++      encode: ({commandEncoder, getBuffer}) => {
++        if (range.byteLength > 0) {
++          commandEncoder.clearBuffer(getBuffer(props.target), range.byteOffset, range.byteLength);
++        }
++      }
++    })
++  });
++}
++
++/** Properties for {@link createGPUReadbackCommandNode}. */
++export type GPUReadbackCommandNodeProps<Parameters> = {
++  /** Node id, unique within the graph. */
++  id: string;
++  /** Graph buffer (transient or imported) or data view to read. */
++  source: GraphBufferHandle | GraphDataView;
++  /** Start of the copied range, relative to `source`. Defaults to `0`. Multiple of four. */
++  byteOffset?: number;
++  /** Length of the copied range. Defaults to the rest of `source`. Multiple of four. */
++  byteLength?: number;
++  /** Returns the reserved readback ticket that receives the copy, per encoding. */
++  getTicket: (parameters: Parameters) => GPUReadbackTicket;
++  /** Ids of nodes that must be scheduled before this one. */
++  dependsOn?: string[];
++};
++
++/**
++ * Creates a copy-pass node that copies a graph buffer range into a {@link GPUReadbackTicket}.
++ *
++ * Because the copy is a graph node, a transient result can be read at the point of the schedule
++ * where it holds its value, without importing it or extending its lifetime beyond this node. The
++ * application still submits the encoder and calls `ticket.read()`.
++ */
++export function createGPUReadbackCommandNode<Parameters = void>(
++  props: GPUReadbackCommandNodeProps<Parameters>
++): GPUCopyCommandNode<Parameters> {
++  const range = getGraphByteRange(props.source, props.byteOffset, props.byteLength, 'readback');
++  return createGPUCopyCommandNode<Parameters>({
++    id: props.id,
++    dependsOn: props.dependsOn,
++    resources: [{buffer: props.source, usage: 'copy-source'}],
++    compile: () => ({
++      encode: ({commandEncoder, getBuffer, parameters}) => {
++        props.getTicket(parameters).copyFrom(commandEncoder, getBuffer(props.source), {
++          sourceOffset: range.byteOffset,
++          byteLength: range.byteLength
++        });
++      }
++    })
++  });
++}
++
++function getGraphByteRange(
++  buffer: GraphBufferHandle | GraphDataView,
++  byteOffset: number | undefined,
++  byteLength: number | undefined,
++  label: string
++): GraphByteRange {
++  const base =
++    buffer instanceof GraphDataView
++      ? {
++          byteOffset: buffer.byteOffset,
++          byteLength:
++            buffer.length === 0 ? 0 : (buffer.length - 1) * buffer.byteStride + buffer.rowByteLength
++        }
++      : {byteOffset: 0, byteLength: buffer.byteLength};
++  const offset = byteOffset ?? 0;
++  const length = byteLength ?? base.byteLength - offset;
++  if (
++    !Number.isSafeInteger(offset) ||
++    !Number.isSafeInteger(length) ||
++    offset < 0 ||
++    length < 0 ||
++    offset % 4 !== 0 ||
++    length % 4 !== 0 ||
++    offset + length > base.byteLength
++  ) {
++    throw new Error(`${label} byte range must be non-negative, four-byte aligned, and in bounds`);
++  }
++  return {byteOffset: base.byteOffset + offset, byteLength: length};
++}
+diff --git a/modules/gpgpu/src/gpu-core/gpu-command-graph-compiler.ts b/modules/gpgpu/src/gpu-core/gpu-command-graph-compiler.ts
+index 226d7ef60..460abfbaa 100644
+--- a/modules/gpgpu/src/gpu-core/gpu-command-graph-compiler.ts
++++ b/modules/gpgpu/src/gpu-core/gpu-command-graph-compiler.ts
+@@ -12,6 +12,7 @@ import type {
+   GPUCommandGraphPreflightReport,
+   GPUCommandGraphRenderExecutable,
+   GPUCommandGraphStats,
++  GPUCommandGraphUninitializedTransientRead,
+   GraphBufferHandle,
+   GraphBufferUsage,
+   GraphBufferUse,
+@@ -441,6 +442,7 @@ function getGPUCommandGraphPreflightReport<Parameters>(
+     }, 0);
+   return Object.freeze({
+     nodes: Object.freeze(nodeReports),
++    uninitializedTransientReads: Object.freeze(getUninitializedTransientReads(nodes)),
+     annotatedNodeCount: nodes.filter(node => node.workload !== undefined).length,
+     conditionalNodeCount: nodes.filter(node => node.condition !== undefined).length,
+     commandCount: sum('commandCount'),
+@@ -458,6 +460,41 @@ function getGPUCommandGraphPreflightReport<Parameters>(
+   });
+ }
+ 
++/**
++ * Finds transient buffers whose first scheduled access is a pure read (the node declares no write
++ * of that buffer before or alongside it). `storage-read-write` counts as a write.
++ * @internal
++ */
++export function getUninitializedTransientReads<Parameters>(
++  nodes: readonly GPUCommandGraphNode<Parameters>[]
++): GPUCommandGraphUninitializedTransientRead[] {
++  const written = new Set<GraphBufferHandle>();
++  const reported = new Set<GraphBufferHandle>();
++  const findings: GPUCommandGraphUninitializedTransientRead[] = [];
++  for (const node of nodes) {
++    const nodeWrites: GraphBufferHandle[] = [];
++    for (const resource of node.resources ?? []) {
++      if (!isGraphBufferUse(resource)) {
++        continue;
++      }
++      const handle = getBufferHandle(resource.buffer);
++      if (!handle.transient) {
++        continue;
++      }
++      if (isBufferWriteUsage(resource.usage)) {
++        nodeWrites.push(handle);
++      } else if (!written.has(handle) && !reported.has(handle)) {
++        reported.add(handle);
++        findings.push({bufferId: handle.id, nodeId: node.id, usage: resource.usage});
++      }
++    }
++    for (const handle of nodeWrites) {
++      written.add(handle);
++    }
++  }
++  return findings;
++}
++
+ /** Returns the underlying logical buffer for either a handle or typed data view. @internal */
+ export function getBufferHandle(buffer: GraphBufferHandle | GraphDataView): GraphBufferHandle {
+   return 'buffer' in buffer ? buffer.buffer : buffer;
+diff --git a/modules/gpgpu/src/gpu-core/gpu-command-graph-types.ts b/modules/gpgpu/src/gpu-core/gpu-command-graph-types.ts
+index 6b375bf91..e82d0fecc 100644
+--- a/modules/gpgpu/src/gpu-core/gpu-command-graph-types.ts
++++ b/modules/gpgpu/src/gpu-core/gpu-command-graph-types.ts
+@@ -600,9 +600,26 @@ export type GPUCommandGraphNodePreflight = Readonly<
+   }
+ >;
+ 
++/** A graph-owned transient buffer that a node reads before any scheduled node wrote it. */
++export type GPUCommandGraphUninitializedTransientRead = Readonly<{
++  /** Logical transient buffer id. */
++  bufferId: string;
++  /** Id of the first node that reads the buffer without an earlier write. */
++  nodeId: string;
++  /** The read access declared by that node. */
++  usage: GraphBufferUsage;
++}>;
++
+ /** Aggregated static workload bounds available before the graph is submitted. */
+ export type GPUCommandGraphPreflightReport = {
+   readonly nodes: readonly GPUCommandGraphNodePreflight[];
++  /**
++   * Transient buffers whose first scheduled access is a read. Transients are not zero-initialized
++   * and may share bytes with other transients, so such a read observes undefined contents. Writes
++   * are tracked per buffer, not per byte range: a buffer counts as initialized once any node
++   * writes it, so partial writes (for example atomic accumulators) still need an explicit clear.
++   */
++  readonly uninitializedTransientReads: readonly GPUCommandGraphUninitializedTransientRead[];
+   /** Number of scheduled nodes that supplied a workload estimate. */
+   readonly annotatedNodeCount: number;
+   /** Number of nodes carrying CPU or GPU conditional-execution metadata. */
+diff --git a/modules/gpgpu/src/gpu-core/gpu-command-graph.ts b/modules/gpgpu/src/gpu-core/gpu-command-graph.ts
+index 7e3db544d..836b463d3 100644
+--- a/modules/gpgpu/src/gpu-core/gpu-command-graph.ts
++++ b/modules/gpgpu/src/gpu-core/gpu-command-graph.ts
+@@ -116,6 +116,7 @@ export type {
+   GPUCommandGraphStats,
+   GPUCommandGraphEncodingStats,
+   GPUCommandGraphTimingReport,
++  GPUCommandGraphUninitializedTransientRead,
+   GraphBufferDescriptor,
+   GraphBufferUsage,
+   GraphBufferUse,
+diff --git a/modules/gpgpu/src/gpu-core/index.ts b/modules/gpgpu/src/gpu-core/index.ts
+index 3594c1779..7dd8981bf 100644
+--- a/modules/gpgpu/src/gpu-core/index.ts
++++ b/modules/gpgpu/src/gpu-core/index.ts
+@@ -53,6 +53,7 @@ export type {
+   GPUCommandGraphRenderNode,
+   GPUCommandGraphStats,
+   GPUCommandGraphTimingReport,
++  GPUCommandGraphUninitializedTransientRead,
+   GraphBufferDescriptor,
+   GraphBufferUsage,
+   GraphBufferUse,
+@@ -567,6 +568,14 @@ export type {
+   GPUCopyCommandNode,
+   GPURenderCommandNode
+ } from './gpu-command-node';
++export {
++  createGPUClearBufferCommandNode,
++  createGPUReadbackCommandNode
++} from './gpu-buffer-command-nodes';
++export type {
++  GPUClearBufferCommandNodeProps,
++  GPUReadbackCommandNodeProps
++} from './gpu-buffer-command-nodes';
+ export {
+   getGPUOperationTree,
+   GPUCompositeOperation,
+diff --git a/modules/gpgpu/test/gpu-core/gpu-buffer-command-nodes.node.spec.ts b/modules/gpgpu/test/gpu-core/gpu-buffer-command-nodes.node.spec.ts
+new file mode 100644
+index 000000000..ea91832dd
+--- /dev/null
++++ b/modules/gpgpu/test/gpu-core/gpu-buffer-command-nodes.node.spec.ts
+@@ -0,0 +1,137 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {Buffer} from '@luma.gl/core';
++import {
++  createGPUClearBufferCommandNode,
++  createGPUReadbackCommandNode,
++  GPUCommandGraph,
++  GPUReadbackRing
++} from '@luma.gl/gpgpu/gpu-core';
++import {NullDevice} from '@luma.gl/test-utils';
++import {describe, expect, test} from 'vitest';
++
++describe('GPU buffer command nodes', () => {
++  test('clear node zeroes the requested range of an imported buffer', async () => {
++    const device = getWebGPULookalikeDevice();
++    const buffer = device.createBuffer({
++      data: new Uint32Array([1, 2, 3, 4]),
++      usage: Buffer.COPY_SRC | Buffer.COPY_DST
++    });
++    const graph = new GPUCommandGraph(device, {id: 'clear'});
++    const handle = graph.importBuffer(
++      {id: 'target', byteLength: buffer.byteLength, usage: buffer.usage},
++      buffer
++    );
++    graph.add(
++      createGPUClearBufferCommandNode({id: 'zero', target: handle, byteOffset: 4, byteLength: 8})
++    );
++    const compiled = graph.compile();
++    const encoder = device.createCommandEncoder();
++    compiled.encode(encoder, {parameters: undefined});
++    device.submit(encoder.finish());
++    const bytes = await buffer.readAsync();
++    expect(Array.from(new Uint32Array(bytes.buffer, bytes.byteOffset, 4))).toEqual([1, 0, 0, 4]);
++    compiled.destroy();
++    buffer.destroy();
++  });
++
++  test('readback node reads a transient at its place in the schedule', async () => {
++    const device = getWebGPULookalikeDevice();
++    const source = device.createBuffer({
++      data: new Uint32Array([7, 8, 9, 10]),
++      usage: Buffer.COPY_SRC | Buffer.COPY_DST
++    });
++    const graph = new GPUCommandGraph(device, {id: 'read'});
++    const imported = graph.importBuffer(
++      {id: 'source', byteLength: 16, usage: source.usage},
++      source
++    );
++    const transient = graph.createTransientBuffer({
++      id: 'scratch',
++      byteLength: 16,
++      usage: Buffer.COPY_SRC | Buffer.COPY_DST
++    });
++    const ring = new GPUReadbackRing(device, {byteLength: 16, slotCount: 1});
++    const ticket = ring.tryAcquire()!;
++    graph.addCopyPass({
++      id: 'fill',
++      resources: [
++        {buffer: imported, usage: 'copy-source'},
++        {buffer: transient, usage: 'copy-destination'}
++      ],
++      compile: () => ({
++        encode: ({commandEncoder, getBuffer}) =>
++          commandEncoder.copyBufferToBuffer({
++            sourceBuffer: getBuffer(imported),
++            destinationBuffer: getBuffer(transient),
++            size: 16
++          })
++      })
++    });
++    graph.add(
++      createGPUReadbackCommandNode({id: 'read', source: transient, getTicket: () => ticket})
++    );
++    const compiled = graph.compile();
++    expect(compiled.preflight.uninitializedTransientReads).toEqual([]);
++    const encoder = device.createCommandEncoder();
++    compiled.encode(encoder, {parameters: undefined});
++    device.submit(encoder.finish());
++    const bytes = await ticket.read();
++    expect(Array.from(new Uint32Array(bytes.buffer, bytes.byteOffset, 4))).toEqual([7, 8, 9, 10]);
++    compiled.destroy();
++    ring.destroy();
++    source.destroy();
++  });
++
++  test('byte ranges must be aligned and in bounds', async () => {
++    const device = getWebGPULookalikeDevice();
++    const graph = new GPUCommandGraph(device, {id: 'range'});
++    const handle = graph.createTransientBuffer({
++      id: 'scratch',
++      byteLength: 16,
++      usage: Buffer.COPY_DST
++    });
++    expect(() => createGPUClearBufferCommandNode({id: 'a', target: handle, byteOffset: 2})).toThrow(
++      /four-byte aligned/
++    );
++    expect(() =>
++      createGPUClearBufferCommandNode({id: 'b', target: handle, byteLength: 32})
++    ).toThrow(/in bounds/);
++  });
++});
++
++describe('uninitialized transient reads (preflight)', () => {
++  test('flags a transient read before any write, accepts a clear first', async () => {
++    const device = getWebGPULookalikeDevice();
++    for (const clearFirst of [false, true]) {
++      const graph = new GPUCommandGraph(device, {id: `lint-${clearFirst}`});
++      const transient = graph.createTransientBuffer({
++        id: 'accumulator',
++        byteLength: 16,
++        usage: Buffer.COPY_SRC | Buffer.COPY_DST
++      });
++      if (clearFirst) {
++        graph.add(createGPUClearBufferCommandNode({id: 'zero', target: transient}));
++      }
++      graph.addCopyPass({
++        id: 'consume',
++        resources: [{buffer: transient, usage: 'copy-source'}],
++        compile: () => ({encode: () => {}})
++      });
++      const compiled = graph.compile();
++      expect(compiled.preflight.uninitializedTransientReads).toEqual(
++        clearFirst ? [] : [{bufferId: 'accumulator', nodeId: 'consume', usage: 'copy-source'}]
++      );
++      compiled.destroy();
++    }
++  });
++});
++
++/** GPUCommandGraph only needs a `webgpu` device type to build and encode copy nodes. */
++function getWebGPULookalikeDevice(): NullDevice {
++  const device = new NullDevice({id: 'buffer-command-nodes-device'});
++  Object.defineProperty(device, 'type', {value: 'webgpu'});
++  return device;
++}
