@@ -21,6 +21,7 @@ import {
 	tileXToLon,
 	tileYToLat,
 } from "../dem";
+import { getFlag } from "../flags";
 import { localMaxOf } from "../geo/peaks";
 import {
 	bearingDeg,
@@ -168,7 +169,13 @@ export class TerrainSet {
 
 	/** Highest DEM point within `radiusM` (snaps OSM peak nodes onto the DEM summit). */
 	localMax(lat: number, lon: number, radiusM = 150) {
-		return localMaxOf((la, lo) => this.heightAt(la, lo), lat, lon, radiusM);
+		return localMaxOf(
+			(la, lo) => this.heightAt(la, lo),
+			lat,
+			lon,
+			radiusM,
+			getFlag("peakSnapInterior") === "on",
+		);
 	}
 
 	/**

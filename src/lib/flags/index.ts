@@ -107,6 +107,13 @@ export const FLAG_SCHEMA = {
 	 */
 	focalSeedGate: onOff("off"),
 	/**
+	 * peak snapping (geo/peaks.ts localMaxOf, both engines): on = a DEM maximum on the search grid's
+	 * outer ring is treated as a flank, not a summit, and the peak keeps its OSM node position (22 % of
+	 * catalogue peaks in the 2026-10-02 dev study, reports/steps-2026-10-02/peak.md). Moves labels, so
+	 * off until a label batch pass compares both.
+	 */
+	peakSnapInterior: onOff("off"),
+	/**
 	 * band colour stats (LOOK_HARMONIZE, src/lib/gpu/look/color-stats-fold.ts): gpu (default since
 	 * 2026-10-01) = the per-workgroup partials are folded and finalized on the GPU (luma GPUProgramSpMV +
 	 * a finalize node, f32) and only the ColorStats (256 B) is read back; f64 = the partials (6.6 KB) come

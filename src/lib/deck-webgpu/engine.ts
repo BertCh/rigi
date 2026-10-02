@@ -1588,7 +1588,14 @@ export class WebGpuEngine implements Renderer {
 			}
 			if (this.snapPending.has(p)) return undefined;
 			const r = replayHeights(
-				(heightAt) => localMaxOf(heightAt, p.lat, p.lon, radiusM),
+				(heightAt) =>
+					localMaxOf(
+						heightAt,
+						p.lat,
+						p.lon,
+						radiusM,
+						getFlag("peakSnapInterior") === "on",
+					),
 				(lats, lons) => hg.heightsAt(terrain, lats, lons),
 			);
 			if (!(r instanceof Promise)) return r;

@@ -132,6 +132,30 @@ describe("peakSnapRadiusM / localMaxOf", () => {
 		expect(peakSnapRadiusM(47_500)).toBe(250);
 		expect(peakSnapRadiusM(110_000)).toBe(250);
 	});
+	it("interior: a maximum on the outer ring keeps the node; an inner one snaps; off is unchanged", () => {
+		// a slope rising north: the grid maximum is the northern ring
+		const slope = (la: number) => (la - 46) * 1e5;
+		const off = localMaxOf(slope, 46, 8, 100);
+		expect(off.lat).toBeGreaterThan(46);
+		expect(localMaxOf(slope, 46, 8, 100, true)).toEqual({
+			lat: 46,
+			lon: 8,
+			h: 0,
+		});
+		// a summit 50 m north of the node (inside ±100 m): snapped either way
+		const top = 46 + 50 / 111320;
+		const cone = (la: number, lo: number) =>
+			-Math.abs(la - top) * 1e5 - Math.abs(lo - 8) * 1e5;
+		expect(localMaxOf(cone, 46, 8, 100, true)).toEqual(
+			localMaxOf(cone, 46, 8, 100),
+		);
+		expect(localMaxOf(cone, 46, 8, 100, true).lat).toBeGreaterThan(46);
+		// no height at the node: the ring maximum is kept
+		const hole = (la: number) => (la === 46 ? null : slope(la));
+		expect(localMaxOf(hole, 46, 8, 100, true)).toEqual(
+			localMaxOf(hole, 46, 8, 100),
+		);
+	});
 	it("keeps the start point on ties and ignores unanswered samples", () => {
 		const r = localMaxOf((la) => (la > 46 ? null : 5), 46, 8, 100);
 		expect(r).toEqual({ lat: 46, lon: 8, h: 5 });

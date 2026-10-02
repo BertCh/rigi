@@ -102,18 +102,26 @@ export const peakSnapRadiusM = (distanceM: number) =>
  * ±radiusM, highest wins (h = −Infinity when nothing answers). The one snap rule: the app's peaks
  * (deck/scene.ts snapPeaksNear via TerrainSet.localMax) and viewPeaks below. The calls are made in
  * this order (the GPU gathers record and replay them, deck-webgpu/height-gather.ts).
+ *
+ * `interior` (flag peakSnapInterior, off): a maximum on the grid's outer ring is a slope still
+ * rising towards a higher neighbour, not a summit (dev study 2026-10-02: 22 % of catalogue peaks,
+ * 84 % of those still climbing at 2× radius), so the node keeps its own position and DEM height.
+ * A start point without a height keeps the grid maximum.
  */
 export function localMaxOf(
 	heightAt: (lat: number, lon: number) => number | null,
 	lat: number,
 	lon: number,
 	radiusM = 150,
+	interior = false,
 ) {
-	let best = {
+	const start = {
 		lat,
 		lon,
 		h: heightAt(lat, lon) ?? Number.NEGATIVE_INFINITY,
 	};
+	let best = start;
+	let onRing = false;
 	const dLat = radiusM / M_PER_DEG_LAT;
 	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
 	for (let i = -4; i <= 4; i++)
@@ -121,9 +129,12 @@ export function localMaxOf(
 			const la = lat + (i / 4) * dLat;
 			const lo = lon + (j / 4) * dLon;
 			const h = heightAt(la, lo);
-			if (h != null && h > best.h) best = { lat: la, lon: lo, h };
+			if (h != null && h > best.h) {
+				best = { lat: la, lon: lo, h };
+				onRing = Math.abs(i) === 4 || Math.abs(j) === 4;
+			}
 		}
-	return best;
+	return interior && onRing && Number.isFinite(start.h) ? start : best;
 }
 
 /**
