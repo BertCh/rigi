@@ -129,4 +129,22 @@ after dispose; never throws), `dispose` (idempotent, every RAF/timer/idle callba
 
 ## 7. Landed
 
-(filled in after landing)
+All browser-unverified; one batch-ledger row each (`reports/batch-ledger.md`).
+
+| sha | unit | what |
+|---|---|---|
+| 8ee2a13 | U1 | Heading range widens to a yaw beyond prior ± 40 (folded into 6345569's `headingControlWindow`; U1's duplicate `headingSlider` dropped on rebase); Auto-align / Refine say "found no fit" / "failed" on top of a90cc8b's save and cancel rules; Save image failure as a header notice; `dragPose` / `wheelVfov` + specs; renderer-neutral create error |
+| bce4db3 | U2, U3 | Toggle `role=switch`, Segmented `aria-pressed`, keyboard pin chips, announced progress, `role=alert` error with Try again / Library; eye altitude as state (passed to the eye-rule pod's `EyeHeightRow`); header truncation; User Timing marks; `WEBGPU_REQUIRED_FEATURES` spec |
+| 327aada | U11 | both engines' `init` returns early when already disposed (F16); comment fix (F17); marks renamed `photo-workspace:*` (the ontology check rejects `rigi:*`) |
+| b8a6e96 | W1 (pose-estimate pod) | ExportMenu gets `estimate = { provenance: workspaceProvenance(alignState, verify), label }`; `export-provenance.spec.ts` pins trusted ⇔ `poseAccepted` over every reachable state |
+
+Rebase notes: 6345569 (camera-prior) had already fixed the Heading unwrap, centred on `priorHeading` (honours
+`?geoDecl`), which is more correct than U1's raw `photo.heading` centre; its implementation was kept and U1
+contributed only the widening, with a spec in `geocam/priors/__tests__/heading.spec.ts`. 36adadc / a90cc8b
+(accept-rule) save and cancel semantics were kept verbatim; U1's messages sit on top, and the "aborted" mark
+reads the existing `verifyAbort` signal (no second cancel path).
+
+Fast tier on the final tree (before W1): 110 pass, 4 fail, none from this branch: `biome` (gipfelbuch
+shell.spec), `ontology` (generated `domain.ts` stale after peer vocabulary edits), `unit` (upload specs:
+`?url` import denied through the worktree's node_modules symlink; tools python specs). align-cert times
+out at 120 s under load (load average ~56), as before this branch. tsc passed.
