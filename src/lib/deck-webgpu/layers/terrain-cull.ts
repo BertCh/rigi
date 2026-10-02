@@ -10,7 +10,7 @@
 //            CPU path's group order, the indexed indirect records, and a stable compaction of the
 //            visible table rows into the slot's instance buffer
 // BatchedTerrainCore.draw then issues CULL_SLOTS (at most the distinct segs) drawIndexedIndirect
-// calls through luma's Model.setIndirectBuffer (luma #3328, vendored rigi.2). The index buffer is the
+// calls through luma's Model.setIndirectBuffer (luma #3328, vendored since rigi.2). The index buffer is the
 // segs' gridMesh indices concatenated (firstIndex selects the seg; baseVertex = firstInstance = 0).
 // No count is read back. WebGPU only; the CPU cull stays the path for WebGL, ?gpu=off,
 // terrainGpuCull=off, a custom `cull` hook, > CULL_SLOTS segs, and any failure here.

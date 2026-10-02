@@ -1,6 +1,6 @@
 # src/lib/gpu/core: shared WebGPU compute foundation
 
-This directory is the shared layer that every kernel in `src/lib/gpu/**` builds on. It uses luma 10.0.0-alpha.2's (vendored `10.0.0-alpha.2-rigi.2`) stable `@luma.gl/core` API plus the experimental `@luma.gl/gpgpu/gpu-core`, and it is meant to move to luma/deck "next" (WebGPU everywhere) with as little churn as possible. The house rules from `../README.md` all still apply:
+This directory is the shared layer that every kernel in `src/lib/gpu/**` builds on. It uses luma 10.0.0-alpha.2's (vendored `10.0.0-alpha.2-rigi.3`) stable `@luma.gl/core` API plus the experimental `@luma.gl/gpgpu/gpu-core`, and it is meant to move to luma/deck "next" (WebGPU everywhere) with as little churn as possible. The house rules from `../README.md` all still apply:
 - Every kernel keeps a CPU twin, and the CPU twin is the reference.
 - `getComputeDevice()` resolving `null` means the caller takes the CPU path.
 - `?gpu=off` turns everything off.

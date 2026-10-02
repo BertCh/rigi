@@ -4,6 +4,10 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Vendored luma.gl rigi.3 (2026-10-01)
+- luma.gl bumped to `10.0.0-alpha.2-rigi.3`: luma master `7289d961` plus #3313 (`attach()`, now with application-owned devices and canvases), #3302, #3287, #3328, a PipelineFactory compute-hash commit (`c80b7ce6`), #3333, #3334 and #3330 (details, checksums and rebuild recipe in `vendor/luma/README.md`; compute-hash patch in `vendor/luma/patches/`). `DeviceProps._ownsHandle` is gone (attached devices are never destroyed by luma; `attachWebGPUDevice` already destroys the `GPUDevice` itself), the engine comment that still named it is fixed.
+- `@math.gl/core` and the packed luma manifests move to the published `5.0.0-alpha.10`; `@math.gl/polygon` and `@math.gl/web-mercator` are no longer direct dependencies (deck pulls them), and `overrides` pins the types-only `@math.gl/types` to `5.0.0-alpha.10` so one copy is installed. Browser-unverified until the render-lock gates run.
+
 ### WAG wave 4: more of the app on the luma graph, more GPU defaults (2026-10-01)
 
 Built without browser runs (user's call: no render-lock waits); evidence is node checks, several on luma.gl's WebGPU device over Dawn in node. Every item below is **browser-unverified** until the consolidated pass (`research_notes/whole-app-graph-2026-10-01/consolidated-pass-wave4.md`); a regression there reverts that default.

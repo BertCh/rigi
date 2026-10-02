@@ -944,7 +944,7 @@ export class WebGpuEngine implements Renderer {
 					c.destroy();
 				} catch {}
 			try {
-				host.destroy(); // destroys the device (luma created it, so _ownsHandle)
+				host.destroy(); // destroys the device (luma.createDevice created it, so the Device owns the GPUDevice)
 			} catch (err) {
 				console.warn(
 					"[webgpu-engine] destroying the host after a failed boot",

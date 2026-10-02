@@ -81,7 +81,7 @@ Screenshots go to `$SUMMIT_VIEW_SCREENSHOTS`, or to the OS temp directory by def
 
 `package.json` lists the versions this example is written against: deck.gl 9.4.0-beta.4,
 luma.gl 10.0.0-alpha.2 and math.gl 5 alpha. Inside the Rigi repository they resolve to the root
-install, which vendors those versions (luma.gl as `10.0.0-alpha.2-rigi.2`, an alpha.2 build with
+install, which vendors those versions (luma.gl as `10.0.0-alpha.2-rigi.3`, an alpha.2 build with
 unmerged upstream fixes; see `vendor/luma/README.md`). The Vite config adds no source aliases. Only public
 deck.gl APIs are used (no underscore-prefixed exports). One type-level detail: deck.gl does not
 export its `CommonViewState` type by name, so `summit-view.ts` infers it from `View`.

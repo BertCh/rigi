@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// luma.gl 10.0.0-alpha.2-rigi.2 (#3328) Model.setIndirectBuffer on WebGPU: N instances drawn from a
+// luma.gl 10.0.0-alpha.2-rigi.3 (#3328) Model.setIndirectBuffer on WebGPU: N instances drawn from a
 // GPU-written indirect record (a compute pass counts flags and writes the args; the CPU instance
 // count is 0) must equal a direct draw of the same count, byte for byte. Runs
 // scripts/gpu/indirect-draw-page.ts in headless Chromium against the dev server.

@@ -39,7 +39,7 @@ Hence:
   MRT, MSAA resolve and pipeline state.
 - deck's canvas pass draws only the screen cores, through one thin `CoreLayer`.
 
-We are on luma 10.0.0-alpha.2 (vendored as `10.0.0-alpha.2-rigi.2`, `vendor/luma/README.md`) with deck vendored from PR #10752. Moving to a published deck 10
+We are on luma 10.0.0-alpha.2 (vendored as `10.0.0-alpha.2-rigi.3`, `vendor/luma/README.md`) with deck vendored from PR #10752. Moving to a published deck 10
 should be mechanical: only `hosts/deck.ts` and `device.ts` touch deck. Cores use `Model`,
 `ShaderModule` and `RenderPass` and nothing else, and build their Models with pass.ts's own
 `WGSLShaderAssembler`, so deck's default-assembler state never reaches them.
@@ -496,7 +496,7 @@ IMG_7130 with `fullTerrain` and views at ±90°: autoAlign pose bit-identical, m
 5. **Retire WebGL deck layers** (terrain-layer, batched-terrain-layer, composite*, trail-layer,
    world-view layers, deck-splat-layer, tiles3d deck-layer, geometry-pass) once Safari / Firefox
    ship WebGPU on the supported OS versions; move `/roll` last (`layers/multi-drape.ts` is ready).
-6. **luma 10 / deck 10:** we run vendored luma `10.0.0-alpha.2-rigi.2` with deck vendored from PR #10752
+6. **luma 10 / deck 10:** we run vendored luma `10.0.0-alpha.2-rigi.3` with deck vendored from PR #10752
    (one `@deck.gl/core` override remains; no `.npmrc`; `vendor/deck/README.md`, `vendor/luma/README.md`). Only
    `hosts/deck.ts` and `device.ts` touch deck; swap to npm when deck publishes on luma 10, then
    drop the workarounds listed below.

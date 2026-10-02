@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Page side of scripts/gpu/indirect-draw-check.mjs: luma.gl 10.0.0-alpha.2-rigi.2 (#3328)
+// Page side of scripts/gpu/indirect-draw-check.mjs: luma.gl 10.0.0-alpha.2-rigi.3 (#3328)
 // Model.setIndirectBuffer. A compute pass counts the live flags and writes the draw record, a
 // render pass draws from it, and the framebuffer must equal a direct draw of the same count.
 import { Buffer, luma, Texture } from "@luma.gl/core";

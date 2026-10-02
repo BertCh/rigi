@@ -1,6 +1,6 @@
 # src/lib/gpu — WebGPU compute
 
-The compute kernels in this directory run on a luma.gl 10 (vendored `10.0.0-alpha.2-rigi.2`) WebGPU device.
+The compute kernels in this directory run on a luma.gl 10 (vendored `10.0.0-alpha.2-rigi.3`) WebGPU device.
 Under the default WebGPU renderer (`src/lib/deck-webgpu/**`, the default since 2026-10-01) the renderer
 hands its device over with `adoptRenderDevice`, so the kernels run on the render device: one queue,
 and render targets are read without a copy. Under the WebGL fallback (`?renderer=deck`) and in
@@ -21,7 +21,7 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
   `GraphDataView` and the rest from there. A luma 10 bump should touch this file plus the
   workarounds its header lists. The app moved to luma `10.0.0-alpha.2` on 2026-09-30 (098d9f2),
   with deck.gl vendored from PR #10752 (`vendor/deck/README.md`). luma itself is vendored as
-  `10.0.0-alpha.2-rigi.2` since 2026-10-01 (d0969e2, c5b2aa1; `vendor/luma/README.md`), which fixed
+  `10.0.0-alpha.2-rigi.N` since 2026-10-01 (d0969e2, c5b2aa1; `vendor/luma/README.md`), which fixed
   the manifests, so the overrides and `.npmrc` are gone.
 - **Kernel modules** (`horizon/`, `align/`, `look/`, `eye/`, `skyglobal/`, `solve/`, `sky/`): each defines
   its WGSL with `core/kernel` `defineKernel` and runs it as a core `ComputeGraph` (`core/graph`,

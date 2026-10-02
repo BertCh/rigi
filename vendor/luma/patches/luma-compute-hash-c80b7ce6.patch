@@ -1,0 +1,102 @@
+commit d705b6d10452080086f2ca4f8fc63eb593573a98
+Author: Robert Christie <rgcgeog@gmail.com>
+Date:   Thu Oct 1 00:29:01 2026 -0400
+
+    fix(core): include entryPoint and stable constants in PipelineFactory compute pipeline hash
+    
+    Two compute specs differing only in entryPoint or override constants previously
+    received the same cached pipeline. Render hash audited: WebGPU render hash already
+    includes vertex/fragment entry points; vs/fsConstants are unused by pipeline creation.
+    
+    (cherry picked from commit c80b7ce6d0a3c05d7f4541ceff15228139a9b216)
+
+diff --git a/modules/core/src/factories/pipeline-factory.ts b/modules/core/src/factories/pipeline-factory.ts
+index 871654429..47eaf915f 100644
+--- a/modules/core/src/factories/pipeline-factory.ts
++++ b/modules/core/src/factories/pipeline-factory.ts
+@@ -19,6 +19,18 @@ type PendingCacheItem<ResourceT extends Resource<any>> = {
+   useCount: number;
+ };
+ 
++/** Stable (key-sorted) serialization of pipeline override constants, for cache keys */
++function stableStringifyConstants(constants: Record<string, number> | undefined): string {
++  if (!constants) {
++    return '{}';
++  }
++  return JSON.stringify(
++    Object.keys(constants)
++      .sort()
++      .map(key => [key, constants[key]])
++  );
++}
++
+ const asyncCompilationByDevice = new WeakMap<Device, Promise<unknown>[]>();
+ 
+ /**
+@@ -370,7 +382,12 @@ export class PipelineFactory {
+     const {type} = this.device;
+     const shaderHash = this._getHash(props.shader.source);
+     const shaderLayoutHash = this._getHash(JSON.stringify(props.shaderLayout));
+-    return `${type}/C/${shaderHash}SL${shaderLayoutHash}`;
++    // `entryPoint` and override `constants` change the created `GPUComputePipeline`, so two
++    // specs that differ only in these must not share a cached pipeline. Constants are
++    // serialized with sorted keys so equivalent objects hash identically.
++    const entryPointHash = this._getHash(String(props.entryPoint ?? ''));
++    const constantsHash = this._getHash(stableStringifyConstants(props.constants));
++    return `${type}/C/${shaderHash}EP${entryPointHash}K${constantsHash}SL${shaderLayoutHash}`;
+   }
+ 
+   /** Calculate a hash based on all the inputs for a render pipeline */
+diff --git a/modules/core/test/factories/pipeline-factory.spec.ts b/modules/core/test/factories/pipeline-factory.spec.ts
+index c43b8b1d1..0cba70fee 100644
+--- a/modules/core/test/factories/pipeline-factory.spec.ts
++++ b/modules/core/test/factories/pipeline-factory.spec.ts
+@@ -381,6 +381,48 @@ it('PipelineFactory#caching with WebGPU attachment formats', async () => {
+   void 0;
+ });
+ 
++it('PipelineFactory does not alias compute pipelines that differ in entryPoint or constants', async () => {
++  const webgpuDevice = await getWebGPUTestDevice();
++  if (!webgpuDevice?.props._cachePipelines) {
++    return;
++  }
++
++  const pipelineFactory = new PipelineFactory(webgpuDevice);
++  const shader = webgpuDevice.createShader({
++    source: /* wgsl */ `
++override scale: f32 = 1.0;
++override bias: f32 = 0.0;
++@compute @workgroup_size(1) fn mainA() { _ = scale + bias; }
++@compute @workgroup_size(1) fn mainB() { _ = scale - bias; }
++`
++  });
++  const base: ComputePipelineProps = {shader, shaderLayout: {bindings: []}, entryPoint: 'mainA'};
++
++  try {
++    const a = pipelineFactory.createComputePipeline(base);
++    const sameKeyOrderSwapped = pipelineFactory.createComputePipeline({
++      ...base,
++      constants: {bias: 2, scale: 3}
++    });
++    const sameKeyOrder = pipelineFactory.createComputePipeline({
++      ...base,
++      constants: {scale: 3, bias: 2}
++    });
++    const otherEntry = pipelineFactory.createComputePipeline({...base, entryPoint: 'mainB'});
++    const otherConstants = pipelineFactory.createComputePipeline({
++      ...base,
++      constants: {scale: 4, bias: 2}
++    });
++
++    expect(sameKeyOrder).toBe(sameKeyOrderSwapped);
++    expect(a).not.toBe(sameKeyOrder);
++    expect(a).not.toBe(otherEntry);
++    expect(otherConstants).not.toBe(sameKeyOrder);
++  } finally {
++    shader.destroy();
++  }
++});
++
+ it('PipelineFactory preserves a synchronous compute cache entry when async compilation finishes', async () => {
+   const webgpuDevice = await getWebGPUTestDevice();
+   if (!webgpuDevice?.props._cachePipelines) {
