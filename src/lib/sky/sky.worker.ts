@@ -59,6 +59,7 @@ import type {
 	SkyWorkerRequest,
 	SkyWorkerResponse,
 } from "./protocol";
+import { createSerialQueue } from "./serial-queue";
 
 // Explicit wasm URL: needed in dev (Vite pre-bundles ORT, breaking its own
 // import.meta.url lookup) and resolves to the same hashed asset in builds.
@@ -68,6 +69,7 @@ ort.env.wasm.wasmPaths = { wasm: wasmUrl };
 ort.env.wasm.numThreads = 1;
 ort.env.logLevel = "error";
 
+const queue = createSerialQueue();
 const models = new Map<string, Promise<SkyModel | null>>();
 let modelError: string | undefined;
 // A failed load is not cached for good: retry after a growing backoff, up to a cap.
@@ -81,13 +83,18 @@ let lastDevice: Device | undefined;
 // The prep and refine graphs are cached per shape; free them after this long without a request (the
 // device itself stays: ORT shares it). A later request rebuilds the same graphs.
 const SKY_GRAPH_IDLE_MS = 30_000;
-const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, async () => {
-	const device = lastDevice;
-	if (!device) return;
-	// refine-graph is loaded on demand by refine.ts (import cycle); the cache is empty if it never was
-	const { releaseSkyGraphs } = await import("#/lib/gpu/sky/refine-graph");
-	await Promise.all([releasePrepGraphs(device), releaseSkyGraphs(device)]);
-});
+const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
+	// on the request queue: a request that arrives while the imports below are awaited runs after
+	// the release, never on graphs it is destroying; a request already queued runs first (skip)
+	queue.run(async () => {
+		if (queue.size > 1) return;
+		const device = lastDevice;
+		if (!device) return;
+		// refine-graph is loaded on demand by refine.ts (import cycle); the cache is empty if it never was
+		const { releaseSkyGraphs } = await import("#/lib/gpu/sky/refine-graph");
+		await Promise.all([releasePrepGraphs(device), releaseSkyGraphs(device)]);
+	}),
+);
 
 /** The worker's luma compute device when the page allows the GPU (null: CPU refine). */
 async function computeDevice(gpu: boolean | undefined): Promise<Device | null> {
@@ -332,8 +339,7 @@ async function segmentWith(
 }
 
 // One ORT session can't run concurrent inferences ("Session already started"),
-// so requests are handled strictly in arrival order.
-let queue: Promise<void> = Promise.resolve();
+// so requests (and the idle release) are handled strictly in arrival order.
 
 async function handle(req: SkyWorkerRequest) {
 	idle.begin();
@@ -355,5 +361,5 @@ async function handle(req: SkyWorkerRequest) {
 
 scope.onmessage = (ev: MessageEvent<SkyWorkerRequest>) => {
 	const req = ev.data;
-	queue = queue.then(() => handle(req));
+	void queue.run(() => handle(req));
 };
