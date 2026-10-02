@@ -501,11 +501,12 @@ function aggregate() {
 		marchVsDenseOracle: [] as number[],
 		denseMarchVsDenseOracle: [] as number[],
 	};
-	const demPy = {
+	const mk = () => ({
 		vsMarch100: [] as number[],
 		vsOracle100: [] as number[],
 		marchVsOracle100: [] as number[],
-	};
+	});
+	const demPy = { dmin20: mk(), dmin5: mk() };
 	const perEye: Record<string, unknown>[] = [];
 	const frameTimes: number[] = [];
 	for (const e of have) {
@@ -522,21 +523,27 @@ function aggregate() {
 			oracleCpuMs: c.oracleMs,
 			hfVsOracle: stats(dHO),
 		};
-		const dm = path.join(OUT, `dempy-${e.id}.json`);
-		const c1 = path.join(OUT, `c100-${e.id}.json`);
-		if (fs.existsSync(dm) && fs.existsSync(c1)) {
-			const dpy = readJson(`dempy-${e.id}.json`);
+		for (const [tag, prefix] of [
+			["dmin20", "dempy"],
+			["dmin5", "dempy5"],
+		] as const) {
+			const dm = path.join(OUT, `${prefix}-${e.id}.json`);
+			const c1 = path.join(OUT, `c100-${e.id}.json`);
+			if (!fs.existsSync(dm) || !fs.existsSync(c1)) continue;
+			const dpy = readJson(`${prefix}-${e.id}.json`);
 			const k = readJson(`c100-${e.id}.json`);
 			const a = dpx(dpy.el, k.hf, e.hfov);
 			const b = dpx(dpy.el, k.oracle, e.hfov);
-			const c2 = dpx(k.hf, k.oracle, e.hfov);
-			for (const v of a) demPy.vsMarch100.push(v);
-			for (const v of b) demPy.vsOracle100.push(v);
-			for (const v of c2) demPy.marchVsOracle100.push(v);
-			row.demPy = {
+			for (const v of a) demPy[tag].vsMarch100.push(v);
+			for (const v of b) demPy[tag].vsOracle100.push(v);
+			if (tag === "dmin20")
+				for (const v of dpx(k.hf, k.oracle, e.hfov))
+					demPy[tag].marchVsOracle100.push(v);
+			if (!row.demPy) row.demPy = {};
+			(row.demPy as Record<string, unknown>)[tag] = {
 				vsMarch100: stats(a),
 				vsOracle100: stats(b),
-				marchVsOracle100: stats(c2),
+				marchVsOracle100: stats(dpx(k.hf, k.oracle, e.hfov)),
 			};
 		}
 		const dp = path.join(OUT, `dense-${e.id}.json`);
@@ -624,7 +631,12 @@ function aggregate() {
 					: "KILL",
 		pooledPxStats: pooledStats,
 		demPy: Object.fromEntries(
-			Object.entries(demPy).map(([k, v]) => [k, v.length ? stats(v) : null]),
+			Object.entries(demPy).map(([tag, set]) => [
+				tag,
+				Object.fromEntries(
+					Object.entries(set).map(([k, v]) => [k, v.length ? stats(v) : null]),
+				),
+			]),
 		),
 		posthocDense: Object.fromEntries(
 			Object.entries(posthoc).map(([k, v]) => [k, v.length ? stats(v) : null]),

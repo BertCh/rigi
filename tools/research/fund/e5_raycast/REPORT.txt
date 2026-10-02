@@ -1,0 +1,83 @@
+FUND E5: ray-cast oracle (F3). REPORT, 2026-10-02. Protocol: PROTOCOL.txt (committed before any measurement, 1558b1d).
+All numbers are DEV, n = 54 eyes (19 GT + 35 wild dev with a stated eye), not a result. Raw numbers: results.json.
+Machine: Apple GPU through node Dawn (webgpu@0.3.0, Metal), 12 cores, shared with ~8 other sessions: the 1-minute load
+average during the GPU stage was 28 to 55 (recorded per eye in out/e5/gpu-*.json, gitignored), so the frame times
+below were taken under heavy contention and are, if anything, pessimistic.
+
+VERDICT (dev): PASS on both gates.
+  (a) pooled p95 |Δelevation| oracle vs horizon-fast = 0.191 px (limit 0.5); n = 194,400 (eye, azimuth) samples.
+  (b) median GPU time per 1024x768 frame at 150 km = 18.7 ms wall (limit 50); 14 posed GT eyes x 15 warm frames = 210.
+
+WHAT WAS BUILT (src/lib/raycast, not wired, no flag)
+  cpu.ts        f64 reference. Per ray: apparent slope s, ray height above the eye r(d) = s d + c d^2 with
+                c = (1 - REFRACTION_K) / (2 EARTH_R) (imported, no new copy of 0.13), terrain hit when h - h0 >= r(d).
+                First hit, front to back, over the horizon-fast Mercator ring mosaics and their exact-partition max
+                mips: the largest mip block whose max (incl. the bilinear footprint) is below the ray's minimum height
+                over the block's exit span is skipped (r is a convex parabola, so the minimum is closed form), then a
+                24-step bisection refines the hit between the lattice point before it and the hit sample. Samples sit
+                on a distance lattice that does not depend on the skips (per octave 2^k, n_k equal steps from the
+                horizon-fast step rule), so mip skipping gives EXACTLY the brute-force result (spec: 300 random rays,
+                equal hit flag, distance and height; samples drop by more than half). The first sample is exactly
+                minDistance, as the march. Great-circle path = the march's piecewise-linear Mercator segments with
+                cancellation-free breakpoint offsets so the WGSL twin runs in f32.
+                Outputs: per-pixel range (Infinity = sky), ENU xyz of the hit (true geometry), ground arc distance, sky
+                flag; column mode = top-most elevation per azimuth by bisection on the slope (28 steps over +-90 deg).
+  raycast.wgsl.ts + gpu.ts   the same algorithm as one WGSL kernel (core defineKernel / kernelAsync / ComputeGraph,
+                heights and mips in the horizon GPU's resident mosaic pages via uploadMosaics). Nothing under
+                src/lib/gpu was edited. Mode 0 = one invocation per pixel, mode 1 = per azimuth.
+  Specs (src/lib/raycast/__tests__, synthetic fields only): flat plane horizon = -2 sqrt(h0 c) (1e-3 deg), downward ray hit
+                distance on a plane, cone flank hit distance (< 6 m at a 6.6 m cell) and apex horizon, mip skip ==
+                brute force, xyz reprojects to its own pixel (< 0.02 px), hitEnu / enuToApparent inverses, first sample at
+                minDistance, GPU params layout vs the WGSL constants.
+
+(a) HORIZON PARITY, identical inputs (same mosaics: DEFAULT_RINGS, 150 km, z15/13/12/11/10 around each eye; k = 0.13;
+    cap 150 km; minDistance 20 m; azimuth step 0.1 deg; step schedule = horizon-fast's)
+  oracle (CPU f64) vs horizon-fast CPU march, px at the photo's hfov (1024 px frame):
+      p50 0.006   p95 0.191   p99 0.669   max 8.42     (same in degrees: p50 0.0003, p95 0.0063, p99 0.021, max 0.26)
+      no (eye, azimuth) where exactly one of the two sees no terrain.
+      per-eye p95 > 0.5 px: wc_0034 (hfov 11 deg) 1.21, wc_0009 (25 deg) 0.77, wc_0077 (44 deg) 1.59 only; all three are
+      narrow-FOV dev photos, where 0.5 px is 0.005 to 0.02 deg. Worst GT eye p95: IMG_3304 0.21.
+  The disagreement is sampling, not a different horizon (all labelled POST HOC, they do not change the verdict):
+      each marcher against a 10x denser run of itself-on-the-same-mosaics (cellSteps 0.05, stepFactor 3.5e-5):
+        march vs dense march    p95 0.272 px     oracle vs dense march   p95 0.234 px
+        dense oracle vs dense march  p50 0.0004  p95 0.023  p99 0.106 px
+      i.e. both coarse marchers undersample narrow peaks by about the same amount (the oracle slightly less) and the two
+      dense runs agree to 0.023 px p95: neither marcher is wrong, the oracle is a valid replacement for the march on
+      identical inputs. (An earlier dense run with a lattice that did not start exactly at minDistance disagreed on
+      summit eyes; fixed in 4c7507b, specs added; the coarse results are bit-identical before and after the fix:
+      max |Δ| over all 54 eyes = 0.)
+
+(b) FRAME TIME, 1024x768, 150 km cap, warm, tiles and upload excluded (14 posed GT eyes at their GT poses)
+  wall (submit to onSubmittedWorkDone, the gating number): median over 210 frames 18.7 ms; per-eye medians 13.4 to 29.7 ms;
+  slowest single frame 81 ms (IMG_7053, under load 41). Not gating: GPU timestamp-query (Dawn exposes it): per-eye medians
+  11.8 to 28.8 ms. Sky fraction of the frames 0.15 to 0.50.
+  CPU oracle, measured only on the 128x96 sub-grid (never extrapolated): 12 to 55 us per ray.
+
+REPORTED, NOT GATING
+  GPU oracle vs CPU oracle (f32 vs f64): horizon columns |Δelevation| p50 9e-7 deg, p95 5e-6, max 1e-4 deg (0.006 px max);
+      frames (128x96 grid, 5 GT eyes): range relative error p95 1.5e-7 to 4.2e-7, 0 sky mismatches, 100% agree (criterion
+      of the protocol). GPU oracle columns take 76 ms median per eye (3600 bisections), CPU oracle 1.9 s, horizon-fast
+      CPU 0.38 s, GPU horizon (src/lib/gpu/horizon) 0.44 s (includes mosaic upload).
+  GPU horizon (src/lib/gpu/horizon, same mosaics) vs horizon-fast: p95 0.0024 px, max 0.30 px (the f32 twin of the same
+      algorithm); vs the oracle: p95 0.191 px, i.e. the same sampling difference as the CPU march.
+  Frame depth, 5 GT eyes (IMG_5495, 6958, 7018, 7131, 7155), GPU vs CPU oracle vs brute force (no mip, fixed step
+      0.1 cell, stepFactor 3.5e-5; the brute force took 9 to 28 s per 12,288 rays on the CPU): GPU vs CPU 100% on all five;
+      oracle (GPU or CPU) vs brute force 99.95% to 100% (1 to 6 of 12,288 pixels differ, thin-feature hits the coarse
+      lattice steps over; the dense march is the one that finds them).
+  tools/matcher/dem.py (own tile cache, own bands 3/15/100 km at z14/12/10, 100 km cap, local equirectangular frame): a
+      different input, so compared with the marchers' 100 km runs, 19 GT eyes. With its first sample at the default 5 m it
+      disagrees by hundreds of px on eyes that sit within a few metres of a rise (IMG_7155 median 760 px; the marchers
+      start at 20 m: a documented input difference). Aligned with dmin = 20 m: p50 0.44 px, p95 6.2 px, p99 29 px
+      against the 100 km march (the 100 km march and oracle agree p95 0.06 px); worst eyes IMG_4703 (p95 49 px),
+      IMG_7063 (21), IMG_7068 (20), IMG_7053 (19). Not diagnosed further: its coarser far bands and sampling are the
+      suspects, not the oracle. dem.py ran with network fetches (63 MB cache in the scratchpad).
+  Engine raster horizon: NOT RUN (needs a browser; cook mode). Not estimated.
+
+WHAT SURVIVES / FOLLOW-UPS
+  - The oracle is exact against the march on identical inputs, f32 GPU matches f64 CPU to 5e-6 deg, and a full 1024x768
+    xyz / range / sky frame costs ~19 ms. It can serve as the measurement kernel for horizon, xyz and visibility.
+  - Out of scope here: ortho colour and land-cover id outputs, DEM resident in the matcher, replacing the 8 marchers /
+    4 visibility tests / near-dem (a decision for the app pipeline; the parity above is for the horizon only), tiles
+    beyond what horizon-fast mosaics hold, Terrarium-less sea (NO_DATA is skipped as in the march).
+  - Caveats: dev, 54 eyes; timings under heavy machine load; GPU stage and Dawn hang at process exit (harmless, killed);
+    the px metric makes narrow-FOV photos stricter; the rings are DEFAULT_RINGS only.
