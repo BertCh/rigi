@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import photosJson from "virtual:photos";
+import { concordOn } from "#/lib/concord/flags";
+import { lensCorrectedVfov } from "#/lib/concord/priors/focal-table";
 import { storageKey } from "#/lib/ontology/core/storage";
 import type { Pose } from "./camera";
 import type { LatLonPair, LonLatPair } from "./ontology/core/geometry";
@@ -26,6 +28,9 @@ export type PhotoMeta = {
 	heading: number | null;
 	f35: number;
 	vfov: number;
+	/** EXIF Model / LensModel (absent in photos.json written before 2026-10-02): key the per-lens focal table. */
+	model?: string | null;
+	lensModel?: string | null;
 	gravity: number[] | null;
 	pitch: number;
 	roll: number;
@@ -59,8 +64,18 @@ export const photos = photosJson as PhotoMeta[];
 
 const localPhotos = new Map<string, PhotoMeta>();
 
+const lensPrior = new WeakMap<PhotoMeta, PhotoMeta>();
+
+/** The photo with its camera prior. ?concord=eye applies the per-lens focal table to vfov (a cached copy; the stored meta is untouched). */
 export function getPhoto(id: string) {
-	return localPhotos.get(id) ?? photos.find((p) => p.id === id);
+	const p = localPhotos.get(id) ?? photos.find((q) => q.id === id);
+	if (!p || !concordOn("eye")) return p;
+	let q = lensPrior.get(p);
+	if (!q) {
+		q = { ...p, vfov: lensCorrectedVfov(p) };
+		lensPrior.set(p, q);
+	}
+	return q;
 }
 
 /**

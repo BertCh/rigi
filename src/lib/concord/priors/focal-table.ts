@@ -114,3 +114,24 @@ export function lensModelFromCamera(
 	if (f35 >= 50) return undefined; // telephoto 6 mm (or zoom beyond it): no calibration
 	return "iPhone 11 Pro back triple camera 4.25mm f/1.8";
 }
+
+/**
+ * A photo's vertical FOV with the per-lens focal table applied (WP-B wiring into the app prior, roadmap C2):
+ * the stored vfov is the crop-aware EXIF focal, so only `fScale` is applied. The lens is the EXIF
+ * LensModel when the metadata has it, else guessed from the camera Model; no calibration ⇒ vfov unchanged.
+ */
+export function lensCorrectedVfov(p: {
+	height: number;
+	vfov: number;
+	f35: number;
+	model?: string | null;
+	lensModel?: string | null;
+}): number {
+	const entry = lensEntry(
+		p.lensModel ?? lensModelFromCamera(p.model ?? undefined, p.f35),
+		p.f35,
+	);
+	if (entry.fScale === 1) return p.vfov;
+	const t = Math.tan((p.vfov * Math.PI) / 360) / entry.fScale;
+	return (Math.atan(t) * 360) / Math.PI;
+}

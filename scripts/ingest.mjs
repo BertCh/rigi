@@ -275,6 +275,8 @@ async function main() {
 			heading: ex.GPSImgDirection ?? null,
 			f35,
 			vfov,
+			model: ex.Model ?? null,
+			lensModel: ex.LensModel ?? null,
 			gravity,
 			pitch: orient?.pitch ?? 0,
 			roll: orient?.roll ?? 0,

@@ -69,6 +69,7 @@ export type ExifTags = {
 	ExifImageHeight?: number;
 	Make?: string;
 	Model?: string;
+	LensModel?: string;
 	makerNote?: Uint8Array;
 };
 
@@ -364,6 +365,8 @@ export function buildPhotoMeta(
 		heading,
 		f35,
 		vfov,
+		model: tags.Model ?? null,
+		lensModel: tags.LensModel ?? null,
 		gravity,
 		pitch: orient?.pitch ?? 0,
 		roll: orient?.roll ?? 0,
