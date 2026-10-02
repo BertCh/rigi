@@ -346,6 +346,22 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"each worker owns its own compute device (worker realm); worker:unknown-pose marches its 360° scene here under flag unknownGpu (default on since 2026-10-01; off / ?gpu=off: the CPU sceneHorizon)",
 	},
 	{
+		id: "mosaic-mips",
+		island: "I3",
+		paths: ["src/lib/gpu/horizon/mosaic-mips.ts"],
+		groups: ["mosaic-mips"],
+		realms: ["worker:horizon-fast", "worker:unknown-pose", "worker:eye"],
+		cadence: "per photo",
+		resources: [
+			"mosaic pages (imports, written in place)",
+			"per-level params uniform",
+		],
+		readbacks: [],
+		status: "default",
+		notes:
+			"max-mip pyramid built on the GPU inside the horizon march's page (flag mosaicGpu, default on; byte-identical to the CPU pyramid, scripts/gpu/mosaic-mips-dawn.ts); the CPU pyramid stays for ?mosaicGpu=off, ?gpu=off and the CPU march",
+	},
+	{
 		id: "horizon-cert",
 		island: "I3",
 		paths: [

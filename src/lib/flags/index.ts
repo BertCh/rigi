@@ -57,6 +57,11 @@ export const FLAG_SCHEMA = {
 	/** autoAlign's skyline march */
 	gpuHorizon: onOff("on"),
 	/**
+	 * the horizon march's max-mip pyramid built on the GPU inside the uploaded mosaic page
+	 * (src/lib/gpu/horizon/mosaic-mips.ts; byte-identical to the CPU pyramid) instead of on the CPU
+	 */
+	mosaicGpu: onOff("on"),
+	/**
 	 * the skyline's tan → degrees and ENU stages: certified f32 on the GPU (default since 2026-10-01; the
 	 * precision gate found no quality difference: GT-12 12/12 identical, webgpu accepts identical) or f64
 	 * on the CPU (?horizonPrecision=f64)

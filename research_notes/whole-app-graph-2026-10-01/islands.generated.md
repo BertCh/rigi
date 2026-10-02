@@ -11,9 +11,9 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I0 | Loaders (not a graph) | per photo, per tile | page, worker:decode | – | – |
 | I1 | Terrain residency | per tile | page | ingest-terrarium, ingest-terrarium-tile, atlas-resize, height-gather, look-relief-heights | `ingest-terrarium`, `ingest-terrarium-tile`, `height-gather` |
 | I2 | Photo prep | per photo | page, worker:sky | photoprep | `photoprep` |
-| I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, horizon-cert, precision-probe | `horizon-march`, `horizon-cert`, `precision-probe` |
+| I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, mosaic-mips, horizon-cert, precision-probe | `horizon-march`, `mosaic-mips`, `horizon-cert`, `precision-probe` |
 | I4 | Align | per align | page | align-pose, align-cert, silhouette-gpu | `align-pose`, `align-cert`, `silhouette-mask` |
-| I5 | Unknown-pose solve | per photo | worker:unknown-pose, worker:pipeline | solve-coarse, skyglobal | `solve-coarse`, `skyglobal` |
+| I5 | Unknown-pose solve | per photo | worker:unknown-pose, worker:pipeline | solve-coarse, skyglobal, skyline | `solve-coarse`, `skyglobal`, `skyline` |
 | I6 | Sky model | per photo | worker:sky | sky-model, sky-prep, sky-refine | `sky-prep`, `sky-refine` |
 | I7 | Frame | per frame | page | deck-webgpu-frame, terrain-gpu-cull | – |
 | I8 | Queries | per settle | page | geo-query-gpu | `geo-query` |
@@ -33,6 +33,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | look-relief-heights | I1 | default | page | per settle | – | terrain tile heights texture array (import); Mercator nodes, tile rows (imports) | – |
 | photoprep | I2 | default | page | per photo | `photoprep` | rgba, fg, lim, dims (pooled imports); edge / sky scratch (transients) | read: coarse + fine edge planes, sky, sky-cum, select, echo (≈3.5 MB at 512 grid) |
 | horizon-march | I3 | default | worker:horizon-fast, worker:unknown-pose, worker:eye (remote) | per eye | `horizon-march` | mosaic pages pg0…pgN (imports); u, params (imports) | read: out nE·nAz·8 B + stats |
+| mosaic-mips | I3 | default | worker:horizon-fast, worker:unknown-pose, worker:eye (remote) | per photo | `mosaic-mips` | mosaic pages (imports, written in place); per-level params uniform | – |
 | horizon-cert | I3 | default | worker:horizon-fast (remote) | per eye | `horizon-cert` | u, consts, td (march [t, d]) or prof + az + cols (pooled imports); samp (transient, B → C) | A: outA n·8 B (elevation bits + flag); B→C: outC 8192·16 B (direction bits + flag) |
 | precision-probe | I3 | default | worker:horizon-fast, page | per photo | `precision-probe` | u, pin (pooled imports); pout (transient) | read: pout 4096·80 B, once per device |
 | align-pose | I4 | default | page | per align | `align-pose` | u, poses, dirs, edge planes (uploaded once per photo), sky planes (pooled imports); out (transient, cleared) | read: nPoses·stride B per round (≈40 rounds per autoAlign) |
@@ -40,6 +41,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | silhouette-gpu | I4 | default | page | per align | `silhouette-mask` | geometry targets rgba32float, one per pose (render device; imports bound per run); per-pose uniforms, mask output (imports, owned by SilhouetteMaskGpu) | read: pass mask, 18 KB per 384 × 288 pose (one read node per re-rank) |
 | solve-coarse | I5 | default | worker:unknown-pose, worker:pipeline (remote) | per photo | `solve-coarse` | resident horizon profile hz (per device); u, grid imports | rows: 16 B per yaw row; blocks (flagged rows only): nYaw·nBlk·16 B |
 | skyglobal | I5 | bench only | bench | bench | `skyglobal` | score maps, profile (pooled imports); cells, red (transients) | candidate list: count + head slots, rare second exact read |
+| skyline | I5 | opt-in | worker:unknown-pose, worker:eye (remote) | per photo | `skyline` | photo planes (rgba, pooled import); features, prior, sky-model cost images (transients) | cost images for the CPU Viterbi + sky-model refit |
 | sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
 | sky-prep | I6 | default | worker:sky (remote) | per photo | `sky-prep` | ImageBitmap → rgba8unorm texture (per photo); tmp (transient); axis taps, constants, LUT (pooled imports); rgba, rgbLo, ORT input (handed to the model and sky-refine) | opacity flag (4 B); first 3 photos per device: rgba + rgbLo + input (verification) |
 | sky-refine | I6 | default | worker:sky (remote) | per photo | `sky-refine` | ORT P(sky) buffer (wrapped per run); guide, rgba, axis taps, LUT (pooled imports) | read: byte mask (+ float mask when asked) |
@@ -65,12 +67,14 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **look-relief-heights**: rasterises the relief height field from the resident tiles; compiles into the "look-relief" group (listed under look-relief)
 - **photoprep**: planes read back and re-uploaded by align (R1, dataflow-map §3)
 - **horizon-march**: each worker owns its own compute device (worker realm); worker:unknown-pose marches its 360° scene here under flag unknownGpu (default on since 2026-10-01; off / ?gpu=off: the CPU sceneHorizon)
+- **mosaic-mips**: max-mip pyramid built on the GPU inside the horizon march's page (flag mosaicGpu, default on; byte-identical to the CPU pyramid, scripts/gpu/mosaic-mips-dawn.ts); the CPU pyramid stays for ?mosaicGpu=off, ?gpu=off and the CPU march
 - **horizon-cert**: certified-f32 tan → degrees and ENU / resample (D7, D8); ?horizonPrecision=certified-f32; ties recomputed by the f64 path
 - **precision-probe**: strict-IEEE probe gating every certified-f32 stage (horizon in the horizon-fast worker; align on the page)
 - **align-cert**: certified-f32 coordinate descent (WAG W3.3): R rounds per submit, DECIDE → EVAL (indirect) → EVAL2 double-f32 (indirect); ?alignPrecision=certified-f32
 - **silhouette-gpu**: one kernel node per pose, one submit per re-rank; keyed by pose count and target shape
 - **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) when unknownGpu is on
 - **skyglobal**: T6 skyline global search; not wired into the service
+- **skyline**: detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default off: 1 of 77 unknown-pose accept decisions flipped in the node A/B)
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU
 - **sky-prep**: cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; flag skyGpuPrep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)
 - **deck-webgpu-frame**: deck.gl layers in one encoder; not a ComputeGraph

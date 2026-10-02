@@ -194,7 +194,7 @@ export function computeRidgeTopsGpu(
 	m: RidgeMarch,
 ): Promise<RidgeTops> {
 	return withLease(LEASE, async () => {
-		const set = uploadMosaics(device, mosaics);
+		const set = await uploadMosaics(device, mosaics);
 		const { params, uniform } = packRidgeMarch(mosaics, set.rings, m);
 		const n = m.slabs * m.cols;
 		const dummy = acquire(device, `${LEASE}/dummy`, 16, Buffer.STORAGE);

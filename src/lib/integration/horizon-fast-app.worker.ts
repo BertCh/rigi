@@ -15,6 +15,7 @@ import {
 	tileId,
 	validateTile,
 } from "#/lib/dem";
+import { setFlagOverride } from "#/lib/flags";
 import { applyRealmGpuOptions, takeGpuProfile } from "#/lib/gpu/core/realm";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
@@ -205,6 +206,8 @@ async function march(
 }
 
 let spans: SectorSpan[] = [];
+/** CPU max-mips are skipped when the GPU march builds them (?mosaicGpu); a CPU march still builds them lazily. */
+let cpuMips = true;
 const sent = new Set<number>();
 const send = (res: Extract<HorizonWorkerOut, { type: "dirs" }>) => {
 	sent.add(res.eyeH);
@@ -216,6 +219,8 @@ scope.onmessage = async (e: MessageEvent<HorizonWorkerIn>) => {
 	try {
 		if (m.type === "spans") {
 			spans = m.spans;
+			cpuMips = !(m.gpu && m.mosaicGpu);
+			setFlagOverride("mosaicGpu", m.mosaicGpu === false ? "off" : undefined);
 			precision = m.precision ?? "f64";
 			mergeSpotLedger(m.spotLedger);
 			applyRealmGpuOptions(m.gpuOpts);
@@ -240,7 +245,7 @@ scope.onmessage = async (e: MessageEvent<HorizonWorkerIn>) => {
 						ringWindow(j.lat, j.lon, s.span, store.tileSize, s.az0, s.az1),
 						s.span,
 						j.lat,
-						true,
+						cpuMips,
 					),
 				);
 				return { mosaics, mosaicMs: performance.now() - t0 };

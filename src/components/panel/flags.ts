@@ -177,6 +177,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "mosaicGpu",
+		label: "Mosaic mips on GPU",
+		help: "Builds the skyline march's max-mip pyramid on the GPU (same bytes as the CPU), skipping the CPU build and upload.",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "horizonPrecision",
 		label: "Skyline precision",
 		help: "Certified f32: the skyline's angle stages on the GPU with an exact certificate and CPU f64 ties (same output).",

@@ -54,6 +54,10 @@ const solveGpuWanted = opt("solve-gpu", "on") === "on";
 const fusedWanted = opt("fused", "on") === "on";
 // --skyline-gpu on|off: the ?skylineGpu arm (detectSkylineAsync: GPU cost images vs the CPU detector)
 setFlagOverride("skylineGpu", opt("skyline-gpu", "off") as string);
+// --mosaic-gpu on|off: the ?mosaicGpu arm (the march's max-mip pyramid built on the GPU or the CPU)
+setFlagOverride("mosaicGpu", opt("mosaic-gpu", "on") as string);
+// --mosaic-gpu on|off: the ?mosaicGpu arm (the march's max-mip pyramid built on the GPU vs the CPU)
+setFlagOverride("mosaicGpu", opt("mosaic-gpu", "on") as string);
 const jitter = opt("horizon-jitter")?.split(":").map(Number) ?? null;
 
 /** The scene with its elevations jittered by ±amp (seeded LCG), a copy: the cached scene stays exact. */

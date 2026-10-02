@@ -51,6 +51,7 @@
  * own switch (?unknownGpu, on by default since 2026-10-01; unknown-opt-in.ts).
  */
 import { Buffer, type Device } from "@luma.gl/core";
+import { getFlag } from "#/lib/flags";
 import { DEG, EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import {
 	defineKernel,
@@ -75,6 +76,7 @@ import {
 } from "./certified";
 import { graphChunker } from "./graph";
 import { HORIZON_WGSL } from "./horizon.wgsl";
+import { buildMipsGpu, type MipJob, mipDims } from "./mosaic-mips";
 
 const RING_STRIDE = 40;
 const MAX_PAGES = 4;
@@ -90,6 +92,10 @@ interface RingLayout {
 	page: number;
 	dataOff: number;
 	mipOff: number[];
+	/** pyramid shape (the CPU pyramid's, or mipDims() when the GPU builds it) */
+	minLevel: number;
+	mipWidths: number[];
+	mipHeights: number[];
 }
 
 interface MosaicSet {
@@ -120,7 +126,10 @@ function destroySet(s: MosaicSet) {
 }
 
 /** Uploads (once) the mosaics' heights + max-mips; builds missing mips like the CPU march does. */
-export function uploadMosaics(device: Device, mosaics: Mosaic[]): MosaicSet {
+export async function uploadMosaics(
+	device: Device,
+	mosaics: Mosaic[],
+): Promise<MosaicSet> {
 	const hit = sets.get(mosaics);
 	if (hit && hit.device === device) return hit;
 	if (hit) releaseHorizonGpu(mosaics);
@@ -130,11 +139,20 @@ export function uploadMosaics(device: Device, mosaics: Mosaic[]): MosaicSet {
 		device.limits.maxBufferSize,
 	);
 	// Greedy page packing, whole rings (data then its mip levels) per page.
-	const sizes = mosaics.map((m) => {
-		m.mip ??= buildMips(m);
-		if (m.mip.mips.length > MAX_MIPS) throw new Error("too many mip levels");
-		return (m.data.length + m.mip.mips.reduce((a, x) => a + x.length, 0)) * 4;
+	// mosaicGpu: a mosaic without CPU mips gets its pyramid built on the GPU inside its page
+	const gpuMips = getFlag("mosaicGpu") === "on";
+	const shapes = mosaics.map((m) => {
+		if (!m.mip && !gpuMips) m.mip = buildMips(m);
+		const shape = m.mip ?? mipDims(m.width, m.height);
+		if (shape.widths.length > MAX_MIPS) throw new Error("too many mip levels");
+		return shape;
 	});
+	const sizes = mosaics.map(
+		(m, r) =>
+			(m.data.length +
+				shapes[r].widths.reduce((a, w, i) => a + w * shapes[r].heights[i], 0)) *
+			4,
+	);
 	const pageBytes: number[] = [];
 	const rings: RingLayout[] = [];
 	for (let r = 0; r < mosaics.length; r++) {
@@ -147,34 +165,57 @@ export function uploadMosaics(device: Device, mosaics: Mosaic[]): MosaicSet {
 		}
 		if (p >= MAX_PAGES) throw new Error("mosaics need more than 4 GPU pages");
 		const m = mosaics[r];
-		const mip = m.mip as NonNullable<Mosaic["mip"]>;
+		const sh = shapes[r];
 		let off = pageBytes[p] / 4;
 		const dataOff = off;
 		off += m.data.length;
 		const mipOff: number[] = [];
-		for (const x of mip.mips) {
+		for (let i = 0; i < sh.widths.length; i++) {
 			mipOff.push(off);
-			off += x.length;
+			off += sh.widths[i] * sh.heights[i];
 		}
-		rings.push({ page: p, dataOff, mipOff });
+		rings.push({
+			page: p,
+			dataOff,
+			mipOff,
+			minLevel: sh.minLevel,
+			mipWidths: sh.widths,
+			mipHeights: sh.heights,
+		});
 		pageBytes[p] = off * 4;
 	}
 	const pages = pageBytes.map((b, i) =>
 		device.createBuffer({
 			id: `horizon-page-${i}`,
-			usage: Buffer.STORAGE | Buffer.COPY_DST,
+			// COPY_SRC: the Dawn check (scripts/gpu/mosaic-mips-dawn.ts) reads the pages back
+			usage: Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC,
 			byteLength: Math.max(16, b),
 		}),
 	);
+	const gpuJobs: MipJob[][] = pages.map(() => []);
 	try {
 		for (let r = 0; r < mosaics.length; r++) {
 			const m = mosaics[r];
 			const L = rings[r];
 			const pg = pages[L.page];
 			pg.write(m.data, L.dataOff * 4);
-			const mips = (m.mip as NonNullable<Mosaic["mip"]>).mips;
-			for (let i = 0; i < mips.length; i++) pg.write(mips[i], L.mipOff[i] * 4);
+			if (m.mip) {
+				const mips = m.mip.mips;
+				for (let i = 0; i < mips.length; i++)
+					pg.write(mips[i], L.mipOff[i] * 4);
+			} else
+				gpuJobs[L.page].push({
+					dataOff: L.dataOff,
+					width: m.width,
+					height: m.height,
+					minLevel: L.minLevel,
+					widths: L.mipWidths,
+					heights: L.mipHeights,
+					mipOff: L.mipOff,
+				});
 		}
+		for (let i = 0; i < pages.length; i++)
+			if (gpuJobs[i].length) await buildMipsGpu(device, pages[i], gpuJobs[i]);
 	} catch (e) {
 		for (const p of pages) p.destroy();
 		throw e;
@@ -349,7 +390,7 @@ async function marchLocked(
 	tds: Float32Array[] | null = null,
 ): Promise<FastHorizonProfile[]> {
 	const tu = performance.now();
-	const set = uploadMosaics(device, mosaics);
+	const set = await uploadMosaics(device, mosaics);
 	const t1 = performance.now();
 	const uploadMs = t1 - tu;
 	// unused pages bind a 16-byte dummy, as before
@@ -394,21 +435,20 @@ async function marchLocked(
 	// Rings.
 	for (let r = 0; r < nR; r++) {
 		const m = mosaics[r];
-		const mip = m.mip as NonNullable<Mosaic["mip"]>;
 		const L = set.rings[r];
 		const b = ringOff + r * RING_STRIDE;
 		pu[b] = L.page;
 		pu[b + 1] = L.dataOff;
 		pu[b + 2] = m.width;
-		pu[b + 3] = mip.mips.length;
+		pu[b + 3] = L.mipOff.length;
 		pu[b + 4] = m.height;
 		pF[b + 6] = m.worldPx;
 		pF[b + 7] = m.cellMeters * cellSteps;
-		pu[b + 8] = 1 << mip.minLevel;
-		for (let i = 0; i < mip.mips.length; i++) {
+		pu[b + 8] = 1 << L.minLevel;
+		for (let i = 0; i < L.mipOff.length; i++) {
 			pu[b + 16 + i] = L.mipOff[i];
-			pu[b + 24 + i] = mip.widths[i];
-			pu[b + 32 + i] = mip.heights[i];
+			pu[b + 24 + i] = L.mipWidths[i];
+			pu[b + 32 + i] = L.mipHeights[i];
 		}
 	}
 	// Azimuths (f64 sin/cos, like marchRay).

@@ -21,6 +21,7 @@
 // to the GPU horizon.
 import { tilePriority } from "#/lib/cache";
 import { fetchDemBytes, MAPTERHORN, type TileKey, tileId } from "#/lib/dem";
+import { getFlag } from "#/lib/flags";
 import { REFRACTION_K } from "#/lib/geodesy";
 import {
 	type GpuProfile,
@@ -55,6 +56,8 @@ export type HorizonWorkerIn =
 			spans: SectorSpan[];
 			/** March on the GPU (src/lib/gpu/horizon) when the worker gets a WebGPU device. Opt-in: gpuHorizonOptIn(). */
 			gpu?: boolean;
+			/** The ?mosaicGpu switch (the worker can't read the URL): max-mips built on the GPU, not the CPU. */
+			mosaicGpu?: boolean;
 			/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
 			gpuOpts?: RealmGpuOptions;
 			/** Precision of the tan → degrees and ENU stages (opt-in: horizonPrecisionOptIn(); default f64). */
@@ -221,6 +224,7 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 			type: "spans",
 			spans,
 			gpu: gpuHorizonOptIn(),
+			mosaicGpu: getFlag("mosaicGpu") === "on",
 			gpuOpts: realmGpuOptions(),
 			precision,
 			...(precision !== "f64" ? { spotLedger: spotLedger() } : {}),
