@@ -203,7 +203,7 @@ The fixes in e82ae57:
 **Open for the user.**
 1. **Playback.** The grammar's once + hold (replay on return, hover or tap) is the default, and `playback="loop"` is opt-in. Should the hero (rigi Fig. 1) loop like the landing's RevealLoop?
 2. **Pose-note ghost.** Ghosting the guess's numbers to 0.35 in the final frame, as opposed to hiding them, keeps the static frame complete but adds ink.
-3. **Duration.** The film is about 15 s (2.8 s beats, a 4.5 s result hold), against the landing's 28 s scene.
+3. **Duration.** The film runs 12.9 s (three 2.8 s beats and a 4.5 s result hold; the trace focus adds 0.8 s), against the landing's 28 s scene.
 
 **Top next items.**
 1. A browser pass over §10, especially the frame-edge registration of the moving horizon, and riders handing over to the KR8 labels.
