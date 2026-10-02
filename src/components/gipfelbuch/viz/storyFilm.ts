@@ -17,6 +17,8 @@ export const FILM_MOTION = {
 	replayFade: 450, // grammar: MOTION.replayFade
 	settle: 620, // grammar: MOTION.settle
 	draw: 900, // grammar: MOTION.draw
+	trace: 1300, // grammar: MOTION.trace (the eye's pass over the skyline, linear)
+	mark: 280, // grammar: MOTION.mark (a hand mark: a strike)
 	beat: 2800, // grammar: MOTION.beat
 	stagger: 110, // grammar: MOTION.stagger
 	staggerLabel: 60, // grammar: MOTION.staggerLabel
@@ -235,13 +237,8 @@ export function filmFrame(plan: FilmPlan, ms: number): FilmFrame {
 
 	// 2. measure (evidence): the eye's trace, then the gap at each column, then its median
 	const m0 = measure.start + M.lead;
-	const traceMs = plan.focus === "trace" ? M.draw + 800 : M.draw;
-	const skylineWipe = ramp(
-		t,
-		m0,
-		traceMs,
-		plan.focus === "trace" ? FILM_EASE.linear : FILM_EASE.draw,
-	);
+	const traceMs = plan.focus === "trace" ? M.trace + 800 : M.trace;
+	const skylineWipe = ramp(t, m0, traceMs, FILM_EASE.linear);
 	const tracedNote = ramp(t, m0 + traceMs, M.fade);
 	const weight = plan.focus === "trace" ? ramp(t, m0 + traceMs, M.settle) : 0;
 	const tickAt = m0 + traceMs + M.fade * 0.5;
@@ -273,7 +270,7 @@ export function filmFrame(plan: FilmPlan, ms: number): FilmFrame {
 	let back = 0;
 	if (plan.accepted) {
 		strikes = strikes.map((_, i) =>
-			ramp(t, r0 + i * M.stagger, M.draw * 0.5, FILM_EASE.draw),
+			ramp(t, r0 + i * M.stagger, M.mark, FILM_EASE.draw),
 		);
 		const pulseAt = r0 + M.fade * 0.5;
 		pulses = pulses.map((_, i) => ramp(t, pulseAt + i * M.stagger, M.settle));
