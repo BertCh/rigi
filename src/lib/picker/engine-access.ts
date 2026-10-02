@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Read-only access to what the picker needs from either renderer (PhotoEngine / DeckEngine) without
-// widening the shared Renderer interface (engine.ts and deck/engine.ts stay unchanged). Both engines
-// keep, under the same private names:
+// Read-only access to what the picker needs from either renderer (DeckEngine / WebGpuEngine) without
+// widening the shared Renderer interface. Both engines keep, under the same private names:
 //   horizonDirs: Float32Array  unit ENU directions of the traced 360° horizon (xyz triples)
 //   edge: EdgeMap              the photo's edge / sky model that autoAlign scores against
-// and their peaks as either `peaks: {world: Vector3}[]` (three, snapped up front) or, on deck, the
-// lazily snapped set from `snapped(pose)` ({position: [x,y,z]}). Every accessor degrades to null / []
+// and their peaks as the lazily snapped set from `snapped(pose)` ({position: [x,y,z]}). Every accessor degrades to null / []
 // when a field is missing, so a renamed field turns a feature off instead of throwing.
 import { type EdgeMap, scorePose } from "#/lib/align";
 import { type Pose, poseBasis } from "#/lib/camera";
@@ -18,7 +16,6 @@ import type { PoolPeak } from "./candidates";
 type Internals = {
 	horizonDirs?: Float32Array;
 	edge?: EdgeMap;
-	peaks?: unknown[];
 	snapped?: (pose: Pose) => unknown[];
 };
 
@@ -82,8 +79,8 @@ const asTriple = (w: unknown): [number, number, number] | null => {
 };
 
 /**
- * Named summits around the given poses in the engine frame. three: every snapped region peak. deck:
- * the lazily snapped set, first widened around each pose (its snap only covers peaks near a frame).
+ * Named summits around the given poses in the engine frame. The
+ * lazily snapped set, first widened around each pose (its snap only covers peaks near a frame).
  */
 export function peakPool(e: Renderer, around: Pose[]): PoolPeak[] {
 	const it = internals(e);
@@ -98,7 +95,7 @@ export function peakPool(e: Renderer, around: Pose[]): PoolPeak[] {
 				/* terrain not ready */
 			}
 		}
-	} else if (Array.isArray(it.peaks)) raw.push(...it.peaks);
+	}
 	const out: PoolPeak[] = [];
 	for (const r of raw) {
 		const pk = r as {
@@ -108,7 +105,7 @@ export function peakPool(e: Renderer, around: Pose[]): PoolPeak[] {
 			world?: unknown;
 			position?: unknown;
 		};
-		const w = asTriple(pk.world ?? pk.position);
+		const w = asTriple(pk.position);
 		if (!pk.name || !w) continue;
 		out.push({
 			name: pk.name,

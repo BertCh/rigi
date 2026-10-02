@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// CPU skyline for PhotoEngine via d1's src/lib/horizon-fast. It replaces the 8 float geometry renders
+// CPU skyline for the renderer via d1's src/lib/horizon-fast. It replaces the 8 float geometry renders
 // of the old GPU horizon (1024×1536 RGBA32F each, read back synchronously). That GPU path is still the
 // fallback.
 //

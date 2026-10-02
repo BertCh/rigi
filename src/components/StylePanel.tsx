@@ -118,7 +118,7 @@ const hex = (c: Hex) => toHexString(c, false);
 
 /**
  * Display hex for a "raw" shader colour (ridges, casing, hairline): the classic float tuples are
- * used as linear values (style/three-apply.ts), so show what they look like on screen.
+ * used as linear values (style/deck-apply.ts), so show what they look like on screen.
  */
 function rawHex(c: Hex) {
 	if (typeof c === "string") return hex(c);

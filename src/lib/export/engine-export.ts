@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
-// Glue between a live PhotoEngine and the pure export builders in this folder.
+// Glue between a live Renderer and the pure export builders in this folder.
 // Browser-only (Blob, fetch, canvas). Uses ONLY the engine's public API:
 //   engine.photo, pose, frame, eye, demAtCamera, terrain (readiness), settings.protectPeople,
 //   peaksInFrame(), sampleAt(u,v), isForeground(u,v), exportImage(withLabels), photoElement,
@@ -13,7 +13,7 @@ import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
 import { attributionLine, fullAttribution } from "#/lib/licences/attribution";
 import type { PhotoMeta } from "#/lib/photos";
 import { unprojectDir } from "#/lib/pose";
-import type { Renderer as PhotoEngine } from "#/lib/renderer";
+import type { Renderer } from "#/lib/renderer";
 import { geoidUndulation } from "#/lib/tiles3d/geoid";
 import { composeAnnotatedPng } from "./annotate";
 import { buildCameraModel, type CameraModel } from "./camera";
@@ -92,8 +92,8 @@ export type ExportResult = { blob: Blob; filename: string; notes: string[] };
  * after setPose(autoAlign result)).
  */
 export function engineReady(
-	engine: PhotoEngine | null | undefined,
-): engine is PhotoEngine {
+	engine: Renderer | null | undefined,
+): engine is Renderer {
 	return !!engine?.terrain;
 }
 
@@ -104,14 +104,14 @@ export function exportFilename(photo: Pick<PhotoMeta, "id">, kind: ExportKind) {
 
 /** N for the engine's frame: the caller's value, else EGM2008 at the frame origin (CR-04: the DEM heights are MSL). */
 export function resolveGeoidUndulation(
-	engine: Pick<PhotoEngine, "frame">,
+	engine: Pick<Renderer, "frame">,
 	explicit?: number,
 ): number {
 	return explicit ?? geoidUndulation(engine.frame.lat, engine.frame.lon);
 }
 
 export function engineCameraModel(
-	engine: PhotoEngine,
+	engine: Renderer,
 	opts: EngineExportOptions = {},
 ): CameraModel {
 	const p = engine.photo;
@@ -137,7 +137,7 @@ export type GeometryState = "fresh" | "stale" | "empty";
  * describes the previous pose, and before the first readback it is all zeros. Tested directly: the
  * direction eye→sample.world of buffer hits on a grid must match the current pose's pixel ray.
  */
-export function geometryBufferState(engine: PhotoEngine): {
+export function geometryBufferState(engine: Renderer): {
 	state: GeometryState;
 	hits: number;
 	medianErrDeg: number | null;
@@ -180,7 +180,7 @@ export function geometryBufferState(engine: PhotoEngine): {
  * Resolves with the final state; 'empty' after the timeout means all sky or no readback yet.
  */
 export async function refreshGeometry(
-	engine: PhotoEngine,
+	engine: Renderer,
 	timeoutMs = 1500,
 ): Promise<GeometryState> {
 	let st = geometryBufferState(engine).state;
@@ -201,7 +201,7 @@ export async function refreshGeometry(
  * GeoJSON gets all visible peaks, not only the ones that got an on-screen label.
  */
 export function enginePeaks(
-	engine: PhotoEngine,
+	engine: Renderer,
 	geometry: GeometryState = geometryBufferState(engine).state,
 ): GeoJsonPeak[] {
 	const e = engine.eye;
@@ -242,7 +242,7 @@ const isJpeg = (b: Uint8Array) =>
 
 /** Original photo bytes if they are a JPEG, else the decoded photo re-encoded as JPEG. */
 async function photoJpeg(
-	engine: PhotoEngine,
+	engine: Renderer,
 	notes: string[],
 ): Promise<Uint8Array> {
 	try {
@@ -270,7 +270,7 @@ async function photoJpeg(
 
 /** Build one export from the live engine. Throws if the engine is not ready. */
 export async function exportFromEngine(
-	engine: PhotoEngine,
+	engine: Renderer,
 	kind: ExportKind,
 	opts: EngineExportOptions = {},
 ): Promise<ExportResult> {
@@ -376,7 +376,7 @@ export async function exportFromEngine(
 }
 
 /** Compact per-source credit line for the engine's current view (src/lib/licences). */
-function engineAttribution(engine: PhotoEngine) {
+function engineAttribution(engine: Renderer) {
 	const s = engine.settings;
 	const imagery =
 		s.mode === "replace" &&

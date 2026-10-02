@@ -59,7 +59,7 @@ to be blind-verified before it enters any benchmark.
 |---|---|
 | `flags.ts` | `?picker=` via `src/lib/flags` (`flagFrom`) |
 | `candidates.ts` | pure maths: `poseSepDeg`, `topDistinct`, `nearbyPeaks`, `rerankWithTaps`, `isAutoHigh` |
-| `engine-access.ts` | read-only access to both engines' `horizonDirs`, `edge` and peaks (deck `snapped(pose)`; the three `peaks[].world` branch is dead since the three.js engine was removed), without widening `Renderer`; missing fields turn features off |
+| `engine-access.ts` | read-only access to both engines' `horizonDirs`, `edge` and peaks (`snapped(pose)`), without widening `Renderer`; missing fields turn features off |
 | `log.ts` | the correction log |
 | `PickerPanel.tsx` | UI (lazy chunk) |
 | `PickerMount.tsx` | the one PhotoWorkspace call site; null without the flag |

@@ -47,26 +47,3 @@ export function projectGeo(
 	}
 	return { x: q.u * stageW, y: q.v * stageH, dist, visible };
 }
-
-/** Project a [lon, lat] ring at a fixed height offset above the terrain heights in `hs` (or h0). */
-export function projectRing(
-	eng: Renderer,
-	ring: [number, number][],
-	h: number | ((i: number) => number),
-	stageW: number,
-	stageH: number,
-): ({ x: number; y: number; dist: number } | null)[] {
-	const e = eng.eye;
-	const eye = [e.x, e.y, e.z];
-	return ring.map(([lon, lat], i) => {
-		const hh = typeof h === "number" ? h : h(i);
-		const p = eng.frame.fromGeo(lat, lon, hh);
-		const q = projectPoint(eng.pose, eng.aspect, eye, p);
-		if (!q) return null;
-		return {
-			x: q.u * stageW,
-			y: q.v * stageH,
-			dist: Math.hypot(p[0] - e.x, p[1] - e.y, p[2] - e.z),
-		};
-	});
-}

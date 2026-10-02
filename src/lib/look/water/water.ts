@@ -80,5 +80,3 @@ fn ts_water_shade(col: vec3<f32>, elev: f32, xy: vec2<f32>, grad: f32, n: vec3<f
   return mix(col, mix(body, sky, fres), m * 0.95);
 }
 `;
-
-export const WATER_WGSL = waterWgsl(false);

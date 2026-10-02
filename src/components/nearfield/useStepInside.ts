@@ -32,7 +32,7 @@ import type {
 import type { PhotoMeta } from "#/lib/photos";
 import type { Renderer } from "#/lib/renderer";
 
-/** The engine extras Step Inside drives (structural: PhotoEngine and DeckEngine both have them). */
+/** The engine extras Step Inside drives (structural: the deck engines have them). */
 type StepEngine = Renderer & {
 	enterStepInside?(o: StepInsideOpts): void;
 	exitStepInside?(): void;

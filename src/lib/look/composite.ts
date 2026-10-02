@@ -410,7 +410,7 @@ export class CompositeLook {
 	}
 }
 
-/** A "raw" shader colour (three-apply rawColor): float tuples exact, hex strings sRGB → linear. */
+/** A "raw" shader colour (deck-apply.ts rawColor): float tuples exact, hex strings sRGB → linear. */
 function raw(c: Hex): [number, number, number] {
 	const [r, g, b] = hexToRgb01(c);
 	return typeof c === "string"

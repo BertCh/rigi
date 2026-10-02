@@ -29,7 +29,7 @@ import {
 	useState,
 } from "react";
 import type { PhotoMeta } from "#/lib/photos";
-import type { Renderer as PhotoEngine } from "#/lib/renderer";
+import type { Renderer } from "#/lib/renderer";
 import { cn } from "#/lib/utils";
 import {
 	downloadBlob,
@@ -47,11 +47,11 @@ import {
 } from "./splat";
 
 export type EngineSource =
-	| PhotoEngine
+	| Renderer
 	| null
 	| undefined
-	| { current: PhotoEngine | null }
-	| (() => PhotoEngine | null | undefined);
+	| { current: Renderer | null }
+	| (() => Renderer | null | undefined);
 
 export type ExportMenuProps = EngineExportOptions & {
 	engine: EngineSource;
@@ -86,11 +86,11 @@ const ICONS: Record<ExportKind, ComponentType<{ className?: string }>> = {
 	xmp: FileCode,
 };
 
-function resolve(src: EngineSource): PhotoEngine | null {
+function resolve(src: EngineSource): Renderer | null {
 	if (!src) return null;
 	if (typeof src === "function") return src() ?? null;
 	if ("current" in src && !("photo" in src)) return src.current;
-	return src as PhotoEngine;
+	return src as Renderer;
 }
 
 export function ExportMenu({

@@ -84,7 +84,7 @@ export function poseAccepted(
 	);
 }
 
-/** The renderer members the controller reads (PhotoEngine satisfies it; DeckEngine too once it has setNearField). */
+/** The renderer members the controller reads (the deck engines satisfy it). */
 export type NearFieldHost = {
 	readonly pose: Pose;
 	readonly aspect: number;

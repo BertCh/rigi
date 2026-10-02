@@ -25,7 +25,7 @@ import {
 	type Provenance,
 } from "#/lib/nearfield/types";
 import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
-import type { Renderer as PhotoEngine } from "#/lib/renderer";
+import type { Renderer } from "#/lib/renderer";
 import { resolveGeoidUndulation } from "./engine-export";
 
 export type SplatExportKind = "splat-ply" | "splat-v1";
@@ -393,7 +393,7 @@ type NearFieldSceneSource =
  * (property or getter function) or `getNearFieldScene()` on the engine; null when the feature is off.
  */
 export function engineNearFieldScene(
-	engine: PhotoEngine | null | undefined,
+	engine: Renderer | null | undefined,
 ): NearFieldScene | null {
 	if (!engine) return null;
 	const e = engine as unknown as {
@@ -415,7 +415,7 @@ export function engineNearFieldScene(
 
 /** Export the engine's near-field scene. Throws when there is none or it belongs to another photo. */
 export function exportSplatsFromEngine(
-	engine: PhotoEngine,
+	engine: Renderer,
 	kind: SplatExportKind,
 	opts: Pick<SplatExportMeta, "geoidUndulation" | "model" | "toLv95"> & {
 		scene?: NearFieldScene | null;

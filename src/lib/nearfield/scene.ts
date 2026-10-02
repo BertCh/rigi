@@ -50,7 +50,7 @@ import {
 	type SplitResult,
 } from "./types";
 
-/** The Renderer members the builder reads (PhotoEngine and DeckEngine both satisfy it). */
+/** The Renderer members the builder reads (the deck engines satisfy it). */
 export type NearFieldRendererLike = {
 	readonly pose: Pose;
 	readonly aspect: number;

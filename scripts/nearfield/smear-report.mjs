@@ -5,7 +5,7 @@
 
 // Summarise tools/nearfield/smear/grid-<renderer>-<id>.json against the blind labels (labels.json).
 // See smear-measure.mjs for the smear definition. No browser.
-//   node scripts/nearfield/smear-report.mjs [--renderer=deck] [--band=0.02]   (stored three grids: --renderer=three)
+//   node scripts/nearfield/smear-report.mjs [--renderer=deck] [--band=0.02]
 // Writes tools/nearfield/smear/summary-<renderer>.json and prints a table.
 import {
 	existsSync as _ex,

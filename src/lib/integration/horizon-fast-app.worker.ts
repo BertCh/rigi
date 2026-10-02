@@ -139,7 +139,7 @@ async function march(
 	const t1 = performance.now();
 	const { prof, on } = await marchProfile(mosaics, j, eyeH);
 	const t2 = performance.now();
-	// ENU unit directions in PhotoEngine's frame (gpu/horizon/dirs-cpu.ts: the f64 stage, moved there
+	// ENU unit directions in the renderer's frame (gpu/horizon/dirs-cpu.ts: the f64 stage, moved there
 	// verbatim; certified-f32 gives the same bits through the GPU plus the f64 tie path)
 	const device = on === "gpu" && gpu ? await gpu : null;
 	// this march's tan → degrees stage stats (certified-f32 requests only; per profile, since several

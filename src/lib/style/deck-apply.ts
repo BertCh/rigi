@@ -3,11 +3,11 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // ViewStyle → deck.gl uniform values for the deck backend (styling.md §2.6, chunk 7). The deck
-// counterpart of three-apply.ts, with no three.js import: it produces plain numbers the deck layers
+// counterpart of the removed three-apply.ts (three.js renderer), with no three.js import: it produces plain numbers the deck layers
 // (src/lib/deck/terrain-layer.ts, composite-shader.ts, trail-layer.ts, world-view.ts) put in their
 // uniform blocks / layer props.
 //
-// Colour conventions: exactly three-apply.ts's, so a preset looks the same in both renderers.
+// Colour conventions: the removed three-apply.ts's, kept so a preset looks the same in both deck engines.
 //  - ramp stops and solid contour colours: sRGB, mixed in sRGB, then the shader applies pow(2.2);
 //  - haze: what THREE.Color.set(hex) stores (sRGB → linear), then the shader's toLinear on top (the
 //    legacy double linearisation, styling.md §2.3, kept on purpose in both renderers);
@@ -47,7 +47,7 @@ import type {
 
 export type DeckStyleMode = ViewMode;
 
-/** A "raw" shader colour: float tuples exact, hex strings sRGB → linear (three-apply.ts rawColor). */
+/** A "raw" shader colour: float tuples exact, hex strings sRGB → linear (as the removed three-apply.ts rawColor). */
 export function rawColor(c: Hex): Vec3 {
 	const [r, g, b] = hexToRgb01(c);
 	return typeof c === "string"
@@ -163,7 +163,7 @@ const IDENTITY_IMAGERY: ImageryAdjust = {
 	tintAmount: 0,
 };
 
-/** three-apply.ts applyTerrainLook + applyLayerStyle(u, style, mode) + applyAtmosphereLook, as values. */
+/** The removed three-apply.ts applyTerrainLook + applyLayerStyle(u, style, mode) + applyAtmosphereLook, as values. */
 export function deckTerrainStyle(
 	style: ViewStyle,
 	mode: DeckStyleMode,
@@ -286,7 +286,7 @@ export function deckElevRange(
 
 // ---- composite (overlay / replace) ---------------------------------------------------------------
 
-/** The composite shader's style uniforms (composite-shader.ts), three-apply.ts applyCompositeStyle. */
+/** The composite shader's style uniforms (composite-shader.ts), the removed three-apply.ts applyCompositeStyle. */
 export type DeckCompositeStyle = {
 	ridgeInner: Vec3;
 	ridgeSky: Vec3;

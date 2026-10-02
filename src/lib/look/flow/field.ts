@@ -371,10 +371,6 @@ export function flowStepFor(
 	};
 }
 
-/** Particle position (ENU metres) of a record. */
-export const flowPositionM = (nx: number, ny: number, extentM: number) =>
-	[(nx * 2 - 1) * extentM, (ny * 2 - 1) * extentM] as const;
-
 export const FLOW_ADVECT_WGSL = /* wgsl */ `\
 struct FlowParams {
   a: vec4<f32>, // count, dt, lifetime, extentM

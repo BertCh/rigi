@@ -217,10 +217,8 @@ const OWNERS = [
 		"9e",
 		{
 			exact: [
-				"src/lib/engine.ts",
 				"src/lib/align.ts",
 				"src/lib/terrain.ts",
-				"src/lib/materials.ts",
 				"src/lib/pose.ts",
 				"src/lib/geodesy.ts",
 				"src/lib/photos.ts",
@@ -3324,7 +3322,7 @@ async function selftest() {
 	);
 	ok(pu.v > 0.5, "pitch up + moves the horizon down in the image");
 	ok(
-		ownerOf("src/lib/engine.ts") === "9e" &&
+		ownerOf("src/lib/align.ts") === "9e" &&
 			ownerOf("scripts/eval-app.mjs") === "9e" &&
 			ownerOf("scripts/eval.ts") === "0f" &&
 			ownerOf("src/lib/deck/scene.ts") === "f0" &&

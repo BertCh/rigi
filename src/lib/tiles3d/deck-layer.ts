@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Step Inside 3D Tiles for DeckEngine (deck.gl 9.4, CARTESIAN camera-anchored ENU): draws the visible
-// meshes of a Tiles3DSet (tiles.ts) — the same THREE tile selector as the three engine, driven by the
-// deck world camera (a THREE camera), so both engines show identical tiles.
+// meshes of a Tiles3DSet (tiles.ts) — the tile selector (a three.js camera, no three engine), driven by the
+// deck world camera, so both deck engines show identical tiles.
 //   · one luma Model per tile mesh, made on first draw from its THREE geometry (positions / uv / colour
 //     converted to float32 once), freed when the tile unloads (Tiles3DSet.onDisposeMesh)
 //   · i3dm (instanced trees): the InstancedMesh matrices as four per-instance vec4 attributes
