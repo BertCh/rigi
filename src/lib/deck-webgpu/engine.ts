@@ -4295,7 +4295,10 @@ export class WebGpuEngine implements Renderer {
 			}
 			const bytes = await readTexture(device, read);
 			if (!bytes) return null;
-			return o.screen ? bytes : halfToFloat(bytes);
+			if (o.screen) return bytes;
+			return read.format === "rg11b10ufloat"
+				? rg11b10ToRgbaFloat(bytes)
+				: halfToFloat(bytes);
 		} finally {
 			this.viewOverride = prevOverride;
 			// the copy was queued before these: WebGPU defers the frees until it is done
@@ -4529,6 +4532,7 @@ const BYTES_PER_PIXEL: Record<string, number> = {
 	rgba8unorm: 4,
 	rgba16float: 8,
 	rgba32float: 16,
+	rg11b10ufloat: 4, // opt-in ?colorTarget=rg11b10 resolve (decoded by rg11b10ToRgbaFloat)
 };
 
 /**
@@ -4564,6 +4568,34 @@ async function readTexture(
 	} finally {
 		buf.destroy();
 	}
+}
+
+/** One unsigned small float (5-bit exponent, `mantBits` mantissa, no sign). */
+function unpackSmallFloat(bits: number, mantBits: number): number {
+	const e = bits >> mantBits;
+	const m = bits & ((1 << mantBits) - 1);
+	const scale = 1 << mantBits;
+	if (e === 0) return 2 ** -14 * (m / scale);
+	if (e === 31) return m ? Number.NaN : Number.POSITIVE_INFINITY;
+	return 2 ** (e - 15) * (1 + m / scale);
+}
+
+/** rg11b10ufloat texels (u32 LE: R 11 bits, G 11, B 10) → rgba Float32Array with alpha = 1 (no alpha stored). */
+function rg11b10ToRgbaFloat(bytes: Uint8Array): Float32Array {
+	const u = new Uint32Array(
+		bytes.buffer,
+		bytes.byteOffset,
+		bytes.byteLength / 4,
+	);
+	const out = new Float32Array(u.length * 4);
+	for (let i = 0; i < u.length; i++) {
+		const v = u[i];
+		out[i * 4] = unpackSmallFloat(v & 0x7ff, 6);
+		out[i * 4 + 1] = unpackSmallFloat((v >>> 11) & 0x7ff, 6);
+		out[i * 4 + 2] = unpackSmallFloat((v >>> 22) & 0x3ff, 5);
+		out[i * 4 + 3] = 1;
+	}
+	return out;
 }
 
 /** IEEE half floats (little endian) → Float32Array. */
