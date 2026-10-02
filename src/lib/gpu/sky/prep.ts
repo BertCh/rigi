@@ -40,6 +40,7 @@ import {
 } from "./prep.wgsl";
 import { axisTapsF64, constsTable } from "./prep-ref";
 import { lutTable } from "./refine";
+import { packSkyPrepParams } from "./uniforms";
 
 const GROUP = "sky-prep";
 const def = (id: string, src: string, layout: [string, BindKind][]) =>
@@ -320,9 +321,7 @@ function runPrep(
 		const N = W * H;
 		const rowBytes = Math.ceil((W * 4) / 256) * 256;
 		const t = tables(W, H, lw, lh);
-		const words = new Uint32Array(8);
-		words.set([W, H, lw, lh, rowBytes / 4]);
-		const prm = uniform(device, words.buffer);
+		const prm = uniform(device, packSkyPrepParams(W, H, lw, lh, rowBytes));
 		const axH = pooledStorage(device, "sky-prep/axH", t.axH);
 		const axV = pooledStorage(device, "sky-prep/axV", t.axV);
 		const cst = pooledStorage(device, "sky-prep/cst", t.cst);

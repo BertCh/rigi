@@ -49,6 +49,7 @@ import {
 	type SkyRefineOutput,
 	wrapGpu,
 } from "./refine";
+import { packSkyRefineParams } from "./uniforms";
 
 const WG = 256;
 
@@ -231,16 +232,15 @@ export async function refineSkyGraph(
 			hit: !!hit,
 			stats: graph.stats as GraphStats,
 		};
-		const words = new ArrayBuffer(32);
-		new Uint32Array(words, 0, 6).set([
+		const words = packSkyRefineParams({
 			lw,
 			lh,
 			W,
 			H,
-			input.radius ?? 3,
-			input.band ?? 3,
-		]);
-		new Float32Array(words, 24, 1)[0] = input.eps ?? 2e-3;
+			r: input.radius ?? 3,
+			br: input.band ?? 3,
+			eps: input.eps ?? 2e-3,
+		});
 		const prm = pooledUniform(device, "sky-refine/prm", words);
 		const borrowed: Buffer[] = [];
 		const gl = isHost(input.guideLo)
