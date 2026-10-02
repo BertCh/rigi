@@ -12,6 +12,7 @@ import {
 	angDiff,
 	BIAS_WINDOW_S,
 	biasedPrior,
+	biasWindowS,
 	compassHeading,
 	hasCompass,
 	MAX_BIAS_DEG,
@@ -139,6 +140,31 @@ describe("viewpointBias", () => {
 		expect(
 			viewpointBias([anchor("a", 0, 0, -MAX_BIAS_DEG)], 0, 0)?.biasDeg,
 		).toBe(-MAX_BIAS_DEG);
+	});
+});
+
+describe("bias window", () => {
+	const at = [anchor("a", 0, 0, 10), anchor("b", 0, 600, 30)];
+	it("narrows the anchors a photo learns from when given a window", () => {
+		expect(viewpointBias(at, 0, 590)?.biasDeg).toBe(20); // both within 45 min
+		expect(viewpointBias(at, 0, 590, undefined, 60)).toEqual({
+			biasDeg: 30,
+			n: 1,
+		});
+		expect(viewpointBias(at, 0, 300, undefined, 60)).toBeNull();
+	});
+	it("reads ?rollBiasWindow when positive, else BIAS_WINDOW_S", () => {
+		try {
+			expect(biasWindowS()).toBe(BIAS_WINDOW_S);
+			setFlagOverride("rollBiasWindow", "60");
+			expect(biasWindowS()).toBe(60);
+			for (const bad of ["0", "-5", "abc"]) {
+				setFlagOverride("rollBiasWindow", bad);
+				expect(biasWindowS()).toBe(BIAS_WINDOW_S);
+			}
+		} finally {
+			setFlagOverride("rollBiasWindow", undefined);
+		}
 	});
 });
 

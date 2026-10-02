@@ -187,6 +187,22 @@ describe("alignRoll", () => {
 		expect(priors).toEqual([200]);
 	});
 
+	it("learns only from anchors inside biasWindowS", async () => {
+		const priors: number[] = [];
+		cascade.solve.mockImplementation(async (_img, prior: Pose) => {
+			priors.push(prior.yaw);
+			return rejected(prior.yaw);
+		});
+		const roll = rollOf([
+			{ ...photo("anchor", "saved", 100), pose: pose(130) },
+			photo("t", "prior", 200, { t: 120 }),
+		]);
+		await alignRoll(roll, { persist: false, biasWindowS: 60 });
+		expect(priors).toEqual([200]);
+		await alignRoll(roll, { persist: false, biasWindowS: 180 });
+		expect(priors).toEqual([200, 230]);
+	});
+
 	it("learns from an acceptance and retries an earlier rejection from the new bias", async () => {
 		const calls: [string, number][] = [];
 		cascade.solve.mockImplementation(async (_img, prior: Pose) => {

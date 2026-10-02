@@ -11,11 +11,28 @@
 // decision (alignRoll never accepts on consistency alone).
 
 import type { Pose } from "../../camera";
+import { getFlag } from "../../flags";
 import { priorHeading } from "../../geocam/priors/heading";
 import type { PhotoMeta } from "../../photos";
 
 /** Anchors further apart in time than this (s) don't inform each other: compass drift, recalibration. */
 export const BIAS_WINDOW_S = 45 * 60;
+
+/**
+ * The anchor window alignRoll uses: ?rollBiasWindow=<s> when it is a positive number, else
+ * BIAS_WINDOW_S. Opt-in experiment: on the 12-photo demo session (public/demo/gipfelbuch, one
+ * iPhone, 20 min at one spot) the solved-minus-compass offset swings from +11° to −19° within 10
+ * minutes while photos seconds apart agree to about 1°, so a 45-minute median can be a worse prior
+ * than the raw compass and a window near 60 s a better one (leave-one-out, n = 10, one session: design
+ * evidence, not a result; reports/steps-2026-10-02/camera-roll.md). The default stays until a roll
+ * bench measures accepts and precision.
+ */
+export function biasWindowS(): number {
+	const s = getFlag("rollBiasWindow");
+	return typeof s === "number" && Number.isFinite(s) && s > 0
+		? s
+		: BIAS_WINDOW_S;
+}
 /**
  * A bias estimate larger than this (deg) is not applied: past it the compass says nothing about the
  * heading anyway. Large biases are allowed on purpose: a badly calibrated phone can be 45°+ off for a
@@ -82,12 +99,13 @@ export function viewpointBias(
 	viewpoint: number,
 	t: number,
 	excludeId?: string,
+	windowS = BIAS_WINDOW_S,
 ): { biasDeg: number; n: number } | null {
 	const near = anchors.filter(
 		(a) =>
 			a.viewpoint === viewpoint &&
 			a.id !== excludeId &&
-			Math.abs(a.t - t) <= BIAS_WINDOW_S,
+			Math.abs(a.t - t) <= windowS,
 	);
 	if (!near.length) return null;
 	// median, not mean: one wrong anchor (a saved pose off by a peak) must not drag the rest

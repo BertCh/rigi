@@ -28,6 +28,7 @@ import {
 	anchorOf,
 	angDiff,
 	biasedPrior,
+	biasWindowS,
 	compassHeading,
 	hasCompass,
 	MIN_BIAS_DEG,
@@ -86,6 +87,8 @@ export type AlignOptions = {
 	resolve?: boolean;
 	/** Use the viewpoint compass-bias prior (see viewpoint.ts). Default true. */
 	viewpointBias?: boolean;
+	/** Anchor window of the viewpoint bias, s. Default biasWindowS() (?rollBiasWindow, else 45 min). */
+	biasWindowS?: number;
 	/** Store accepted poses with saveSolvedPose. Default true (evaluation turns it off). */
 	persist?: boolean;
 	/** Per attempt deadline, ms (the worker's own DEM load gives up after 90 s). Default 150 s. */
@@ -194,6 +197,7 @@ export async function alignRoll(
 	const t0 = performance.now();
 	const { signal, onProgress, onPhoto } = opts;
 	const useBias = opts.viewpointBias ?? true;
+	const windowS = opts.biasWindowS ?? biasWindowS();
 	const persist = opts.persist ?? true;
 	const timeoutMs = opts.timeoutMs ?? 150_000;
 	const targets = alignTargets(roll, opts.resolve);
@@ -216,7 +220,7 @@ export async function alignRoll(
 
 	const biasFor = (p: RollPhoto) =>
 		useBias && hasCompass(p.meta)
-			? viewpointBias(anchors, p.viewpoint, p.t, p.meta.id)
+			? viewpointBias(anchors, p.viewpoint, p.t, p.meta.id, windowS)
 			: null;
 
 	const attempt = async (
@@ -351,7 +355,7 @@ export async function alignRoll(
 	for (const p of targets) {
 		const r = results.get(p.meta.id);
 		if (r?.status !== "accepted" || !hasCompass(p.meta)) continue;
-		const nb = viewpointBias(anchors, p.viewpoint, p.t, p.meta.id);
+		const nb = viewpointBias(anchors, p.viewpoint, p.t, p.meta.id, windowS);
 		if (!nb) continue;
 		const deltaDeg = angDiff(
 			angDiff(r.pose.yaw, compassHeading(p.meta)),

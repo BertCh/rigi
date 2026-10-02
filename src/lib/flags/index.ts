@@ -217,6 +217,8 @@ export const FLAG_SCHEMA = {
 	cogReader: oneOf(["loaders", "own"], "own"),
 	// /roll
 	propagate: oneOf(["off", "on", "dev"], "off"),
+	/** Align roll: compass-bias anchor window, s (roll/align/viewpoint.ts; unset = BIAS_WINDOW_S, 45 min) */
+	rollBiasWindow: num,
 	// appearance: applies live (not a RESTART_FLAG); precedence and the boot script are in ./theme-boot.ts
 	theme: oneOf(["auto", "light", "dark"], "auto"),
 	// owned by their stores
