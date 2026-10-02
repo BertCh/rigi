@@ -34,6 +34,7 @@ import { GPUSort } from "../core/luma";
 import { profiling, recordGpuTime } from "../core/profile";
 import { errorChecks, submit, submitted } from "../core/queue";
 import { DEPTH_WGSL, KEYS_WGSL, TILE } from "./splat-sort.wgsl";
+import { packSplatSortParams } from "./uniforms";
 
 /** The kernels' group and the core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "splat-sort"). */
 const GROUP = "splat-sort";
@@ -239,14 +240,7 @@ export class GpuSplatSorter {
 		if (!this.compiled) throw new Error("[splat-sort] sort() before ready");
 		const t0 = performance.now();
 		const { device, blocks, count } = this;
-		const w = new ArrayBuffer(32);
-		const fl = new Float32Array(w);
-		const u = new Uint32Array(w);
-		fl.set(row, 0);
-		fl[4] = 0; // near: the worker's default and what SplatsCore uses; depth keys need near >= 0
-		u[5] = count;
-		u[6] = blocks;
-		this.params.write(new Uint8Array(w));
+		this.params.write(packSplatSortParams(row, count, blocks));
 		// encoded and submitted synchronously, so a cache eviction (a destroy queued under the graph's
 		// lease) can never land in between; a graph rebuilt after one compiles here from the
 		// per-device pipeline cache the first compileAsync filled (throws while another sorter's
