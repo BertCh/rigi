@@ -226,7 +226,7 @@ export interface SensorFeed {
 	latest(): SensorSample | null;
 	/** Degrees east added to magnetic headings (from the eye position once known; 0 until then). */
 	setDeclination(degrees: number): void;
-	/** Declination for a position, via the compact model; updates the feed too. */
+	/** Declination for a position, via WMM2025; updates the feed too. */
 	setPosition(lat: number, lon: number): number;
 	dispose(): void;
 }

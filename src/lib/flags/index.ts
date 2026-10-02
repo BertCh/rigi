@@ -181,7 +181,7 @@ export const FLAG_SCHEMA = {
 	liveSource: text,
 	/** /live: offer "Step Inside (beta)", per-frame depth to splats on the GPU (src/components/live/liveStep.ts; WebGPU only) */
 	liveStep: onOff("off"),
-	/** /live: fixed magnetic declination in degrees east; unset = compact WMM model at the eye (src/lib/live/declination.ts) */
+	/** /live: fixed magnetic declination in degrees east; unset = WMM2025 at the eye (src/lib/live/declination.ts) */
 	liveDeclination: num,
 	// appearance: applies live (not a RESTART_FLAG); precedence and the boot script are in ./theme-boot.ts
 	theme: oneOf(["auto", "light", "dark"], "auto"),
