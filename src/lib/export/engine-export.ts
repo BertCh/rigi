@@ -16,7 +16,12 @@ import { unprojectDir } from "#/lib/pose";
 import type { Renderer } from "#/lib/renderer";
 import { geoidUndulation } from "#/lib/tiles3d/geoid";
 import { composeAnnotatedPng, DEFAULT_ATTRIBUTION } from "./annotate";
-import { buildCameraModel, type CameraModel } from "./camera";
+import {
+	buildCameraModel,
+	type CameraModel,
+	isTrustedEstimate,
+	type PoseEstimateNote,
+} from "./camera";
 import { buildColmapZip } from "./colmap";
 import { buildGeoJson, type GeoJsonPeak } from "./geojson";
 import { buildKmz, kmzBlob } from "./kml";
@@ -82,6 +87,8 @@ export type EngineExportOptions = {
 	maxRange?: number;
 	/** Display-only mark burned into the annotated PNG (share views, src/lib/share). */
 	watermark?: string;
+	/** How the current pose is known (the host's provenance); written into pose JSON and XMP. */
+	estimate?: PoseEstimateNote | null;
 };
 
 export type ExportResult = { blob: Blob; filename: string; notes: string[] };
@@ -128,6 +135,7 @@ export function engineCameraModel(
 		demAtCamera: engine.demAtCamera,
 		takenAt: p.takenAtUtc ?? p.takenAt,
 		geoidUndulation: resolveGeoidUndulation(engine, opts.geoidUndulation),
+		estimate: opts.estimate ?? null,
 	});
 }
 
@@ -282,6 +290,10 @@ export async function exportFromEngine(
 	if (!fmt) throw new Error(`unknown export kind ${kind}`);
 	const filename = exportFilename(engine.photo, kind);
 	const notes: string[] = [];
+	if (opts.estimate && !isTrustedEstimate(opts.estimate))
+		notes.push(
+			`Pose not verified${opts.estimate.label ? ` (${opts.estimate.label})` : ""}: check it before use`,
+		);
 	const text = (s: string) => new Blob([s], { type: fmt.mime });
 
 	switch (kind) {

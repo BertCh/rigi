@@ -16,6 +16,7 @@ import {
 	type CameraInput,
 	type CameraModel,
 	fixedAzimuth,
+	isTrustedEstimate,
 	wrap360,
 } from "./camera";
 import { xmlEscape } from "./kml";
@@ -39,6 +40,23 @@ export function buildXmp(input: CameraInput | CameraModel): string {
 	const dirHundredths = Math.round(heading * 100) % 36000;
 	const altMm = Math.round(Math.abs(m.altMsl) * 1000);
 	const f = (v: number, d = 6) => Number(v.toFixed(d)).toString();
+	const est = m.input.estimate;
+	// How the pose is known; nothing is written when the exporter did not say (unknown, not "untrusted")
+	const estimate = [
+		est
+			? `\n   slens:PoseTrusted="${isTrustedEstimate(est) ? "True" : "False"}"`
+			: "",
+		est?.provenance.status
+			? `\n   slens:PoseStatus="${xmlEscape(est.provenance.status)}"`
+			: "",
+		est?.provenance.method
+			? `\n   slens:PoseMethod="${xmlEscape(est.provenance.method)}"`
+			: "",
+		est?.label ? `\n   slens:PoseLabel="${xmlEscape(est.label)}"` : "",
+		est?.confidence != null && Number.isFinite(est.confidence)
+			? `\n   slens:PoseConfidence="${f(est.confidence)}"`
+			: "",
+	].join("");
 	const ts = m.input.takenAt
 		? `\n   exif:GPSTimeStamp="${xmlEscape(m.input.takenAt)}"`
 		: "";
@@ -74,7 +92,7 @@ export function buildXmp(input: CameraInput | CameraModel): string {
    slens:AltitudeMSL="${f(m.altMsl, 3)}"
    slens:AltitudeEllipsoid="${f(m.altEllipsoid, 3)}"
    slens:CameraCenterECEF="${m.C_ecef.map((v) => f(v, 4)).join(" ")}"
-   slens:RotationCameraToECEF="${m.R_cam2ecef.map((v) => f(v, 12)).join(" ")}"
+   slens:RotationCameraToECEF="${m.R_cam2ecef.map((v) => f(v, 12)).join(" ")}"${estimate}
    slens:Convention="yaw clockwise from true north; pitch up +; roll right-side-down +; camera axes x right, y down, z forward; rotation row-major"/>
  </rdf:RDF>
 </x:xmpmeta>

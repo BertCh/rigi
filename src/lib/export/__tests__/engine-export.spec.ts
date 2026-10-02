@@ -205,6 +205,28 @@ describe("exportFromEngine", () => {
 		expect(j.position.geoidUndulation).toBe(49);
 		expect(j.photo.takenAt).toBe("2023-07-01T10:20:30Z");
 	});
+	it("pose: carries the host's estimate and notes an unverified pose", async () => {
+		const estimate = {
+			provenance: {
+				agent: "sensor",
+				method: "exif-prior",
+				status: "candidate",
+			},
+			label: "Phone sensors",
+		} as const;
+		const r = await exportFromEngine(fakeEngine(), "pose", { estimate });
+		const j = JSON.parse(await r.blob.text());
+		expect(j.estimate.trusted).toBe(false);
+		expect(j.estimate.method).toBe("exif-prior");
+		expect(r.notes.join(" ")).toMatch(/Pose not verified \(Phone sensors\)/);
+		const trusted = await exportFromEngine(fakeEngine(), "pose", {
+			estimate: { provenance: { status: "endorsed" } },
+		});
+		expect(trusted.notes.join(" ")).not.toMatch(/not verified/);
+		const none = await exportFromEngine(fakeEngine(), "pose");
+		expect(JSON.parse(await none.blob.text()).estimate).toBeNull();
+		expect(none.notes.join(" ")).not.toMatch(/not verified/);
+	});
 	it("xmp: well-formed XML", async () => {
 		const r = await exportFromEngine(fakeEngine(), "xmp");
 		expect(r.filename).toBe("IMG_7131.xmp");

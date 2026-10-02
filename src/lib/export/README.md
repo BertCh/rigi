@@ -38,6 +38,17 @@ Import everything from `#/lib/export` (the barrel is `index.ts`).
   - `points3D.txt` is empty apart from its header.
   - `buildColmapZip(inputOrModel, {…, dir = 'sparse/0'}) → Uint8Array` packs the three files into a store-only zip.
 - `buildPoseJson(inputOrModel, {exportedAt?}) → PoseJson`, with constants `POSE_SCHEMA` and `POSE_SCHEMA_VERSION`.
+  - `estimate` says how the pose is known: `trusted`, the provenance axes (`status`, `agent`, `method`, `role`, `outcome`, `level`, `corroborated`), `label`, `confidence` and `sigmaDeg`. It comes from `CameraInput.estimate` (a `PoseEstimateNote`) and is `null` when the exporter did not say. The block was added to v1 on 2026-10-02, so older v1 files do not have the key.
+  - `trusted` is `isTrustedEstimate(note)`: a person's endorsed pose, or an automatic pose that ontology `isTrustedAuto` accepts. A compass prior is never trusted.
+- `readPoseJson(textOrObject) → {ok: true, json, input, claimed} | {ok: false, error}` reads a v1 file and fails closed. It rejects:
+  - a wrong schema or version
+  - a missing or non-finite field
+  - a vfov outside (0, 180)
+  - a frame latitude or longitude out of range
+  - angles that disagree with the file's own `R_cam2enu` (by more than 1e-6) or with `fx`
+  - any provenance word the ontology does not know
+
+  `input` rebuilds the camera with `buildCameraModel`. `json` is re-derived from `input`, so the file's extra or stale fields do not survive it. The file's provenance comes back as `claimed`, which cannot be verified. `json.estimate.trusted` is always false: an importer records the pose as its own (for example, a person's endorsed pose).
 - KML and KMZ:
   - `buildPhotoOverlayKml(inputOrModel, {href?, name?, description?, near?}) → string`. The default href is `files/<imageName>`.
   - `buildKmz(inputOrModel, jpegBytes, opts) → Uint8Array`, and `kmzBlob(bytes)`.
@@ -46,8 +57,10 @@ Import everything from `#/lib/export` (the barrel is `index.ts`).
   - **Antimeridian:** longitudes are unwrapped around the camera. Any wedge, view line or footprint that crosses ±180° is split into a `MultiPolygon` or `MultiLineString`, as RFC 7946 §3.1.9 requires, so every longitude stays within [−180, 180].
   - **Heights (RFC 7946 §4):** a third coordinate means height above the ellipsoid. So the camera and peak points get a z value (altEllipsoid, or ele + N) only when `geoidUndulation` was passed. Otherwise they are 2D, and the MSL heights are in `properties.altMsl` and `ele`. The camera's `properties.heightDatum` says which case applies.
 - `buildXmp(inputOrModel) → string` (the .xmp text), plus `xmpGpsCoord` and `SLENS_NS`.
+  - When the input has an `estimate`, the sidecar also carries `slens:PoseTrusted` (`True`/`False`), `slens:PoseStatus`, `slens:PoseMethod`, `slens:PoseLabel` and `slens:PoseConfidence`. Without one, none of these tags is written: the provenance is unknown, which is not the same as untrusted.
   - `xmpGpsCoord` rounds the total minutes first, so a value like 46.99999999999 becomes `47,0.000000N` and never `46,60.000000N`.
   - `GPSImgDirection` stays within 0 to 359.99: it rounds to hundredths and then takes the result mod 36000.
+- `exportFromEngine(engine, kind, {estimate})` passes the estimate through. When the estimate is not trusted, every export adds the note "Pose not verified (label): check it before use".
 - `composeAnnotatedPng(photo, overlays[], {width?, height?, attribution?, title?, footerHeight?, type?, quality?, createCanvas?}) → Promise<Blob>`.
   - It uses `OffscreenCanvas` when available and otherwise `document.createElement('canvas')`, or a factory you pass in.
   - Overlays are stretched onto the photo rectangle.

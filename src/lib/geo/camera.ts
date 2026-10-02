@@ -137,7 +137,10 @@ export interface CameraParams {
 	yaw: number;
 	/** Degrees, positive = looking up. */
 	pitch: number;
-	/** Degrees, positive = clockwise image rotation of the scene. */
+	/**
+	 * Degrees, positive = camera turned clockwise as seen from behind (right side down), so the
+	 * horizon turns counterclockwise in the image (same sign as camera/index Pose.roll and GPano).
+	 */
 	roll: number;
 }
 

@@ -14,6 +14,24 @@ import { DEG as D, wrap360 } from "../geodesy";
 import { cross3, dot3, type Vec3 } from "../linalg";
 
 export type Pose = { yaw: Deg; pitch: Deg; roll: Deg; vfov: Deg };
+
+/**
+ * A usable pose: every angle finite and the vfov a real lens (0 < vfov < 180). Read paths (saved
+ * poses, imported files) use it so a NaN or a sentinel such as `{yaw: null, …, vfov: 180}` never
+ * reaches a renderer. It does not range-check yaw (any finite heading wraps) or pitch/roll.
+ */
+export function isPose(x: unknown): x is Pose {
+	if (x == null || typeof x !== "object") return false;
+	const p = x as Record<string, unknown>;
+	return (
+		Number.isFinite(p.yaw) &&
+		Number.isFinite(p.pitch) &&
+		Number.isFinite(p.roll) &&
+		Number.isFinite(p.vfov) &&
+		(p.vfov as number) > 0 &&
+		(p.vfov as number) < 180
+	);
+}
 export type { Mat3 };
 
 /** Camera axes in ENU (same operation order as three.js vector math, so pose.ts is bitwise equal). */

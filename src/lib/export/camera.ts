@@ -16,6 +16,10 @@
 //   refraction lift (k = 0.13) to distant points; the exported model is purely geometric.
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
+	isTrustedAuto,
+	type ProvenanceClass,
+} from "#/lib/ontology/core/provenance";
+import {
 	FF35_DIAGONAL_MM,
 	hfovFromVfov,
 	type Mat3,
@@ -25,6 +29,27 @@ import {
 import { DEG as D, toEcef, WGS84, wrap360 } from "../geodesy";
 
 export type { Vec3 };
+
+/**
+ * How the exported pose is known: the host's provenance (e.g. ontology workspaceProvenance), copied
+ * into the pose JSON and XMP so a compass prior never travels as if it were a solved pose.
+ */
+export type PoseEstimateNote = {
+	provenance: ProvenanceClass;
+	/** The UI word the host shows for it, e.g. "Accepted" or "Phone sensors". */
+	label?: string;
+	/** The producer's own score 0..1, when it has one (scales differ between producers). */
+	confidence?: number | null;
+	/** 1σ per angle in degrees, when a solver reported them (e.g. the pin solve's covariance). */
+	sigmaDeg?: Partial<Record<"yaw" | "pitch" | "roll" | "vfov", number>>;
+};
+
+/**
+ * True when the pose may be used without asking: a person's own (endorsed) pose, or an automatic one
+ * accepted by a strict rule or corroborated (ontology isTrustedAuto). Unknown provenance is not trusted.
+ */
+export const isTrustedEstimate = (e: PoseEstimateNote | null | undefined) =>
+	!!e && (e.provenance.status === "endorsed" || isTrustedAuto(e.provenance));
 
 export type CameraInput = {
 	photoId: string;
@@ -48,6 +73,8 @@ export type CameraInput = {
 	geoidUndulation?: number;
 	/** ISO capture time (UTC), copied into outputs. */
 	takenAt?: string | null;
+	/** How the pose is known; omitted = unknown (the outputs then say so). */
+	estimate?: PoseEstimateNote | null;
 };
 
 export type CameraModel = {

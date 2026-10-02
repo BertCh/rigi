@@ -104,6 +104,7 @@ export function ExportMenu({
 	geoidUndulation,
 	maxRange,
 	watermark,
+	estimate,
 }: ExportMenuProps) {
 	const [open, setOpen] = useState(false);
 	const [busy, setBusy] = useState<ExportKind | SplatExportKind | null>(null);
@@ -204,6 +205,7 @@ export function ExportMenu({
 					geoidUndulation,
 					maxRange,
 					watermark,
+					estimate,
 				});
 				downloadBlob(r.blob, r.filename);
 				setMsg({ text: [`Saved ${r.filename}`, ...r.notes].join(" · ") });
@@ -219,7 +221,15 @@ export function ExportMenu({
 				setBusy(null);
 			}
 		},
-		[engine, onExported, withLabels, geoidUndulation, maxRange, watermark],
+		[
+			engine,
+			onExported,
+			withLabels,
+			geoidUndulation,
+			maxRange,
+			watermark,
+			estimate,
+		],
 	);
 
 	return (
