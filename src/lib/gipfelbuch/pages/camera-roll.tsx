@@ -61,6 +61,7 @@ import {
 } from "#/components/gipfelbuch/viz/scene";
 import { RollCompasses } from "#/components/site/meta/RollCompasses";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Camera Roll: how a day's photos become a place. Everything below follows the real code:
 //   src/lib/roll/roll.ts        ROLL_LINK_M = 15 000 m (single-linkage), VIEWPOINT_RADIUS_M = 250 m (first match wins,
@@ -1423,7 +1424,7 @@ function useRollData() {
 	const [d, setD] = useState<RollData | null>(null);
 	useEffect(() => {
 		let live = true;
-		fetch("/demo/gipfelbuch/camera-roll/roll.json")
+		fetch(publicUrl("/demo/gipfelbuch/camera-roll/roll.json"))
 			.then((r) => r.json())
 			.then((v) => live && setD(v))
 			.catch((e) => console.warn("[gipfelbuch] camera-roll data", e));
@@ -1530,7 +1531,7 @@ function RealRoll() {
 								onKeyDown={(e) => e.key === "Enter" && setSel(r.id)}
 							>
 								<image
-									href={`/demo/thumbs/${r.id}.jpg`}
+									href={publicUrl(`/demo/thumbs/${r.id}.jpg`)}
 									x={i * slot + 2}
 									y={4}
 									width={slot - 4}
@@ -2047,7 +2048,7 @@ function HeroStages() {
 						render: () =>
 							frame(
 								<img
-									src="/demo/shots/drape.jpg"
+									src={publicUrl("/demo/shots/drape.jpg")}
 									alt="Twelve photos draped on the Niederhorn terrain"
 									className="size-full object-cover"
 								/>,
@@ -2228,7 +2229,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							body: "All photos blend onto the terrain at once.",
 							visual: (
 								<img
-									src="/demo/shots/drape.jpg"
+									src={publicUrl("/demo/shots/drape.jpg")}
 									alt="Photos draped on the terrain"
 									className="block h-full w-full object-cover"
 									style={{ aspectRatio: "1" }}

@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { type RefObject, useEffect, useState } from "react";
+import { publicUrl } from "#/lib/public-url";
 
 /** Baked by scripts/gipfelbuch/data-sheet.ts. Coordinates are integer sheet units (y down). */
 export interface SheetData {
@@ -74,7 +75,7 @@ export interface SheetRock {
 	scree: string[];
 }
 
-export const SHEET_URL = "/demo/gipfelbuch/sheet/sheet.json";
+export const SHEET_URL = publicUrl("/demo/gipfelbuch/sheet/sheet.json");
 /** Aspect of the baked sheet, used for loading placeholders so nothing shifts. */
 export const SHEET_ASPECT = 2400 / 1640;
 

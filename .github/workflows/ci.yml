@@ -24,6 +24,10 @@ jobs:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
+      # Model weights are Git LFS objects (public/models, deployed by pages.yml). CI does not fetch
+      # them: drop the pointer files so checks that need the weights SKIP as on a clone without them.
+      - name: Drop LFS pointer files
+        run: git lfs ls-files --name-only | xargs -r rm -f
       - uses: actions/setup-node@v4
         with:
           # package.json engines is >=22; @types/node is ^22 and local dev runs v22.20

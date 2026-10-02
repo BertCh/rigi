@@ -52,6 +52,7 @@ import {
 import { PlotSeries } from "#/components/gipfelbuch/viz/Plot";
 import { MAPTERHORN, TERRARIUM_AWS } from "#/lib/dem/sources";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Terrain model: height tiles (MAPTERHORN / TERRARIUM_AWS in src/lib/dem/sources.ts) and the one lookup over them
 //   (TerrainSampler in src/lib/geo/terrain.ts). Level tile counts, the seam patch, the transects and the per-camera
@@ -124,12 +125,12 @@ function useTerrainData() {
 	const [d, setD] = useState<TerrainData | null>(null);
 	useEffect(() => {
 		let live = true;
-		terrainCache ??= fetch("/demo/gipfelbuch/terrain/terrain.json").then(
-			(r) => {
-				if (!r.ok) throw new Error(`terrain.json ${r.status}`);
-				return r.json();
-			},
-		);
+		terrainCache ??= fetch(
+			publicUrl("/demo/gipfelbuch/terrain/terrain.json"),
+		).then((r) => {
+			if (!r.ok) throw new Error(`terrain.json ${r.status}`);
+			return r.json();
+		});
 		terrainCache.then(
 			(v) => live && setD(v),
 			(e) => {
@@ -232,7 +233,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 				className="mx-auto max-w-[640px] overflow-hidden"
 				before={
 					<img
-						src="/demo/gipfelbuch/terrain/hs-terrarium.jpg"
+						src={publicUrl("/demo/gipfelbuch/terrain/hs-terrarium.jpg")}
 						alt="Terrarium hillshade of the Niederhorn ridge"
 						className="block aspect-square w-full object-cover"
 						draggable={false}
@@ -240,7 +241,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 				}
 				after={
 					<img
-						src="/demo/gipfelbuch/terrain/hs-mapterhorn.jpg"
+						src={publicUrl("/demo/gipfelbuch/terrain/hs-mapterhorn.jpg")}
 						alt="Mapterhorn hillshade of the same ridge"
 						className="block size-full object-cover"
 						draggable={false}

@@ -6,6 +6,7 @@ import photosJson from "virtual:photos";
 import { concordOn } from "#/lib/concord/flags";
 import { lensCorrectedVfov } from "#/lib/concord/priors/focal-table";
 import { storageKey } from "#/lib/ontology/core/storage";
+import { publicUrl } from "#/lib/public-url";
 import type { Pose } from "./camera";
 import type { LatLonPair, LonLatPair } from "./ontology/core/geometry";
 import type { Height } from "./ontology/core/quantity";
@@ -96,7 +97,7 @@ const regionCache = new Map<string, Promise<RegionData>>();
 export function loadRegion(id: string) {
 	let p = regionCache.get(id);
 	if (!p) {
-		p = fetch(`/photos/${id}.json`).then((r) => {
+		p = fetch(publicUrl(`/photos/${id}.json`)).then((r) => {
 			if (!r.ok) throw new Error(`region ${id}: HTTP ${r.status}`);
 			return r.json() as Promise<RegionData>;
 		});

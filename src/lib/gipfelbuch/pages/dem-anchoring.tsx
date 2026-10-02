@@ -51,6 +51,7 @@ import {
 import { byId, gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 import { curveRange } from "#/lib/nearfield/anchor";
+import { publicUrl } from "#/lib/public-url";
 
 // DEM anchoring: how a monocular depth map is turned into metres by fitting a range curve to the terrain.
 // Mechanism constants are the real ones in src/lib/nearfield/anchor.ts:
@@ -99,12 +100,12 @@ function useTerrainData() {
 	const [d, setD] = useState<TerrainData | null>(null);
 	useEffect(() => {
 		let live = true;
-		terrainCache ??= fetch("/demo/gipfelbuch/terrain/terrain.json").then(
-			(r) => {
-				if (!r.ok) throw new Error(`terrain.json ${r.status}`);
-				return r.json();
-			},
-		);
+		terrainCache ??= fetch(
+			publicUrl("/demo/gipfelbuch/terrain/terrain.json"),
+		).then((r) => {
+			if (!r.ok) throw new Error(`terrain.json ${r.status}`);
+			return r.json();
+		});
 		terrainCache.then(
 			(v) => live && setD(v),
 			(e) => {

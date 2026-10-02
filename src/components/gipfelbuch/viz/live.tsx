@@ -22,6 +22,7 @@ import demo01Bake from "#/components/site/surround/demo-01.json";
 import demo09Bake from "#/components/site/surround/demo-09.json";
 import mapBake from "#/components/site/surround/map.json";
 import { useNearViewport } from "#/components/site/useNearViewport";
+import { publicUrl } from "#/lib/public-url";
 import { cn } from "#/lib/utils";
 import { KrokiTitle, NorthArrow } from "../notebook/carto";
 import { PenArrow } from "../notebook/Ink";
@@ -827,7 +828,7 @@ function ContactStrip({ note }: { note: string }) {
 
 // ---- measured captions ------------------------------------------------------------------------
 
-const ROLL_JSON = "/demo/gipfelbuch/camera-roll/roll.json";
+const ROLL_JSON = publicUrl("/demo/gipfelbuch/camera-roll/roll.json");
 
 /** "demo-01: yaw +9.3° off the phone's guess; skyline gap median 5.2 → 2.7 px; 20 peaks named." */
 function usePhotoClaim(id: GipfelbuchPhotoId, lead: string): ReactNode {
@@ -844,22 +845,24 @@ function useRollClaim(): RollData | null {
 // ---- the figures ------------------------------------------------------------------------------
 
 const variantSet = (name: string) =>
-	[640, 1024, 1440].map((w) => `/demo/w/${name}-${w}.jpg ${w}w`).join(", ");
+	[640, 1024, 1440]
+		.map((w) => `${publicUrl(`/demo/w/${name}-${w}.jpg`)} ${w}w`)
+		.join(", ");
 const PLATE_SIZES = "(min-width: 1024px) 760px, calc(100vw - 48px)";
 
 /** The landing's two photo-plus-overlay pairs (scripts/demo/make-landing-variants.sh) and their surround bakes. */
 export const LIVE_REVEAL_SETS = {
 	"demo-01": {
-		photo: "/demo/photos/demo-01.jpg",
-		overlay: "/demo/shots/demo-01-overlay.jpg",
+		photo: publicUrl("/demo/photos/demo-01.jpg"),
+		overlay: publicUrl("/demo/shots/demo-01-overlay.jpg"),
 		photoSet: variantSet("demo-01"),
 		overlaySet: variantSet("demo-01-overlay"),
 		bake: demo01Bake as SurroundBake,
 		alt: "Contours, ridgelines and peak names drawn into a photo over Lake Thun",
 	},
 	"demo-09": {
-		photo: "/demo/photos/demo-09.jpg",
-		overlay: "/demo/shots/hero.jpg",
+		photo: publicUrl("/demo/photos/demo-09.jpg"),
+		overlay: publicUrl("/demo/shots/hero.jpg"),
 		photoSet: variantSet("demo-09"),
 		overlaySet: variantSet("hero"),
 		bake: demo09Bake as SurroundBake,
@@ -1095,14 +1098,14 @@ export function LiveDrape({
 			}
 			poster={
 				<PosterImage
-					src="/demo/shots/drape.jpg"
+					src={publicUrl("/demo/shots/drape.jpg")}
 					alt="Photos draped on the 3D terrain"
 				/>
 			}
 		>
 			{() => (
 				<LiveRollMap
-					poster="/demo/shots/drape.jpg"
+					poster={publicUrl("/demo/shots/drape.jpg")}
 					className="aspect-[var(--gb-live-aspect)] w-full"
 				/>
 			)}
@@ -1157,7 +1160,7 @@ export function LiveStepInside({
 			}
 			poster={
 				<PosterImage
-					src="/demo/step/photo.jpg"
+					src={publicUrl("/demo/step/photo.jpg")}
 					alt="A hiker on Niederhorn above Lake Thun, the Bernese Alps behind"
 					fit="contain"
 				/>

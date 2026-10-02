@@ -1,0 +1,64 @@
+# Deploys the app as a static SPA to GitHub Pages (https://bertch.github.io/rigi/).
+# RIGI_PAGES=1 sets Vite's base to /rigi/ and prerenders the SPA shell (vite.config.ts);
+# scripts/pages/finalize.mjs adds the 404.html deep-link fallback. Model weights come from Git LFS,
+# cached by object id so a deploy only downloads weights that changed (LFS bandwidth is metered).
+# Gitignored data (public/photos, public/baseline) is not part of the site.
+name: pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: List LFS objects
+        run: git lfs ls-files --long | cut -d' ' -f1 | sort > .lfs-assets-id
+      - name: Cache LFS objects
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+          restore-keys: lfs-
+      - name: Pull LFS objects
+        run: git lfs pull
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      - name: Build static site
+        run: npx vite build
+        env:
+          RIGI_PAGES: "1"
+      - name: Finalize (404.html fallback, .nojekyll, size check)
+        run: node scripts/pages/finalize.mjs .output/public
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .output/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

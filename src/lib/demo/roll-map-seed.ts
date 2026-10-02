@@ -10,6 +10,7 @@
 // parts are not memoised: the engine keeps what it uses, and a later engine refetches from the HTTP
 // cache. The terrain decode is shared (demoTerrainSeed) with the landing's Step Inside, which serves
 // its far tiles from it (deck/seeded-tiles.ts) while it holds it.
+import { publicUrl } from "#/lib/public-url";
 import { sharedSeed } from "../deck/seeded-tiles";
 import {
 	decodeImagerySeed,
@@ -19,7 +20,7 @@ import {
 	type RollMapSeed,
 } from "../roll/map/roll-seed";
 
-export const ROLL_MAP_SEED_DIR = "/demo/roll-map";
+export const ROLL_MAP_SEED_DIR = publicUrl("/demo/roll-map");
 export const ROLL_MAP_SEED_FILES = {
 	terrain: "terrain.bin",
 	imagery: "imagery.bin",

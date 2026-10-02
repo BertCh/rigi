@@ -15,6 +15,7 @@ import {
 	useState,
 } from "react";
 import { brandVar } from "#/brand/khipu";
+import { publicUrl } from "#/lib/public-url";
 import { type SurroundBake, SurroundLayer } from "../Surround";
 import {
 	type Angles,
@@ -50,7 +51,7 @@ import { type WorldState, WorldView } from "./WorldView";
 // are all computed from real data; only the timing is staged. When it has played, the terrain
 // line can be dragged off and springs back.
 
-const SCENE_URL = "/demo/how/scene.json";
+const SCENE_URL = publicUrl("/demo/how/scene.json");
 /** Fraction of the photo height shown: the skyline band, not the foreground. */
 const CROP = 0.5;
 const SWEEP = 30;

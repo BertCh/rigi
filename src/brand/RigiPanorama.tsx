@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { wrap360 } from "#/lib/geodesy";
+import { publicUrl } from "#/lib/public-url";
 
 /**
  * The view south from Rigi Kulm, drawn as depth-layered ridgelines from the DEM
@@ -49,7 +50,7 @@ export function RigiPanorama({ className }: { className?: string }) {
 
 	useEffect(() => {
 		let live = true;
-		fetch("/brand/rigi-panorama.json")
+		fetch(publicUrl("/brand/rigi-panorama.json"))
 			.then((r) => r.json())
 			.then((d: Panorama) => live && setData(d))
 			.catch(() => {});

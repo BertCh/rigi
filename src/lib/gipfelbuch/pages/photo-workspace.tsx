@@ -54,6 +54,7 @@ import {
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Photo Workspace: the cockpit decides WHICH pose to trust and when to let you export it.
 // Mechanism numbers are literal from the code:
@@ -1104,7 +1105,7 @@ function AnnotatedWorkspace() {
 				aria-label="The photo workspace output for one photo with numbered annotations"
 			>
 				<image
-					href="/demo/shots/demo-01-overlay.jpg"
+					href={publicUrl("/demo/shots/demo-01-overlay.jpg")}
 					width={2048}
 					height={1536}
 				/>

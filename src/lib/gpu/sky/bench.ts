@@ -9,7 +9,9 @@
 // downloaded. Extra cases exercise the other resample branches: the classical fallback's low-res
 // P(sky) (640 px, uploaded floats) and a 512 px working image under a 640 px model (area-average
 // downsample instead of bilinear upsample).
+
 import { getComputeDevice } from "#/lib/gpu/device";
+import { publicUrl } from "#/lib/public-url";
 import {
 	classicalSky,
 	type ModelRun,
@@ -65,7 +67,7 @@ const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
 async function rasterise(name: string, longSide: number) {
 	const img = new Image();
-	img.src = `/photos/${name}.jpg`;
+	img.src = publicUrl(`/photos/${name}.jpg`);
 	await img.decode();
 	const { width: W, height: H } = workingSize(
 		img.naturalWidth,

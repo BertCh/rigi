@@ -37,6 +37,7 @@ import {
 import { Beat, Details, Mark, Trio } from "#/components/gipfelbuch/viz/explain";
 import { byId, gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Terrain snapping hub (chapter II): snap, bound, hint, with links out to eye-rule, peak and
 // dem-anchoring. The peak snap is drawn here because the peak sheet starts after it.
@@ -93,12 +94,12 @@ function useTerrainData() {
 	const [d, setD] = useState<TerrainData | null>(null);
 	useEffect(() => {
 		let live = true;
-		terrainCache ??= fetch("/demo/gipfelbuch/terrain/terrain.json").then(
-			(r) => {
-				if (!r.ok) throw new Error(`terrain.json ${r.status}`);
-				return r.json();
-			},
-		);
+		terrainCache ??= fetch(
+			publicUrl("/demo/gipfelbuch/terrain/terrain.json"),
+		).then((r) => {
+			if (!r.ok) throw new Error(`terrain.json ${r.status}`);
+			return r.json();
+		});
 		terrainCache.then(
 			(v) => live && setD(v),
 			(e) => {
@@ -191,7 +192,7 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 					aria-label={`Hillshade around the OSM node of ${ex.name}, with the 9 by 9 search grid and the snapped summit`}
 				>
 					<image
-						href="/demo/gipfelbuch/terrain/snap-0.jpg"
+						href={publicUrl("/demo/gipfelbuch/terrain/snap-0.jpg")}
 						width={ex.px}
 						height={ex.px}
 					/>

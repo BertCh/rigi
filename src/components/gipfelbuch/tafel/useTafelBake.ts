@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { useEffect, useState } from "react";
+import { publicUrl } from "#/lib/public-url";
 import type { GipfelbuchPhotoId } from "../viz/real";
 import type { TafelCamera } from "./project";
 
@@ -44,7 +45,7 @@ const loaded = new Map<string, TafelBake | null>();
 function loadBake(id: string): Promise<TafelBake | null> {
 	let p = cache.get(id);
 	if (!p) {
-		p = fetch(`/demo/gipfelbuch/tafel/${id}.json`)
+		p = fetch(publicUrl(`/demo/gipfelbuch/tafel/${id}.json`))
 			.then((r) => {
 				if (!r.ok) return null;
 				// a dev server answers a missing file with index.html

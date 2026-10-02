@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Tiles3DCredit } from "#/components/nearfield/Tiles3DCredit";
 import type { Pose } from "#/lib/camera";
 import type { PhotoMeta } from "#/lib/photos";
+import { publicUrl } from "#/lib/public-url";
 import type { Renderer } from "#/lib/renderer";
 import { LiveLines } from "./LiveLines";
 import { type Lines, viewOfCamera } from "./lineArt";
@@ -20,7 +21,7 @@ import { useLiveEmbed } from "./liveSlot";
 // Started only once the section scrolls into view; the photo itself is the poster (the step camera
 // starts exactly on it).
 
-const BASE = "/demo/step";
+const BASE = publicUrl("/demo/step");
 
 type BakedStep = {
 	photoId: string;
@@ -371,7 +372,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 	return (
 		<div className="relative isolate">
 			<LiveLines
-				src="/demo/surround/step-lines.bin"
+				src={publicUrl("/demo/surround/step-lines.bin")}
 				getView={stepView}
 				className="-z-10"
 			/>

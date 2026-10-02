@@ -4,6 +4,7 @@
 
 import { Link } from "@tanstack/react-router";
 import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
+import { publicUrl } from "#/lib/public-url";
 import { Hachure, PenCircle, PenLine, SketchRect } from "../notebook/Ink";
 import { MarkerUnderline } from "../swiss/hand";
 import { TYPE } from "../swiss/type";
@@ -109,7 +110,12 @@ function PhotoPickerRow({
 						aria-label={`Photo ${id.slice(5)}${ok == null ? "" : ok ? ", accepted" : ", refused"}`}
 						onClick={() => onFollow(id)}
 					>
-						<img src={`/demo/thumbs/${id}.jpg`} alt="" width={48} height={36} />
+						<img
+							src={publicUrl(`/demo/thumbs/${id}.jpg`)}
+							alt=""
+							width={48}
+							height={36}
+						/>
 						<span
 							className={`nb-num text-[12px] leading-[14px] ${ok === false ? "text-[var(--gb-red)]" : ""}`}
 						>

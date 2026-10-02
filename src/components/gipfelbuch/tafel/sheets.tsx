@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import type { CSSProperties, ReactNode } from "react";
+import { publicUrl } from "#/lib/public-url";
 import {
 	Hachure,
 	HandDot,
@@ -1268,7 +1269,7 @@ const bandAnchoring = ({ d, w, h }: BandCtx) => {
 
 const bandRigi = ({ w, h }: BandCtx) => (
 	<image
-		href="/demo/shots/demo-01-overlay.jpg"
+		href={publicUrl("/demo/shots/demo-01-overlay.jpg")}
 		width={w}
 		height={h}
 		preserveAspectRatio="xMidYMid slice"
@@ -1411,7 +1412,7 @@ const bandStepInside = ({ w, h }: BandCtx) => (
 	<>
 		<rect width={w} height={h} fill="#131313" />
 		<image
-			href="/demo/shots/drape.jpg"
+			href={publicUrl("/demo/shots/drape.jpg")}
 			width={w}
 			height={h}
 			preserveAspectRatio="xMidYMid slice"

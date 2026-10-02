@@ -10,7 +10,9 @@
 // theirs to supply and are not in the repository: drop the official white-on-dark wordmark at
 // public/tiles3d/google-maps-logo.png (see its README) and it is shown automatically; until then the
 // line carries a plain "Google Maps" text label, which is not the logo (reports/licences.md, NOTICE.md).
+
 import { type RefObject, useEffect, useState } from "react";
+import { publicUrl } from "#/lib/public-url";
 import type { Renderer } from "#/lib/renderer";
 
 export function Tiles3DCredit({
@@ -44,7 +46,7 @@ export function Tiles3DCredit({
 					<span className="mr-1 font-semibold text-white/90">Google Maps</span>
 				) : (
 					<img
-						src="/tiles3d/google-maps-logo.png"
+						src={publicUrl("/tiles3d/google-maps-logo.png")}
 						alt="Google Maps"
 						className="mr-1.5 inline-block h-3.5 align-middle"
 						data-tiles3d-google-logo=""

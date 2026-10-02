@@ -18,6 +18,7 @@ import {
 	project,
 	R_EFF,
 } from "#/components/site/how/model";
+import { publicUrl } from "#/lib/public-url";
 import { type Hero, type Section, useHero, wrap180 } from "./data";
 
 // "The skyline is the farthest thing you can see": a ladder-of-abstraction pair from one demo
@@ -35,7 +36,7 @@ const PHOTO_H = 1536;
  */
 const NEAR = 5000;
 /** The default bearing: the Eiger (public/demo/how/scene.json peaks). */
-const PEAKS_URL = "/demo/how/scene.json";
+const PEAKS_URL = publicUrl("/demo/how/scene.json");
 
 type Peak = { name: string; ele: number; az: number; el: number; dist: number };
 

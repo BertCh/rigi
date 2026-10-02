@@ -21,6 +21,7 @@ import { ComputeGraph, cachedGraphCount } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
 import { capacityFor, pooledStorage, withLease } from "#/lib/gpu/core/pool";
 import { getComputeDevice } from "#/lib/gpu/device";
+import { publicUrl } from "#/lib/public-url";
 import {
 	classicalSky,
 	refineToWorking,
@@ -47,7 +48,7 @@ const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
 async function rasterise(name: string, W: number, H: number) {
 	const img = new Image();
-	img.src = `/photos/${name}.jpg`;
+	img.src = publicUrl(`/photos/${name}.jpg`);
 	await img.decode();
 	const c = new OffscreenCanvas(W, H);
 	const ctx = c.getContext("2d", { willReadFrequently: true });

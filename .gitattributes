@@ -5,3 +5,4 @@
 *.png binary
 *.webp binary
 *.glb binary
+public/models/*.safetensors filter=lfs diff=lfs merge=lfs -text

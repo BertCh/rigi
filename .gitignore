@@ -42,12 +42,15 @@ tools/bench/collect*/work/
 
 # model weights & binary artifacts
 weights/
-public/models/
+public/models/*
 *.onnx
 *.pt
 *.pth
 *.tar
 *.safetensors
+# the app's runtime weights (scripts/models/manifest.json) are tracked through Git LFS (.gitattributes)
+# and deployed by .github/workflows/pages.yml; parity-only .onnx/.tflite stay local
+!public/models/*.safetensors
 *.npz
 *.npy
 *.so

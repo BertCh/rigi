@@ -5,6 +5,7 @@
 // Loads terroir packs (public/terroir/index.json → <path>/pack.json, cover.png). Packs are found by
 // location, not by region id, so every photo inside a pack's bbox gets it (demo, bundled and local).
 // Missing packs resolve to null: every terroir layer then draws nothing.
+import { publicUrl } from "#/lib/public-url";
 import type {
 	BBox,
 	CoverClassId,
@@ -12,7 +13,7 @@ import type {
 	TerroirPackIndex,
 } from "./types";
 
-const BASE = "/terroir";
+const BASE = publicUrl("/terroir");
 
 let indexP: Promise<TerroirPackIndex | null> | null = null;
 const packCache = new Map<string, Promise<TerroirPack | null>>();

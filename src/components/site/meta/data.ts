@@ -14,6 +14,7 @@ import {
 	camera,
 	type Obs,
 } from "#/components/site/how/model";
+import { publicUrl } from "#/lib/public-url";
 
 export type RollPhoto = {
 	id: string;
@@ -95,8 +96,8 @@ function useJson<T>(url: string) {
 	return v;
 }
 
-export const useRoll = () => useJson<Roll>("/demo/meta/roll.json");
-export const useHero = () => useJson<Hero>("/demo/meta/hero.json");
+export const useRoll = () => useJson<Roll>(publicUrl("/demo/meta/roll.json"));
+export const useHero = () => useJson<Hero>(publicUrl("/demo/meta/hero.json"));
 
 import { wrap180, wrap360 } from "#/lib/geodesy";
 

@@ -60,6 +60,7 @@ import {
 import { Eq, Frac, Op, Sym } from "#/components/gipfelbuch/viz/math";
 import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Viewport inference: the solve end to end. Predict the horizon, trace the skyline, align the two, gate, fall back.
 // Pipeline facts are from src/lib/geo/pipeline.ts (loadScene, sceneHorizon, cascade / escalate, EYE_ABOVE_GROUND 1.6).
@@ -1448,7 +1449,7 @@ function usePoseSolve() {
 	useEffect(() => {
 		let live = true;
 		poseSolveCache ??= fetch(
-			"/demo/gipfelbuch/pose-solve/pose-solve.json",
+			publicUrl("/demo/gipfelbuch/pose-solve/pose-solve.json"),
 		).then((r) => r.json());
 		poseSolveCache.then(
 			(v) => live && setD(v),

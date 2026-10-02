@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { publicUrl } from "#/lib/public-url";
 import { DEG as D } from "../geodesy";
 // Static OSM pre-extracts (roadmap N2): answer peak queries from a file under public/osm/ instead of
 // the public Overpass API (~10k queries/day shared by everyone) when the query area lies wholly
@@ -57,22 +58,13 @@ export const EXTRACT_TAGS = [
 	"wikidata",
 ] as const;
 
-function baseUrl(): string {
-	try {
-		const b = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL;
-		return b ?? "/";
-	} catch {
-		return "/";
-	}
-}
-
 let manifestP: Promise<ExtractManifestEntry[]> | null = null;
 const extracts = new Map<string, Promise<OsmExtract | null>>();
 
 /** Injectable for Node checks (scripts/licences-check.ts). */
 export type ExtractLoader = (file: string) => Promise<unknown>;
 let loader: ExtractLoader = async (file) => {
-	const res = await fetch(`${baseUrl()}osm/${file}`);
+	const res = await fetch(publicUrl(`/osm/${file}`));
 	if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
 	return res.json();
 };

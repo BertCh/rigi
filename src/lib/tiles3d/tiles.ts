@@ -24,6 +24,7 @@ import {
 import type { Matrix4 } from "@math.gl/core";
 import { getFlag } from "#/lib/flags";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
+import { publicBase } from "#/lib/public-url";
 import {
 	googleTilesKey,
 	TILES3D_SOURCES,
@@ -105,8 +106,7 @@ export const tileCoreApi = {
 
 /** The app's base URL, absolute when there is a page: a Draco worker resolves `modules` against its own URL. */
 function baseUrl(): string {
-	const base =
-		(import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
+	const base = publicBase();
 	const page = globalThis.location?.href;
 	return page ? new URL(base, page).href : base;
 }

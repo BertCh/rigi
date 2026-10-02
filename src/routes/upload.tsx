@@ -19,6 +19,7 @@ import { SiteNav } from "#/components/site/SiteNav";
 import { hfovFromVfov } from "#/lib/camera";
 import { distanceBearing } from "#/lib/geodesy";
 import type { RegionData } from "#/lib/photos";
+import { publicUrl } from "#/lib/public-url";
 import {
 	deleteLocalPhoto,
 	HeicUnsupportedError,
@@ -473,7 +474,7 @@ function Credits() {
 					) that you may replace with your own build (licence texts are under{" "}
 					<a
 						className="text-cyan-300/80 light:text-[var(--rigi-glow)]/80 hover:underline"
-						href="/licenses/README.txt"
+						href={publicUrl("/licenses/README.txt")}
 					>
 						/licenses
 					</a>

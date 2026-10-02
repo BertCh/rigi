@@ -14,6 +14,7 @@ import {
 	useState,
 	useSyncExternalStore,
 } from "react";
+import { publicUrl } from "#/lib/public-url";
 import { cn } from "#/lib/utils";
 import { HandDot, SketchPath } from "../notebook/Ink";
 import { sketchify } from "../notebook/sketchify";
@@ -285,7 +286,7 @@ export function useLoadFailure(id?: string): string | null {
 		() => failedVersion,
 		() => 0,
 	);
-	const prefix = "/demo/gipfelbuch/";
+	const prefix = publicUrl("/demo/gipfelbuch/");
 	if (id) return failed.has(`${prefix}${id}.json`) ? id : null;
 	for (const url of failed)
 		if (url.startsWith(prefix))
@@ -295,10 +296,10 @@ export function useLoadFailure(id?: string): string | null {
 
 /** Measured pipeline data for one demo photo (null while loading). */
 export const useGipfelbuchPhoto = (id: GipfelbuchPhotoId | null) =>
-	useJson<GipfelbuchPhotoData>(id && `/demo/gipfelbuch/${id}.json`);
+	useJson<GipfelbuchPhotoData>(id && publicUrl(`/demo/gipfelbuch/${id}.json`));
 /** Per-photo summary of all 12 + ground-truth eval rows. */
 export const useGipfelbuchIndex = () =>
-	useJson<GipfelbuchIndex>("/demo/gipfelbuch/index.json");
+	useJson<GipfelbuchIndex>(publicUrl("/demo/gipfelbuch/index.json"));
 
 /** SVG path through a row-per-column array; breaks at nulls and at jumps larger than `maxJump` px. */
 export function rowsPath(rows: Rows, maxJump = 12, sx = 1, sy = 1) {
@@ -1457,7 +1458,7 @@ export function PhotoPicker({
 				>
 					<span className="relative block h-12 w-16 overflow-hidden">
 						<img
-							src={`/demo/thumbs/${id}.jpg`}
+							src={publicUrl(`/demo/thumbs/${id}.jpg`)}
 							alt=""
 							className="size-full object-cover"
 						/>

@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { wrap360 } from "#/lib/geodesy";
+import { publicUrl } from "#/lib/public-url";
 // The bundled sample trip (public/demo/, built by scripts/demo/unpack.mjs from an exported upload
 // roll). Its photos are registered with photos.ts like uploads, so /photo/demo-NN and /roll/demo use
 // the normal workspace and roll code. Each photo ships the pose the roll aligner found on the
@@ -45,7 +46,7 @@ let full: Promise<DemoManifest> | null = null;
  * For views that draw no trails (the landing's panorama, topo board and live map).
  */
 export function loadDemoCore(): Promise<DemoManifest> {
-	core ??= fetch("/demo/manifest.json")
+	core ??= fetch(publicUrl("/demo/manifest.json"))
 		.then((r) => {
 			if (!r.ok) throw new Error(`demo manifest: HTTP ${r.status}`);
 			return r.json() as Promise<
@@ -72,7 +73,7 @@ export function loadDemoCore(): Promise<DemoManifest> {
 export function loadDemo(): Promise<DemoManifest> {
 	full ??= Promise.all([
 		loadDemoCore(),
-		fetch("/demo/trails.json").then((r) => {
+		fetch(publicUrl("/demo/trails.json")).then((r) => {
 			if (!r.ok) throw new Error(`demo trails: HTTP ${r.status}`);
 			return r.json() as Promise<RegionData["trails"]>;
 		}),
@@ -96,7 +97,7 @@ export async function demoPose(id: string): Promise<Pose | null> {
 }
 
 /** The sample trip's panorama terrain, baked by scripts/demo/bake-pano-terrain.ts (by terrainKey). */
-const PANO_BASE = "/demo/pano";
+const PANO_BASE = publicUrl("/demo/pano");
 let panoIndex: Promise<Record<string, string>> | null = null;
 function bakedTerrainIndex() {
 	panoIndex ??= fetch(`${PANO_BASE}/index.json`)
@@ -194,6 +195,8 @@ export async function loadDemoRoll(opts: DemoRollOptions = {}): Promise<Roll> {
 	if (need)
 		for (const p of roll.photos)
 			if (need === true || smallCopyPxPerDeg(p.meta, p.pose.vfov) >= need)
-				p.meta.src = `/demo/photos-${DEMO_SMALL_LONG}/${p.meta.id}.jpg`;
+				p.meta.src = publicUrl(
+					`/demo/photos-${DEMO_SMALL_LONG}/${p.meta.id}.jpg`,
+				);
 	return roll;
 }

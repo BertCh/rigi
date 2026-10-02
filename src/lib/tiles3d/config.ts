@@ -13,6 +13,7 @@
 // silhouette passes, sampleAt, anchoring, exports or a persistent cache.
 
 import { getFlag } from "#/lib/flags";
+import { publicUrl } from "#/lib/public-url";
 
 export type Tiles3DSourceId =
 	| "swisstopo-buildings"
@@ -92,7 +93,7 @@ export function isMeasurableSource(id: string): boolean {
 }
 
 /** Where the official Google Maps logo must be shipped (Tiles3DCredit.tsx shows it from there). */
-export const GOOGLE_LOGO_ASSET = "/tiles3d/google-maps-logo.png";
+export const GOOGLE_LOGO_ASSET = publicUrl("/tiles3d/google-maps-logo.png");
 
 /**
  * Hard gate for Google tiles in a public (non-dev) build: false until the official logo asset exists

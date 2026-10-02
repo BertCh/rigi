@@ -8,9 +8,10 @@
 //
 // Layout (little-endian, before gzip): "RPM1", u32 count, then per mask: u8 id length, the id
 // (ASCII), u16 width, u16 height (0 × 0 = segmentForeground returned null), width·height bytes.
+import { publicUrl } from "#/lib/public-url";
 import type { ForegroundMask } from "../segment";
 
-export const PEOPLE_MASKS_URL = "/demo/masks/people-masks.bin";
+export const PEOPLE_MASKS_URL = publicUrl("/demo/masks/people-masks.bin");
 const MAGIC = "RPM1";
 
 export type PeopleMasks = Map<string, ForegroundMask | null>;

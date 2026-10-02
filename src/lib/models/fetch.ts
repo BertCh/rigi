@@ -6,6 +6,7 @@
 // it is cached); in node, public/models on disk. The download core takes its globals as arguments so
 // specs can drive it without a browser.
 
+import { publicUrl } from "#/lib/public-url";
 import MANIFEST from "../../../scripts/models/manifest.json";
 import { forgetModelDownload, reportModelDownload } from "./progress";
 
@@ -43,14 +44,9 @@ export function filenameHash(file: string): string | undefined {
 	return /\.([0-9a-f]{8})\.[^./]+$/.exec(modelFileName(file))?.[1];
 }
 
-function baseUrl(): string {
-	const b = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL;
-	return b ? (b.endsWith("/") ? b : `${b}/`) : "/";
-}
-
 /** The URL public/models/<file> is served at (honours Vite's base). */
 export function modelUrl(file: string): string {
-	return `${baseUrl()}models/${modelFileName(file)}`;
+	return publicUrl(`/models/${modelFileName(file)}`);
 }
 
 export const isNodeRuntime = (): boolean =>

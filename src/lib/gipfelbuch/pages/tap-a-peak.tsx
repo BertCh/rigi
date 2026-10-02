@@ -69,6 +69,7 @@ import {
 	summitOnSkyline,
 } from "#/components/gipfelbuch/viz/scene";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Tap-a-peak: how a few user taps turn into a pose.
 // Mechanism is the real one:
@@ -956,7 +957,9 @@ function useTapData(id: string) {
 		setD(null);
 		let p = tapCache.get(id);
 		if (!p) {
-			p = fetch(`/demo/gipfelbuch/tap/${id}.json`).then((r) => r.json());
+			p = fetch(publicUrl(`/demo/gipfelbuch/tap/${id}.json`)).then((r) =>
+				r.json(),
+			);
 			tapCache.set(id, p);
 		}
 		p.then((v) => live && setD(v)).catch((e) =>

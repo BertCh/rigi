@@ -11,6 +11,7 @@ import {
 	useGipfelbuchPhoto,
 } from "#/components/gipfelbuch/viz/real";
 import { byId } from "#/lib/gipfelbuch/graph-utils";
+import { publicUrl } from "#/lib/public-url";
 import { type NotebookStep, STEP_NUMBER, stepAnchor } from "./entries";
 import { SketchPath } from "./Ink";
 import { useNotebookPhoto } from "./useNotebookPhoto";
@@ -356,10 +357,10 @@ export function useNotebookContext(): NotebookContext {
 		if (loaded) setData(loaded);
 	}, [loaded]);
 	const roll = useStaticJson<RollData>(
-		"/demo/gipfelbuch/camera-roll/roll.json",
+		publicUrl("/demo/gipfelbuch/camera-roll/roll.json"),
 	);
 	const terrain = useStaticJson<TerrainData>(
-		"/demo/gipfelbuch/terrain/terrain.json",
+		publicUrl("/demo/gipfelbuch/terrain/terrain.json"),
 	);
 	return { data, index, roll, terrain };
 }

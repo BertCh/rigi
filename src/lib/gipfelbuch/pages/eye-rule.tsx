@@ -51,6 +51,7 @@ import {
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Constants mirrored from src/lib/concord/priors/altitude.ts (EYE_PRIOR_DEFAULTS) and deck/scene.ts (eyeAltitude).
 const H = 1.6;
@@ -535,7 +536,7 @@ function useEyeData(): EyeData | null {
 	const [d, setD] = useState<EyeData | null>(null);
 	useEffect(() => {
 		let live = true;
-		fetch("/demo/gipfelbuch/eye-rule/eye-rule.json")
+		fetch(publicUrl("/demo/gipfelbuch/eye-rule/eye-rule.json"))
 			.then((r) => r.json())
 			.then((v) => live && setD(v))
 			.catch((e) => console.warn("[gipfelbuch]", e));

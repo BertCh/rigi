@@ -56,7 +56,15 @@ const gateRoutes =
 // patterns; a leading "**" keeps them relative to public/).
 const PARITY_ONLY_MODELS = ["**/models/*.onnx", "**/models/*.tflite"];
 
+// GitHub Pages (.github/workflows/pages.yml): RIGI_PAGES=1 builds a static SPA served under /rigi/. Vite's
+// base becomes the router basepath (TanStack Start derives it), public/ files resolve through
+// src/lib/public-url.ts, and the client build lands in .output/public. The SPA
+// shell is prerendered at /index.html; scripts/pages/finalize.mjs copies it to 404.html for deep links.
+const pages = process.env.RIGI_PAGES === "1";
+const PAGES_BASE = process.env.RIGI_PAGES_BASE ?? "/rigi/";
+
 const config = defineConfig({
+	base: pages ? PAGES_BASE : "/",
 	cacheDir: devPort ? `node_modules/.vite-${devPort}` : "node_modules/.vite",
 	resolve: {
 		tsconfigPaths: true,
@@ -84,16 +92,19 @@ const config = defineConfig({
 		photosJson(),
 		nitro({ ignore: PARITY_ONLY_MODELS }),
 		tailwindcss(),
-		tanstackStart(
-			gateRoutes
+		tanstackStart({
+			...(gateRoutes
 				? {
 						router: {
 							routeFileIgnorePattern: GATED_ROUTE_FILES,
 							generatedRouteTree: PROD_ROUTE_TREE,
 						},
 					}
-				: undefined,
-		),
+				: {}),
+			...(pages
+				? { spa: { enabled: true, prerender: { outputPath: "/index.html" } } }
+				: {}),
+		}),
 		viteReact(),
 	],
 });

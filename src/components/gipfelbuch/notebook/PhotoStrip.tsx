@@ -7,6 +7,7 @@ import {
 	type GipfelbuchIndex,
 	type GipfelbuchPhotoId,
 } from "#/components/gipfelbuch/viz/real";
+import { publicUrl } from "#/lib/public-url";
 import { PenCircle, SketchPath } from "./Ink";
 
 /** A pen tick or cross, standing in for the glyph (the button's aria-label carries the meaning). */
@@ -79,7 +80,7 @@ export function PhotoStrip({
 							style={{ padding: "3px 3px 3px" }}
 						>
 							<img
-								src={photo?.thumb ?? `/demo/thumbs/${id}.jpg`}
+								src={photo?.thumb ?? publicUrl(`/demo/thumbs/${id}.jpg`)}
 								alt=""
 								className={
 									small

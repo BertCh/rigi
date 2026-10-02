@@ -24,6 +24,7 @@ import {
 	withDisplayPixels,
 } from "#/lib/geo/photo-meta";
 import { wrap180, wrap360 } from "#/lib/geodesy";
+import { publicUrl } from "#/lib/public-url";
 import { type Layers, Overlay } from "./Overlay";
 import {
 	bucketColor,
@@ -153,7 +154,7 @@ export function BaselinePage({
 
 	// --- data sources --------------------------------------------------------
 	useEffect(() => {
-		fetch("/baseline/index.json")
+		fetch(publicUrl("/baseline/index.json"))
 			.then((r) => {
 				if (!r.ok) throw new Error(`HTTP ${r.status}`);
 				return r.json() as Promise<SampleEntry[]>;
@@ -206,7 +207,7 @@ export function BaselinePage({
 		showPhoto({
 			id: `sample:${s.name}`,
 			name: s.name,
-			src: `/baseline/${s.file}`,
+			src: publicUrl(`/baseline/${s.file}`),
 			meta: s.meta,
 			heic: false,
 		});

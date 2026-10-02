@@ -31,6 +31,7 @@ import how from "#/components/site/surround/how.json";
 import map from "#/components/site/surround/map.json";
 import { NearViewport } from "#/components/site/useNearViewport";
 import { attributionLine } from "#/lib/licences/attribution";
+import { publicUrl } from "#/lib/public-url";
 
 /** Data credit for the landing's maps and renders (the Niederhorn demo, src/lib/licences). */
 const LANDING_CREDIT = attributionLine(
@@ -69,7 +70,9 @@ const HowItWorksScene = lazy(() =>
 const PLACEHOLDER = "bg-white/[0.03]";
 /** Width variants of the hero and story stills (scripts/demo/make-landing-variants.sh). */
 const variantSet = (name: string) =>
-	[640, 1024, 1440].map((w) => `/demo/w/${name}-${w}.jpg ${w}w`).join(", ");
+	[640, 1024, 1440]
+		.map((w) => `${publicUrl(`/demo/w/${name}-${w}.jpg`)} ${w}w`)
+		.join(", ");
 const HERO_SIZES =
 	"(min-width: 1024px) 611px, (min-width: 640px) calc(100vw - 64px), calc(100vw - 32px)";
 const STORY_SIZES =
@@ -166,8 +169,8 @@ function Home() {
 						>
 							<Compare
 								onMove={showHeroLeftSpill}
-								before="/demo/photos/demo-09.jpg"
-								after="/demo/shots/hero.jpg"
+								before={publicUrl("/demo/photos/demo-09.jpg")}
+								after={publicUrl("/demo/shots/hero.jpg")}
 								beforeSet={variantSet("demo-09")}
 								afterSet={variantSet("hero")}
 								sizes={HERO_SIZES}
@@ -193,8 +196,8 @@ function Home() {
 				cta={{ to: "demo-01", label: "Open this photo" }}
 			>
 				<RevealLoop
-					photo="/demo/photos/demo-01.jpg"
-					overlay="/demo/shots/demo-01-overlay.jpg"
+					photo={publicUrl("/demo/photos/demo-01.jpg")}
+					overlay={publicUrl("/demo/shots/demo-01-overlay.jpg")}
 					photoSet={variantSet("demo-01")}
 					overlaySet={variantSet("demo-01-overlay")}
 					sizes={STORY_SIZES}
@@ -244,7 +247,7 @@ function Home() {
 				<NearViewport placeholder={<div className={LIVE_BOX} />} margin={400}>
 					<Suspense fallback={<div className={LIVE_BOX} />}>
 						<LiveRollMap
-							poster="/demo/shots/drape.jpg"
+							poster={publicUrl("/demo/shots/drape.jpg")}
 							className="aspect-[16/10] max-h-[78vh] w-full rounded-md"
 						/>
 					</Suspense>

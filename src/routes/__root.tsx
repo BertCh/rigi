@@ -11,6 +11,7 @@ import {
 import { BRAND } from "#/brand/khipu";
 import { FLAG_NAMES, type FlagSearch, flagSearch } from "#/lib/flags";
 import { THEME_BOOT_SCRIPT } from "#/lib/flags/theme-boot";
+import { publicUrl } from "#/lib/public-url";
 import { ThemeSync } from "#/lib/theme/react";
 
 import appCss from "../styles.css?url";
@@ -47,7 +48,7 @@ export const Route = createRootRoute({
 			// fonts are self-hosted (src/styles/fonts.css); preload the body face so first text paints in it
 			{
 				rel: "preload",
-				href: "/fonts/gipfelbuch/fira-sans-normal-400-latin.woff2",
+				href: publicUrl("/fonts/gipfelbuch/fira-sans-normal-400-latin.woff2"),
 				as: "font",
 				type: "font/woff2",
 				crossOrigin: "anonymous",
@@ -55,7 +56,7 @@ export const Route = createRootRoute({
 			// the landing hero h1 is Fira Sans 600
 			{
 				rel: "preload",
-				href: "/fonts/gipfelbuch/fira-sans-normal-600-latin.woff2",
+				href: publicUrl("/fonts/gipfelbuch/fira-sans-normal-600-latin.woff2"),
 				as: "font",
 				type: "font/woff2",
 				crossOrigin: "anonymous",
@@ -67,7 +68,7 @@ export const Route = createRootRoute({
 			{
 				rel: "icon",
 				type: "image/svg+xml",
-				href: "/favicon.svg",
+				href: publicUrl("/favicon.svg"),
 			},
 		],
 	}),

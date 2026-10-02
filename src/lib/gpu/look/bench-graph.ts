@@ -18,7 +18,9 @@
 // - VRAM: pooled-equivalent bytes (pow2 capacities) vs graph imports + physical transients (after
 //   aliasing);
 // - timing: medians of graph calls.
+
 import type { Device } from "@luma.gl/core";
+import { publicUrl } from "#/lib/public-url";
 import { bandInputs, reduceBands } from "../../look/color-stats";
 import { guidedFilter } from "../../look/guided-filter";
 import type { Vec3 } from "../../ontology/core/geometry";
@@ -41,7 +43,7 @@ const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
 async function rasterise(name: string, W: number, H: number) {
 	const img = new Image();
-	img.src = `/photos/${name}.jpg`;
+	img.src = publicUrl(`/photos/${name}.jpg`);
 	await img.decode();
 	const c = new OffscreenCanvas(W, H);
 	const ctx = c.getContext("2d", { willReadFrequently: true });

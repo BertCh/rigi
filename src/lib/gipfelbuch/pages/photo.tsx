@@ -59,6 +59,7 @@ import { Eq, Frac, Sym } from "#/components/gipfelbuch/viz/math";
 import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import { groupColor } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 /* The record each demo photo carries: public/demo/manifest.json (what the ingest wrote). The prior and the solved pose
  * come from the gipfelbuch data (public/demo/gipfelbuch/<id>.json, scripts/gipfelbuch/build-data.ts). "Error" on this
@@ -122,7 +123,7 @@ function useManifest() {
 	const [m, setM] = useState<Record<string, ManifestPhoto> | null>(null);
 	useEffect(() => {
 		let live = true;
-		fetch("/demo/manifest.json")
+		fetch(publicUrl("/demo/manifest.json"))
 			.then((r) => r.json())
 			.then((j: { photos: ManifestPhoto[] }) => {
 				if (live) setM(Object.fromEntries(j.photos.map((p) => [p.id, p])));

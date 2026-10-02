@@ -28,6 +28,7 @@ import {
 } from "#/components/gipfelbuch/viz/explain";
 import { byId, gipfelbuchHref, groupColor } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Rigi, the whole story on one page: photo in, pose out, what you get.
 // Real data: the 12 Niederhorn photos (scripts/gipfelbuch/build-data.ts). Numbers quoted without measurement come
@@ -204,7 +205,7 @@ function Outcomes() {
 					body: "Twelve photos are placed on the terrain they show.",
 					visual: (
 						<img
-							src="/demo/shots/drape.jpg"
+							src={publicUrl("/demo/shots/drape.jpg")}
 							alt="Twelve photos draped on the 3D terrain of the Niederhorn"
 							className="block h-auto w-full"
 						/>
@@ -216,12 +217,12 @@ function Outcomes() {
 					visual: (
 						<div className="relative">
 							<img
-								src="/demo/step/photo.jpg"
+								src={publicUrl("/demo/step/photo.jpg")}
 								alt="A hiker on the ridge, the near ground lifted into 3D"
 								className="block h-auto w-full"
 							/>
 							<img
-								src="/demo/gipfelbuch/step-inside/split.png"
+								src={publicUrl("/demo/gipfelbuch/step-inside/split.png")}
 								alt=""
 								className="absolute inset-0 size-full"
 							/>

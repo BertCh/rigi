@@ -15,11 +15,13 @@
  * single solveOnce (fullSearchFallback off; headingKnown false for the 360° ones) so its time is the
  * time of the grid being replaced plus the fine stage. Returns small JSON.
  */
+
 import { poseToCamera } from "#/lib/camera";
 import { fetchDemTile, MAPTERHORN } from "#/lib/dem";
 import { loadScene, sceneHorizon } from "#/lib/geo/pipeline";
 import { detectSkyline } from "#/lib/geo/skyline";
 import { type SolveOptions, solvePose } from "#/lib/geo/solve";
+import { publicUrl } from "#/lib/public-url";
 import { getComputeDevice } from "../device";
 import {
 	type CoarseGpuStats,
@@ -90,7 +92,7 @@ const same = (a: CoarseResult, b: CoarseResult) =>
 	);
 
 async function skylineOf(id: string) {
-	const blob = await (await fetch(`/photos/${id}.jpg`)).blob();
+	const blob = await (await fetch(publicUrl(`/photos/${id}.jpg`))).blob();
 	const bmp = await createImageBitmap(blob);
 	const w = WORK_WIDTH;
 	const h = Math.round((bmp.height * w) / bmp.width);

@@ -60,6 +60,7 @@ import {
 import { cameraFromAngles, directionENU, project } from "#/lib/geo/camera";
 import { byId, gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { publicUrl } from "#/lib/public-url";
 
 // Peak: from an OSM node to a label in the photo. Everything below mirrors src/lib/geo/peaks.ts:
 //   apparentElevation = atan2(h - eye - d²/(2 R_eff), d), R_eff = R / (1 - 0.13)  (REFRACTION_K, geodesy.ts)
@@ -894,9 +895,9 @@ function usePeakData() {
 	const [d, setD] = useState<PeakData | null>(null);
 	useEffect(() => {
 		let live = true;
-		peakDataPromise ??= fetch("/demo/gipfelbuch/peak/peak.json").then((r) =>
-			r.json(),
-		);
+		peakDataPromise ??= fetch(
+			publicUrl("/demo/gipfelbuch/peak/peak.json"),
+		).then((r) => r.json());
 		peakDataPromise.then((v) => live && setD(v)).catch(() => {});
 		return () => {
 			live = false;

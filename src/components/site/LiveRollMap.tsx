@@ -6,6 +6,7 @@ import { Link } from "@tanstack/react-router";
 import { Cpu, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { MapAttribution } from "#/lib/licences/MapAttribution";
+import { publicUrl } from "#/lib/public-url";
 import {
 	failBackend,
 	initialBackendState,
@@ -210,7 +211,7 @@ export function LiveRollMap({
 	return (
 		<div className="relative isolate">
 			<LiveLines
-				src="/demo/surround/live3d-lines.bin"
+				src={publicUrl("/demo/surround/live3d-lines.bin")}
 				getView={linesView}
 				className="-z-10"
 			/>

@@ -54,6 +54,7 @@ import {
 } from "#/components/gipfelbuch/viz/explain";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 import { PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
+import { publicUrl } from "#/lib/public-url";
 
 // Step Inside: how a solved photo becomes a place you can move around in.
 // Every constant below is the real default:
@@ -972,7 +973,7 @@ function RealEye() {
 	const [d, setD] = useState<EyeData | null>(null);
 	useEffect(() => {
 		let live = true;
-		fetch("/demo/gipfelbuch/step-inside/eye.json")
+		fetch(publicUrl("/demo/gipfelbuch/step-inside/eye.json"))
 			.then((r) => r.json())
 			.then((v) => live && setD(v))
 			.catch((e) => console.warn("[gipfelbuch] step-inside eye data", e));
@@ -1268,7 +1269,7 @@ function useSplitData() {
 	const [d, setD] = useState<SplitData | null>(null);
 	useEffect(() => {
 		let live = true;
-		fetch("/demo/gipfelbuch/step-inside/split.json")
+		fetch(publicUrl("/demo/gipfelbuch/step-inside/split.json"))
 			.then((r) => r.json())
 			.then((v) => live && setD(v))
 			.catch((e) => console.warn("[gipfelbuch] step-inside split data", e));
@@ -1451,7 +1452,7 @@ function RealSplit() {
 			/>
 			{overlay && (
 				<img
-					src="/demo/gipfelbuch/step-inside/split.png"
+					src={publicUrl("/demo/gipfelbuch/step-inside/split.png")}
 					alt=""
 					className="absolute inset-0 size-full"
 				/>
