@@ -8,7 +8,10 @@
 // PhotoView the deck engine uses (CARTESIAN, ENU metres).
 //   Query: ?mode=fp|orbit  &truth=1  &nodepth=1  &n=<extra random splats>  &yaw= &pitch= &x= &y= &z=
 //   First person: drag to look, WASD / arrows to move, Q/E down/up. Orbit: drag to orbit the hut.
-//   Harness hook: window.__splatLab { setView, stats, measureFps }.
+//   Harness hook: window.__splatLab { setView, stats, measureFps, probe, backend }.
+//   Backend: WebGL2 only. DeckSplatLayer is GLSL (no WGSL path), and `new Deck` here creates deck's default
+//   WebGL device, so there is no ?renderer= param; backend() reports the live device type ("webgl") and
+//   scripts/nearfield/deck-splat-lab-check.mjs asserts it.
 
 import { Deck } from "@deck.gl/core";
 import { createFileRoute } from "@tanstack/react-router";
@@ -367,6 +370,8 @@ type LabHook = {
 	measureFps: (ms: number) => Promise<{ fps: number; frames: number }>;
 	/** Screen (CSS px) positions of the test objects: hidden ball, rock centre, rock bottom. */
 	probe: () => Record<string, number[] | null>;
+	/** Luma device type of the Deck ("webgl" here; the splat layer is GLSL only). */
+	backend: () => string;
 };
 
 // ---------------- page ----------------
@@ -509,6 +514,9 @@ function LabDeckSplats() {
 				redraw();
 			},
 			stats: () => ({ ...splatStats, count: world.cloud.count }),
+			backend: () =>
+				(deck as unknown as { device?: { type?: string } }).device?.type ??
+				"unknown",
 			probe: () => {
 				const vp = deck.getViewports()[0];
 				const at = (x: number, y: number, dz: number) =>
