@@ -72,7 +72,11 @@ import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
 import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { needsPhotoSky } from "#/lib/look/look-key";
 import { poseAccepted } from "#/lib/nearfield/controller";
-import { ALIGN_STATE, type AlignState } from "#/lib/ontology/crosswalk/pose";
+import {
+	ALIGN_STATE,
+	type AlignState,
+	workspaceProvenance,
+} from "#/lib/ontology/crosswalk/pose";
 import {
 	formatTakenAt,
 	loadRegion,
@@ -1511,6 +1515,16 @@ export function PhotoWorkspace({
 						withLabels={showPeaks}
 						photo={photo}
 						watermark={shared ? SHARE_WATERMARK : undefined}
+						// how the pose is known travels with the files, so a compass prior or unverified guess exports as
+						// such: trusted exactly when poseAccepted (export-provenance.spec.ts); null = not known yet
+						estimate={
+							alignState
+								? {
+										provenance: workspaceProvenance(alignState, verify),
+										label: ALIGN_STATE[alignState].label,
+									}
+								: null
+						}
 					/>
 				</header>
 				{notice && (
