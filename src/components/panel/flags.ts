@@ -219,6 +219,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "skylineGpu",
+		label: "Skyline cost images",
+		help: "Photo skyline detector: the per-pixel feature and sky-probability images on the GPU (Viterbi and sky-model fits stay on the CPU). Rows match the CPU to 1e-4 px.",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "terrainGpuCull",
 		label: "Terrain GPU cull",
 		help: "WebGPU: cull the batched terrain's tiles on the GPU and draw them indirectly (no CPU cull per frame).",

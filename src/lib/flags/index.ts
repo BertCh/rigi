@@ -81,6 +81,12 @@ export const FLAG_SCHEMA = {
 	 */
 	unknownGpu: onOff("on"),
 	/**
+	 * skyline detector (geo/skyline.ts detectSkylineAsync): the per-pixel feature, prior and sky-model
+	 * images on the GPU (src/lib/gpu/skyline), the sky-model fits and Viterbi on the CPU. off = the CPU
+	 * detectSkyline (also under ?gpu=off).
+	 */
+	skylineGpu: onOff("off"),
+	/**
 	 * band colour stats (LOOK_HARMONIZE, src/lib/gpu/look/color-stats-fold.ts): gpu (default since
 	 * 2026-10-01) = the per-workgroup partials are folded and finalized on the GPU (luma GPUProgramSpMV +
 	 * a finalize node, f32) and only the ColorStats (256 B) is read back; f64 = the partials (6.6 KB) come

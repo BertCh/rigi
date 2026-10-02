@@ -23,6 +23,7 @@
  *    up above the local median.
  */
 
+import { getFlag } from "../flags";
 import { clamp01, smoothstep } from "../math";
 
 export interface RGBALike {
@@ -93,7 +94,7 @@ function boxBlur(src: Float32Array, w: number, h: number, r: number) {
 	return out;
 }
 
-interface Features {
+export interface Features {
 	r: Float32Array;
 	g: Float32Array;
 	b: Float32Array;
@@ -108,7 +109,7 @@ interface Features {
 
 const BRIGHTENING_EDGE = 0.4;
 
-function computeFeatures(img: RGBALike): Features {
+export function computeFeatures(img: RGBALike): Features {
 	const { width: w, height: h, data } = img;
 	const n = w * h;
 	const r0 = new Float32Array(n);
@@ -194,7 +195,7 @@ function boxBlurH(src: Float32Array, w: number, h: number, r: number) {
 }
 
 /** Hand-made sky prior: blue & bright, or bright & unsaturated; smooth. */
-function heuristicSky(f: Features, n: number) {
+export function heuristicSky(f: Features, n: number) {
 	const s = new Float32Array(n);
 	for (let i = 0; i < n; i++) {
 		const r = f.r[i];
@@ -268,12 +269,12 @@ function solve(a: Float64Array, b: Float64Array) {
  * darker than the sky gradient extrapolated to that spot, which is the cue
  * this model exposes.
  */
-interface SkyModel {
+export interface SkyModel {
 	coef: Float64Array[]; // per channel, NB coefficients
 	sigma: number;
 }
 
-function fitSkyModel(
+export function fitSkyModel(
 	f: Features,
 	w: number,
 	h: number,
@@ -328,7 +329,7 @@ function fitSkyModel(
  * Sky probability from the sky model: close to the local sky colour, or
  * brighter and greyer than it (cloud); darker or more coloured is terrain.
  */
-function modelSky(f: Features, w: number, h: number, m: SkyModel) {
+export function modelSky(f: Features, w: number, h: number, m: SkyModel) {
 	const s = new Float32Array(w * h);
 	const sig2 = (2 * m.sigma) ** 2;
 	// Per row the basis collapses to a quadratic in u: p = a + b u + c u².
@@ -379,7 +380,7 @@ const FAR_ABOVE = 0.2;
  * Viterbi over rows. Returns the boundary row per column (0 = no sky at the
  * top, h = the whole column is sky).
  */
-function viterbi(
+export function viterbi(
 	sky: Float32Array,
 	edge: Float32Array,
 	w: number,
@@ -471,43 +472,127 @@ function viterbi(
 	return bound;
 }
 
-export function detectSkyline(
-	img: RGBALike,
-	opts: SkylineOptions = {},
-): SkylineObservation {
-	const { width: w, height: h } = img;
-	const o = {
+type ResolvedSkylineOptions = Required<
+	Omit<SkylineOptions, "returnSky" | "minWeight" | "refinePasses">
+>;
+
+function resolveOptions(h: number, opts: SkylineOptions) {
+	const o: ResolvedSkylineOptions = {
 		belowBand: opts.belowBand ?? Math.max(8, Math.round(h * 0.15)),
 		aboveBand: opts.aboveBand ?? Math.max(8, Math.round(h * 0.2)),
 		edgeWeight: opts.edgeWeight ?? 60,
 		jumpCost: opts.jumpCost ?? 2,
 		jumpCap: opts.jumpCap ?? 80,
 	};
-	const refinePasses = opts.refinePasses ?? 1;
-	const minWeight = opts.minWeight ?? 0.1;
+	return {
+		o,
+		refinePasses: opts.refinePasses ?? 1,
+		minWeight: opts.minWeight ?? 0.1,
+		returnSky: opts.returnSky !== false,
+	};
+}
+
+/** Seed weight of the first sky-model fit: the heuristic prior, favouring the top. */
+const seedWeightOf =
+	(prior: Float32Array, h: number) => (_x: number, y: number, i: number) =>
+		prior[i] * (1 - y / h) ** 6;
+
+/** Seed weight of a refit: the sky just above the current boundary. */
+const refitWeightOf =
+	(prior: Float32Array, bound: Int32Array, o: ResolvedSkylineOptions) =>
+	(x: number, y: number, i: number) => {
+		const d = bound[x] - y;
+		return d > 4 ? (0.2 + prior[i]) * (d < o.aboveBand ? 1 : 0.2) : 0;
+	};
+
+export function detectSkyline(
+	img: RGBALike,
+	opts: SkylineOptions = {},
+): SkylineObservation {
+	const { width: w, height: h } = img;
+	const { o, refinePasses, minWeight, returnSky } = resolveOptions(h, opts);
 
 	const f = computeFeatures(img);
 	const prior = heuristicSky(f, w * h);
 	// Seed the sky model from sky-coloured, smooth pixels, favouring the top.
 	let sky = prior;
-	const seed = fitSkyModel(f, w, h, (_x, y, i) => {
-		const t = 1 - y / h;
-		return prior[i] * t ** 6;
-	});
+	const seed = fitSkyModel(f, w, h, seedWeightOf(prior, h));
 	if (seed) sky = modelSky(f, w, h, seed);
 	let bound = viterbi(sky, f.edge, w, h, o);
 	for (let p = 0; p < refinePasses; p++) {
 		// Refit to the sky just above the boundary, which is what the
 		// boundary has to be discriminated against.
-		const m = fitSkyModel(f, w, h, (x, y, i) => {
-			const d = bound[x] - y;
-			return d > 4 ? (0.2 + prior[i]) * (d < o.aboveBand ? 1 : 0.2) : 0;
-		});
+		const m = fitSkyModel(f, w, h, refitWeightOf(prior, bound, o));
 		if (!m) break;
 		sky = modelSky(f, w, h, m);
 		bound = viterbi(sky, f.edge, w, h, o);
 	}
+	return finishSkyline(f, sky, bound, w, h, minWeight, returnSky);
+}
 
+/** The per-pixel stages of the detector, which may run elsewhere (the GPU: src/lib/gpu/skyline). */
+export interface SkylineStages {
+	/** computeFeatures + heuristicSky. */
+	features(img: RGBALike): Promise<{ f: Features; prior: Float32Array }>;
+	/** modelSky for a fitted model (called once per fit). */
+	modelSky(m: SkyModel): Promise<Float32Array>;
+}
+
+/**
+ * detectSkyline with its per-pixel image stages supplied by `stages`; the sky-model fits and the
+ * Viterbi passes stay here, on the CPU, exactly as detectSkyline runs them.
+ */
+export async function detectSkylineWith(
+	img: RGBALike,
+	opts: SkylineOptions,
+	stages: SkylineStages,
+): Promise<SkylineObservation> {
+	const { width: w, height: h } = img;
+	const { o, refinePasses, minWeight, returnSky } = resolveOptions(h, opts);
+	const { f, prior } = await stages.features(img);
+	let sky = prior;
+	const seed = fitSkyModel(f, w, h, seedWeightOf(prior, h));
+	if (seed) sky = await stages.modelSky(seed);
+	let bound = viterbi(sky, f.edge, w, h, o);
+	for (let p = 0; p < refinePasses; p++) {
+		const m = fitSkyModel(f, w, h, refitWeightOf(prior, bound, o));
+		if (!m) break;
+		sky = await stages.modelSky(m);
+		bound = viterbi(sky, f.edge, w, h, o);
+	}
+	return finishSkyline(f, sky, bound, w, h, minWeight, returnSky);
+}
+
+/**
+ * detectSkyline, with the per-pixel feature and sky-probability images computed on the GPU compute
+ * device when ?skylineGpu is on and a device is available (src/lib/gpu/skyline); the CPU detectSkyline
+ * otherwise, and on any GPU error. Callers that cannot await keep detectSkyline.
+ */
+export async function detectSkylineAsync(
+	img: RGBALike,
+	opts: SkylineOptions = {},
+): Promise<SkylineObservation> {
+	if (getFlag("skylineGpu") === "on" && getFlag("gpu") === "on") {
+		try {
+			const { detectSkylineGpu } = await import("../gpu/skyline");
+			const r = await detectSkylineGpu(img, opts);
+			if (r) return r;
+		} catch (e) {
+			console.warn("skyline GPU failed, using the CPU", e);
+		}
+	}
+	return detectSkyline(img, opts);
+}
+
+function finishSkyline(
+	f: Features,
+	sky: Float32Array,
+	bound: Int32Array,
+	w: number,
+	h: number,
+	minWeight: number,
+	returnSky: boolean,
+): SkylineObservation {
 	const rows = new Float32Array(w).fill(Number.NaN);
 	const weight = new Float32Array(w);
 	const win = 12;
@@ -589,7 +674,7 @@ export function detectSkyline(
 	}
 
 	const out: SkylineObservation = { width: w, height: h, rows, weight };
-	if (opts.returnSky !== false) {
+	if (returnSky) {
 		const s8 = new Uint8Array(w * h);
 		for (let i = 0; i < w * h; i++) s8[i] = Math.round(clamp01(sky[i]) * 255);
 		out.sky = s8;

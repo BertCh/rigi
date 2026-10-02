@@ -23,7 +23,7 @@ import {
 	loadScene,
 	sceneHorizon,
 } from "#/lib/geo/pipeline";
-import { detectSkyline } from "#/lib/geo/skyline";
+import { detectSkylineAsync } from "#/lib/geo/skyline";
 import type { CoarseProvider, SolveOptions } from "#/lib/geo/solve";
 import type { TileLoader } from "#/lib/geo/terrain";
 import { solveCoarse } from "#/lib/gpu/solve";
@@ -145,7 +145,7 @@ export async function solveUnknownPose(
 	const t0 = performance.now();
 	const { horizon, horizonOn } = await sceneOf();
 	const tHorizon = performance.now() - t0;
-	const sky = detectSkyline(req.image);
+	const sky = await detectSkylineAsync(req.image);
 	const yawKnown = !req.unknown.yaw;
 	const gravKnown = !req.unknown.gravity;
 	// everything known (second opinion on the app's autoAlign, second-opinion.ts): 0f's recommended

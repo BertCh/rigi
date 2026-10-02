@@ -10,7 +10,7 @@
 //   (mkdir /tmp/dawn && cd /tmp/dawn && npm i webgpu@0.3.0)   # not an app dependency
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/gpu/unknown-gpu-node.ts --set gt12|wild --unknown-gpu on|off
 //       --out out/gpu/unknown-gate/<set>-node-<arm>.json [--ids a,b] [--solve-gpu on|off] [--fused on|off]
-//       [--horizon-jitter <deg>:<seed>]
+//       [--horizon-jitter <deg>:<seed>] [--skyline-gpu on|off]
 //
 // --horizon-jitter adds seeded uniform noise of ±deg to every horizon elevation (after the march, either
 // arm): a noise arm for the precision question. Node runs are deterministic (base vs base is identical),
@@ -29,6 +29,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Device } from "@luma.gl/core";
 import { MAPTERHORN } from "../../src/lib/dem";
+import { setFlagOverride } from "../../src/lib/flags";
 import { adoptRenderDevice, gpuEnabled } from "../../src/lib/gpu/device";
 import type { UnknownPoseRequest } from "../../src/lib/integration/unknown-pose";
 import {
@@ -51,6 +52,8 @@ const set = opt("set", "gt12") as string;
 const gpu = opt("unknown-gpu", "off") === "on";
 const solveGpuWanted = opt("solve-gpu", "on") === "on";
 const fusedWanted = opt("fused", "on") === "on";
+// --skyline-gpu on|off: the ?skylineGpu arm (detectSkylineAsync: GPU cost images vs the CPU detector)
+setFlagOverride("skylineGpu", opt("skyline-gpu", "off") as string);
 const jitter = opt("horizon-jitter")?.split(":").map(Number) ?? null;
 
 /** The scene with its elevations jittered by ±amp (seeded LCG), a copy: the cached scene stays exact. */

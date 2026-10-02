@@ -7,7 +7,7 @@
  * detectSkyline on an 800 px wide copy of the photo, every 3rd column with a finite row and weight.
  * Works in a window or a worker (fetch + createImageBitmap + OffscreenCanvas).
  */
-import { detectSkyline } from "#/lib/geo/skyline";
+import { detectSkylineAsync } from "#/lib/geo/skyline";
 import type { SkylineSample } from "#/lib/pose6dof/eye";
 
 export const SAMPLE_WORK_WIDTH = 800;
@@ -24,7 +24,7 @@ export async function photoSamples(url: string) {
 	ctx.drawImage(bmp, 0, 0, W, H);
 	bmp.close();
 	const img = { width: W, height: H, data: ctx.getImageData(0, 0, W, H).data };
-	const sky = detectSkyline(img, { returnSky: false });
+	const sky = await detectSkylineAsync(img, { returnSky: false });
 	const stride = 3;
 	const samples: SkylineSample[] = [];
 	for (let x = 1; x < W; x += stride)
