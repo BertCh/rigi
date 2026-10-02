@@ -42,13 +42,21 @@ export const USAGE = {
 const SHARED = USAGE.RENDER | USAGE.SAMPLE | USAGE.STORAGE | USAGE.COPY_SRC;
 
 /**
- * Opt-in colour-pass format (?colorTarget=rg11b10): rg11b10ufloat (4 B/px, no alpha channel) for the
- * 4x MSAA target and its resolve instead of rgba16float (8 B/px). It carries NO destination alpha, so
- * the compositor reads alpha = 1 everywhere: only correct for views whose colour pass covers every
- * pixel (world view with sky). Set once, before any ColorTargets / pipeline exists, by
- * applyColorTargetFormat (device.ts); default rgba16float.
+ * Opt-in colour-pass format (?colorTarget=rg11b10-unsafe): rg11b10ufloat (4 B/px, no alpha channel) for
+ * the 4x MSAA target and its resolve instead of rgba16float (8 B/px). It has NO destination alpha
+ * (reads as 1, writes dropped), which breaks the renderer today in EVERY view (traced 2026-10-02, g3):
+ *   - photo view: layers/composite.ts reads the resolve's alpha as coverage, so the overlay is opaque
+ *     and hides the photo; the stats readback (readLayer, poseViewRgba) loses its sky mask;
+ *   - world view: layers/atm-sky.ts draws the sky "under" with blend factor one-minus-dst-alpha, which
+ *     is 0 when the target has no alpha, so the sky is never drawn (black); Dawn confirms.
+ * The format is also chosen once per device (pipelines bake it), so it cannot vary by view. Plain
+ * `?colorTarget=rg11b10` is therefore downgraded to rgba16float (device.ts warns); only
+ * `rg11b10-unsafe` honours it, for VRAM / Dawn experiments, until the sky is drawn without dst-alpha
+ * and the photo view stops reading alpha (research_notes/gpu-pod-d-2026-10-02/g3-batch-checklist.md).
+ * Set once, before any ColorTargets / pipeline exists, by applyColorTargetFormat; default rgba16float.
  */
 export type ColorTargetFormat = "rgba16float" | "rg11b10ufloat";
+export type ColorTargetRequest = "rgba16" | "rg11b10" | "rg11b10-unsafe";
 let colorTargetFormat: ColorTargetFormat = "rgba16float";
 
 /** Which format the colour pass uses now. */
@@ -57,19 +65,38 @@ export function getColorTargetFormat(): ColorTargetFormat {
 }
 
 /**
- * Select the colour-pass format: `requested` rg11b10 is honoured only when the device grants
- * rg11b10ufloat-renderable (MSAA and resolve are then both rg11b10ufloat), else rgba16float.
- * Returns the format in force.
+ * Pure format decision: rg11b10ufloat only for the explicit `rg11b10-unsafe` request on a device with
+ * rg11b10ufloat-renderable. `downgrade` says why a request for rg11b10 did not get it (null: none).
+ */
+export function resolveColorTargetFormat(
+	requested: ColorTargetRequest,
+	hasRenderable: boolean,
+): {
+	format: ColorTargetFormat;
+	downgrade: "alpha-unsafe" | "no-feature" | null;
+} {
+	if (requested === "rgba16") return { format: "rgba16float", downgrade: null };
+	if (!hasRenderable) return { format: "rgba16float", downgrade: "no-feature" };
+	if (requested === "rg11b10")
+		return { format: "rgba16float", downgrade: "alpha-unsafe" };
+	return { format: "rg11b10ufloat", downgrade: null };
+}
+
+/**
+ * Select the colour-pass format (see resolveColorTargetFormat; MSAA and resolve always share it).
+ * Returns the format in force; `onDowngrade` hears why a requested rg11b10 was not honoured.
  */
 export function applyColorTargetFormat(
 	device: Pick<Device, "features">,
-	requested: "rgba16" | "rg11b10",
+	requested: ColorTargetRequest,
+	onDowngrade?: (reason: "alpha-unsafe" | "no-feature") => void,
 ): ColorTargetFormat {
-	colorTargetFormat =
-		requested === "rg11b10" &&
-		device.features.has("rg11b10ufloat-renderable" as never)
-			? "rg11b10ufloat"
-			: "rgba16float";
+	const { format, downgrade } = resolveColorTargetFormat(
+		requested,
+		device.features.has("rg11b10ufloat-renderable" as never),
+	);
+	colorTargetFormat = format;
+	if (downgrade) onDowngrade?.(downgrade);
 	return colorTargetFormat;
 }
 

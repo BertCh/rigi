@@ -171,9 +171,13 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "colorTarget",
 		label: "Colour target",
-		help: "WebGPU colour pass format. rg11b10 halves the MSAA colour VRAM but has no alpha: experimental, only for views the sky fully covers.",
+		help: "WebGPU colour pass format. rg11b10 is downgraded to RGBA16F (no alpha breaks the photo overlay and the world sky); rg11b10-unsafe forces the half-VRAM format for experiments.",
 		group: "render",
-		options: { rgba16: "RGBA16F (default)", rg11b10: "RG11B10 (no alpha)" },
+		options: {
+			rgba16: "RGBA16F (default)",
+			rg11b10: "RG11B10 (downgraded)",
+			"rg11b10-unsafe": "RG11B10 (no alpha, forced)",
+		},
 	},
 	{
 		name: "gpu",

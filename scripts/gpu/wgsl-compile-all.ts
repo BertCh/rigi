@@ -827,7 +827,7 @@ async function enumerateColorTargetRg11b10() {
 	const { applyColorTargetFormat, getColorTargetFormat } = await import(
 		"../../src/lib/deck-webgpu/targets"
 	);
-	if (applyColorTargetFormat(device, "rg11b10") !== "rg11b10ufloat")
+	if (applyColorTargetFormat(device, "rg11b10-unsafe") !== "rg11b10ufloat")
 		throw new Error("applyColorTargetFormat did not select rg11b10ufloat");
 	try {
 		const fakeCtx = {

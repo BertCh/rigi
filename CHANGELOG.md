@@ -8,6 +8,7 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - WebGPU imagery overflow is near-first: on devices capped at `maxTextureArrayLayers` (256) a resident far tile now yields its layer to a nearer wanted one (`planImageryOverflow`, `metrics().imagery.evictions`), instead of whichever tiles arrived first keeping imagery. Browser-unverified.
 - **WebGL blank first draw: the redraw waits for the link.** A draw whose program is still linking (KHR_parallel_shader_compile) is skipped silently by luma, so the first terrain pass of a fresh page can read back empty. `redrawIfBlank` now awaits `waitForPrograms` before redrawing, and the first geometry refresh redraws a blank buffer the same way (deck engine only; browser-unverified).
 - Near field (S1 prep, opt-in): cliff-lip anchoring (`nearfield/cliff-lip.ts`, `AnchorOpts.cliffLip`, flag `anchorCliff`, off by default) drops DEM range discontinuities and the lip face from the anchor fit; `nearfield/anchor-parity.ts` compares the DEM grids two engines feed the anchor; segmenter licence shortlist in `research_notes/segmenter-shortlist-2026-10-02/`.
+- **`?colorTarget=rg11b10` is now downgraded to rgba16float with a console warning** (rg11b10ufloat has no destination alpha: the photo overlay turns opaque and the world sky, blended under with `one-minus-dst-alpha`, is never drawn). `?colorTarget=rg11b10-unsafe` forces the old behaviour for experiments.
 
 ### R5 propagation hardening (2026-10-02)
 

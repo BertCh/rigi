@@ -8,6 +8,7 @@ import {
 	colorPassBytes,
 	geometrySize,
 	getColorTargetFormat,
+	resolveColorTargetFormat,
 	TARGET_FORMATS,
 	USAGE,
 } from "../targets";
@@ -29,18 +30,52 @@ describe("geometrySize", () => {
 });
 
 describe("colour target format", () => {
-	it("honours rg11b10 only when the device is renderable for it", () => {
-		expect(applyColorTargetFormat(deviceWith(), "rg11b10")).toBe("rgba16float");
+	it("plain rg11b10 is downgraded: no destination alpha breaks the photo overlay and the sky", () => {
+		const reasons: string[] = [];
+		const renderable = deviceWith("rg11b10ufloat-renderable");
 		expect(
-			applyColorTargetFormat(deviceWith("rg11b10ufloat-renderable"), "rg11b10"),
+			applyColorTargetFormat(renderable, "rg11b10", (r) => reasons.push(r)),
+		).toBe("rgba16float");
+		expect(reasons).toEqual(["alpha-unsafe"]);
+		expect(getColorTargetFormat()).toBe("rgba16float");
+	});
+	it("rg11b10-unsafe is honoured only when the device is renderable for it", () => {
+		const reasons: string[] = [];
+		expect(
+			applyColorTargetFormat(deviceWith(), "rg11b10-unsafe", (r) =>
+				reasons.push(r),
+			),
+		).toBe("rgba16float");
+		expect(reasons).toEqual(["no-feature"]);
+		expect(
+			applyColorTargetFormat(
+				deviceWith("rg11b10ufloat-renderable"),
+				"rg11b10-unsafe",
+			),
 		).toBe("rg11b10ufloat");
 		expect(getColorTargetFormat()).toBe("rg11b10ufloat");
 		expect(
 			applyColorTargetFormat(deviceWith("rg11b10ufloat-renderable"), "rgba16"),
 		).toBe("rgba16float");
 	});
+	it("resolveColorTargetFormat is pure and the default never warns", () => {
+		expect(resolveColorTargetFormat("rgba16", true)).toEqual({
+			format: "rgba16float",
+			downgrade: null,
+		});
+		expect(resolveColorTargetFormat("rgba16", false).downgrade).toBeNull();
+		expect(resolveColorTargetFormat("rg11b10", false).downgrade).toBe(
+			"no-feature",
+		);
+		expect(resolveColorTargetFormat("rg11b10-unsafe", true).format).toBe(
+			"rg11b10ufloat",
+		);
+	});
 	it("TARGET_FORMATS follow it, and rg11b10 loses STORAGE on the resolve", () => {
-		applyColorTargetFormat(deviceWith("rg11b10ufloat-renderable"), "rg11b10");
+		applyColorTargetFormat(
+			deviceWith("rg11b10ufloat-renderable"),
+			"rg11b10-unsafe",
+		);
 		expect(TARGET_FORMATS.colorMS.format).toBe("rg11b10ufloat");
 		expect(TARGET_FORMATS.color.usage & USAGE.STORAGE).toBe(0);
 		expect(TARGET_FORMATS.color.usage & USAGE.SAMPLE).toBe(USAGE.SAMPLE);

@@ -267,7 +267,13 @@ export async function createWebgpuDeck(
  */
 export function adoptForCompute(device: Device) {
 	// opt-in ?colorTarget=rg11b10 (targets.ts): chosen once per device, before any target exists
-	applyColorTargetFormat(device, getFlag("colorTarget"));
+	applyColorTargetFormat(device, getFlag("colorTarget"), (reason) =>
+		console.warn(
+			reason === "alpha-unsafe"
+				? "[webgpu] ?colorTarget=rg11b10 ignored: rg11b10ufloat has no alpha, which breaks the photo overlay and the world sky. Use ?colorTarget=rg11b10-unsafe to force it for experiments."
+				: "[webgpu] ?colorTarget=rg11b10 ignored: device lacks rg11b10ufloat-renderable",
+		),
+	);
 	adoptRenderDevice(device);
 }
 
