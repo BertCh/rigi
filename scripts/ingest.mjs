@@ -15,6 +15,13 @@ import path from "node:path";
 import exifr from "exifr";
 import { focalPxFromF35, isCropped } from "../src/lib/camera/index.ts";
 import { overpass as overpassApi } from "../src/lib/overpass.ts";
+// one EXIF → prior implementation for ingest and browser uploads (MakerNote gravity, holding, capture time)
+import {
+	appleGravity,
+	captureTime,
+	orientationFromGravity,
+	readExif,
+} from "../src/lib/upload/exif.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const IMG_DIR = path.join(ROOT, "img");
@@ -53,111 +60,6 @@ function resetJpegOrientation(file) {
 		o += 2 + len;
 	}
 	return false;
-}
-
-/** Parse the "Apple iOS" MakerNote IFD and return { tag: value } for the tags we care about. */
-function parseAppleMakerNote(buf) {
-	const b = Buffer.from(buf);
-	if (b.toString("latin1", 0, 9) !== "Apple iOS") return {};
-	const le = b.toString("latin1", 12, 14) === "II";
-	const u16 = (o) => (le ? b.readUInt16LE(o) : b.readUInt16BE(o));
-	const u32 = (o) => (le ? b.readUInt32LE(o) : b.readUInt32BE(o));
-	const i32 = (o) => (le ? b.readInt32LE(o) : b.readInt32BE(o));
-	const n = u16(14);
-	const out = {};
-	for (let i = 0; i < n; i++) {
-		const e = 16 + i * 12;
-		const tag = u16(e);
-		const type = u16(e + 2);
-		const count = u32(e + 4);
-		const valOff = u32(e + 8);
-		if (type === 10 || type === 5) {
-			// (S)RATIONAL — always stored at an offset relative to the MakerNote start
-			const vals = [];
-			for (let k = 0; k < count; k++) {
-				const o = valOff + k * 8;
-				const num = type === 10 ? i32(o) : u32(o);
-				const den = type === 10 ? i32(o + 4) : u32(o + 4);
-				vals.push(den ? num / den : 0);
-			}
-			out[tag] = vals;
-		}
-	}
-	return out;
-}
-
-/**
- * Camera rotation prior from the device gravity vector.
- * CoreMotion device frame: +x right (portrait), +y up (portrait top), +z out of screen.
- * The rear camera looks along -z. Image axes depend on how the phone was held; we pick
- * the image "right" and "up" device axes from pixel aspect + EXIF orientation.
- */
-function orientationFromGravity(g, width, height, exifOrientation) {
-	if (!g) return null;
-	const [gx, gy, gz] = g;
-	const norm = Math.hypot(gx, gy, gz) || 1;
-	const d = [gx / norm, gy / norm, gz / norm]; // gravity (points down) in device frame
-	// Stored pixels for iPhone are always landscape sensor-native; EXIF orientation rotates for display.
-	// Sensor-native (Orientation=1): image right = device -y, image up = device -x (home button right).
-	// Rather than trust the tag, choose the holding orientation whose "down" best matches gravity.
-	const candidates = [
-		{ name: "landscape-left", right: [0, 1, 0], up: [-1, 0, 0] },
-		{ name: "landscape-right", right: [0, -1, 0], up: [1, 0, 0] },
-		{ name: "portrait", right: [1, 0, 0], up: [0, 1, 0] },
-		{ name: "portrait-upside", right: [-1, 0, 0], up: [0, -1, 0] },
-	];
-	const displayLandscape = width >= height;
-	let best = null;
-	for (const c of candidates) {
-		const isLandscape = c.name.startsWith("landscape");
-		if (isLandscape !== displayLandscape) continue;
-		const downDot = -(c.up[0] * d[0] + c.up[1] * d[1] + c.up[2] * d[2]);
-		if (!best || downDot > best.downDot) best = { ...c, downDot };
-	}
-	const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-	const fwd = [0, 0, -1];
-	// Pitch: elevation of the optical axis above horizon = angle between fwd and -gravity, minus 90°
-	const pitch =
-		(Math.asin(Math.max(-1, Math.min(1, -dot(fwd, d)))) * 180) / Math.PI;
-	// Roll: rotation of image-right relative to the horizontal plane, about the optical axis
-	const gRight = dot(best.right, d);
-	const gUp = dot(best.up, d);
-	const roll = (Math.atan2(gRight, -gUp) * 180) / Math.PI;
-	return { pitch, roll, holding: best.name, exifOrientation };
-}
-
-/**
- * Capture time as a UTC ISO string. exifr's revived DateTimeOriginal is interpreted in the
- * *ingesting machine's* zone, so read the raw strings: GPS date+time (UTC) first, else
- * DateTimeOriginal + OffsetTimeOriginal.
- */
-async function captureTime(src) {
-	const raw = await exifr.parse(src, {
-		reviveValues: false,
-		gps: true,
-		exif: true,
-	});
-	const offset = raw?.OffsetTimeOriginal ?? raw?.OffsetTime ?? null;
-	if (raw?.GPSDateStamp && Array.isArray(raw.GPSTimeStamp)) {
-		const [Y, M, D] = raw.GPSDateStamp.split(":").map(Number);
-		const [h, m, sec] = raw.GPSTimeStamp;
-		const ms = Date.UTC(
-			Y,
-			M - 1,
-			D,
-			h,
-			m,
-			Math.floor(sec),
-			Math.round((sec % 1) * 1000),
-		);
-		return { utc: new Date(ms).toISOString(), offset };
-	}
-	if (raw?.DateTimeOriginal) {
-		const [d, t] = raw.DateTimeOriginal.split(" ");
-		const iso = `${d.replaceAll(":", "-")}T${t}${offset ?? "Z"}`;
-		return { utc: new Date(iso).toISOString(), offset };
-	}
-	return { utc: null, offset };
 }
 
 /** Stored pixel size of an image file (sips; HEIC/JPEG, before EXIF orientation). */
@@ -251,14 +153,13 @@ async function main() {
 			console.log(
 				`cropped: ${id} exif ${sensor.width}x${sensor.height} native ${native.width}x${native.height}${isCropped(sensor, native) ? "" : " (same aspect: read as a resample)"}`,
 			);
-		const time = await captureTime(src);
-		const mn = ex.makerNote ? parseAppleMakerNote(ex.makerNote) : {};
-		const gravity = mn[0x0008] ?? null;
+		const time = captureTime((await readExif(src)).raw);
+		const gravity = appleGravity(ex.makerNote);
 		const f35 = ex.FocalLengthIn35mmFormat ?? 26;
 		// diagonal-based conversion: f_px = f35 * diag_px / FF35_DIAGONAL_MM (camera/focal.ts), on the sensor diagonal for a crop
 		const fPx = focalPxFromF35(f35, { width: w, height: h }, sensor, native);
 		const vfov = (2 * Math.atan(h / 2 / fPx) * 180) / Math.PI;
-		const orient = orientationFromGravity(gravity, w, h, ex.Orientation);
+		const orient = orientationFromGravity(gravity, w, h);
 		photos.push({
 			id,
 			src: `/photos/${id}.jpg`,

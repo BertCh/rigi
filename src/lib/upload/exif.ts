@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// EXIF → camera prior, ported from scripts/ingest.mjs so browser uploads get exactly the same
+// EXIF → camera prior, shared with scripts/ingest.mjs (which imports the MakerNote, gravity and
+// capture-time code from here) so browser uploads get exactly the same
 // PhotoMeta as ingested photos. Pure functions (no DOM), so this runs in node for the tests too.
 //
 // Pose convention (src/lib/pose.ts): yaw = true heading clockwise from north, pitch up +,
@@ -161,7 +162,7 @@ export const GRAVITY_NORM_RANGE = [0.5, 2] as const;
  * when absent or implausible (non-finite, or |g| outside GRAVITY_NORM_RANGE: e.g. all-zero
  * denominators read as 0). Null makes pitch/roll unknown instead of a trusted 0/180° placeholder.
  */
-function appleGravity(
+export function appleGravity(
 	makerNote: Uint8Array | undefined | null,
 ): number[] | null {
 	if (!makerNote) return null;

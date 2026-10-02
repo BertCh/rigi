@@ -63,7 +63,7 @@ Privacy check: the JPEG passthrough keeps the full EXIF, but it stays in Indexed
 |---|---|---|---|---|---|
 | U1 | Plausibility guards F1–F9 + specs | S | Low. Bit-identical for in-range EXIF: parity on the 19 HEICs is unchanged before and after (the one remaining diff, IMG_4703 vfov, is the probe not passing the crop source size, and it is the same on master) | vitest exif + photos specs, tsc, fast tier | **landed** |
 | U2 | This plan doc | S | none | — | **landed** |
-| U3 | `scripts/ingest.mjs` imports `parseAppleMakerNote`, `orientationFromGravity` and `captureTime` from `src/lib/upload/exif.ts` (it already runs under tsx). It removes about 100 duplicated lines. For the 19 HEICs, prove photos.json is unchanged with a dry-run diff | S | Low. ingest needs sips and network to run fully, so the proof is a dry-run of the meta builder only | parity script, identical photos.json fields | next |
+| U3 (**landed**) | `scripts/ingest.mjs` imports `parseAppleMakerNote`, `orientationFromGravity` and `captureTime` from `src/lib/upload/exif.ts` (it already runs under tsx). It removes about 100 duplicated lines. For the 19 HEICs, prove photos.json is unchanged with a dry-run diff | S | Low. ingest needs sips and network to run fully, so the proof is a dry-run of the meta builder only | parity script, identical photos.json fields | **landed** |
 | U4 | `readExif` also reads XMP (`xmp: true`) into `local.xmp`, as data only: DJI gimbal yaw/pitch/roll, FlightYaw, RelativeAltitude, GPano Pose*. Behind a new flag `xmpPose` (declared in `src/lib/flags`). With the flag on, pitch/roll come from the gimbal (DJI pitch maps straight to our pitch-up+ convention) and yaw becomes a *hint* (yawUnknown stays true). Specs use synthetic XMP packets | M | Medium: a new prior path, so it stays opt-in until a drone dev set exists | flag off = bit-identical; spec | later |
 | U5 | Holding from EXIF Orientation × gravity: when the best off-aspect candidate beats the best on-aspect one by a wide margin (crop flipped the aspect), set `local.holdingAmbiguous` and free roll. Flag-gated | S | Medium (roll prior) | dev-split A/B, opt-in | later |
 | U6 | Derive f35 from FocalLength + FocalPlaneX/YResolution when FocalLengthIn35mmFormat is missing (DSLRs, some Androids). Keep `focalUnknown: true` but seed f35 better | S | Medium: FocalPlaneResolution often refers to a different frame | flag + spec | later |
@@ -84,8 +84,20 @@ Privacy check: the JPEG passthrough keeps the full EXIF, but it stays in Indexed
 
 ## 7. Landed
 
-- U1: `upload: EXIF plausibility guards …` (sha in section 8 after landing).
+- U1 `c4507f4` upload: EXIF plausibility guards F1–F9 + specs (exif.spec +10 cases, photos.spec +1). Parity: `scratchpad/fuzz/parity.mts` gives the same single diff on master and with the change (IMG_4703 vfov is a probe artefact: the probe passes no crop source size). Its CHANGELOG line was dropped at landing, because it conflicted with a peer's uncommitted CHANGELOG hunk. The text is in section 8.
+- U2 `f22da8c` this plan.
+- U3 (next commit) `scripts/ingest.mjs` drops its copies of `parseAppleMakerNote`, `orientationFromGravity` and `captureTime` (−105 lines) and imports them, plus `appleGravity` and `readExif`, from `src/lib/upload/exif.ts`. Parity on the 19 `img/*.HEIC` against the old ingest functions (gravity, pitch, roll, holding, UTC time, offset): **0 diffs** (`scratchpad/fuzz/ingest-parity.mts`). The import graph resolves under tsx: the script runs until its `img/` readdir.
+
+Self-review checklist (no Sonnet reviewer was available):
+- Real-world validity of the bounds: phone |g| is 0.98–1.08 on the corpus. A reading outside 0.5–2 g is free fall or a violent shake, where the direction is not gravity anyway. FocalLengthIn35mmFormat 5–3000 covers 13 mm phone ultrawides up to the 3000 mm P1000. (0, 0) is open sea. No consumer GPS predates 1980.
+- Callers: `routes/upload.tsx` and the new `upload/coach.ts` read `diag.hasGps`/`hasF35` and now treat rejected values as missing, which is the intent. Roll import interpolates position-less photos (`roll/import/index.ts:117`), so a null-island photo is now interpolated instead of being clustered at 0,0.
+- `formatTakenAt` is still unanchored, so trailing bytes after an offset still parse.
+- Solve and accept paths: no change for in-range EXIF. For implausible EXIF the change only *frees* parameters (more unknowns). It never adds evidence.
 
 ## 8. Log
 
-(Filled in after landing.)
+- CHANGELOG text that still has to land (it conflicted with a peer's uncommitted hunk): "Upload EXIF guards (`src/lib/upload/exif.ts`): GPS at (0, 0) or out of range, a zeroed or garbled Apple gravity vector, an out-of-range 35 mm focal and a pre-1980 GPS date stamp now read as unknown, not as trusted placeholders. Headings wrap to [0, 360). Square images let gravity choose the holding. `scripts/ingest.mjs` shares the MakerNote, gravity and time code with uploads. In-range values are unchanged."
+- Environment note: in `scratchpad/wt` worktrees, `upload/__tests__/index.spec.tsx` and `decode-pipeline.spec.tsx` fail with Vite "Denied ID …libheif-bundle.mjs?url", because the node_modules symlink points outside the worktree root. They pass in the main tree. The fast tier on U1 had 4 FAIL rows: biome (peer roll files), unit (that, plus python-unit without a venv), ontology (peer picker and roll storage keys) and align-cert (120 s timeout under load). None of them are in this step's files.
+- Mid-session the disk filled to 100% (ENOSPC). That broke one rebase; the lead recovered it inside its own worktree only.
+- Next: U4 (XMP pose behind `xmpPose`), U5 (holding ambiguity), U6 (f35 from FocalPlaneResolution), U7 (proposal to the baseline-pipeline owner), U8 (README).
+

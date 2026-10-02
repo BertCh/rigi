@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+	appleGravity,
 	buildPhotoMeta,
 	captureTime,
 	DEFAULT_F35,
@@ -597,5 +598,16 @@ describe("readExif error output", () => {
 		expect(r.tags).not.toHaveProperty("errors");
 		expect(r.raw).not.toHaveProperty("errors");
 		expect(exifDiagnostics(r.tags).hasExif).toBe(false);
+	});
+});
+
+describe("appleGravity (shared with scripts/ingest.mjs)", () => {
+	it("returns the AccelerationVector, or null when absent or implausible", () => {
+		expect(appleGravity(makerNote(0x0008, [0, -1, -0.1]))).toEqual([
+			0, -1, -0.1,
+		]);
+		expect(appleGravity(makerNote(0x0008, [0, 0, 0]))).toBeNull();
+		expect(appleGravity(makerNote(0x0009, [0, -1, 0]))).toBeNull();
+		expect(appleGravity(undefined)).toBeNull();
 	});
 });
