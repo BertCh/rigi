@@ -161,6 +161,17 @@ where nothing else did.
   array with a whole chunk of free layers is compacted by copy (`TextureArrayAtlas.compact`, graph
   `atlas-resize|…`) and one with no live layer is dropped; a look without imagery releases every
   layer after 10 s (`releaseWhenIdle`, so the matcher's pose views do not re-upload the drape).
+  The batched height arrays (`bterrain-h256` / `h512`) compact on idle too: 4 s after a sync that
+  freed layers, a pool with at least its initial capacity free compacts through
+  `TextureArrayAtlas.compactLeased`, which moves the store's own layers and the live `AtlasLease`
+  layers together, re-points the leases and returns the remap. It refuses while a leased write is
+  in flight and whenever the live layers it sees differ from the allocator's `used()`. The old
+  texture is destroyed 2 s later so in-flight relief and gather reads finish on it; the texture
+  object changes, so gathers planned before re-plan (heightAt) and `?renderBundles=on` re-records.
+  On a 256-layer device `TileStore.sync` gives layers to the nearest tiles by (distance, id) when a
+  tier's wanted tiles do not fit (`atlas-layout.ts` `nearestWithin`): a nearer fresh tile evicts
+  the farthest drawn non-leased one, and leases held by spare meshes count against the budget.
+  Checks: `atlas-layout`, `height-atlas-dawn`.
 - `base-slots.ts`: the batched terrain's base-grid storage buffer is packed, one slot of
   2·(G+1)² vec4 per tile at an offset kept in the tile's table row (`t2.w`), instead of a fixed
   G = 64 slot per row (WAG W1.6: 47 → ~17 MiB in the photo view, with 15 % headroom). `base-slots.check.ts` (node).
@@ -354,8 +365,10 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   submit) or an atlas grown since the plan take heightAt. `replayHeights` records and replays the
   value-independent readers. Wired in the engine for the camera DEM height (init), `buildTrails`
   and peak snapping (`snapPeaksNear`'s `localMax`; a peak being gathered joins the list on a later
-  call, `settle()` waits for the pose's peaks and for a trail build still gathering). `snapOne`, Step Inside's ground / `nearFieldDemRange`
-  and the lake floor (`geoLakeFloor`, off) keep heightAt. Gates: fast check `height-gather`
+  call, `settle()` waits for the pose's peaks and for a trail build still gathering). The lake floor's DEM-median
+  level samples (`geoLakeFloor`, off) go through it too (`startLakeFloor`'s `absHeights`, replayed;
+  a rejection or the 3 s timeout falls back to heightAt, same result). `snapOne` and Step Inside's
+  ground / `nearFieldDemRange` keep heightAt. Gates: fast check `height-gather`
   (emulated kernel) and `scripts/deck-webgpu/height-gathers-probe.mjs` (counters, atlas bytes, and
   parity of camera height / snapped peaks / trail positions with the CPU readers). Counters:
   `globalThis.__rigiHeightGathers`. Measured 2026-10-01 (Apple / Metal, IMG_7086 / 6958 / 3304,
@@ -459,7 +472,10 @@ and the precision gate call these on either engine (`src/lib/renderer.ts`, optio
 - `renderPoseView(pose)`: geometry from a private `WebGpuGeometrySource` (xyz, sky = 0), colour from
   `renderOffscreen({pose, cores: [terrain]})` (rgba16float, linear premultiplied) converted with
   `poseViewRgba` (deck's arithmetic, sky #b9cde0). Near discard is off while it runs (`poseView`),
-  the look is replace + satellite, and it waits for the imagery array's pending uploads first.
+  the look is replace + satellite, and it waits for the imagery array's pending uploads first. Afterwards it holds the imagery
+  layers for `IMAGERY_POSE_VIEW_HOLD_MS` (120 s, `ImageryArray.hold`), so pose views spaced further
+  apart than the 10 s idle release do not re-upload the drape; a release inside the hold is deferred
+  (`stats.holdDeferrals`). Check `imagery-release`.
 
 Parity, `scripts/deck-webgpu/pose-view-parity.mjs` (2026-10-01, IMG_7155 / 6958 / 7018, yaw
 offsets −20 / 0 / +20 on the full terrain, Apple Metal): the same tiles (534–539) and a

@@ -85,6 +85,9 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
 6. luma primitives (`GPUReduction` / `GPUSort` / `GPUScan` / `GPUHistogram`) are graph nodes too,
    with per-node timings. Worked examples: `horizon/graph.ts` (one kernel), `look/relief-graph.ts`
    (a chain with clears and a CPU condition), `look/textures.ts` (texture inputs).
+   `scripts/gpu/haze-argmin-dawn.ts` and `stats-fold-dawn.ts` (`DAWN_DIR`) run the two luma `GPUProgram`
+   lowerings (haze arg-min, band-stats fold) on real Dawn devices against their CPU emulation (shared
+   generators in `look/*.fixtures.ts`). Dawn lacks `subgroup_id`, so the SpMV subgroup-row branch is browser-only.
 7. Add a bench (`bench.ts` in the module plus `scripts/gpu/<name>-bench.mjs`) that compares against
    the CPU twin and writes small JSON under `out/gpu/**`. Add a row to the table below.
 8. Declare the module in the app graph manifest (`app-graph/manifest.ts`: island I0–I12, its

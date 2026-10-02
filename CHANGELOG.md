@@ -4,6 +4,16 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### luma compute follow-ups (2026-10-01, WAG-next)
+
+- **Sky worker graph lifetime.** The GPU prep and refine graphs are released after 30 s without a request, and a prep that disables itself frees its graphs at once (the device stays; later requests rebuild the same graphs).
+- **Worker flags.** Worker realms (eye search, unknown-pose, horizon, align, baseline, ridgelines) now honour explicit page flags (`?skylineGpu`, `?gpu=off`, `?horizonPrecision`, `?gpuHorizon`, `?mosaicGpu`, `?unknownGpu`, `?alignPrecision`, `?skyGpuPrep`), forwarded through `realmGpuOptions().flags`. Default URLs are unchanged.
+- **Matcher pose views** keep the draped imagery resident for 2 min (`ImageryArray.hold`), so spaced pose views no longer re-upload it.
+- **Lake floor** DEM-median level samples read heights through the GPU height gather on WebGPU (CPU fallback unchanged, bit-identical in the check).
+- **Height atlases** (`bterrain-h256` / `h512`) compact on idle, moving leased and owned layers together; on 256-layer devices the nearest tiles win layers when the wanted set overflows.
+- **Dawn evidence for the two `GPUProgram` lowerings**: `scripts/gpu/haze-argmin-dawn.ts` (both indirect-gate branches) and `scripts/gpu/stats-fold-dawn.ts` (workgroup-row SpMV on a default and a core device, layout-failure marker); fixtures moved to `haze-argmin.fixtures.ts` / `color-stats-fold.fixtures.ts`. No further stages qualify for a lowering.
+- New fast checks: `sky-graph-idle`, `realm-flags`, `imagery-release`, `height-atlas-dawn`, `haze-argmin-dawn`, `stats-fold-dawn`.
+
 ### Wave 5, wave 2 (2026-10-02)
 
 - **Default look = Landeskarte.** The `swiss` preset, shown as "Landeskarte", becomes the Swiss signature:
