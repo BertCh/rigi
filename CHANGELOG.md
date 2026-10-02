@@ -4,6 +4,12 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **luma.gl / deck.gl frontier wave (2026-10-02, browser-unverified).**
+  - Vendored luma.gl bumped to `10.0.0-alpha.2-rigi.5`. It adds luma master `16445518` (#3348 compat-mode cube views), the updated #3313 (idempotent attached-device teardown) and three local commits: `STREAM_READ` for WebGL readback buffers, `Buffer.readAsync(…, {target})`, and WebGL multisampled textures with render-pass `resolveTargets` / `depthStencilResolveTarget`. deck.gl stays `9.4.0-rigi.2` (re-checked, no upstream change). The WebGL compositor's MSAA colour pass and the geometry readback now use these luma APIs (raw WebGL in `deck/composite.ts` 75 → 14). WIP, browser-unverified.
+  - GPU: the last hand-packed compute uniforms (horizon march, skyglobal, skyline, sky prep/refine, splat-sort) are declared once with `defineUniformBlock` (luma `ShaderBlockWriter`); new fast check `gpu-uniform-block-b` proves the bytes identical (browser-unverified).
+  - GPU: the roll panorama strip and the WebGL Step Inside splat colour pass run on luma.gl (a `WebGLDevice`, Models, Textures and Framebuffers) instead of hand-written WebGL. WebGPU adapter peeks, error scopes and ORT device/buffer handoffs each go through one helper (`gpu/adapter-peek.ts`, `core/queue.ts openErrorScopes`, `core/luma.ts nativeWebGPUDevice/nativeWebGPUBuffer`). The gpu-raw-lint ratchet drops from 268 to 127 escapes (browser-unverified).
+  - `@math.gl/proj4` 5.0.0-alpha.10 evaluated for LV95 and not adopted: it matches proj4 to 6e-9 m, but the somerc core alone is 18 KB min+gzip and ships no geoid. Our swisstopo formulas (≤ 0.72 m forward, ≤ 3.9 m inverse from rigorous EPSG:2056) are now pinned by a spec. A sweep of the vendored luma gpgpu catalogue (`GPUKMeans`, FFT, convolution, compaction, gather, histogram, group aggregation, finite differences, batch sort, scene/virtual geometry) found no new adoption.
+
 - **Gipfelbuch: 19 sheets consolidated to 16.**
   - Merged sheets: Baseline Pipeline into Viewport Inference, Camera Prior into Photo, Terrain Sampler into DEM Source (now titled "Terrain Model"). The old URLs redirect to the merged sheet.
   - Terrain Snapping is now a short chapter II hub. It links to Eye Rule, Peak and DEM Anchoring instead of retelling them, and Rigi in one sheet is cut to an overview.
