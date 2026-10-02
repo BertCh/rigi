@@ -82,6 +82,9 @@ export const nativeWebGPUBuffer = (buffer: Buffer): GPUBuffer =>
 	(buffer as WebGPUBuffer).handle;
 
 export type {
+	GPUBatchSortProps,
+	GPUBVHProps,
+	GPUBVHQueryProps,
 	GPUCommandGraphComputeExecutable,
 	GPUCommandGraphComputeNode,
 	GPUCommandGraphCopyNode,
@@ -102,11 +105,17 @@ export type {
 	GPUCommandGraphRenderNode,
 	GPUCommandGraphStats,
 	GPUCommandGraphTimingReport,
+	GPUGridAggregationProps,
+	GPUGridBinningProps,
+	GPUGridIndexProps,
+	GPUGridIndexQueryProps,
 	GPUHistogramProps,
+	GPUMatVecProps,
 	GPUNode,
 	GPUOperation,
 	GPUOperationLoweringContext,
 	GPUOperationMetadata,
+	GPUPointSpatialFilterProps,
 	GPUProgramBindings,
 	GPUProgramCompilation,
 	GPUProgramLoweringReport,
@@ -114,6 +123,7 @@ export type {
 	GPUReductionProps,
 	GPUScalarFormat,
 	GPUScanProps,
+	GPUSegmentedSortProps,
 	GPUSortProps,
 	GraphBufferDescriptor,
 	GraphBufferUsage,
@@ -129,6 +139,9 @@ export type {
 } from "@luma.gl/gpgpu/gpu-core";
 export {
 	CompiledGPUCommandGraph,
+	GPUBatchSort,
+	GPUBVH,
+	GPUBVHQuery,
 	GPUCommandGraph,
 	GPUCommandGraphEncoding,
 	GPUCommandGraphInspector,
@@ -136,7 +149,13 @@ export {
 	GPUConditionalOperation,
 	GPUConvolution,
 	GPUFFT1D,
+	GPUGridAggregation,
+	GPUGridBinning,
+	GPUGridIndex,
+	GPUGridIndexQuery,
 	GPUHistogram,
+	GPUMatVec,
+	GPUPointSpatialFilter,
 	GPUProgram,
 	GPUProgramCompiler,
 	GPUProgramCSRMatrix,
@@ -146,13 +165,27 @@ export {
 	GPUReadbackTicket,
 	GPUReduction,
 	GPUScan,
+	GPUSegmentedSort,
 	GPUSort,
 	GraphBufferHandle,
 	GraphDataView,
 	GraphTextureHandle,
 	GraphTextureView,
+	GraphVectorView,
 	scalarArithmetic,
 	scalarCompare,
 } from "@luma.gl/gpgpu/gpu-core";
 // GPUData: the buffer-backed chunk that binds a GPUProgram external vector (core/program.ts)
 export { GPUData } from "@luma.gl/gpgpu/gpu-data";
+// Vector search (k-means, exact top-k similarity): a sibling experimental subpath over the same
+// gpu-core graph types, so it is re-exported here under the same one-importer rule.
+export type {
+	GPUKMeansProps,
+	GPUSimilaritySearchProps,
+	GraphEmbeddingMatrix,
+	GraphEmbeddingMatrixChunk,
+} from "@luma.gl/gpgpu/gpu-vector-search";
+export {
+	GPUKMeans,
+	GPUSimilaritySearch,
+} from "@luma.gl/gpgpu/gpu-vector-search";
