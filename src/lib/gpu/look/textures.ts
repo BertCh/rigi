@@ -101,7 +101,8 @@ import {
 	TEX_STATS,
 	ZERO_U32,
 } from "./gather-tex.wgsl";
-import { GF_H0, GF_H1, GF_V0, GF_V1 } from "./guided-filter.wgsl";
+import { GF_FINISH, GF_PREP, GF_SOLVE } from "./guided-filter.wgsl";
+import { addGuidedFilter, guidedOnesLength } from "./guided-filter-graph";
 import {
 	BUCKETS,
 	HZ_BIN,
@@ -133,28 +134,25 @@ const GROUP = "look-tex";
 const buf = (id: string, source: string, layout: [string, BindKind][]) =>
 	defineKernel(id, source, layout, { group: GROUP, label: `look-tex-${id}` });
 
-const K_GF_H0 = buf("gf-h0", GF_H0, [
-	["prm", "uniform"],
-	["gI", "read-only-storage"],
-	["gp", "read-only-storage"],
-	["outv", "storage"],
-]);
-const K_GF_V0 = buf("gf-v0", GF_V0, [
-	["prm", "uniform"],
-	["inv", "read-only-storage"],
-	["ab", "storage"],
-]);
-const K_GF_H1 = buf("gf-h1", GF_H1, [
-	["prm", "uniform"],
-	["ab", "read-only-storage"],
-	["outv", "storage"],
-]);
-const K_GF_V1 = buf("gf-v1", GF_V1, [
-	["prm", "uniform"],
-	["inv", "read-only-storage"],
-	["gI", "read-only-storage"],
-	["q", "storage"],
-]);
+const GF_KERNELS = {
+	prep: buf("gf-prep", GF_PREP, [
+		["prm", "uniform"],
+		["gI", "read-only-storage"],
+		["gp", "read-only-storage"],
+		["s1", "storage"],
+	]),
+	solve: buf("gf-solve", GF_SOLVE, [
+		["prm", "uniform"],
+		["s3", "read-only-storage"],
+		["ab", "storage"],
+	]),
+	finish: buf("gf-finish", GF_FINISH, [
+		["prm", "uniform"],
+		["ab3", "read-only-storage"],
+		["gI", "read-only-storage"],
+		["q", "storage"],
+	]),
+};
 const K_PACK = buf("pack-masks", PACK_MASKS, [
 	["prm", "uniform"],
 	["qc", "read-only-storage"],
@@ -802,6 +800,7 @@ function masksGraph(device: Device, plan: MasksPlan) {
 		);
 		const cutIn = cut ? g.importBuffer("cut", n * 4) : null;
 		const qs: GraphBufferHandle[] = [];
+		let previousJob: string | undefined;
 		for (const j of jobs) {
 			const prm = c.uniform(
 				`${j.name}-prm`,
@@ -813,34 +812,23 @@ function masksGraph(device: Device, plan: MasksPlan) {
 					: j.name === "fg"
 						? fgv
 						: (cutIn as GraphBufferHandle);
-			const t4 = g.transientBuffer(`${j.name}-t4`, n * 16);
-			const ab = g.transientBuffer(`${j.name}-ab`, n * 8);
-			const t2 = g.transientBuffer(`${j.name}-t2`, n * 8);
 			const q = g.importBuffer(`q-${j.name}`, n * 4);
 			qs.push(q);
-			g.addKernel({
-				id: `${j.name}-h0`,
-				spec: K_GF_H0,
-				bindings: { prm, gI, gp: p, outv: t4 },
-				workgroups: [groups],
-			});
-			g.addKernel({
-				id: `${j.name}-v0`,
-				spec: K_GF_V0,
-				bindings: { prm, inv: t4, ab },
-				workgroups: [groups],
-			});
-			g.addKernel({
-				id: `${j.name}-h1`,
-				spec: K_GF_H1,
-				bindings: { prm, ab, outv: t2 },
-				workgroups: [groups],
-			});
-			g.addKernel({
-				id: `${j.name}-v1`,
-				spec: K_GF_V1,
-				bindings: { prm, inv: t2, gI, q },
-				workgroups: [groups],
+			previousJob = addGuidedFilter(g, {
+				id: `${j.name}`,
+				w,
+				h,
+				r: j.r,
+				kernels: GF_KERNELS,
+				prm,
+				ones: c.storage(
+					`${j.name}-ones`,
+					new Float32Array(guidedOnesLength(j.r)).fill(1),
+				),
+				gI,
+				p,
+				q,
+				dependsOn: previousJob ? [previousJob] : undefined,
 			});
 		}
 		const packed = g.importBuffer("packed", rowWords * h * 4);

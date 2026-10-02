@@ -2,11 +2,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WGSL for the GPU guided filter (twin of look/guided-filter.ts). The CPU takes box means from a
-// float64 summed-area table; here each (2r+1)² clamped box mean is separable (a row mean, then a
-// column mean of row means: every row of the clamped window has the same count), summed directly in
-// f32. r ≤ ~6 at 512 px, so a direct sum is cheaper than a scan and keeps f32 error ~1e-7.
-// @workgroup_size(256): one texel per invocation, 1-D over w·h; 256 fills an Apple GPU SIMD group ×8.
+// WGSL for the GPU guided filter (twin of look/guided-filter.ts). The box means are NOT here: they are
+// luma GPUConvolutions (all-ones kernel, zero boundary, direct strategy, one horizontal and one
+// vertical pass) between GF_PREP, GF_SOLVE and GF_FINISH, and the kernels here divide the window SUMS
+// by the analytic in-range window count, which is the CPU's clamped-window mean in exact arithmetic.
+// f32 summation differs from the CPU's f64 summed-area table, so q agrees to ~1e-5, not bit for bit
+// (scripts/gpu/guided-filter-conv-dawn.ts prints the numbers).
+//
+// Stack layout: c planes, each h rows of w, followed by r zero rows, one field of width w and height
+// c·(h + r). The gap keeps a vertical window of radius r from reaching the next plane, so one
+// convolution over the stack equals one convolution per plane with a zero boundary.
+// @workgroup_size(256): one stack element per invocation, 1-D; 256 fills an Apple GPU SIMD group ×8.
 
 const PARAMS = /* wgsl */ `
 struct P { w: u32, h: u32, r: u32, eps: f32 };
@@ -18,74 +24,76 @@ fn span(c: u32, r: u32, n: u32) -> vec2<u32> {
 }
 `;
 
-/** Row means of (I, p, I², I·p). */
-export const GF_H0 = /* wgsl */ `${PARAMS}${RANGE}
+/** Stack S1 (4 planes): I, p, I², I·p. Gap rows are written too (zeros): a full write. */
+export const GF_PREP = /* wgsl */ `${PARAMS}
 @group(0) @binding(0) var<uniform> prm: P;
 @group(0) @binding(1) var<storage, read> gI: array<f32>;
 @group(0) @binding(2) var<storage, read> gp: array<f32>;
-@group(0) @binding(3) var<storage, read_write> outv: array<vec4<f32>>;
+@group(0) @binding(3) var<storage, read_write> s1: array<f32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let n = prm.w * prm.h;
+  let pitch = prm.h + prm.r;
   let i = id.x;
-  if (i >= n) { return; }
-  let y = i / prm.w;
-  let x = i - y * prm.w;
-  let s = span(x, prm.r, prm.w);
-  var acc = vec4<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) {
-    let a = gI[y * prm.w + k];
-    let b = gp[y * prm.w + k];
-    acc += vec4<f32>(a, b, a * a, a * b);
+  if (i >= 4u * pitch * prm.w) { return; }
+  let row = i / prm.w;
+  let x = i - row * prm.w;
+  let c = row / pitch;
+  let y = row - c * pitch;
+  var v = 0.0;
+  if (y < prm.h) {
+    let j = y * prm.w + x;
+    let a = gI[j];
+    let b = gp[j];
+    switch (c) {
+      case 0u: { v = a; }
+      case 1u: { v = b; }
+      case 2u: { v = a * a; }
+      default: { v = a * b; }
+    }
   }
-  outv[i] = acc / f32(s.y - s.x);
+  s1[i] = v;
 }
 `;
 
-/** Column means of the row means, then a = cov(I, p) / (var(I) + ε), b = mean(p) − a·mean(I). */
-export const GF_V0 = /* wgsl */ `${PARAMS}${RANGE}
+/**
+ * From the box SUMS of S1 (S3): means = sums / count, then a = cov(I, p) / (var(I) + ε),
+ * b = mean(p) − a·mean(I), into the 2-plane stack (gap rows zero). One invocation per (x, y) of the
+ * h + r rows of a plane.
+ */
+export const GF_SOLVE = /* wgsl */ `${PARAMS}${RANGE}
 @group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> inv: array<vec4<f32>>;
-@group(0) @binding(2) var<storage, read_write> ab: array<vec2<f32>>;
+@group(0) @binding(1) var<storage, read> s3: array<f32>;
+@group(0) @binding(2) var<storage, read_write> ab: array<f32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let n = prm.w * prm.h;
+  let pitch = prm.h + prm.r;
+  let plane = pitch * prm.w;
   let i = id.x;
-  if (i >= n) { return; }
+  if (i >= plane) { return; }
   let y = i / prm.w;
   let x = i - y * prm.w;
-  let s = span(y, prm.r, prm.h);
-  var m = vec4<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) { m += inv[k * prm.w + x]; }
-  m /= f32(s.y - s.x);
-  let a = (m.w - m.x * m.y) / (m.z - m.x * m.x + prm.eps);
-  ab[i] = vec2<f32>(a, m.y - a * m.x);
+  if (y >= prm.h) {
+    ab[i] = 0.0;
+    ab[plane + i] = 0.0;
+    return;
+  }
+  let sx = span(x, prm.r, prm.w);
+  let sy = span(y, prm.r, prm.h);
+  let inv = 1.0 / f32((sx.y - sx.x) * (sy.y - sy.x));
+  let mI = s3[i] * inv;
+  let mp = s3[plane + i] * inv;
+  let mII = s3[2u * plane + i] * inv;
+  let mIp = s3[3u * plane + i] * inv;
+  let a = (mIp - mI * mp) / (mII - mI * mI + prm.eps);
+  ab[i] = a;
+  ab[plane + i] = mp - a * mI;
 }
 `;
 
-/** Row means of (a, b). */
-export const GF_H1 = /* wgsl */ `${PARAMS}${RANGE}
+/** q = clamp(mean(a)·I + mean(b), 0, 1) from the box SUMS of the (a, b) stack (AB3). */
+export const GF_FINISH = /* wgsl */ `${PARAMS}${RANGE}
 @group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> ab: array<vec2<f32>>;
-@group(0) @binding(2) var<storage, read_write> outv: array<vec2<f32>>;
-@compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let n = prm.w * prm.h;
-  let i = id.x;
-  if (i >= n) { return; }
-  let y = i / prm.w;
-  let x = i - y * prm.w;
-  let s = span(x, prm.r, prm.w);
-  var acc = vec2<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) { acc += ab[y * prm.w + k]; }
-  outv[i] = acc / f32(s.y - s.x);
-}
-`;
-
-/** Column means of (a, b), then q = clamp(mean(a)·I + mean(b), 0, 1). */
-export const GF_V1 = /* wgsl */ `${PARAMS}${RANGE}
-@group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> inv: array<vec2<f32>>;
+@group(0) @binding(1) var<storage, read> ab3: array<f32>;
 @group(0) @binding(2) var<storage, read> gI: array<f32>;
 @group(0) @binding(3) var<storage, read_write> q: array<f32>;
 @compute @workgroup_size(256)
@@ -95,10 +103,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   if (i >= n) { return; }
   let y = i / prm.w;
   let x = i - y * prm.w;
-  let s = span(y, prm.r, prm.h);
-  var m = vec2<f32>(0.0);
-  for (var k = s.x; k < s.y; k++) { m += inv[k * prm.w + x]; }
-  m /= f32(s.y - s.x);
-  q[i] = clamp(m.x * gI[i] + m.y, 0.0, 1.0);
+  let plane = (prm.h + prm.r) * prm.w;
+  let sx = span(x, prm.r, prm.w);
+  let sy = span(y, prm.r, prm.h);
+  let inv = 1.0 / f32((sx.y - sx.x) * (sy.y - sy.x));
+  q[i] = clamp((ab3[i] * gI[i] + ab3[plane + i]) * inv, 0.0, 1.0);
 }
 `;

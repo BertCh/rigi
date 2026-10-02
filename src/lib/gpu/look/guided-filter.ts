@@ -4,31 +4,27 @@
 
 // GPU twin of look/guided-filter.ts guidedFilter (grey guide, (2r+1)² clamped box means). The batch
 // form filters several masks against one guide in one submit and one readback, which is what
-// CompositeLook.updateMasks needs (coverage, cut, people). The four kernels per job run as one core
-// ComputeGraph (guided-filter-graph.ts); the pooled dispatchAll path was removed on 2026-10-01.
+// CompositeLook.updateMasks needs (coverage, cut, people). Per job: three small kernels and four luma
+// GPUConvolutions (the box means) in one core ComputeGraph (guided-filter-graph.ts). q is within f32
+// tolerance of the CPU twin (~1e-5), not bit-identical.
 import type { Device } from "@luma.gl/core";
-import { GF_H0, GF_H1, GF_V0, GF_V1 } from "./guided-filter.wgsl";
+import { GF_FINISH, GF_PREP, GF_SOLVE } from "./guided-filter.wgsl";
 import { defineKernel } from "./kernel";
 
-export const K_GF_H0 = defineKernel("gf-h0", GF_H0, [
+export const K_GF_PREP = defineKernel("gf-prep", GF_PREP, [
 	["prm", "uniform"],
 	["gI", "read-only-storage"],
 	["gp", "read-only-storage"],
-	["outv", "storage"],
+	["s1", "storage"],
 ]);
-export const K_GF_V0 = defineKernel("gf-v0", GF_V0, [
+export const K_GF_SOLVE = defineKernel("gf-solve", GF_SOLVE, [
 	["prm", "uniform"],
-	["inv", "read-only-storage"],
+	["s3", "read-only-storage"],
 	["ab", "storage"],
 ]);
-export const K_GF_H1 = defineKernel("gf-h1", GF_H1, [
+export const K_GF_FINISH = defineKernel("gf-finish", GF_FINISH, [
 	["prm", "uniform"],
-	["ab", "read-only-storage"],
-	["outv", "storage"],
-]);
-export const K_GF_V1 = defineKernel("gf-v1", GF_V1, [
-	["prm", "uniform"],
-	["inv", "read-only-storage"],
+	["ab3", "read-only-storage"],
 	["gI", "read-only-storage"],
 	["q", "storage"],
 ]);

@@ -2,36 +2,40 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The GPU guided filter (guided-filter.ts guidedFiltersGpu) on a core ComputeGraph: its only GPU
-// path (the pooled dispatchAll path it replaced, bit for bit, was removed on 2026-10-01).
+// The GPU guided filter (guided-filter.ts guidedFiltersGpu) on a core ComputeGraph: its only GPU path.
 //
-// Per job k (shared guide I):  H0 → t4ₖ → V0 → abₖ → H1 → t2ₖ → V1 → qₖ;  then one read node (all q).
+// Per job k (shared guide I), see addGuidedFilter:
+//   GF_PREP (I, p, I², I·p as a 4-plane stack, r zero gap rows per plane) → GPUConvolution H (2r+1 × 1)
+//   → GPUConvolution V (1 × 2r+1) → GF_SOLVE (sums / analytic in-range count, a and b as a 2-plane
+//   stack) → GPUConvolution H → V → GF_FINISH (sums / count, q = clamp(ā·I + b̄, 0, 1));
+// then one read node (all q). The convolutions are all-ones, zero-boundary, direct: with the division
+// by the analytic count that is the CPU's clamped-window mean in exact arithmetic, so q is within f32
+// tolerance of look/guided-filter.ts (~1e-5), not bit-identical (guided-filter-conv-dawn.ts). The
+// radius shapes the stacks and kernels, so it keys the cached graph; eps is a uniform.
 //
-// Same four KernelSpecs (unchanged WGSL), same uniforms, same workgroup counts, same dispatch order
-// (job k+1's H0 depends on job k's V1: without it the scheduler interleaves the jobs, which keeps
-// every job's t4 alive at once). Each job's t4 / ab / t2 are their OWN logical transients: the graph
-// aliases them by lifetime (job k+1's t4 reuses a buffer job k is done with). The q planes are
-// transients too, read by one read node (one readback slot). GPUConvolution is not used: its tap order / borders are not ours and the a/b
-// maths sits between the passes.
+// Job k+1's PREP depends on job k's FINISH (without it the scheduler interleaves the jobs, which keeps
+// every job's stacks alive at once). Each job's stacks are their OWN logical transients: the graph
+// aliases them by lifetime. The q planes are transients too, read by one read node (one readback
+// slot).
 //
-// Clear audit: every kernel writes every element i < w·h of its output exactly once (the dispatch
-// covers ⌈w·h / 256⌉·256 ≥ w·h invocations, i ≥ n returns) and reads only elements written earlier
-// in the chain, so all outputs are "full" and no clear node is needed; the core lint would refuse a
-// partial / atomic transient without one.
+// Clear audit: PREP and SOLVE write every element of their stacks (gap rows get zeros), each
+// GPUConvolution writes all width·height elements of its output, FINISH writes every i < w·h once, and
+// none uses atomics, so all outputs are "full" and no clear node is needed; the core lint would
+// refuse a partial / atomic transient without one.
 //
-// NaN semantics: a NaN in I or p spreads to every box mean
-// whose window contains it; clamp(NaN, 0, 1) is implementation-defined in WGSL but it is the same
-// pipeline on the same device (on Apple / Metal it returns a finite value: no NaN reaches q). The
-// bench compares q as raw f32 bits, NaN inputs included.
+// NaN semantics: a NaN in I or p spreads through the box sums to every window that contains it (two
+// passes of the means, so up to 2r + 1 px away in each axis); clamp(NaN, 0, 1) is implementation-
+// defined in WGSL. The Dawn gate checks that pixels farther away are unaffected.
 import { Buffer, type Device } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
+import type { KernelSpec } from "../core/kernel";
+import { GPUConvolution, type GraphBufferHandle } from "../core/luma";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import {
 	type GuidedJob,
-	K_GF_H0,
-	K_GF_H1,
-	K_GF_V0,
-	K_GF_V1,
+	K_GF_FINISH,
+	K_GF_PREP,
+	K_GF_SOLVE,
 } from "./guided-filter";
 import { GUIDED_PARAMS } from "./uniform-blocks";
 
@@ -41,48 +45,136 @@ export const GUIDED_GRAPH_GROUP = "look-guided";
 
 type Params = undefined;
 
-/** Build the graph for `jobs` jobs over n texels (import byte lengths as pooled). */
+/** Planes of the (I, p, I², I·p) stack and of the (a, b) stack. */
+const SUM_PLANES = 4;
+const AB_PLANES = 2;
+
+/** Elements of the all-ones kernel a radius-`r` filter needs (the 1-D window). */
+export const guidedOnesLength = (r: number) => 2 * r + 1;
+
+/** The three kernels of one guided filter (the look-tex pass keeps its own specs / warm group). */
+export type GuidedKernels = {
+	prep: KernelSpec;
+	solve: KernelSpec;
+	finish: KernelSpec;
+};
+export const GUIDED_KERNELS: GuidedKernels = {
+	prep: K_GF_PREP,
+	solve: K_GF_SOLVE,
+	finish: K_GF_FINISH,
+};
+
+/**
+ * Add one guided filter (guide `gI`, mask `p`, w × h, radius `r`; `prm` = GUIDED_PARAMS, `ones` = at
+ * least guidedOnesLength(r) ones) to `g`, writing q into `q` (n floats). Returns the id of its last
+ * node, so a caller can chain the next job after it.
+ */
+export function addGuidedFilter(
+	g: ComputeGraph<never>,
+	o: {
+		id: string;
+		w: number;
+		h: number;
+		r: number;
+		kernels: GuidedKernels;
+		prm: GraphBufferHandle;
+		ones: GraphBufferHandle;
+		gI: GraphBufferHandle;
+		p: GraphBufferHandle;
+		q: GraphBufferHandle;
+		dependsOn?: string[];
+	},
+): string {
+	const { id, w, h, r, kernels } = o;
+	const plane = (h + r) * w;
+	const sumCount = SUM_PLANES * plane;
+	const abCount = AB_PLANES * plane;
+	const s1 = g.transientBuffer(`${id}-s1`, sumCount * 4);
+	const s2 = g.transientBuffer(`${id}-s2`, sumCount * 4);
+	const s3 = g.transientBuffer(`${id}-s3`, sumCount * 4);
+	const a1 = g.transientBuffer(`${id}-a1`, abCount * 4);
+	const a2 = g.transientBuffer(`${id}-a2`, abCount * 4);
+	const a3 = g.transientBuffer(`${id}-a3`, abCount * 4);
+	const k = guidedOnesLength(r);
+	const box = (
+		name: string,
+		input: GraphBufferHandle,
+		output: GraphBufferHandle,
+		count: number,
+		planes: number,
+		horizontal: boolean,
+	) =>
+		g.add(
+			new GPUConvolution({
+				id: `${id}-${name}`,
+				width: w,
+				height: planes * (h + r),
+				kernelWidth: horizontal ? k : 1,
+				kernelHeight: horizontal ? 1 : k,
+				strategy: "direct",
+				boundary: "zero",
+				input: g.view(input, "float32", count),
+				kernel: g.view(o.ones, "float32", k),
+				output: g.view(output, "float32", count),
+			}),
+		);
+	g.addKernel({
+		id: `${id}-prep`,
+		spec: kernels.prep,
+		bindings: { prm: o.prm, gI: o.gI, gp: o.p, s1 },
+		workgroups: [Math.ceil(sumCount / WG)],
+		dependsOn: o.dependsOn,
+	});
+	box("sum-h", s1, s2, sumCount, SUM_PLANES, true);
+	box("sum-v", s2, s3, sumCount, SUM_PLANES, false);
+	g.addKernel({
+		id: `${id}-solve`,
+		spec: kernels.solve,
+		bindings: { prm: o.prm, s3, ab: a1 },
+		workgroups: [Math.ceil(plane / WG)],
+	});
+	box("ab-h", a1, a2, abCount, AB_PLANES, true);
+	box("ab-v", a2, a3, abCount, AB_PLANES, false);
+	g.addKernel({
+		id: `${id}-finish`,
+		spec: kernels.finish,
+		bindings: { prm: o.prm, ab3: a3, gI: o.gI, q: o.q },
+		workgroups: [Math.ceil((w * h) / WG)],
+	});
+	return `${id}-finish`;
+}
+
+/** Build the graph for `jobs` jobs over w × h texels (import byte lengths as pooled). */
 export function buildGuidedGraph(
 	g: ComputeGraph<Params>,
-	n: number,
+	w: number,
+	h: number,
+	radii: number[],
 	iBytes: number,
 	pBytes: number[],
 	prmBytes: number,
 ) {
-	const groups: [number] = [Math.ceil(n / WG)];
+	const n = w * h;
 	const gI = g.importBuffer("I", iBytes);
+	let previous: string | undefined;
 	const qs = pBytes.map((pb, k) => {
 		const prm = g.importBuffer(`prm${k}`, prmBytes, undefined, UNIFORM);
 		const gp = g.importBuffer(`p${k}`, pb);
-		const t4 = g.transientBuffer(`t4-${k}`, n * 16);
-		const ab = g.transientBuffer(`ab-${k}`, n * 8);
-		const t2 = g.transientBuffer(`t2-${k}`, n * 8);
+		const ones = g.importBuffer(`ones${k}`, guidedOnesLength(radii[k]) * 4);
 		const q = g.transientBuffer(`q${k}`, n * 4);
-		g.addKernel({
-			id: `h0-${k}`,
-			spec: K_GF_H0,
-			bindings: { prm, gI, gp, outv: t4 },
-			workgroups: groups,
-			dependsOn: k ? [`v1-${k - 1}`] : undefined,
-		})
-			.addKernel({
-				id: `v0-${k}`,
-				spec: K_GF_V0,
-				bindings: { prm, inv: t4, ab },
-				workgroups: groups,
-			})
-			.addKernel({
-				id: `h1-${k}`,
-				spec: K_GF_H1,
-				bindings: { prm, ab, outv: t2 },
-				workgroups: groups,
-			})
-			.addKernel({
-				id: `v1-${k}`,
-				spec: K_GF_V1,
-				bindings: { prm, inv: t2, gI, q },
-				workgroups: groups,
-			});
+		previous = addGuidedFilter(g, {
+			id: `gf${k}`,
+			w,
+			h,
+			r: radii[k],
+			kernels: GUIDED_KERNELS,
+			prm,
+			ones,
+			gI,
+			p: gp,
+			q,
+			dependsOn: previous ? [previous] : undefined,
+		});
 		return q;
 	});
 	g.readNode("q", qs);
@@ -102,7 +194,6 @@ export function guidedFiltersGraph(
 	h: number,
 	jobs: readonly GuidedJob[],
 ): Promise<Float32Array[]> {
-	const n = w * h;
 	if (!jobs.length) return Promise.resolve([]);
 	return withLease("look-guided-graph", async () => {
 		const gI = pooledStorage(device, "look-guided-graph/I", I);
@@ -114,15 +205,21 @@ export function guidedFiltersGraph(
 				GUIDED_PARAMS.pack({ w, h, r: j.r, eps: j.eps }),
 			);
 			buffers[`p${k}`] = pooledStorage(device, `look-guided-graph/p${k}`, j.p);
+			buffers[`ones${k}`] = pooledStorage(
+				device,
+				`look-guided-graph/ones${k}`,
+				new Float32Array(guidedOnesLength(j.r)).fill(1),
+			);
 		});
 		const pBytes = jobs.map((_, k) => buffers[`p${k}`].byteLength);
 		const prmBytes = buffers.prm0.byteLength;
-		const key = `${n}|I${gI.byteLength}|p${pBytes.join(",")}`;
+		const radii = jobs.map((j) => j.r);
+		const key = `${w}x${h}|r${radii.join(",")}|I${gI.byteLength}|p${pBytes.join(",")}`;
 		const { graph, hit } = cachedGraph<Params, void>(
 			device,
 			GUIDED_GRAPH_GROUP,
 			key,
-			(g) => buildGuidedGraph(g, n, gI.byteLength, pBytes, prmBytes),
+			(g) => buildGuidedGraph(g, w, h, radii, gI.byteLength, pBytes, prmBytes),
 		);
 		await graph.compileAsync();
 		const { reads } = await graph.run(undefined, { buffers });

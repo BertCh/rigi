@@ -1164,4 +1164,11 @@ export const CHECKS = [
 		],
 		timeoutS: 180,
 	},
+	{
+		id: "guided-filter-conv-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/guided-filter-conv-dawn.ts"),
+		timeoutS: 120,
+	},
 ];
