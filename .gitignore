@@ -107,4 +107,5 @@ tools/nearfield/**/*.ply
 !public/demo/step/**
 !public/demo/gipfelbuch/**
 !public/demo/meta/**
+!public/demo/surround/**
 src/routeTree.prod.gen.ts
