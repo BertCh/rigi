@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { cn } from "#/lib/utils";
 import { PenArrow, SketchPath, StepNumber } from "../notebook/Ink";
 import { useDrawOn } from "./hooks";
+import { stepsSegmentDelay, stepsStationDelay } from "./sequence";
+
+/** `.nb-fade` / `.nb-draw` start time (notebook.css). */
+const fadeAt = (ms: number) => ({ "--nb-delay": `${ms}ms` }) as CSSProperties;
 
 export interface FlowNode {
 	label: string;
@@ -126,6 +130,9 @@ const CERTAINTY_DASH = {
  * A route topo (SAC style) drawn by hand: a red pen route line down the left, a circled hand station
  * number per step and an optional grade at the right. The segment below a step is solid (measured),
  * dashed (approximate) or dotted (open); the last station is the summit register, circled in ink.
+ * In view, each station fades in as the pen reaches it, then the pen draws on to the next
+ * (`stepsStationDelay`); a dashed or dotted segment fades in instead. Static under reduced motion,
+ * webdriver and print.
  */
 export function Steps({
 	steps,
@@ -139,6 +146,7 @@ export function Steps({
 		<ol ref={ref} className={cn("my-6 space-y-0", drawClass, className)}>
 			{steps.map((s, i) => {
 				const last = i === steps.length - 1;
+				const dashed = (s.certainty ?? "measured") !== "measured";
 				return (
 					<li
 						key={s.title}
@@ -149,7 +157,11 @@ export function Steps({
 								<svg
 									viewBox="0 0 16 100"
 									preserveAspectRatio="none"
-									className="absolute top-[38px] -bottom-[2px] left-[10px] w-4 overflow-visible [&_path]:[vector-effect:non-scaling-stroke]"
+									className={cn(
+										"absolute top-[38px] -bottom-[2px] left-[10px] w-4 overflow-visible [&_path]:[vector-effect:non-scaling-stroke]",
+										dashed && "nb-fade",
+									)}
+									style={dashed ? fadeAt(stepsSegmentDelay(i)) : undefined}
 									aria-hidden="true"
 								>
 									<SketchPath
@@ -160,15 +172,26 @@ export function Steps({
 										dash={CERTAINTY_DASH[s.certainty ?? "measured"]}
 										passes={s.certainty === "open" ? 1 : 2}
 										tolerance={1.1}
-										// a dashed segment is not drawn on (a dash cannot be a draw-on); solid routes are
+										// a dashed segment cannot be drawn on (the svg fades instead); solid routes are
 										draw
-										delay={i * 140 + 150}
+										delay={stepsSegmentDelay(i)}
 									/>
 								</svg>
 							)}
-							<StepNumber value={String(i + 1)} color={last ? "ink" : "red"} />
+							<div
+								className="nb-fade flex"
+								style={fadeAt(stepsStationDelay(i))}
+							>
+								<StepNumber
+									value={String(i + 1)}
+									color={last ? "ink" : "red"}
+								/>
+							</div>
 						</div>
-						<div className="min-w-0 pt-0.5">
+						<div
+							className="nb-fade min-w-0 pt-0.5"
+							style={fadeAt(stepsStationDelay(i))}
+						>
 							<div className="flex items-baseline justify-between gap-3">
 								<h4 className="nb-hand text-[22px] leading-[28px] font-bold text-[var(--gb-ink)]">
 									{s.title}

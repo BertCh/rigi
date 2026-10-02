@@ -7,9 +7,11 @@ import {
 	type PointerEvent,
 	type ReactNode,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { cn } from "#/lib/utils";
 import {
 	HandDot,
@@ -33,7 +35,21 @@ import {
 	useLoadFailure,
 } from "./real";
 import { HandHeading, HandKicker } from "./Section";
+import {
+	COMPARE_COMMIT_MS,
+	compareIntroX,
+	compareKeyX,
+	compareSide,
+	stageFrameKey,
+	stagesInitialIndex,
+	useOpenForPrint,
+	useSequenceMotion,
+} from "./sequence";
 import { SpillSideContext, useAlignmentStory } from "./story";
+
+// Layout effect on the client (the wipe repaints before paint), plain effect on the server.
+const useIsomorphicLayoutEffect =
+	typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // Explainer kit: the building blocks of a concise, visual-first concept page.
 // The recipe (see README "Explainer pages"): a hero figure on a real photo whose caption is the claim,
@@ -68,7 +84,10 @@ export function Beat({
 	);
 }
 
-/** Collapsed in-depth detail. Keeps the precise mechanism on the page without making everyone read it. */
+/**
+ * Collapsed in-depth detail. Keeps the precise mechanism on the page without making everyone read it.
+ * Opens for printing, so the print sheet keeps the mechanism.
+ */
 export function Details({
 	title = "How it works, in depth",
 	children,
@@ -78,8 +97,10 @@ export function Details({
 	children: ReactNode;
 	className?: string;
 }) {
+	const ref = useRef<HTMLDetailsElement>(null);
+	useOpenForPrint(ref);
 	return (
-		<details className={cn("group relative mt-12", className)}>
+		<details ref={ref} className={cn("group relative mt-12", className)}>
 			<summary className="flex cursor-pointer list-none items-center gap-3 py-2 pr-5 select-none [&::-webkit-details-marker]:hidden">
 				<svg
 					viewBox="0 0 14 14"
@@ -118,18 +139,27 @@ export function Details({
 	);
 }
 
-/**
- * Before/after on the same frame: drag (or arrow keys) to wipe between two renderings. Sweeps once on first
- * view unless reduced motion. Touch keeps vertical page scroll (touch-action: pan-y).
- */
 const SPILL_OFF = { off: true };
+/** A side label at rest: the side filling less of the frame is drawn lighter. */
+const LABEL_DIM = 0.55;
 
+/**
+ * Before/after on the same frame: drag (or the arrow, Home and End keys) to wipe between two pixel-aligned
+ * renderings. In view, the intro plays once: the guess alone (setup), one programmed scrub to `start`
+ * (change), then rest (result). A drag writes the clip and the handle straight to the DOM, as the
+ * landing's Compare does, and hands its position to React (story time, spill, side map) at most once
+ * a frame at 30 fps and on release. A position set from outside (the side map) ends the intro. The server render, reduced motion, webdriver and print rest at `start`. Touch
+ * keeps vertical page scroll (touch-action: pan-y).
+ * `spill="pose"` (default): the two sides are two poses, and the geo spill follows the wipe. `"static"`:
+ * the sides are not poses (two DEM rasters, a layer split), so the margins stay put.
+ */
 export function Compare({
 	before,
 	after,
 	beforeLabel,
 	afterLabel,
 	start = 0.5,
+	spill = "pose",
 	className,
 }: {
 	before: ReactNode;
@@ -137,47 +167,139 @@ export function Compare({
 	beforeLabel: string;
 	afterLabel: string;
 	start?: number;
+	spill?: "pose" | "static";
 	className?: string;
 }) {
 	const [ref, inView] = useInView();
 	const reduce = useReducedMotion();
+	const motion = useSequenceMotion(reduce);
 	// inside an alignment story the wipe is the story's position (x = 1 - t: all "after" at x = 0)
 	const story = useAlignmentStory();
 	const [localX, setLocalX] = useState(start);
-	const x = story ? 1 - story.t : localX;
-	const setXRef = useRef((v: number) => setLocalX(v));
-	setXRef.current = (v: number) => (story ? story.setT(1 - v) : setLocalX(v));
-	const setX = (v: number) => setXRef.current(v);
+	const committedX = story ? 1 - story.t : localX;
+	// the live wipe position; React state (committedX) trails it during a drag or the intro
+	const xRef = useRef(committedX);
+	const lastCommitted = useRef(committedX);
+	const commitTimer = useRef(0);
+	const dragging = useRef(false);
 	const touched = useRef(false);
 	const box = useRef<HTMLDivElement>(null);
+	const clip = useRef<HTMLDivElement>(null);
+	const handle = useRef<HTMLDivElement>(null);
+	const slider = useRef<HTMLDivElement>(null);
+	const beforeTag = useRef<HTMLSpanElement>(null);
+	const afterTag = useRef<HTMLSpanElement>(null);
+	const sideText = (v: number) =>
+		compareSide(v) === "before" ? beforeLabel : afterLabel;
+	const paint = (v: number) => {
+		if (clip.current) clip.current.style.clipPath = `inset(0 0 0 ${v * 100}%)`;
+		if (handle.current) handle.current.style.left = `${v * 100}%`;
+		if (slider.current) {
+			slider.current.setAttribute("aria-valuenow", String(Math.round(v * 100)));
+			slider.current.setAttribute("aria-valuetext", sideText(v));
+		}
+		const side = compareSide(v);
+		if (beforeTag.current)
+			beforeTag.current.style.opacity =
+				side === "before" ? "1" : `${LABEL_DIM}`;
+		if (afterTag.current)
+			afterTag.current.style.opacity = side === "after" ? "1" : `${LABEL_DIM}`;
+	};
+	const setStoryT = story?.setT;
+	const commit = (v: number) => {
+		window.clearTimeout(commitTimer.current);
+		commitTimer.current = 0;
+		lastCommitted.current = v;
+		if (setStoryT) setStoryT(1 - v);
+		else setLocalX(v);
+	};
+	const commitRef = useRef(commit);
+	commitRef.current = commit;
+	const apply = (v: number) => {
+		xRef.current = v;
+		paint(v);
+		if (!commitTimer.current)
+			commitTimer.current = window.setTimeout(() => {
+				commitTimer.current = 0;
+				commitRef.current(xRef.current);
+			}, COMPARE_COMMIT_MS);
+	};
+	const applyRef = useRef(apply);
+	applyRef.current = apply;
+	// after every render: adopt a position someone else set (the side map turning the story), then
+	// repaint the live position over the (possibly trailing) committed styles React just wrote
+	useIsomorphicLayoutEffect(() => {
+		if (Math.abs(committedX - lastCommitted.current) > 1e-6) {
+			lastCommitted.current = committedX;
+			// someone else moved the story: the reader takes over (the intro stops), unless mid-drag
+			if (!dragging.current) {
+				window.clearTimeout(commitTimer.current);
+				commitTimer.current = 0;
+				touched.current = true;
+				xRef.current = committedX;
+			}
+		}
+		paint(xRef.current);
+	});
+	useEffect(
+		() => () => {
+			window.clearTimeout(commitTimer.current);
+			commitTimer.current = 0;
+		},
+		[],
+	);
+	// setup frame: once motion is allowed (client, not automation), the untouched wipe waits on the
+	// guess; a layout effect, so a client mount does not paint the result frame first
+	useIsomorphicLayoutEffect(() => {
+		if (!motion || touched.current) return;
+		applyRef.current(1);
+		commitRef.current(1);
+	}, [motion]);
+	// the intro script, once, in view: hold the guess, scrub to `start`, rest
 	useEffect(() => {
-		if (!inView || reduce || touched.current) return;
+		if (!inView || !motion || touched.current) return;
 		let raf = 0;
 		const t0 = performance.now();
 		const tick = (now: number) => {
 			if (touched.current) return;
-			const t = (now - t0) / 2600;
-			if (t >= 1) return setXRef.current(start);
-			// out to the right, back past the left, settle at `start`
-			setXRef.current(start + 0.4 * Math.sin(t * Math.PI * 2) * (1 - t));
+			const { x, done } = compareIntroX(now - t0, start);
+			applyRef.current(x);
+			if (done) return commitRef.current(x);
 			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
-	}, [inView, reduce, start]);
+	}, [inView, motion, start]);
+	// print rests on the result frame
+	useEffect(() => {
+		const toStart = () => {
+			touched.current = true;
+			applyRef.current(start);
+			// commit synchronously, so the story, spill and side map print on the result frame too
+			flushSync(() => commitRef.current(start));
+		};
+		window.addEventListener("beforeprint", toStart);
+		return () => window.removeEventListener("beforeprint", toStart);
+	}, [start]);
 	const move = (e: PointerEvent) => {
 		const r = box.current?.getBoundingClientRect();
-		if (!r) return;
-		touched.current = true;
-		setX(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+		if (!r || r.width === 0) return;
+		apply(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+	};
+	const release = () => {
+		if (!dragging.current) return;
+		dragging.current = false;
+		commit(xRef.current);
 	};
 	const key = (e: KeyboardEvent) => {
-		const d = e.key === "ArrowLeft" ? -0.05 : e.key === "ArrowRight" ? 0.05 : 0;
-		if (!d) return;
+		const v = compareKeyX(e.key, xRef.current);
+		if (v == null) return;
 		e.preventDefault();
 		touched.current = true;
-		setX(Math.min(1, Math.max(0, x + d)));
+		apply(v);
+		commit(v);
 	};
+	const side = compareSide(committedX);
 	return (
 		<div ref={ref} className={className}>
 			<NoImprint>
@@ -186,25 +308,35 @@ export function Compare({
 					className="relative cursor-ew-resize touch-pan-y select-none"
 					onPointerDown={(e) => {
 						(e.target as Element).setPointerCapture?.(e.pointerId);
+						touched.current = true;
+						dragging.current = true;
 						move(e);
 					}}
-					onPointerMove={(e) => e.buttons && move(e)}
+					onPointerMove={(e) => dragging.current && move(e)}
+					onPointerUp={release}
+					onPointerCancel={release}
 				>
 					{/* one geo spill in the margins, carried by the bottom side at the wipe's position */}
-					<SpillSideContext.Provider value={{ t: 1 - x }}>
-						{before}
-					</SpillSideContext.Provider>
+					{spill === "pose" ? (
+						<SpillSideContext.Provider value={{ t: 1 - committedX }}>
+							{before}
+						</SpillSideContext.Provider>
+					) : (
+						before
+					)}
 					<div
+						ref={clip}
 						className="pointer-events-none absolute inset-0"
-						style={{ clipPath: `inset(0 0 0 ${x * 100}%)` }}
+						style={{ clipPath: `inset(0 0 0 ${committedX * 100}%)` }}
 					>
 						<SpillSideContext.Provider value={SPILL_OFF}>
 							{after}
 						</SpillSideContext.Provider>
 					</div>
 					<div
+						ref={handle}
 						className="absolute inset-y-0 w-0"
-						style={{ left: `${x * 100}%` }}
+						style={{ left: `${committedX * 100}%` }}
 					>
 						<svg
 							viewBox="0 0 8 100"
@@ -229,14 +361,16 @@ export function Compare({
 							/>
 						</svg>
 						<div
+							ref={slider}
 							role="slider"
 							tabIndex={0}
 							aria-label={`${beforeLabel} / ${afterLabel}`}
 							aria-valuemin={0}
 							aria-valuemax={100}
-							aria-valuenow={Math.round(x * 100)}
+							aria-valuenow={Math.round(committedX * 100)}
+							aria-valuetext={sideText(committedX)}
 							onKeyDown={key}
-							className="absolute top-1/2 left-1/2 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center text-[var(--gb-ink,currentColor)] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gb-red,var(--accent))]"
+							className="absolute top-1/2 left-1/2 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center text-[var(--gb-ink,currentColor)] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gb-red,var(--accent))] print:hidden"
 						>
 							<svg
 								viewBox="0 0 36 36"
@@ -277,8 +411,20 @@ export function Compare({
 							</svg>
 						</div>
 					</div>
-					<span className={`${PHOTO_LABEL} left-2`}>{beforeLabel}</span>
-					<span className={`${PHOTO_LABEL} right-2`}>{afterLabel}</span>
+					<span
+						ref={beforeTag}
+						className={`${PHOTO_LABEL} left-2`}
+						style={{ opacity: side === "before" ? 1 : LABEL_DIM }}
+					>
+						{beforeLabel}
+					</span>
+					<span
+						ref={afterTag}
+						className={`${PHOTO_LABEL} right-2`}
+						style={{ opacity: side === "after" ? 1 : LABEL_DIM }}
+					>
+						{afterLabel}
+					</span>
 				</div>
 			</NoImprint>
 		</div>
@@ -292,6 +438,11 @@ export interface Stage {
 	render: () => ReactNode;
 	/** Where this stage sits in an enclosing alignment story: 0 = phone's guess, 1 = solved. */
 	pose?: number;
+	/**
+	 * Stages with the same `frame` key keep one mounted frame (the photo is not remounted, only its
+	 * layers change); stages without one each get their own frame and fade in.
+	 */
+	frame?: string;
 }
 
 /** A short pen arrow as a button glyph (prev/next); drawn in currentColor. */
@@ -320,8 +471,10 @@ const PHOTO_LABEL =
 	"gb-caps pointer-events-none absolute top-2 text-[13px] leading-[16px] text-[var(--gb-ink,#131313)] [text-shadow:0_0_2px_var(--gb-paper,#ece6da),0_0_3px_var(--gb-paper,#ece6da),0_0_5px_var(--gb-paper,#ece6da),0_0_7px_var(--gb-paper,#ece6da)]";
 
 /**
- * Step through stages of one process on the same frame (tabs circled by hand + pen-arrow prev/next). Auto-advances while on screen
- * until the reader touches it; frozen on the last stage under reduced motion.
+ * Step through stages of one process on the same frame (tabs circled by hand + pen-arrow prev/next).
+ * The static frame (server render, reduced motion, webdriver, print) is the last stage; where motion is
+ * allowed the client steps back to the first and auto-advances while on screen, pausing while a mouse
+ * rests on the frame, until the reader picks a stage. Print adds every stage's caption as a list.
  */
 export function Stages({
 	stages,
@@ -337,35 +490,70 @@ export function Stages({
 }) {
 	const [ref, inView] = useInView({ once: false });
 	const reduce = useReducedMotion();
-	const [i, setI] = useState(reduce ? stages.length - 1 : 0);
-	const [playing, setPlaying] = useState(!reduce);
+	const motion = useSequenceMotion(reduce);
+	const last = stagesInitialIndex(stages.length);
+	const [i, setI] = useState(last);
+	const [playing, setPlaying] = useState(true);
+	const [held, setHeld] = useState(false);
+	// the static frame is the result; once motion is allowed the client steps back to the first stage
+	const stepped = useRef(false);
+	useIsomorphicLayoutEffect(() => {
+		if (!motion || stepped.current) return;
+		stepped.current = true;
+		setI(0);
+	}, [motion]);
 	useEffect(() => {
-		if (!playing || !inView || reduce) return;
+		// synchronously, so the printed frame is the result
+		const toResult = () => flushSync(() => setI(last));
+		window.addEventListener("beforeprint", toResult);
+		return () => window.removeEventListener("beforeprint", toResult);
+	}, [last]);
+	useEffect(() => {
+		if (!playing || held || !inView || !motion) return;
 		const id = window.setTimeout(
 			() => setI((v) => (v + 1) % stages.length),
 			i === stages.length - 1 ? interval * 1.6 : interval,
 		);
 		return () => window.clearTimeout(id);
-	}, [playing, inView, reduce, i, interval, stages.length]);
+	}, [playing, held, inView, motion, i, interval, stages.length]);
 	const go = (n: number) => {
+		stepped.current = true;
 		setPlaying(false);
+		// the frame under the pointer may remount and never report its pointerleave
+		setHeld(false);
 		setI((n + stages.length) % stages.length);
 	};
-	const s = stages[i];
-	// a stage with a pose moves the enclosing alignment story there ...
+	const s = stages[Math.min(i, last)];
+	// a stage with a pose moves the enclosing alignment story there (only when the stage's pose
+	// changes: the story's setT changes identity with every t, so it is read through a ref) ...
 	const story = useAlignmentStory();
-	const setStoryT = story?.setT;
+	const setStoryT = useRef(story?.setT);
+	setStoryT.current = story?.setT;
+	// the pose this component last wrote and the story has not reflected yet
+	const pendingPose = useRef<number | null>(null);
+	const currentT = useRef(story?.t);
+	currentT.current = story?.t;
 	useEffect(() => {
-		if (setStoryT && s.pose != null) setStoryT(s.pose);
-	}, [s.pose, setStoryT]);
-	// ... and a reader turning the story elsewhere (the side map) brings up the matching stage
+		if (!setStoryT.current || s.pose == null) return;
+		// a write that changes nothing is never echoed back, so it is not waited for
+		if (currentT.current == null || Math.abs(currentT.current - s.pose) > 1e-6)
+			pendingPose.current = s.pose;
+		setStoryT.current(s.pose);
+	}, [s.pose]);
+	// ... and a reader turning the story elsewhere (the side map) brings up the matching stage; the
+	// story's own initial t and the echo of our own write are not the reader
 	const storyT = story?.t;
 	const posed = useRef({ stages, pose: s.pose });
 	posed.current = { stages, pose: s.pose };
 	useEffect(() => {
 		const { stages: all, pose } = posed.current;
-		if (storyT == null || pose == null || Math.abs(storyT - pose) <= 0.5)
+		if (storyT == null) return;
+		if (pendingPose.current != null) {
+			if (Math.abs(storyT - pendingPose.current) <= 1e-6)
+				pendingPose.current = null;
 			return;
+		}
+		if (pose == null || Math.abs(storyT - pose) <= 0.5) return;
 		let best = -1;
 		all.forEach((st, n) => {
 			if (
@@ -377,7 +565,9 @@ export function Stages({
 				best = n;
 		});
 		if (best >= 0) {
+			stepped.current = true;
 			setPlaying(false);
+			setHeld(false);
 			setI(best);
 		}
 	}, [storyT]);
@@ -386,7 +576,7 @@ export function Stages({
 			ref={ref}
 			className={cn("py-2 [container-type:inline-size]", className)}
 		>
-			<div className="mb-3 flex items-start gap-1.5">
+			<div className="mb-3 flex items-start gap-1.5 print:hidden">
 				{/* one row of equal tabs from 560 px of container width, two columns below */}
 				<div className="grid min-w-0 flex-1 grid-cols-2 gap-x-1.5 [@container(min-width:560px)]:auto-cols-fr [@container(min-width:560px)]:grid-flow-col [@container(min-width:560px)]:grid-cols-none">
 					{stages.map((st, n) => (
@@ -421,7 +611,13 @@ export function Stages({
 					type="button"
 					onClick={() => setPlaying((p) => !p)}
 					aria-label={playing ? "Pause" : "Play"}
-					className="nb-hand relative mt-0.5 mr-1 shrink-0 px-2 text-[18px] leading-[24px] text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]"
+					// nothing plays where motion is not allowed: the button keeps its place but is hidden
+					aria-hidden={!motion || undefined}
+					tabIndex={motion ? undefined : -1}
+					className={cn(
+						"nb-hand relative mt-0.5 mr-1 shrink-0 px-2 text-[18px] leading-[24px] text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]",
+						!motion && "invisible",
+					)}
 				>
 					{playing ? "pause" : "play"}
 					<HandFrame
@@ -439,16 +635,19 @@ export function Stages({
 				)}
 			>
 				<div
-					key={i}
-					className="animate-[gipfelbuch-fade_420ms_ease-out]"
+					key={stageFrameKey(s, i)}
+					className="animate-[gipfelbuch-fade_420ms_ease-out] motion-reduce:animate-none"
 					// a photo's geo spill keeps off the side map
 					data-gb-bleed-bounds={aside ? "right" : undefined}
+					// a mouse resting on the frame holds the clock (a hover is not a choice: autoplay resumes)
+					onPointerEnter={(e) => e.pointerType === "mouse" && setHeld(true)}
+					onPointerLeave={() => setHeld(false)}
 				>
 					<NoImprint>{s.render()}</NoImprint>
 				</div>
 				{aside && <NoImprint>{aside}</NoImprint>}
 			</div>
-			<div className="mt-3 flex items-start gap-3">
+			<div className="mt-3 flex items-start gap-3 print:hidden">
 				<button
 					type="button"
 					onClick={() => go(i - 1)}
@@ -472,6 +671,14 @@ export function Stages({
 					<HandArrowIcon seed="stages-next" dir={1} />
 				</button>
 			</div>
+			{/* print: the frame shows the result; every stage's caption follows as a numbered list */}
+			<ol className="mt-3 hidden list-decimal space-y-1 pl-6 text-[13px] leading-[18px] text-[var(--gb-ink)] print:block">
+				{stages.map((st) => (
+					<li key={st.label}>
+						<span className="gb-caps">{st.label}</span>: {st.caption}
+					</li>
+				))}
+			</ol>
 			<style>
 				{"@keyframes gipfelbuch-fade{from{opacity:.25}to{opacity:1}}"}
 			</style>
