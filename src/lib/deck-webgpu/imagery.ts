@@ -58,6 +58,63 @@ const COMPACT_IDLE_MS = 4000;
  */
 export const IMAGERY_RELEASE_IDLE_MS = 10_000;
 
+/**
+ * A matcher run's pose views are spaced by seconds to minutes: renderPoseView holds the layers this
+ * long after each view (ImageryArray.hold), so a later view finds the drape still resident.
+ */
+export const IMAGERY_POSE_VIEW_HOLD_MS = 120_000;
+
+export type ReleaseTimerHost = {
+	now: () => number;
+	setTimeout: (fn: () => void, ms: number) => unknown;
+	clearTimeout: (handle: unknown) => void;
+};
+const realTimers: ReleaseTimerHost = {
+	now: () => Date.now(),
+	setTimeout: (fn, ms) => setTimeout(fn, ms),
+	clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+};
+
+/**
+ * The deferred release: arm(ms) keeps the first deadline while armed, cancel() disarms, holdUntil(t)
+ * pushes the release past a deadline (a firing timer before it re-arms for the remainder).
+ */
+export class ReleaseTimer {
+	private handle: unknown = null;
+	private heldUntil = 0;
+	/** Firings deferred by a hold. */
+	deferrals = 0;
+	constructor(
+		private readonly onFire: () => void,
+		private readonly host: ReleaseTimerHost = realTimers,
+	) {}
+	get armed() {
+		return this.handle !== null;
+	}
+	arm(ms: number) {
+		if (this.handle !== null) return;
+		this.handle = this.host.setTimeout(() => this.fire(), ms);
+	}
+	cancel() {
+		if (this.handle === null) return;
+		this.host.clearTimeout(this.handle);
+		this.handle = null;
+	}
+	holdUntil(t: number) {
+		this.heldUntil = Math.max(this.heldUntil, t);
+	}
+	private fire() {
+		this.handle = null;
+		const left = this.heldUntil - this.host.now();
+		if (left > 0) {
+			this.deferrals++;
+			this.arm(left);
+			return;
+		}
+		this.onFire();
+	}
+}
+
 type Tier = ImageryTier;
 const tierOf = (bmp: ImageBitmap): Tier => imageryTierOf(bmp.width, bmp.height);
 const mipLevels = (size: number) => Math.log2(size) + 1;
@@ -74,7 +131,8 @@ export class ImageryArray {
 	private mipSampler?: ReturnType<Device["createSampler"]>;
 	private destroyed = false;
 	private idleTimer: ReturnType<typeof setTimeout> | null = null;
-	private releaseTimer: ReturnType<typeof setTimeout> | null = null;
+	private releaseTimer: ReleaseTimer;
+	private readonly timers: ReleaseTimerHost = realTimers;
 	readonly maxLayers: number;
 	stats = {
 		layers: 0,
@@ -88,11 +146,18 @@ export class ImageryArray {
 		/** live layers per tier */
 		small: 0,
 		big: 0,
+		/** release firings pushed back by hold() */
+		holdDeferrals: 0,
 	};
 	/** Called when uploads land or layers move (the host re-points rows and redraws). */
 	onChange?: () => void;
 
-	constructor(readonly device: Device) {
+	constructor(
+		readonly device: Device,
+		timers?: ReleaseTimerHost,
+	) {
+		this.releaseTimer = new ReleaseTimer(() => this.release(), timers);
+		this.timers = timers ?? realTimers;
 		this.maxLayers = Math.min(
 			2048,
 			(device.limits as { maxTextureArrayLayers?: number })
@@ -197,18 +262,21 @@ export class ImageryArray {
 	 * Repeated calls keep the first deadline (the engine calls this on every sync of such a look).
 	 */
 	releaseWhenIdle(ms = IMAGERY_RELEASE_IDLE_MS) {
-		if (this.destroyed || this.releaseTimer) return;
+		if (this.destroyed || this.releaseTimer.armed) return;
 		if (!this.layers.size && !this.pending.size) return;
-		this.releaseTimer = setTimeout(() => {
-			this.releaseTimer = null;
-			this.release();
-		}, ms);
+		this.releaseTimer.arm(ms);
+	}
+
+	/**
+	 * Keep the layers at least `ms` more even if a releaseWhenIdle deadline falls earlier (a timer that
+	 * fires inside the hold re-arms for the rest). Only a deferred release; release() is immediate.
+	 */
+	hold(ms: number) {
+		this.releaseTimer.holdUntil(this.timers.now() + ms);
 	}
 
 	private cancelRelease() {
-		if (!this.releaseTimer) return;
-		clearTimeout(this.releaseTimer);
-		this.releaseTimer = null;
+		this.releaseTimer.cancel();
 	}
 
 	/** The look drapes no imagery any more: every layer goes, the arrays at the next idle. */
@@ -227,6 +295,7 @@ export class ImageryArray {
 	private updateStats() {
 		let small = 0;
 		for (const l of this.layers.values()) if (l.tier === 256) small++;
+		this.stats.holdDeferrals = this.releaseTimer.deferrals;
 		this.stats.layers = this.layers.size;
 		this.stats.small = small;
 		this.stats.big = this.layers.size - small;

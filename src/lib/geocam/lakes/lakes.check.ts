@@ -341,6 +341,96 @@ async function asyncChecks() {
 		demAtFix: 548,
 	});
 	ok(dry === null, "photoLakeFloor dam case → null");
+	// ---- absHeights (batched, e.g. the GPU gather) = absHeight: bit-identical floor and level
+	// synthetic lakes without ele (DEM median) next to the Swiss-table one, analytic heights
+	_resetLakesMemo();
+	const analytic = (lat: number, lon: number) =>
+		540 + 40 * Math.sin(lat * 900) + 25 * Math.cos(lon * 1100);
+	const demEls: WaterElement[] = [
+		{
+			type: "way",
+			id: 11,
+			tags: { natural: "water", name: "Namenlos" },
+			geometry: ring(sq(0, 0, 1000, 1000)),
+		},
+		{
+			type: "way",
+			id: 12,
+			tags: { natural: "water", name: "Thunersee" },
+			geometry: ring(sq(1200, 0, 2200, 1000)),
+		},
+	];
+	const demFetch = async () => ({ elements: demEls });
+	let cpuCalls = 0;
+	const cpu = (la: number, lo: number) => {
+		cpuCalls++;
+		return analytic(la, lo);
+	};
+	let batchPoints = 0;
+	const batch = (lats: number[], lons: number[]) => {
+		batchPoints += lats.length;
+		return Float64Array.from(lats, (la, i) => analytic(la, lons[i]));
+	};
+	const pt = ll(300, 300);
+	const base = { fetchWater: demFetch, hAccM: 10, demAtFix: 520 };
+	const ref = await photoLakeFloor(pt.lat, pt.lon, { ...base, absHeight: cpu });
+	ok(ref != null && ref.levelSource === "dem", "dem-level reference floor");
+	for (const [name, lookup] of [
+		["sync", batch],
+		["async", async (la: number[], lo: number[]) => batch(la, lo)],
+	] as const) {
+		batchPoints = 0;
+		const f = await photoLakeFloor(pt.lat, pt.lon, {
+			...base,
+			absHeight: () => {
+				throw new Error("cpu path must not run");
+			},
+			absHeights: lookup,
+		});
+		ok(
+			f?.floorM === ref?.floorM && f?.levelM === ref?.levelM,
+			`absHeights ${name}: bit-identical floor and level`,
+		);
+		// the recorder pass and the replay pass each ask nothing; the lookup gets one pass of points
+		ok(
+			batchPoints === cpuCalls,
+			`absHeights ${name}: same number of samples (${batchPoints} vs ${cpuCalls})`,
+		);
+	}
+	// rejecting lookup falls back to absHeight, identically
+	const fb = await photoLakeFloor(pt.lat, pt.lon, {
+		...base,
+		absHeight: cpu,
+		absHeights: async () => {
+			throw new Error("gather failed");
+		},
+	});
+	ok(
+		fb?.floorM === ref?.floorM && fb?.levelM === ref?.levelM,
+		"absHeights rejects: CPU fallback identical",
+	);
+	// Swiss-table lake: no lookup needed, same level
+	const tp = ll(1700, 500);
+	let tableLookups = 0;
+	const tableFloor = await photoLakeFloor(tp.lat, tp.lon, {
+		...base,
+		absHeights: (la, lo) => {
+			tableLookups++;
+			return batch(la, lo);
+		},
+	});
+	ok(
+		tableFloor?.levelSource === "table" && near(tableFloor.levelM, 557.8, 0.01),
+		"table lake level via absHeights path",
+	);
+	// a hung gather hits the timeout
+	const th = await photoLakeFloor(pt.lat, pt.lon, {
+		...base,
+		timeoutMs: 50,
+		absHeights: () => new Promise<Float64Array>(() => {}),
+	});
+	ok(th === null, "hung absHeights → timeout null");
+	void tableLookups;
 }
 
 await asyncChecks();

@@ -227,7 +227,7 @@ import {
 	runGeometryPass,
 	runScreenPass,
 } from "./hosts/passes";
-import { ImageryArray } from "./imagery";
+import { IMAGERY_POSE_VIEW_HOLD_MS, ImageryArray } from "./imagery";
 import { AtmSkyCore } from "./layers/atm-sky";
 import {
 	type BatchedTerrainCore,
@@ -1344,7 +1344,15 @@ export class WebGpuEngine implements Renderer {
 			this.sync();
 		}
 		if (lakeFloor) {
-			const floor = await lakeFloor(dem, (la, lo) => terrain.heightAt(la, lo));
+			// the DEM-median level samples go through the GPU gather when it is on (else heightAt)
+			const lakeHg = this.heights();
+			const floor = await lakeFloor(
+				dem,
+				(la, lo) => terrain.heightAt(la, lo),
+				lakeHg
+					? (lats, lons) => lakeHg.heightsAt(terrain, lats, lons)
+					: undefined,
+			);
 			if (this.disposed) return;
 			if (floor != null && floor > this.eyeAlt) {
 				this.setEye(floor);
@@ -4164,6 +4172,9 @@ export class WebGpuEngine implements Renderer {
 			src?.dispose();
 			this.poseView = false;
 			this.settings = prev;
+			// the sync below restores the look (often one without a drape → releaseWhenIdle): the next
+			// pose view of a matcher run may be minutes away, so the layers outlive that grace
+			this.gpu?.imagery.hold(IMAGERY_POSE_VIEW_HOLD_MS);
 			if (!this.disposed) this.sync();
 		}
 	}

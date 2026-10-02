@@ -16,6 +16,7 @@
 // 3 s), abort or any error.
 
 import { lakeLevel } from "../../concord/cues/water";
+import { replayHeights } from "../../dem/replay-heights";
 import { getFlag } from "../../flags";
 import { DEG, EARTH_R } from "../../geodesy";
 import {
@@ -124,6 +125,16 @@ export type PhotoLakeFloorOpts = {
 	demAtFix?: number | null;
 	/** Absolute DEM height at a lat/lon (the DEM-median level fallback); null/NaN when unknown. */
 	absHeight?: (lat: number, lon: number) => number | null | undefined;
+	/**
+	 * Batched absolute heights (NaN = unknown), e.g. the engine's GPU gather: the DEM-median level
+	 * samples are recorded, looked up in one call and replayed (replay-heights.ts; the sampling
+	 * order is geometric, so the result equals `absHeight`'s). A rejection (or the timeout) falls
+	 * back to `absHeight`.
+	 */
+	absHeights?: (
+		lats: number[],
+		lons: number[],
+	) => Float64Array | Promise<Float64Array>;
 	region?: { lakes?: LakeGeo[] } | null;
 	/** An already-started lakesNear promise (the engines start it at init). */
 	lakes?: Promise<LakeGeo[]>;
@@ -191,7 +202,24 @@ export async function photoLakeFloor(
 		lakesP.catch(() => {}); // a late failure after the timeout is not an unhandled rejection
 		const lakes = await Promise.race([lakesP, timeout]);
 		if (!lakes?.length) return null;
-		const cands = candidateLakes(lakes, lat, lon, o);
+		const cpu = () => candidateLakes(lakes, lat, lon, o);
+		let cands: SceneLake[] | null;
+		if (o.absHeights) {
+			const absHeights = o.absHeights;
+			const gathered = Promise.resolve(
+				replayHeights(
+					(h) =>
+						candidateLakes(lakes, lat, lon, {
+							hAccM: o.hAccM,
+							absHeight: h,
+						}),
+					absHeights,
+				),
+			);
+			gathered.catch(() => {}); // a late failure after the timeout is not an unhandled rejection
+			cands = await Promise.race([gathered.catch(cpu), timeout]);
+		} else cands = cpu();
+		if (!cands) return null;
 		return lakeFloorDetail(cands, [0, 0], {
 			hAccM: o.hAccM,
 			demAtFix: o.demAtFix,
@@ -218,6 +246,7 @@ export function startLakeFloor(
 	| ((
 			demAtFix: number,
 			absHeight?: (lat: number, lon: number) => number | null | undefined,
+			absHeights?: PhotoLakeFloorOpts["absHeights"],
 	  ) => Promise<number | null>)
 	| null {
 	if (getFlag("geoLakeFloor") !== "on") return null;
@@ -229,12 +258,13 @@ export function startLakeFloor(
 		}),
 	);
 	lakes.catch(() => {});
-	return async (demAtFix, absHeight) => {
+	return async (demAtFix, absHeight, absHeights) => {
 		const f = await photoLakeFloor(photo.lat, photo.lon, {
 			lakes,
 			hAccM: photo.hAccuracy,
 			demAtFix,
 			absHeight,
+			absHeights,
 			signal,
 			timeoutMs,
 		});
