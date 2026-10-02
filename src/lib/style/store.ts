@@ -29,6 +29,8 @@ export const DEFAULT_STYLE_STATE: StyleState = {
 	overrides: {},
 };
 
+const PERSIST_DEBOUNCE_MS = 250;
+
 type Stored = { v: 1; preset: PresetId; overrides: DeepPartial<ViewStyle> };
 
 /** Untrusted JSON (storage) → a valid StyleState; anything unusable → the default look. */
@@ -84,6 +86,8 @@ export type StyleStore = {
 	/** Drop all overrides (the "Reset to preset" action). */
 	resetOverrides(): void;
 	subscribe(cb: () => void): () => void;
+	/** Write any pending (debounced) state to storage now. */
+	flush(): void;
 	/** true while ?style= overrides storage */
 	readonly urlOverride: boolean;
 	dispose(): void;
@@ -124,21 +128,44 @@ export function createStyleStore(env: StyleStoreEnv = {}): StyleStore {
 				})
 			: () => {};
 
+	// Persistence is debounced (a slider drag would otherwise serialise the whole style per step);
+	// in-memory state and subscribers stay synchronous, and a hidden page flushes at once.
+	let persistTimer: ReturnType<typeof setTimeout> | null = null;
+	const persist = () => {
+		try {
+			if (
+				state.preset === DEFAULT_STYLE_STATE.preset &&
+				!Object.keys(state.overrides).length
+			)
+				env.storage?.removeItem(STYLE_STORAGE_KEY);
+			else env.storage?.setItem(STYLE_STORAGE_KEY, serializeState(state));
+		} catch {
+			// storage full / disabled: the style still applies for this session
+		}
+	};
+	const flush = () => {
+		if (persistTimer === null) return;
+		clearTimeout(persistTimer);
+		persistTimer = null;
+		persist();
+	};
+	const schedulePersist = () => {
+		if (persistTimer !== null) clearTimeout(persistTimer);
+		persistTimer = setTimeout(flush, PERSIST_DEBOUNCE_MS);
+	};
+	const onVisibility = () => {
+		if (document.visibilityState === "hidden") flush();
+	};
+	const hasWindow = !fromUrl && typeof window !== "undefined";
+	if (hasWindow) {
+		window.addEventListener("pagehide", flush);
+		document.addEventListener("visibilitychange", onVisibility);
+	}
+
 	const setState: StyleStore["setState"] = (next) => {
 		const n = typeof next === "function" ? next(state) : next;
 		if (!apply(n)) return;
-		if (!fromUrl) {
-			try {
-				if (
-					state.preset === DEFAULT_STYLE_STATE.preset &&
-					!Object.keys(state.overrides).length
-				)
-					env.storage?.removeItem(STYLE_STORAGE_KEY);
-				else env.storage?.setItem(STYLE_STORAGE_KEY, serializeState(state));
-			} catch {
-				// storage full / disabled: the style still applies for this session
-			}
-		}
+		if (!fromUrl) schedulePersist();
 		emit();
 	};
 
@@ -161,8 +188,14 @@ export function createStyleStore(env: StyleStoreEnv = {}): StyleStore {
 			listeners.add(cb);
 			return () => listeners.delete(cb);
 		},
+		flush,
 		urlOverride: !!fromUrl,
 		dispose: () => {
+			flush();
+			if (hasWindow) {
+				window.removeEventListener("pagehide", flush);
+				document.removeEventListener("visibilitychange", onVisibility);
+			}
 			offExternal();
 			listeners.clear();
 		},

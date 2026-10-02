@@ -40,7 +40,11 @@ import {
 	TimeScrubber,
 	vpColor,
 } from "#/lib/roll/mosaic";
-import { deleteUploadRoll, isLocalRollId } from "#/lib/roll/mosaic/loadRoll";
+import {
+	deleteUploadRoll,
+	getUploadThumb,
+	isLocalRollId,
+} from "#/lib/roll/mosaic/loadRoll";
 import { PropagatePanel, propagateMode } from "#/lib/roll/propagate";
 import { hfovOf } from "#/lib/roll/roll";
 import type { Roll, RollPhoto } from "#/lib/roll/types";
@@ -331,8 +335,10 @@ function DetailStrip({
 				>
 					{photo.meta.src && (
 						<img
-							src={photo.meta.src}
+							src={getUploadThumb(photo.meta.id) ?? photo.meta.src}
 							alt={photo.meta.id}
+							decoding="async"
+							loading="lazy"
 							className="size-full object-cover"
 						/>
 					)}

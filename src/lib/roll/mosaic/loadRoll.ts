@@ -18,6 +18,11 @@ import type { Roll } from "../types";
 export const LOCAL_ROLL_PREFIX = UPLOAD_ROLL_PREFIX;
 export const isLocalRollId = (id: string) => id.startsWith(LOCAL_ROLL_PREFIX);
 
+const thumbUrls = new Map<string, string>();
+/** Thumbnail blob URL of an upload photo seen by the last listUploadRolls/loadRoll call, if any. */
+export const getUploadThumb = (photoId: string): string | null =>
+	thumbUrls.get(photoId) ?? null;
+
 /** Upload rolls for the list page, with thumbnail URLs (meta.src is empty until restored). */
 export async function listUploadRolls(): Promise<{
 	rolls: Roll[];
@@ -27,6 +32,7 @@ export async function listUploadRolls(): Promise<{
 	const list = await m.listLocalPhotos();
 	const thumbs = new Map<string, string>();
 	for (const s of list) if (s.thumbUrl) thumbs.set(s.id, s.thumbUrl);
+	for (const [k, v] of thumbs) thumbUrls.set(k, v);
 	return { rolls: uploadRolls(list.map((s) => s.meta)), thumbs };
 }
 
@@ -53,8 +59,18 @@ export async function loadRoll(id: string): Promise<Roll | null> {
 	if (!isLocalRollId(id)) return getBuiltinRoll(id);
 	const m = await import("#/lib/upload");
 	const list = await m.listLocalPhotos();
+	for (const s of list) if (s.thumbUrl) thumbUrls.set(s.id, s.thumbUrl);
+	// Group the stored metas first and register only the requested roll's photos (each registration
+	// is a DB read, a full-size blob URL and a map region load).
+	const found = findUploadRoll(uploadRolls(list.map((s) => s.meta)), id);
+	if (!found) return null;
+	const wanted = new Set(found.photos.map((p) => p.meta.id));
 	const metas = await Promise.all(
-		list.map(async (s) => (await m.ensureLocalPhotoRegistered(s.id)) ?? s.meta),
+		list.map(async (s) =>
+			wanted.has(s.id)
+				? ((await m.ensureLocalPhotoRegistered(s.id)) ?? s.meta)
+				: s.meta,
+		),
 	);
 	return findUploadRoll(uploadRolls(metas), id);
 }

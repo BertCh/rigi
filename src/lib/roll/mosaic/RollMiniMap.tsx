@@ -175,6 +175,15 @@ export function RollMiniMap({
 	// photos arrive time-sorted (makeRoll); keep that order for the track
 	const track = [...photos].sort((a, b) => a.t - b.t);
 
+	const pendingPan = useRef<{ x: number; y: number } | null>(null);
+	const panFrame = useRef<number | null>(null);
+	const applyPan = () => {
+		if (panFrame.current != null) cancelAnimationFrame(panFrame.current);
+		panFrame.current = null;
+		const p = pendingPan.current;
+		pendingPan.current = null;
+		if (p) setView((v) => (v ? { ...v, x: p.x, y: p.y } : v));
+	};
 	const onPointerDown = (e: React.PointerEvent) => {
 		if (!view) return;
 		const id =
@@ -197,9 +206,14 @@ export function RollMiniMap({
 		const dx = e.clientX - d.x;
 		const dy = e.clientY - d.y;
 		if (Math.hypot(dx, dy) > 4) d.moved = true;
-		if (d.moved) setView((v) => (v ? { ...v, x: d.vx - dx, y: d.vy - dy } : v));
+		if (!d.moved) return;
+		// coalesce to one view update per animation frame
+		pendingPan.current = { x: d.vx - dx, y: d.vy - dy };
+		if (panFrame.current == null)
+			panFrame.current = requestAnimationFrame(applyPan);
 	};
 	const onPointerUp = () => {
+		applyPan();
 		const d = drag.current;
 		drag.current = null;
 		if (d && !d.moved && d.id) onSelect(d.id === selectedId ? null : d.id);
@@ -234,6 +248,7 @@ export function RollMiniMap({
 					key={t.key}
 					src={t.url}
 					alt=""
+					decoding="async"
 					draggable={false}
 					className="pointer-events-none absolute max-w-none brightness-[0.8] saturate-[0.7]"
 					style={{ left: t.x, top: t.y, width: TILE, height: TILE }}
@@ -250,7 +265,10 @@ export function RollMiniMap({
 					{track.length > 1 && (
 						<polyline
 							points={track
-								.map((p) => `${at(p.meta).x},${at(p.meta).y}`)
+								.map((p) => {
+									const c = at(p.meta);
+									return `${c.x},${c.y}`;
+								})
 								.join(" ")}
 							fill="none"
 							stroke={BRAND.paper}

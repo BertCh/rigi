@@ -216,6 +216,7 @@ export function SlippyMap({
 					key={t.key}
 					src={t.url}
 					alt=""
+					decoding="async"
 					draggable={false}
 					className="pointer-events-none absolute max-w-none"
 					style={{ left: t.x, top: t.y, width: TILE, height: TILE }}

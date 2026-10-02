@@ -108,13 +108,37 @@ describe("createStyleStore", () => {
 		const storage = memoryStorage();
 		const store = createStyleStore({ storage });
 		store.setPreset("night");
+		store.flush();
 		expect(JSON.parse(storage.m.get(STYLE_STORAGE_KEY) ?? "null")).toEqual({
 			v: 1,
 			preset: "night",
 			overrides: {},
 		});
 		store.setPreset("swiss");
+		store.flush();
 		expect(storage.m.has(STYLE_STORAGE_KEY)).toBe(false);
+	});
+	it("debounces persistence: one trailing write, flushed on dispose", () => {
+		vi.useFakeTimers();
+		try {
+			const storage = memoryStorage();
+			const store = createStyleStore({ storage });
+			store.setPreset("night");
+			store.patch({ terrain: { ambient: 0.4 } });
+			expect(storage.m.has(STYLE_STORAGE_KEY)).toBe(false);
+			expect(store.getStyle().terrain.ambient).toBe(0.4);
+			vi.advanceTimersByTime(300);
+			expect(JSON.parse(storage.m.get(STYLE_STORAGE_KEY) ?? "")).toMatchObject({
+				preset: "night",
+			});
+			store.setPreset("minimal");
+			store.dispose();
+			expect(JSON.parse(storage.m.get(STYLE_STORAGE_KEY) ?? "")).toMatchObject({
+				preset: "minimal",
+			});
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 	it("?style= wins over storage, is never saved and edits stay in memory", () => {
 		const storage = memoryStorage({
