@@ -145,6 +145,8 @@ export const FLAG_SCHEMA = {
 	 * from depth), fp16 = the checkpoint (70 MB, the parity reference).
 	 */
 	nearfieldWeights: oneOf(["q8", "q8lite", "fp16"], "q8"),
+	/** Step Inside: persistent per-photo depth cache in Cache Storage (nearfield/local/depth-cache.ts); off = always recompute. */
+	nearfieldDepthCache: onOff("on"),
 	// alignment aids
 	picker: oneOf(["off", "on", "always"], "off"),
 	/** tap-a-peak pin solve (src/lib/pins/seed.ts): seeded = closed-form start + lens bound, kept only when it fits the taps better */

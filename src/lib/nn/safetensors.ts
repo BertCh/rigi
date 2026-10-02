@@ -49,10 +49,14 @@ export function halfToFloat32(half: Uint16Array): Float32Array {
 	return out;
 }
 
+// one shared scratch pair: per-call allocation dominated whole-image encodes
+const HALF_F32 = new Float32Array(1);
+const HALF_U32 = new Uint32Array(HALF_F32.buffer);
+
 /** f32 → half bits, round to nearest even (for tests and producers). */
 export function floatToHalf(v: number): number {
-	const f = new Float32Array([v]);
-	const x = new Uint32Array(f.buffer)[0];
+	HALF_F32[0] = v;
+	const x = HALF_U32[0];
 	const s = (x >>> 16) & 0x8000;
 	const e = (x >>> 23) & 0xff;
 	let m = x & 0x7fffff;

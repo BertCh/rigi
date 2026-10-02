@@ -44,6 +44,13 @@ import {
 import type { GaussianCloud, NearFieldDepth } from "../types";
 import { composeDepth } from "./compose";
 import {
+	cacheStorageBackend,
+	type DepthCacheBackend,
+	depthCacheKey,
+	getCachedDepth,
+	putCachedDepth,
+} from "./depth-cache";
+import {
 	FOCAL_GRID,
 	MOGE2_VITS,
 	MOGE2_WEIGHTS,
@@ -215,6 +222,8 @@ export type LocalDeps = {
 		inp: LiftInput,
 		signal: AbortSignal,
 	): Promise<GaussianCloud>;
+	/** Persistent depth cache storage (./depth-cache.ts); null = none (node, private mode). */
+	cache: DepthCacheBackend | null;
 };
 
 const defaultDeps: LocalDeps = {
@@ -228,6 +237,7 @@ const defaultDeps: LocalDeps = {
 	estimate: estimateDepth,
 	lift: (device, inp, signal) =>
 		liftGaussiansGpu(device, inp, undefined, signal),
+	cache: cacheStorageBackend(),
 };
 
 const FAILURE_MESSAGES: Partial<Record<NearFieldErrorCode, string>> = {
@@ -512,11 +522,52 @@ export class LocalNearFieldClient {
 		return abortable(j.promise, signal).finally(leave);
 	}
 
+	/** The persistent cache key of this photo + weights + grid + tokens, or null (flag off, no storage / crypto). */
+	private async depthCacheKey(
+		blob: Blob,
+		opts: LocalOpts,
+	): Promise<string | null> {
+		if (!this.deps.cache || getFlag("nearfieldDepthCache") === "off")
+			return null;
+		return depthCacheKey(blob, {
+			weights: this.weightsFile,
+			size: opts.maxSide ?? LOCAL_MAX_SIDE,
+			tokens: this.tokens,
+		});
+	}
+
+	/** A stored depth: no weight load, no inference; the lift's rgba comes from decoding the blob. */
+	private async depthCacheHit(
+		blob: Blob,
+		opts: LocalOpts,
+		key: string | null,
+	): Promise<PhotoResult | null> {
+		if (!key) return null;
+		const cached = await getCachedDepth(key, { backend: this.deps.cache });
+		if (!cached) return null;
+		try {
+			const dec = await this.deps.decode(
+				blob,
+				opts.maxSide ?? LOCAL_MAX_SIDE,
+				this.tokens,
+			);
+			if (dec.width !== cached.width || dec.height !== cached.height)
+				return null;
+			opts.onProgress?.("Depth from the local cache");
+			return { depth: cached, rgba: dec.rgba };
+		} catch {
+			return null;
+		}
+	}
+
 	private async runJob(
 		blob: Blob,
 		opts: LocalOpts,
 		signal: AbortSignal,
 	): Promise<PhotoResult> {
+		const cacheKey = await this.depthCacheKey(blob, opts);
+		const hit = await this.depthCacheHit(blob, opts, cacheKey);
+		if (hit) return hit;
 		const onProgress = opts.onProgress;
 		if (onProgress) this.progress.add(onProgress);
 		const { net } = await this.load().finally(() => {
@@ -536,6 +587,10 @@ export class LocalNearFieldClient {
 					);
 					signal.throwIfAborted();
 					const depth = await this.deps.estimate(net, dec, signal);
+					if (cacheKey)
+						void putCachedDepth(cacheKey, depth as never, {
+							backend: this.deps.cache,
+						});
 					return { depth, rgba: dec.rgba };
 				} catch (e) {
 					throw toNearFieldError(e, "inference-failed");

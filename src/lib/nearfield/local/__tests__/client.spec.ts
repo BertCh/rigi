@@ -384,3 +384,45 @@ describe("LocalNearFieldClient idle unload", () => {
 		expect(h.log).toContain("release");
 	});
 });
+
+describe("LocalNearFieldClient persistent depth cache", () => {
+	it("a new client on the same storage answers a repeated photo without the net", async () => {
+		const backend = new Map<string, Uint8Array>();
+		const cache = {
+			get: async (k: string) => backend.get(k) ?? null,
+			put: async (k: string, b: Uint8Array) => void backend.set(k, b.slice()),
+			delete: async (k: string) => void backend.delete(k),
+			keys: async () => [...backend.keys()],
+		};
+		const full = (tag: number) => ({
+			...(fakeDepth(tag) as object),
+			focal: 0.8,
+			shift: 0.1,
+		});
+		let estimates = 0;
+		const over: Partial<LocalDeps> = {
+			cache,
+			decode: async () =>
+				({ width: 2, height: 2, rgba: new Uint8ClampedArray(16) }) as never,
+			estimate: async () => {
+				estimates++;
+				return full(5) as never;
+			},
+		};
+		const b = new Blob([new Uint8Array([1, 2, 3, 4])]);
+		const first = harness(over).client;
+		const d1 = await first.depth(b);
+		expect(estimates).toBe(1);
+		await vi.waitFor(() => expect(backend.size).toBeGreaterThan(1));
+		// "reload": fresh client, fresh blob object with the same bytes, nothing loaded
+		const h2 = harness(over);
+		const d2 = await h2.client.depth(new Blob([new Uint8Array([1, 2, 3, 4])]));
+		expect(estimates).toBe(1);
+		expect(h2.loads()).toBe(0);
+		expect(d2?.depth).toEqual(d1?.depth);
+		expect(d2?.model).toBe("fake");
+		// a different photo still computes
+		await h2.client.depth(new Blob([new Uint8Array([9])]));
+		expect(estimates).toBe(2);
+	});
+});
