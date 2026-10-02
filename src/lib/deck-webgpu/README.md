@@ -161,6 +161,10 @@ where nothing else did.
   array with a whole chunk of free layers is compacted by copy (`TextureArrayAtlas.compact`, graph
   `atlas-resize|…`) and one with no live layer is dropped; a look without imagery releases every
   layer after 10 s (`releaseWhenIdle`, so the matcher's pose views do not re-upload the drape).
+  Past `maxTextureArrayLayers` the overflow is near-first like the height atlas: `sync` takes tile
+  distances and `planImageryOverflow` (`atlas-layout.ts`, per tier) lets the nearest tiles keep or get
+  layers, evicting a farther resident tile for a nearer one (`stats.evictions`; `stats.overflow` = wanted
+  tiles drawn without imagery); a resident tile inside the budget is never re-uploaded.
   The batched height arrays (`bterrain-h256` / `h512`) compact on idle too: 4 s after a sync that
   freed layers, a pool with at least its initial capacity free compacts through
   `TextureArrayAtlas.compactLeased`, which moves the store's own layers and the live `AtlasLease`

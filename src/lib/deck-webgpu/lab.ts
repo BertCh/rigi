@@ -194,7 +194,7 @@ export async function startLab(
 		if (!imagery || !set) return;
 		imagery.sync(
 			imgMap,
-			set.tiles.map((t) => t.id),
+			set.tiles.map((t) => ({ id: t.id, distance: t.distance })),
 		);
 		terrain.syncImageryLayers();
 	};

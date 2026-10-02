@@ -156,6 +156,49 @@ export function nearestWithin<T extends { id: string; distance: number }>(
 }
 
 /**
+ * Imagery overflow (imagery.ts ImageryArray.sync when a tier's array is at maxTextureArrayLayers):
+ * per tier, the `maxLayers` nearest of the `wanted` tiles keep or get a layer. Rank = (distance,
+ * resident first, id): a missing distance is +Infinity, and among exact ties a tile that already
+ * holds a layer wins, so the same input never churns and nothing re-uploads needlessly.
+ * `resident` maps tile id → the tier its layer is in; a resident tile wanted in another tier (its
+ * source changed size) does not rank as resident in this one. `evict` lists the resident tiles that lose their
+ * layer to a nearer tile (resident ids that are not wanted are the caller's to drop); `overflow`
+ * lists the wanted tiles left without a layer. Near-first like nearestWithin, per tier.
+ */
+export function planImageryOverflow(
+	wanted: readonly { id: string; tier: ImageryTier; distance?: number }[],
+	resident: ReadonlyMap<string, ImageryTier>,
+	maxLayers: number,
+) {
+	const admit = new Set<string>();
+	const evict: string[] = [];
+	const overflow: string[] = [];
+	for (const tier of [256, 512] as const) {
+		const inTier = wanted.filter((w) => w.tier === tier);
+		const holds = (id: string) => resident.get(id) === tier;
+		const dist = (w: { distance?: number }) =>
+			w.distance ?? Number.POSITIVE_INFINITY;
+		const ranked = [...inTier].sort((a, b) => {
+			const da = dist(a);
+			const db = dist(b);
+			if (da !== db) return da < db ? -1 : 1;
+			const ha = holds(a.id);
+			if (ha !== holds(b.id)) return ha ? -1 : 1;
+			return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+		});
+		const budget = Math.max(0, maxLayers);
+		ranked.forEach((w, i) => {
+			if (i < budget) admit.add(w.id);
+			else {
+				overflow.push(w.id);
+				if (resident.has(w.id)) evict.push(w.id);
+			}
+		});
+	}
+	return { admit, evict, overflow };
+}
+
+/**
  * Load-time leases (texture-array-atlas.ts writeTerrariumLeased) take a layer only while the atlas
  * keeps this many layers free below maxLayers. Leased spare tiles (deck/terrain-stream.ts
  * spareGpuLayers, 48) and in-flight loads (concurrency 10) must never take the layer a drawn tile

@@ -17,7 +17,9 @@
 // The layers live in TextureArrayAtlases (texture-array-atlas.ts, shared with the terrain's height
 // arrays): capacity grows in chunks (copies keep every mip of the existing layers) up to the
 // device's maxTextureArrayLayers (256 on 'core' devices, 2048 on Apple with featureLevel 'max').
-// Tiles that don't fit draw without imagery (hillshade) and are counted in stats.overflow.
+// Tiles that don't fit draw without imagery (hillshade) and are counted in stats.overflow; which
+// ones is near-first (planImageryOverflow): given tile distances, a resident far tile yields its
+// layer to a nearer wanted one (stats.evictions), and a resident tile inside the budget keeps its.
 // On idle (COMPACT_IDLE_MS without a release or upload) an array whose free layers make up a whole
 // chunk is compacted by copy (TextureArrayAtlas.compact); an array with no live layer is dropped.
 // release() (the look no longer drapes) releases every layer, so the arrays go at the next idle.
@@ -31,6 +33,7 @@ import {
 	encodeImageryLayer,
 	type ImageryTier,
 	imageryTierOf,
+	planImageryOverflow,
 } from "./atlas-layout";
 import { USAGE } from "./targets";
 import { TextureArrayAtlas } from "./texture-array-atlas";
@@ -139,6 +142,8 @@ export class ImageryArray {
 		capacity: 0,
 		uploads: 0,
 		overflow: 0,
+		/** resident layers given up to nearer wanted tiles (cumulative) */
+		evictions: 0,
 		mipGens: 0,
 		/** idle compactions / arrays dropped */
 		compactions: 0,
@@ -219,12 +224,21 @@ export class ImageryArray {
 
 	/**
 	 * Match the arrays to `images` (tile id → bitmap) restricted to `keep` (the rendered tiles):
-	 * releases layers of dropped tiles, uploads new / changed bitmaps asynchronously.
+	 * releases layers of dropped tiles, uploads new / changed bitmaps asynchronously. `keep` entries
+	 * are ids or { id, distance } (the camera distance, nearer first): when a tier's array is full
+	 * the nearest tiles get the layers and a farther resident tile is evicted for a nearer one
+	 * (planImageryOverflow); a plain id has distance +Infinity.
 	 */
-	sync(images: ReadonlyMap<string, ImageBitmap>, keep: Iterable<string>) {
+	sync(
+		images: ReadonlyMap<string, ImageBitmap>,
+		keep: Iterable<string | { id: string; distance?: number }>,
+	) {
 		if (this.destroyed) return;
 		this.cancelRelease();
-		const want = new Set(keep);
+		const want = new Map<string, number | undefined>();
+		for (const k of keep)
+			if (typeof k === "string") want.set(k, undefined);
+			else want.set(k.id, k.distance);
 		let released = 0;
 		for (const id of [...this.layers.keys()])
 			if (!want.has(id) || !images.has(id)) {
@@ -232,8 +246,27 @@ export class ImageryArray {
 				this.sources.delete(id);
 				released++;
 			}
-		let overflow = 0;
-		for (const id of want) {
+		const plan = planImageryOverflow(
+			[...want]
+				.filter(([id]) => images.has(id))
+				.map(([id, distance]) => ({
+					id,
+					tier: tierOf(images.get(id) as ImageBitmap),
+					distance,
+				})),
+			new Map([...this.layers].map(([id, l]) => [id, l.tier])),
+			this.maxLayers,
+		);
+		for (const id of plan.evict) {
+			this.drop(id);
+			this.sources.delete(id);
+			this.pending.delete(id); // an upload in flight for it must not land (upload() checks)
+			released++;
+			this.stats.evictions++;
+		}
+		let overflow = plan.overflow.length;
+		for (const id of plan.overflow) this.pending.delete(id);
+		for (const id of plan.admit) {
 			const bmp = images.get(id);
 			if (!bmp || this.sources.get(id) === bmp || this.pending.get(id) === bmp)
 				continue;
@@ -255,6 +288,8 @@ export class ImageryArray {
 		this.stats.overflow = overflow;
 		this.updateStats();
 		if (released) this.scheduleIdle();
+		// evicted rows must point at no layer now (the caller also re-points after sync)
+		if (plan.evict.length) this.onChange?.();
 	}
 
 	/**

@@ -24,6 +24,8 @@
 //   7. leases (texture-array-atlas.ts AtlasLease / TileLayerRef): the layer returns to the atlas
 //      exactly once, when the last of tile + TileStore references goes, in either order; a tile ref
 //      releases once; nothing returns to a destroyed atlas
+//  11. imagery overflow (planImageryOverflow): the nearest `maxLayers` per tier keep layers, evictions
+//      are exactly the resident tiles that lose, and the plan is stable under repeated application
 //   9. lease-aware compaction (compactLeasedPlan): owner and lease layers disjoint, their count equals
 //      the allocator's used(), minCapacity respected, every layer ends at a distinct index below the
 //      new capacity, the remap applied to leases (AtlasLease.relocate) moves exactly the live ones,
@@ -49,6 +51,7 @@ import {
 	LayerAllocator,
 	leaseFits,
 	nearestWithin,
+	planImageryOverflow,
 } from "./atlas-layout";
 import { AtlasLease, TileLayerRef } from "./texture-array-atlas";
 
@@ -654,6 +657,50 @@ const rand = () => {
 			}
 	}
 	console.log("near-first overflow: 200 trials");
+}
+
+// ---------- 11. imagery overflow ----------
+{
+	let seed = 7;
+	const rnd = () => {
+		seed = (seed * 1664525 + 1013904223) >>> 0;
+		return seed / 2 ** 32;
+	};
+	for (let trial = 0; trial < 200; trial++) {
+		const max = 1 + Math.floor(rnd() * 8);
+		const wanted = Array.from({ length: 20 }, (_, i) => ({
+			id: `t${i}`,
+			tier: rnd() < 0.5 ? (256 as const) : (512 as const),
+			distance: Math.floor(rnd() * 6),
+		}));
+		let resident = new Map<string, 256 | 512>();
+		for (const w of wanted) if (rnd() < 0.3) resident.set(w.id, w.tier);
+		const plan = planImageryOverflow(wanted, resident, max);
+		for (const tier of [256, 512] as const) {
+			const n = wanted.filter((w) => w.tier === tier);
+			const adm = n.filter((w) => plan.admit.has(w.id));
+			if (adm.length !== Math.min(max, n.length))
+				fail(`imagery trial ${trial}: tier ${tier} admitted ${adm.length}`);
+			const far = Math.max(-1, ...adm.map((w) => w.distance));
+			for (const w of n)
+				if (!plan.admit.has(w.id) && w.distance < far)
+					fail(`imagery trial ${trial}: nearer tile refused`);
+		}
+		for (const id of plan.evict)
+			if (!resident.has(id) || plan.admit.has(id))
+				fail(`imagery trial ${trial}: bad eviction ${id}`);
+		// apply: evicted leave, admitted join; the same input again changes nothing
+		resident = new Map(
+			wanted.filter((w) => plan.admit.has(w.id)).map((w) => [w.id, w.tier]),
+		);
+		const again = planImageryOverflow(wanted, resident, max);
+		if (
+			again.evict.length ||
+			[...again.admit].sort().join() !== [...plan.admit].sort().join()
+		)
+			fail(`imagery trial ${trial}: not stable`);
+	}
+	console.log("imagery overflow: 200 trials");
 }
 
 console.log(failures ? `FAIL (${failures})` : "PASS atlas-layout");

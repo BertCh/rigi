@@ -2559,7 +2559,7 @@ export class WebGpuEngine implements Renderer {
 		if (!g || !set || !this.imagery.key || !this.imageryDraped) return;
 		g.imagery.sync(
 			this.imagery.map,
-			set.tiles.map((t) => t.id),
+			set.tiles.map((t) => ({ id: t.id, distance: t.distance })),
 		);
 		g.terrain.syncImageryLayers();
 	}

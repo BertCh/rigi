@@ -4,6 +4,8 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- WebGPU imagery overflow is near-first: on devices capped at `maxTextureArrayLayers` (256) a resident far tile now yields its layer to a nearer wanted one (`planImageryOverflow`, `metrics().imagery.evictions`), instead of whichever tiles arrived first keeping imagery. Browser-unverified.
+
 ### Luma-native GPU pass (2026-10-02, session 07)
 
 - **Vendored luma `10.0.0-alpha.2-rigi.4` and deck `9.4.0-rigi.2`.** luma adds #3345 (compatibility devices get the adapter's real limits) and four local APIs: `CommandEncoder.clearBuffer`, `Device.submit(cb?, additionalCommandBuffers?)`, `Buffer.mapAndReadAsync(…, {waitForSubmittedWork})`, MSAA `RenderBundleEncoder`. deck adds #10779, #10778, #10782, #10753, #10776. The app now uses those APIs instead of the raw `clearBuffer`, the private submit finaliser, raw `mapAsync` and the native bundle encoder.
