@@ -21,6 +21,7 @@
 // uses arrayLength()), and holds the previous call's bytes, so zero it (`zero: true` or clear())
 // when a kernel relies on a fresh buffer being zero, as look/kernel.ts's storage(device, n) did.
 import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
+import { abortable } from "./abort";
 import { busy, done as notBusy, onLost } from "./lifecycle";
 
 type Entry = { buffer: Buffer; retired: Buffer[] };
@@ -163,21 +164,27 @@ const active = new Set<string>();
  * Run `fn` holding the lease on `key`: calls with the same key run one at a time, in call order.
  * Hold it across acquire → encode → submit → read of that key's slots. Rejections propagate to
  * the caller and release the lease. Not re-entrant: don't take the same key inside `fn`.
+ * `opts.signal`: when it aborts before the lease is granted, `fn` never runs and the caller rejects
+ * with the reason (at once, not when the lease would have come).
  */
 export function withLease<T>(
 	key: string,
 	fn: () => Promise<T> | T,
+	opts: { signal?: AbortSignal } = {},
 ): Promise<T> {
+	const { signal } = opts;
 	const prev = tails.get(key) ?? Promise.resolve();
 	let done!: () => void;
 	const tail = new Promise<void>((r) => {
 		done = r;
 	});
 	tails.set(key, tail);
-	return prev.then(async () => {
+	// An aborted waiter still takes its turn in the chain (FIFO stays intact) but never runs fn.
+	const turn = prev.then(async () => {
 		active.add(key);
 		busy();
 		try {
+			signal?.throwIfAborted();
 			return await fn();
 		} finally {
 			notBusy();
@@ -187,6 +194,8 @@ export function withLease<T>(
 			done();
 		}
 	});
+	// the caller hears about an abort while waiting at once; the chain passes the lease on in order
+	return abortable(turn, signal);
 }
 
 const covers = (lease: string, slot: string) =>

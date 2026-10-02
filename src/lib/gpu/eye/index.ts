@@ -42,7 +42,11 @@ import {
 	TileStore,
 } from "#/lib/horizon-fast/mosaic";
 import type { EyeHorizon, Vec3 } from "#/lib/pose6dof/eye";
-import { computeHorizonsAuto, releaseHorizonGpu } from "../horizon";
+import {
+	computeHorizonsAuto,
+	type GpuHorizonOptions,
+	releaseHorizonGpu,
+} from "../horizon";
 
 /** Azimuth sector, degrees clockwise from north (az0 < az1; az1 − az0 ≥ 360 = full circle). */
 export interface AzSector {
@@ -122,6 +126,8 @@ export interface EyeHorizonProviderOptions {
 	 * step 0.05°, minDistance 2 m, maxDistance 120 km.
 	 */
 	horizon?: FastHorizonOptions;
+	/** Cancel the horizon batches in flight (the photo changed); they reject with an AbortError. */
+	signal?: AbortSignal;
 }
 
 export interface EyeHorizonProviderStats {
@@ -150,12 +156,13 @@ export function createEyeHorizonProvider(
 	o: EyeHorizonProviderOptions,
 ): EyeHorizonProvider {
 	const { lat, lon, mosaics } = o;
-	const hOpts: FastHorizonOptions = {
+	const hOpts: GpuHorizonOptions = {
 		step: 0.05,
 		minDistance: 2,
 		maxDistance: 120_000,
 		...o.horizon,
 		noRidges: true,
+		signal: o.signal,
 	};
 	const step = hOpts.step ?? 0.05;
 	const n = Math.round(360 / step);

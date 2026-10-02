@@ -8,6 +8,7 @@
 // is one, so the DEM decode, the march readback and the LM stay off the page's main thread.
 
 import type { Pose } from "#/lib/camera";
+import { isAbortError } from "#/lib/gpu/core/abort";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
 	type BasinGap,
@@ -60,12 +61,13 @@ export async function runBasinGap(
 		const device = await getComputeDevice().catch(() => null);
 		if (device) {
 			const { rotSearchGpu } = await import("./basin-gpu");
-			const gpu = rotSearchGpu(device);
+			const gpu = rotSearchGpu(device, o.signal);
 			name = "gpu";
 			scorer = async (...a) => {
 				try {
 					return await gpu(...a);
 				} catch (e) {
+					if (isAbortError(e)) throw e; // a cancel, not a GPU failure
 					console.warn(
 						"[matcher] basin grid on the GPU failed, using the CPU",
 						e,

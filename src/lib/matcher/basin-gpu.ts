@@ -317,7 +317,7 @@ export function releaseBasinGpu(device: Device): Promise<void> {
 }
 
 /** The GPU grid scorer: same contract as rotSearchCpu. Throws on a GPU failure (the caller falls back). */
-export function rotSearchGpu(device: Device): GridScorer {
+export function rotSearchGpu(device: Device, signal?: AbortSignal): GridScorer {
 	return async (nodeDirs, cands, sk, W, H, f) => {
 		const nodes = nodeDirs.length;
 		const K = cands.length;
@@ -330,55 +330,70 @@ export function rotSearchGpu(device: Device): GridScorer {
 		const wyc = Math.ceil(K / wx);
 		if (nodes * wyc > maxDim)
 			throw new Error("basin-gpu: grid too large for one dispatch");
-		return withLease(BASIN_GRAPH_GROUP, async () => {
-			const S = new Float32Array(sk.S.length);
-			for (let i = 0; i < S.length; i++) S[i] = sk.S[i];
-			const bufs: Inputs = {
-				prm: pooledUniform(
+		return withLease(
+			BASIN_GRAPH_GROUP,
+			async () => {
+				const S = new Float32Array(sk.S.length);
+				for (let i = 0; i < S.length; i++) S[i] = sk.S[i];
+				const bufs: Inputs = {
+					prm: pooledUniform(
+						device,
+						`${BASIN_GRAPH_GROUP}/prm`,
+						BASIN_U.pack({
+							W,
+							H,
+							f,
+							w: sk.w,
+							h: sk.h,
+							nDirs,
+							K,
+							nodes,
+							wx,
+							wyc,
+						}),
+					),
+					S: pooledStorage(device, `${BASIN_GRAPH_GROUP}/S`, S),
+					dirs: pooledStorage(
+						device,
+						`${BASIN_GRAPH_GROUP}/dirs`,
+						packNodeDirs(nodeDirs, nDirs),
+					),
+					cand: pooledStorage(
+						device,
+						`${BASIN_GRAPH_GROUP}/cand`,
+						packCandidates(cands),
+					),
+				};
+				const { graph } = graphFor(
 					device,
-					`${BASIN_GRAPH_GROUP}/prm`,
-					BASIN_U.pack({ W, H, f, w: sk.w, h: sk.h, nDirs, K, nodes, wx, wyc }),
-				),
-				S: pooledStorage(device, `${BASIN_GRAPH_GROUP}/S`, S),
-				dirs: pooledStorage(
-					device,
-					`${BASIN_GRAPH_GROUP}/dirs`,
-					packNodeDirs(nodeDirs, nDirs),
-				),
-				cand: pooledStorage(
-					device,
-					`${BASIN_GRAPH_GROUP}/cand`,
-					packCandidates(cands),
-				),
-			};
-			const { graph } = graphFor(
-				device,
-				bufs,
-				capacityFor(nodes * K * 4),
-				capacityFor(nodes * TOP * 8),
-			);
-			await graph.compileAsync();
-			const { reads } = await graph.run(
-				{ wx, wyc, nodes, K },
-				{ buffers: bufs },
-			);
-			const raw = reads.read?.[0];
-			if (!raw) throw new Error("basin-gpu: read node did not run");
-			const f32 = new Float32Array(raw);
-			const u32 = new Uint32Array(raw);
-			return nodeDirs.map((_, n) => {
-				const out: RotHyp[] = [];
-				for (let r = 0; r < TOP; r++) {
-					const index = u32[(n * TOP + r) * 2 + 1];
-					if (index === 0xffffffff) break;
-					out.push({
-						score: f32[(n * TOP + r) * 2],
-						pose: cands[index],
-						index,
-					});
-				}
-				return out;
-			});
-		});
+					bufs,
+					capacityFor(nodes * K * 4),
+					capacityFor(nodes * TOP * 8),
+				);
+				await graph.compileAsync();
+				const { reads } = await graph.run(
+					{ wx, wyc, nodes, K },
+					{ buffers: bufs, signal },
+				);
+				const raw = reads.read?.[0];
+				if (!raw) throw new Error("basin-gpu: read node did not run");
+				const f32 = new Float32Array(raw);
+				const u32 = new Uint32Array(raw);
+				return nodeDirs.map((_, n) => {
+					const out: RotHyp[] = [];
+					for (let r = 0; r < TOP; r++) {
+						const index = u32[(n * TOP + r) * 2 + 1];
+						if (index === 0xffffffff) break;
+						out.push({
+							score: f32[(n * TOP + r) * 2],
+							pose: cands[index],
+							index,
+						});
+					}
+					return out;
+				});
+			},
+			{ signal },
+		);
 	};
 }

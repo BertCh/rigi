@@ -52,6 +52,7 @@
  */
 import { Buffer, type Device } from "@luma.gl/core";
 import { DEG, EARTH_R, REFRACTION_K } from "#/lib/geodesy";
+import { isAbortError } from "#/lib/gpu/core/abort";
 import {
 	defineKernel,
 	warmKernels,
@@ -280,6 +281,8 @@ export let lastGpuHorizonTiming: GpuHorizonTiming | null = null;
 export type GpuHorizonOptions = FastHorizonOptions & {
 	/** "f64" (default): CPU atan per sample; "certified-f32": GPU + certificate + CPU ties (bit-identical) */
 	precision?: HorizonPrecision;
+	/** Cancel: the march is skipped before the lease / each chunk and rejects with the reason (see isAbortError). */
+	signal?: AbortSignal;
 };
 
 /**
@@ -298,8 +301,10 @@ export async function computeHorizonGpu(
 	// certified-f32: the march's raw (t, d) per eye, converted after the march (outside its lease)
 	const tds: Float32Array[] | null =
 		opts.precision === "certified-f32" ? [] : null;
-	const out = await withLease(LEASE, () =>
-		marchLocked(device, mosaics, eyes, opts, t0, tds),
+	const out = await withLease(
+		LEASE,
+		() => marchLocked(device, mosaics, eyes, opts, t0, tds),
+		{ signal: opts.signal },
 	);
 	if (tds) await certifyElevations(device, out, tds);
 	if (opts.peaks)
@@ -351,7 +356,7 @@ async function marchLocked(
 	device: Device,
 	mosaics: Mosaic[],
 	eyes: Eye[],
-	opts: FastHorizonOptions,
+	opts: GpuHorizonOptions,
 	t0: number,
 	tds: Float32Array[] | null = null,
 ): Promise<FastHorizonProfile[]> {
@@ -482,6 +487,7 @@ async function marchLocked(
 	let prev: Pending | null = null;
 	try {
 		for (let c0 = 0; c0 < eyes.length; c0 += eyesPerChunk) {
+			opts.signal?.throwIfAborted();
 			const nE = Math.min(eyesPerChunk, eyes.length - c0);
 			for (let j = 0; j < nE; j++) {
 				const eye = eyes[c0 + j];
@@ -589,6 +595,7 @@ export async function computeHorizonsAuto(
 			try {
 				return await computeHorizonGpu(device, mosaics, eyes, opts);
 			} catch (e) {
+				if (isAbortError(e)) throw e; // a cancel, not a GPU failure
 				console.warn("[gpu] horizon kernel failed, using the CPU", e);
 			}
 		}

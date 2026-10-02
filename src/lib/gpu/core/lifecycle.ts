@@ -101,3 +101,5 @@ export const done = () => {
 };
 /** Milliseconds since the last GPU use; 0 while anything is in flight. */
 export const idleFor = () => (inflight ? 0 : now() - last);
+
+export { abortable, isAbortError } from "./abort";

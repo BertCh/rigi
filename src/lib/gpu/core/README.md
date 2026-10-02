@@ -21,6 +21,7 @@ Luma-native ratchet: `scripts/ci/gpu-raw-lint.mjs` (fast-tier check `gpu-raw-lin
 | `binding-guard.ts` | Pure storage-binding checks (zero size, offset alignment) called by `encodeDispatch` |
 | `profile.ts` | Opt-in GPU timestamp profiling (`globalThis.__RIGI_GPU_PROFILE__ = true`) and `getGpuProfile()`, including the GPU workers' reports |
 | `realm.ts` | The page → worker protocol for the profiling / error-check switches, and the worker → page profile report. Import-light (no luma runtime) |
+| `abort.ts` | `isAbortError`, `abortable`: cancellation helpers (see Cancellation below). No luma runtime |
 | `lifecycle.ts` | `untilLost`, `onLost` and the activity counters behind the idle release. No luma runtime |
 | `graph.ts` | `ComputeGraph`, a thin wrapper over `GPUCommandGraph` for multi-pass pipelines with GPU-resident intermediates. Since WAG W0.1 it also passes through upstream's GPU indirect conditions (compute nodes only, with a GPU-condition clear lint), render and copy nodes (audited like kernels), transient / frame textures and texture bindings in kernels, `workload` + `preflight`, and adopts an external `GPUCommandGraph` (`{ graph }`); `listCachedGraphs` enumerates the cache. `GPUCommandGraphInspector` is wired through `inspect.ts` (W0.2, see Inspection below). The clear lint, `readNode` and `cachedGraph` have no upstream equivalent. Audit: `research_notes/whole-app-graph-2026-10-01/upstream-api.md` |
 | `inspector.ts` | One upstream `GPUCommandGraphInspector` per device (WAG W0.2), created on first observation and dropped with the device; `observeCompiledGraph`, `inspectorSnapshots` |
@@ -52,7 +53,7 @@ export function pooledUniform(device: Device, key: string, words: ArrayBuffer | 
 export const range: (buffer: Buffer, bytes: number, offset?: number) => { buffer: Buffer; offset: number; size: number };
 export function clear(enc: CommandEncoder, buffer: Buffer, offset?: number, size?: number): void; // encoder clearBuffer
 export const isPooled: (buffer: Buffer) => boolean;
-export function withLease<T>(key: string, fn: () => Promise<T> | T): Promise<T>; // FIFO mutex per key; "a" covers "a/…" slots
+export function withLease<T>(key: string, fn: () => Promise<T> | T, opts?: { signal?: AbortSignal }): Promise<T>; // FIFO mutex per key; "a" covers "a/…" slots
 export function releasePool(device: Device, prefix?: string): void;
 export function poolStats(device: Device): { slots: number; bytes: number };
 
@@ -68,7 +69,7 @@ export type StagedPartialRead = { read: () => Promise<{ header: ArrayBuffer; dat
   cancel: () => void };
 export function stagePartialRead(device: Device, enc: CommandEncoder, range: PartialReadRange): StagedPartialRead;
 export function readBack(device: Device, build: (enc: CommandEncoder) => unknown, ranges?: ReadRange[],
-  opts?: { id?: string }): Promise<ArrayBuffer[]>;                   // ranges ?? (ReadRange[] returned by build)
+  opts?: { id?: string; signal?: AbortSignal }): Promise<ArrayBuffer[]>;                   // ranges ?? (ReadRange[] returned by build)
 export function readbackStats(device: Device): { slots: number; busy: number; bytes: number };
 
 // queue.ts (submit is also re-exported from kernel.ts)
@@ -78,6 +79,9 @@ export const submitted: (enc: CommandEncoder) => Promise<void>;     // rejects G
 export const errorChecks: () => boolean;                            // globalThis.__RIGI_GPU_CHECKS__ === true
 export class GpuValidationError extends Error { readonly kind: "validation" | "out-of-memory" }
 
+// abort.ts (no luma runtime; re-exported by lifecycle.ts)
+export function isAbortError(e: unknown): boolean;                       // a cancel (name "AbortError"), not a GPU failure
+export function abortable<T>(p: Promise<T>, signal?: AbortSignal): Promise<T>; // rejects with signal.reason at once; p runs on
 // lifecycle.ts
 export class GpuDeviceLostError extends Error {}
 export function untilLost<T>(device: Device, p: Promise<T>): Promise<T>;       // rejects as soon as device is lost
@@ -143,7 +147,7 @@ export class ComputeGraph<P = void> {
   encode(enc: CommandEncoder, parameters: P, buffers?: Record<string, GraphImportedBuffer>,
     textures?: Record<string, GraphImportedTexture>): GPUCommandGraphEncoding;
   run(parameters: P, opts?: { buffers?: Record<string, GraphImportedBuffer>; textures?: Record<string, GraphImportedTexture>;
-    read?: ReadRange[]; timings?: boolean }):
+    read?: ReadRange[]; timings?: boolean; signal?: AbortSignal }):
     Promise<{ data: ArrayBuffer[]; timings?: GPUCommandGraphTimingReport }>;
   destroy(): void;
   // additive (worker-realm graph migration, 2026-09-30):
@@ -278,6 +282,7 @@ Constant buffers a builder creates (`look/textures.ts` footprints, parameter wor
 
 ## Design notes
 
+- **Cancellation.** `withLease`, `ComputeGraph.run` / `runNow` and `readBack` take an optional `AbortSignal`. An aborted lease waiter still takes its turn in the FIFO chain but never runs `fn`, and its caller rejects with `signal.reason` at once instead of when the lease would have come. `run` checks the signal before encoding, again right before `submit` (nothing is submitted, `finish()` returns the staged slots), and races the readback against it. Once work is submitted it cannot be recalled: the caller rejects early, and the staged slot goes back to the ring only when its map settles (the existing `read()` finally path), so a slot is never reused while a map is in flight. Callers catch with `isAbortError(e)` and must not fall back to the CPU or log an error on a cancel. Signals only exist in the realm that owns them: work in a worker is cancelled by terminating the worker.
 - **Device limits.** luma's featureLevel `"max"` raises limits but also requests every feature, so `device.ts` (`createSidecar`) calls `webgpuAdapter.create` (re-exported by `luma.ts`) with `featureLevel: "core"`, `COMPUTE_FEATURES` as `optionalFeatures` and `RAISED_LIMITS` at the adapter maximum as `requiredLimits` (luma #3312); the maxima are read from a peek adapter, the only raw WebGPU left. A luma-created device owns its GPUDevice, so `destroy()` releases it. `attachWebGPUDevice` remains for ORT's device in the sky worker (ORT creates and owns it). If that request fails, it retries with default limits. On this Mac (Apple, Metal) the sidecar now gets `maxStorageBufferBindingSize` / `maxBufferSize` of 4 GiB−4, and `maxComputeWorkgroupStorageSize` of 32 KiB.
 - **Adopted device.** `getComputeDevice()` returns the adopted render device instead of the sidecar. Pipelines, pools and readback slots are all per device (WeakMaps), so both devices can be live at once. Never mix buffers between devices.
 - **Pool retirement.** When a slot grows, the old buffer is destroyed once the lease covering that key ends. For unleased slots it happens at the next core `submit()`. Unleased callers must therefore encode and submit without awaiting in between.

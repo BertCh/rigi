@@ -13,6 +13,7 @@
 // as the device is lost (core/lifecycle.ts), so a failed or orphaned kernel never resolves zeros
 // or hangs its caller (and the lease it holds).
 import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
+import { abortable } from "./abort";
 import { busy, done, GpuDeviceLostError, onLost, untilLost } from "./lifecycle";
 import { capacityFor } from "./pool";
 import { cancelIfSubmitFails, submit, submitted } from "./queue";
@@ -315,8 +316,9 @@ export async function readBack(
 	device: Device,
 	build: (enc: CommandEncoder) => unknown,
 	ranges?: ReadRange[],
-	opts: { id?: string } = {},
+	opts: { id?: string; signal?: AbortSignal } = {},
 ): Promise<ArrayBuffer[]> {
+	opts.signal?.throwIfAborted();
 	const enc = device.createCommandEncoder({ id: opts.id ?? "core-readback" });
 	const built = build(enc);
 	const staged = stageReads(
@@ -330,7 +332,8 @@ export async function readBack(
 		staged.cancel();
 		throw e;
 	}
-	return staged.read();
+	// on abort the caller rejects at once; the slot goes back when its map settles
+	return abortable(staged.read(), opts.signal);
 }
 
 /** Staging slots of `device`: count, busy count and bytes held. */

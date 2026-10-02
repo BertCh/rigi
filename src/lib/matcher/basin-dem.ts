@@ -27,7 +27,13 @@ export async function loadBasinDem(
 		maxDistance: 100_000,
 	});
 	if (o.signal?.aborted) throw new DOMException("aborted", "AbortError");
-	const hp = eye.createEyeHorizonProvider({ lat, lon, mosaics, sector });
+	const hp = eye.createEyeHorizonProvider({
+		lat,
+		lon,
+		mosaics,
+		sector,
+		signal: o.signal,
+	});
 	const ground = (E: number, N: number) => hp.ground(E, N) - drop(E, N);
 	return {
 		ground,

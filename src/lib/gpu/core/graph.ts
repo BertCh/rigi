@@ -54,6 +54,7 @@ import {
 	type Device,
 	type QuerySet,
 } from "@luma.gl/core";
+import { abortable } from "./abort";
 import { type ClearAudit, clearLintError } from "./clear-lint";
 import { observeCompiledGraph } from "./inspector";
 import {
@@ -223,6 +224,12 @@ export type GraphRunOptions<P> = {
 	frameTextures?: GraphEncodeExtras<P>["frameTextures"];
 	read?: ReadRange[];
 	timings?: boolean;
+	/**
+	 * Cancel: run() skips the work if it aborts before the lease is granted, skips the submit if it
+	 * aborts before it, and rejects with the reason at once if it aborts during the read (the staged
+	 * slots still return to the ring when their maps settle). Use isAbortError to tell it from a failure.
+	 */
+	signal?: AbortSignal;
 };
 
 /** What ComputeGraph.run() / runNow() resolve. */
@@ -1045,7 +1052,9 @@ export class ComputeGraph<P = void> {
 	 * 'timestamp-query'; profiled runs also add `${id}/${node}` to getGpuProfile().
 	 */
 	run(parameters: P, opts: GraphRunOptions<P> = {}): Promise<GraphRunResult> {
-		return withLease(`graph:${this.id}`, () => this.execute(parameters, opts));
+		return withLease(`graph:${this.id}`, () => this.execute(parameters, opts), {
+			signal: opts.signal,
+		});
 	}
 
 	/**
@@ -1073,6 +1082,7 @@ export class ComputeGraph<P = void> {
 		parameters: P,
 		opts: GraphRunOptions<P>,
 	): Promise<GraphRunResult> {
+		if (opts.signal?.aborted) return Promise.reject(opts.signal.reason);
 		const compiled = this.compile().compiled as CompiledGPUCommandGraph<P>;
 		const prof = profiling(this.device);
 		const timed =
@@ -1106,13 +1116,14 @@ export class ComputeGraph<P = void> {
 		if (timed) this.timing = true;
 		try {
 			staged = stageReads(this.device, enc, opts.read ?? []);
+			opts.signal?.throwIfAborted(); // nothing submitted yet: finish() returns the slots
 			submit(this.device, enc);
 		} catch (e) {
 			finish();
 			return Promise.reject(e);
 		}
 		const pending = staged;
-		return (async () => {
+		const result = (async () => {
 			try {
 				const [data, reads] = await Promise.all([
 					pending.read(),
@@ -1139,6 +1150,7 @@ export class ComputeGraph<P = void> {
 				finish();
 			}
 		})();
+		return abortable(result, opts.signal);
 	}
 
 	/**
