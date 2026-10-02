@@ -1,0 +1,71 @@
+FUND E5: ray-cast oracle (F3). PROTOCOL, written and committed BEFORE any measurement.
+Date 2026-10-02. Worker unit e5 (Pod C). Branch pod/podc-e5.
+
+QUESTION
+Is one max-mip heightfield ray caster (curvature + refraction per ray, WGSL via src/lib/gpu/core, f64 CPU
+reference) exact against the existing 1-D marcher and fast enough to be a per-pixel oracle?
+
+FIXED KILL CRITERION (verbatim from the manager; not to be changed after results)
+"KILL if (a) with identical inputs (same mosaics and rings, same curvature/refraction constant, same distance cap) the oracle's horizon profile disagrees with the horizon-fast CPU march (src/lib/horizon-fast/march.ts) by more than 0.5 px at the 95th percentile over all (eye, azimuth) samples, where px = |Δelevation°| × 1024 / hfov° with hfov the photo's horizontal FOV from ground truth / EXIF (60° when unknown), and the excess is not explained by a documented input difference; OR (b) the median GPU time per 1024×768 frame with a 150 km distance cap, warm, excluding tile load and upload, on this machine's GPU through Dawn exceeds 50 ms. Otherwise PASS."
+
+EYES (dev only; no test id, no data_v3, no blind pack)
+ 1. Every photo in data/ground-truth.json (19): lat, lon, h = "eye" (MSL metres).
+ 2. Wild DEV photos (tools/matcher/v2/refs.py dev_ids(), 50 ids) that have a stated eye in
+    out/geocam/decoys/<pid>.json ("stated": lat, lon, h): 35 ids. The other 15 dev ids have no stated eye
+    height and are EXCLUDED (not guessed).
+ Total 54 eyes. Eyes whose tiles cannot be fetched are listed as excluded in REPORT.txt, not silently dropped.
+ Azimuth step 0.1 deg (3600 samples per eye, azimuth i*0.1 clockwise from north).
+
+INPUTS (identical for oracle and horizon-fast)
+ Mosaics: loadMosaics(lat, lon, TileStore(Mapterhorn via demTileLoaderNode), {rings: DEFAULT_RINGS,
+ maxDistance: 150000, mips: true}), full circle. Tiles come from a worktree copy of the main tree's
+ .cache/dem-mapterhorn (new tiles may be fetched from Mapterhorn into that copy).
+ Constants: k = REFRACTION_K (src/lib/geodesy.ts, 0.13) with R = EARTH_R; distance cap 150000 m;
+ minDistance 20 m; step schedule = horizon-fast defaults (stepFactor 3.5e-4, cellSteps 0.5, nearFactor 0.01,
+ 0.25 m floor); segmentTolerance 2e-5; MIN_VALID cut-off for no-data.
+ horizon-fast arm: computeHorizonFast(mosaics, eye, {step: 0.1, noRidges: true}) (k and the above defaults).
+ Oracle arm (CPU, f64): column mode of src/lib/raycast/cpu.ts on the same mosaics (largest ray slope s for
+ which the max-mip first-hit trace finds terrain, by bisection on s), elevation = atan(s) in degrees; -90 =
+ no terrain, as horizon-fast.
+
+METRIC (a)
+ For each (eye, azimuth): dpx = |el_oracle - el_march| (deg) * 1024 / hfov_deg. If exactly one of the two
+ is the -90 "no terrain" sentinel, dpx = +Infinity (counts as a miss); both -90 gives 0.
+ hfov: GT photos: 2*atan(W / (2 f)) with W and f from ground-truth.json when f is non-null, else 60.
+ Dev photos: 2*atan(tan(vfov0/2) * W/H) from the decoy file's vfov0 and tools/bench/data/manifest.json
+ width/height when "focalKnown", else 60.
+ Statistic: the 95th percentile of dpx POOLED over all eyes and azimuths (nearest-rank on the sorted
+ pooled sample). Per-eye p50, p95, max also reported (not gating). PASS on (a) iff pooled p95 <= 0.5 px,
+ or the excess is explained by a documented input difference (both arms consume the same mosaics and
+ constants by construction, so no input difference is expected; an algorithmic difference such as a
+ different sample positions is NOT an input difference).
+
+METRIC (b)
+ Frame: 1024 x 768, 150 km cap, minDistance 20 m, pixel mode of the WGSL kernel (hit range, ENU xyz, sky
+ flag per pixel). Poses: the GT photos that have a pose (yaw non-null) at their GT eye and pose; render hfov
+ = the photo's hfov (2*atan(W/(2f))) on the 1024x768 frame whatever the photo orientation. Mosaics and the
+ GPU upload exist before timing and are excluded. 3 warmup frames, then 15 timed frames per eye.
+ GPU time per frame = wall clock from queue submit to onSubmittedWorkDone of the one compute dispatch
+ (no readback, no upload inside the timed region); this is an upper bound and is the GATING number.
+ If the Dawn device exposes timestamp-query, the pass timestamp is reported alongside (not gating).
+ Statistic: the median over all timed frames pooled over all posed GT eyes. FAIL (b) iff it exceeds 50 ms.
+ Per-eye medians and the maximum are reported.
+
+REPORTED, NOT GATING
+ - the GPU horizon (src/lib/gpu/horizon computeHorizonGpu through node Dawn) vs horizon-fast and vs the
+   oracle, same mosaics, same px metric;
+ - tools/matcher/dem.py horizon (own tile cache, own bands 3/15/100 km, 100 km cap, so a different input;
+   run only if it works offline on cached tiles, else the reason is stated);
+ - CPU oracle vs GPU oracle (column mode and the frame): ulp / relative statistics;
+ - CPU-oracle time per frame;
+ - the engine raster horizon: NOT RUN (needs a browser; cook mode). Never estimated.
+ - frame depth agreement: for 3 to 5 GT eyes with a pose, the GPU 1024x768 frame sub-sampled on a 128x96
+   grid (every 8th pixel centre) against (i) the CPU oracle at the same pixels and (ii) a dense CPU
+   brute-force march (no mip, fixed step 0.1 * cell, stepFactor 3.5e-5) at the same pixels. Agreement =
+   both sky, or both hit with |d_range| <= max(1% of range, 2 cells of the serving ring).
+ POST HOC findings (anything computed after seeing results) are labelled POST HOC and never change the verdict.
+
+OUT OF SCOPE: ortho colour and land-cover id outputs (follow-up).
+SEEDS: no randomness in the measurement. Vitest specs use a seeded LCG (seed 12345).
+NOT WIRED: src/lib/raycast is not imported by the app, no flag.
+All numbers are dev, n = eyes above, not a result.
