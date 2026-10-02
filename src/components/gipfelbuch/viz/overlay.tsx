@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
+import { useReducedMotion } from "./hooks";
 import { EASE, MOTION, stagger } from "./motion";
 
 // The explainer grammar's overlay stack (reports/gipfelbuch-explainers-2026-10-02/grammar.md §2): one
@@ -79,8 +80,13 @@ export function layerDuration(role: OverlayRole, leaving = false): number {
  * the raster first. Leaving runs the stack backwards.
  */
 export function layerDelay(role: OverlayRole, leaving = false): number {
+	// the interaction layer answers the pointer at once
+	if (role === "interaction") return 0;
 	const i = OVERLAY_STACK[role].z;
-	return stagger(leaving ? OVERLAY_ROLES.length - 1 - i : Math.max(0, i - 2));
+	// leaving never waits more than two staggers: a figure clears quickly
+	return leaving
+		? stagger(Math.min(2, OVERLAY_ROLES.length - 2 - i))
+		: stagger(Math.max(0, i - 2));
 }
 
 /** `items` sorted bottom to top by role (stable), for drawing into one svg in stack order. */
@@ -105,7 +111,11 @@ export function sortByStack<T extends { layer: OverlayRole }>(
 export function overlayStyle(
 	role: OverlayRole,
 	state: LayerState,
-	{ delay, previous }: { delay?: number; previous?: LayerState } = {},
+	{
+		delay,
+		previous,
+		reduce = false,
+	}: { delay?: number; previous?: LayerState; reduce?: boolean } = {},
 ): CSSProperties {
 	const opacity = layerOpacity(role, state);
 	const leaving = previous != null && layerOpacity(role, previous) > opacity;
@@ -114,9 +124,11 @@ export function overlayStyle(
 	return {
 		zIndex: OVERLAY_STACK[role].z,
 		opacity,
-		transition: ms
-			? `opacity ${ms}ms ${leaving ? EASE.linear : EASE.out}${wait ? ` ${wait}ms` : ""}`
-			: undefined,
+		// an inline transition beats a motion-reduce class, so reduced motion is decided here
+		transition:
+			ms && !reduce
+				? `opacity ${ms}ms ${leaving ? EASE.linear : EASE.out}${wait ? ` ${wait}ms` : ""}`
+				: undefined,
 		pointerEvents: role === "interaction" ? undefined : "none",
 	};
 }
@@ -124,7 +136,7 @@ export function overlayStyle(
 /**
  * One layer of the stack: a `<g>` inside an svg (default) or an absolutely placed `<div>` over the
  * photo. Marked `data-layer` / `data-state` so specs and the browser pass can find it. Under reduced
- * motion the transition is dropped by `motion-reduce:transition-none`.
+ * motion it changes state without a transition.
  */
 export function OverlayLayer({
 	layer: role,
@@ -148,12 +160,13 @@ export function OverlayLayer({
 	useEffect(() => {
 		shown.current = state;
 	}, [state]);
-	const style = overlayStyle(role, state, { delay, previous });
+	const reduce = useReducedMotion();
+	const style = overlayStyle(role, state, { delay, previous, reduce });
 	const common = {
 		"data-layer": role,
 		"data-state": state,
 		"aria-hidden": state === "hidden" ? true : undefined,
-		className: `motion-reduce:transition-none ${className ?? ""}`.trim(),
+		className,
 	};
 	if (as === "div")
 		return (

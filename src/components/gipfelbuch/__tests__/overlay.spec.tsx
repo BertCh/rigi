@@ -59,6 +59,14 @@ describe("overlay stack", () => {
 		expect(overlayStyle("interaction", "on").pointerEvents).toBeUndefined();
 	});
 
+	it("answers the pointer at once, clears quickly and drops transitions under reduced motion", () => {
+		expect(layerDelay("interaction")).toBe(0);
+		expect(layerDelay("ground", true)).toBeLessThanOrEqual(2 * MOTION.stagger);
+		expect(
+			overlayStyle("notes", "on", { reduce: true }).transition,
+		).toBeUndefined();
+	});
+
 	it("sorts mixed items into stack order, stably", () => {
 		const items = [
 			{ layer: "notes" as const, id: "n" },

@@ -6,6 +6,7 @@ import { act, render, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Figure } from "../viz/Figure";
 import {
+	type BeatClock,
 	type BeatSpec,
 	dwellOf,
 	MOTION,
@@ -194,7 +195,7 @@ describe("useBeatClock", () => {
 			},
 		);
 		// the clock arms through its ref, so it needs an element
-		const result: { current: ReturnType<typeof useBeatClock> } = {
+		const result: { current: BeatClock<HTMLDivElement> } = {
 			current: null as never,
 		};
 		const Probe = () => {
@@ -217,6 +218,11 @@ describe("useBeatClock", () => {
 				vi.advanceTimersByTime(16);
 			});
 		expect(result.current).toMatchObject({ done: true, playing: false });
+		act(() => result.current.seek(3));
+		expect(result.current).toMatchObject({
+			done: true,
+			ms: result.current.total,
+		});
 		act(() => result.current.seek(1));
 		expect(result.current).toMatchObject({
 			index: 1,
@@ -224,6 +230,42 @@ describe("useBeatClock", () => {
 			playing: false,
 		});
 		expect(result.current.progress).toBeGreaterThan(0.99);
+	});
+});
+
+describe("useArmedInView via useBeats", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+	});
+
+	it("observes a frame that mounts after the hook", () => {
+		vi.useFakeTimers();
+		vi.stubGlobal("matchMedia", (q: string) => ({
+			matches: false,
+			media: q,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+		}));
+		const observed: Element[] = [];
+		vi.stubGlobal(
+			"IntersectionObserver",
+			class {
+				observe(el: Element) {
+					observed.push(el);
+				}
+				disconnect() {}
+			},
+		);
+		const Late = ({ open }: { open: boolean }) => {
+			const b = useBeats(STORY);
+			return open ? <div ref={b.ref} data-late /> : null;
+		};
+		const { rerender, container } = render(<Late open={false} />);
+		expect(observed).toHaveLength(0);
+		rerender(<Late open />);
+		const el = container.querySelector("[data-late]");
+		expect(observed).toContain(el);
 	});
 });
 

@@ -14,11 +14,14 @@ import {
 	ease,
 	MOTION,
 	nextArmed,
+	rampAt,
 	sampleTimeline,
 	settledBeats,
 	shownShare,
+	smooth,
 	spillTAt,
 	stagger,
+	startOf,
 	transitionOf,
 } from "../viz/motion";
 
@@ -133,6 +136,19 @@ describe("beat timelines", () => {
 		expect(beatScriptProblem([{ id: "a", kind: "change" }])).toMatch(
 			/not a result/,
 		);
+	});
+
+	it("find a beat's start and ramp a layer that stays drawn", () => {
+		const tl = buildTimeline(STORY);
+		expect(startOf(tl, "correct")).toBe(5600);
+		expect(() => startOf(tl, "nope")).toThrow(/nope/);
+		expect(rampAt(tl, 5000, "correct")).toBe(0);
+		expect(rampAt(tl, 5600 + 210, "correct")).toBeCloseTo(0.5, 6);
+		expect(rampAt(tl, tl.total, "correct")).toBe(1);
+		expect(rampAt(tl, 5700, "correct", 100, 0)).toBe(1);
+		expect(rampAt(tl, 5699, "correct", 100, 0)).toBe(0);
+		expect(smooth(-1)).toBe(0);
+		expect(smooth(2)).toBe(1);
 	});
 
 	it("move the spill at the change", () => {

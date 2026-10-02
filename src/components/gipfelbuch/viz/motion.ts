@@ -238,6 +238,36 @@ export function sampleTimeline(
 	return { index: last, kind: tl.beats[last].kind, progress: 1, done: true };
 }
 
+/** Start (ms) of the beat `id`. Throws on an unknown id: a script typo should fail its spec, not draw nothing. */
+export function startOf(tl: Timeline, id: string): number {
+	const b = tl.beats.find((x) => x.id === id);
+	if (!b) throw new Error(`no beat "${id}"`);
+	return b.start;
+}
+
+/** Smoothstep, the landing how-scene's ramp shape (`x²(3 − 2x)`), clamped to 0..1. */
+export const smooth = (x: number) => {
+	const t = Math.min(1, Math.max(0, x));
+	return t * t * (3 - 2 * t);
+};
+
+/**
+ * A layer growing inside beat `id`: 0 before `start + delay`, 1 after `+ dur`, `shape` in between. A later
+ * beat keeps what an earlier one drew (it stays 1), so the static end frame shows every layer.
+ */
+export function rampAt(
+	tl: Timeline,
+	ms: number,
+	id: string,
+	delay = 0,
+	dur: number = MOTION.fade,
+	shape: (t: number) => number = smooth,
+): number {
+	const t0 = startOf(tl, id) + delay;
+	if (dur <= 0) return ms >= t0 ? 1 : 0;
+	return shape(Math.min(1, Math.max(0, (ms - t0) / dur)));
+}
+
 /** The spill's pose for a beat: the guess (0) until the change, the solved pose (1) from it. */
 export const spillTAt = (kind: BeatKind): 0 | 1 =>
 	kind === "change" || kind === "result" ? 1 : 0;
@@ -352,7 +382,13 @@ export function useMotionAllowed(): boolean {
 	return allowed;
 }
 
-const THRESHOLDS = Array.from({ length: 21 }, (_, i) => i / 20);
+// 1 % steps: a frame taller than the viewport only reaches a ratio of viewH / h, so coarse steps could
+// never report the ARM share of a very tall figure
+const THRESHOLDS = Array.from({ length: 101 }, (_, i) => i / 100);
+
+/** A ref that is both an object (`ref.current`) and a callback, so a late-attached element is seen. */
+export type ElementRef<T extends Element> = RefObject<T | null> &
+	((el: T | null) => void);
 
 /**
  * `armed` while the element is shown past ARM (with hysteresis down to RESET); `near` once it is within
@@ -360,13 +396,21 @@ const THRESHOLDS = Array.from({ length: 21 }, (_, i) => i / 20);
  */
 export function useArmedInView<T extends Element = HTMLDivElement>(
 	opts: { arm?: number; reset?: number; nearMargin?: number } = {},
-): { ref: RefObject<T | null>; armed: boolean; near: boolean } {
+): { ref: ElementRef<T>; armed: boolean; near: boolean } {
 	const { arm = ARM, reset = RESET, nearMargin = MOTION.nearMargin } = opts;
-	const ref = useRef<T>(null);
+	// the element lives in state, so a frame mounted after the hook (a lazy or conditional child) is observed
+	const [el, setEl] = useState<T | null>(null);
+	const ref = useMemo(() => {
+		const r = ((node: T | null) => {
+			r.current = node;
+			setEl(node);
+		}) as ElementRef<T>;
+		r.current = null;
+		return r;
+	}, []);
 	const [armed, setArmed] = useState(false);
 	const [near, setNear] = useState(false);
 	useEffect(() => {
-		const el = ref.current;
 		if (!el) return;
 		if (typeof IntersectionObserver === "undefined") {
 			setArmed(true);
@@ -374,7 +418,9 @@ export function useArmedInView<T extends Element = HTMLDivElement>(
 			return;
 		}
 		const armIo = new IntersectionObserver(
-			([e]) => {
+			(entries) => {
+				// the newest entry: after a fast scroll the batch holds stale ones first
+				const e = entries[entries.length - 1];
 				const viewH = e.rootBounds?.height ?? window.innerHeight;
 				const share = e.isIntersecting
 					? shownShare(
@@ -388,8 +434,8 @@ export function useArmedInView<T extends Element = HTMLDivElement>(
 			{ threshold: THRESHOLDS },
 		);
 		const nearIo = new IntersectionObserver(
-			([e]) => {
-				if (e.isIntersecting) {
+			(entries) => {
+				if (entries.some((e) => e.isIntersecting)) {
 					setNear(true);
 					nearIo.disconnect();
 				}
@@ -402,12 +448,12 @@ export function useArmedInView<T extends Element = HTMLDivElement>(
 			armIo.disconnect();
 			nearIo.disconnect();
 		};
-	}, [arm, reset, nearMargin]);
+	}, [el, arm, reset, nearMargin]);
 	return { ref, armed, near };
 }
 
 export interface Beats<T extends Element> extends BeatState {
-	ref: RefObject<T | null>;
+	ref: ElementRef<T>;
 	kind: BeatKind;
 	/** The spill's pose for the current beat (`spillTAt`). */
 	spillT: 0 | 1;
@@ -450,10 +496,13 @@ export function useBeats<T extends Element = HTMLDivElement>(
 		setState((s) => beatReducer(s, a, count, playback));
 	// rewind and play once motion is known to be fine; settle when it is not
 	useEffect(() => {
-		setState(
-			motion
-				? beatReducer(settledBeats(count), { type: "start" }, count, playback)
-				: settledBeats(count),
+		setState((s) =>
+			// a reader's own step survives a print (motion off and on again)
+			s.manual && s.index < count
+				? { ...s, playing: false }
+				: motion
+					? beatReducer(settledBeats(count), { type: "start" }, count, playback)
+					: settledBeats(count),
 		);
 	}, [motion, count, playback]);
 	// a finished `once` sequence replays when the reader comes back (armed again after RESET)
@@ -490,9 +539,10 @@ export function useBeats<T extends Element = HTMLDivElement>(
 		spillT: spillTAt(kind),
 		motion,
 		setIndex: (i) => dispatch({ type: "set", index: i }),
-		play: () => dispatch({ type: "play" }),
+		// where nothing animates, play and replay leave the static frame as it is
+		play: () => motion && dispatch({ type: "play" }),
 		pause: () => dispatch({ type: "pause" }),
-		replay: () => dispatch({ type: "replay" }),
+		replay: () => motion && dispatch({ type: "replay" }),
 		hold: setHeld,
 	};
 }
@@ -502,7 +552,7 @@ export const quantiseMs = (ms: number, fps: number = MOTION.fps) =>
 	Math.floor((ms * fps) / 1000) * (1000 / fps);
 
 export interface BeatClock<T extends Element> extends TimelineSample {
-	ref: RefObject<T | null>;
+	ref: ElementRef<T>;
 	/** Story time in ms, quantised to `fps` (`total` when settled or static). */
 	ms: number;
 	total: number;
@@ -557,6 +607,8 @@ export function useBeatClock<T extends Element = HTMLDivElement>(
 		setManual(false);
 		if (motion && total > 0) {
 			set(0);
+			// the first beat starts after MOTION.lead (the clock runs from −lead, shown as 0)
+			elapsed.current = -MOTION.lead;
 			setPlaying(true);
 		} else {
 			set(total);
@@ -592,7 +644,7 @@ export function useBeatClock<T extends Element = HTMLDivElement>(
 				}
 			}
 			elapsed.current = next;
-			const q = quantiseMs(next, fps);
+			const q = quantiseMs(Math.max(0, next), fps);
 			setMs((p) => (p === q ? p : q));
 			raf = requestAnimationFrame(tick);
 		};
@@ -610,11 +662,14 @@ export function useBeatClock<T extends Element = HTMLDivElement>(
 		manual,
 		motion,
 		seek: (index) => {
-			const b = tl.beats[Math.min(tl.beats.length - 1, Math.max(0, index))];
+			const i = Math.min(tl.beats.length - 1, Math.max(0, index));
+			const b = tl.beats[i];
 			setPlaying(false);
 			setManual(true);
-			// the beat finished: just before its end, so it samples as this beat at progress ~1
-			if (b) set(Math.max(b.start, b.end - 1));
+			// the beat finished: the last one is the end frame; another samples just before its end
+			// (a zero-dwell beat has no time of its own and samples as the next one)
+			if (b)
+				set(i === tl.beats.length - 1 ? total : Math.max(b.start, b.end - 1));
 		},
 		scrub: (v) => {
 			setPlaying(false);

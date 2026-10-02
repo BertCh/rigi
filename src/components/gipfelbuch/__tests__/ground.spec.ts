@@ -158,3 +158,26 @@ describe("measurePalette", () => {
 		expect(JSON.stringify(PALETTES).length).toBeLessThan(4096);
 	});
 });
+
+describe("ground hardening", () => {
+	it("keeps polarity: an ink lighter than its ground lightens, a darker one darkens", () => {
+		const ground = "#6e6e6e";
+		const light = ensureContrast("#8a8a8a", ground, 3);
+		expect(relativeLuminance(light)).toBeGreaterThan(relativeLuminance(ground));
+		const dark = ensureContrast("#5a5a5a", ground, 3);
+		expect(relativeLuminance(dark)).toBeLessThan(relativeLuminance(ground));
+		expect(contrastRatio(light, ground)).toBeGreaterThanOrEqual(3);
+		expect(contrastRatio(dark, ground)).toBeGreaterThanOrEqual(3);
+	});
+
+	it("falls back to the other side when its own side cannot reach the floor", () => {
+		const out = ensureContrast("#0f0f0f", "#131313", 3);
+		expect(contrastRatio(out, "#131313")).toBeGreaterThanOrEqual(3);
+	});
+
+	it("never returns NaN colours or inherited keys", () => {
+		expect(hexToRgb("var(--gb-ink)")).toEqual([128, 128, 128]);
+		expect(groundPalette("constructor")).toBeUndefined();
+		expect(groundVars("toString")).toEqual({});
+	});
+});

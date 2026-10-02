@@ -1,6 +1,6 @@
 # Gipfelbuch explainer grammar (pod G), 2026-10-02
 
-Status: **v0.2.** It amends v0.1 after the pods' first specs; §6 lists what changed. The primitives are implemented in `motion.ts`, `ground.ts`, `overlay.tsx` and `Figure.tsx`. They are landing now; the sha will be added here.
+Status: **v0.3.** The primitives are on master: round 1 is d9b7320, and round 2 (the review fixes and D's helpers) follows. §5 is the changelog, and §6 holds the cross-pod consistency notes.
 - Amendments go in the changelog at the bottom.
 - A section marked *(API pending)* names functions that have not landed yet. Code against the names and signatures given here. They will not change unless a note arrives in your inbox first.
 - Disagreements go to `inbox/G.md`. Do not fork the grammar.
@@ -151,11 +151,11 @@ stagger(i: number, step = MOTION.stagger, base = 0): number   // delay in ms for
 
 ### 1.4 Entrance and settle
 - The figure entrance belongs to Figure: once, `enter`, `EASE.enter`. Do not add a second fade to the content.
-- Beats start only once the figure is armed (§1.5). The first beat starts after `MOTION.lead`.
+- Beats start only once the figure is armed (§1.5). The first beat starts after `MOTION.lead`. `useBeatClock` does this itself. With `useBeats`, the first beat's CSS transitions take a `lead` delay.
 - Any value that ends on a measured position settles over `settle` ms with `EASE.out`.
 
 ### 1.5 In-view gating
-`useArmedInView({ arm, reset = 0.2, nearMargin = 600 })` returns `{ ref, armed, near }`.
+`useArmedInView({ arm, reset = 0.2, nearMargin = 600 })` returns `{ ref, armed, near }`. `ref` is both a callback and an object (`ref.current`), so a frame that mounts after the hook (a lazy or conditional child) is still observed. Observers use 1 % thresholds, so a frame much taller than the viewport still reaches its arm share.
 - **`armed`** turns on when `arm` of the frame, or of the viewport if the frame is taller, is on screen. A beat sequence arms at **0.45** (`ARM_SEQUENCE`, as the landing's how-it-works scene does). A single bloom or sweep arms at **0.75** (`ARM`, as RevealLoop does).
 - **`reset`**: below 20 % it turns off.
 - **Sequences** play only while armed. If they had not finished, they **resume** from the beat they were on when re-armed. A finished `once` sequence **replays** when the reader comes back.
@@ -167,7 +167,8 @@ stagger(i: number, step = MOTION.stagger, base = 0): number   // delay in ms for
 - **`playback: "loop"`** is opt-in, for ambient demos with no story (a search sweep). It cycles while armed. After the result hold, it returns to `setup` through a `replayFade`.
 - **Hold.** A hover or focus pause is `hold(true)` and `hold(false)`. It is not manual: letting go resumes.
 - **Touch ends autoplay.** A stepper click, a scrub drag or a key press switches to manual. Autoplay never resumes on its own; a "▶" button resumes it. This is today's behaviour in Stages and useAutoScrub.
-- **Stepper** = the beat index. A jump animates over `settle` (it is not instant), and ghosts appear as they do in the sequence.
+- **Stepper** = the beat index. A jump animates over `settle` (it is not instant), and ghosts appear as they do in the sequence. The hooks only change the index; the figure's CSS transitions do the settling.
+- **Hold** restarts the current beat's dwell in full when it is released.
 - **Compare** is a scrub, not a sequence. Each half shows its own state, so a Compare has **no ghost layers**. Its result frame is the split at its `start`.
 - **Scrub** = story time t ∈ [0, 1].
   - A drag writes straight to the DOM (a style or a CSS var), not to React state on every pointer move. This is the Compare pattern.
@@ -249,7 +250,7 @@ From that palette, pure functions derive the CSS custom properties that `Figure`
 | `--fig-sky-ink` | Navy shifted toward the sky hue, ≥ 3:1 on the wash | Sky tone lightened, ≥ 3:1 | Sky hachure in the spill |
 | `--fig-terrain-ink` | Contour brown shifted toward the terrain hue, ≥ 3:1 | Terrain tone lightened, ≥ 3:1 | Spill ridges, LiveLines (`--rigi-paper` on plates), ruler |
 | `--fig-horizon-ink` | Ink of the horizon band, ≥ 4.5:1 | ≥ 4.5:1 | Horizon tick, compass ruler figures |
-| `--fig-halo` | A dark or light halo for photo-ink lines, picked from `horizonL` | Same | CrispLine halo |
+| `--fig-halo` | A dark or light **line** halo, picked from `horizonL` | Same | Only the outer halo of photo-ink *lines* (CrispLine, a wipe line). Peak names and HandLabels on a photo keep their paper halo: their ink is dark |
 
 Rules:
 - Photos are **never** filtered, tinted or blended. Only the ground around them changes.
@@ -301,6 +302,15 @@ Notes (v0.2):
   - **Compare:** it has no ghosts.
   - **Overlay stack:** derived now sits under measured, and the `OverlayLayer` prop is `layer`.
   - **CSS:** motion vars and keyframes in theme.css.
+- v0.3 (pod G, after its adversarial review, round 2):
+  - **`useArmedInView`** takes a late-attached ref, reads the newest observer entry and uses 1 % thresholds.
+  - **`OverlayLayer`** drops its transition under reduced motion (an inline transition beats a class). The interaction layer has no delay, and leaving waits at most two staggers.
+  - **`useBeats`** `play` and `replay` do nothing where motion is off. A reader's manual step survives a print.
+  - **`useBeatClock`** starts after `lead`, and `seek(last)` is the exact end frame.
+  - **`ensureContrast`** keeps polarity.
+  - **Palette lookups** are own-key only.
+  - **Print** drops only a photo-tinted wash.
+  - **New pure helpers** for pod D: `startOf`, `smooth`, `rampAt`.
 
 ## 6. Cross-pod consistency notes (pod G review)
 - **S (photo story):**
@@ -313,4 +323,6 @@ Notes (v0.2):
   - `priorRows` and `solvedRows` are derived.
 - **C (sequences):** Stages moves to `once` (decision 1 ruled; it remains open to the user). The Compare intro is a `once` script.
 - **M (maps):** it already follows the grammar (settle 620 for the cone, so the map and the spill arrive together). Its search demo may use `loop`.
+- **P (hero photo):** `--fig-halo` is a line halo only (now stated in §3). Six Figures set `bleed` with no spilled photo inside (galleries and 2×2 panels: rigi Fig. 4, photo Fig. 4, camera-prior Fig. 3, baseline-pipeline D1, viewport-inference Fig. 3, accept-rule Fig. 4), so they widen into an empty margin. Rule: `bleed` and `plate` only on a figure that spills or carries a plate. The fix is a page hunk, and pod L owns the tiles.
+- **D (diagrams):** `startOf(tl, id)`, `smooth` and `rampAt(tl, ms, id, delay, dur, shape)` are in motion.ts (round 2). `useBeatClock.seek(i)` lands on the end of beat i.
 - **D (diagrams):** `script.ts` and `useScript.ts` fold into `useBeatClock`. `useTime` is fixed at the hook side; D fixes the `still` values at the call sites.

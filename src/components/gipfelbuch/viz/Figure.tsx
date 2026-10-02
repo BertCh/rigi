@@ -126,7 +126,9 @@ export function Figure({
 				className={cn(
 					"relative",
 					(well || plate) &&
-						"bg-[var(--fig-wash,var(--gb-paper-deep,transparent))] print:bg-transparent",
+						"bg-[var(--fig-wash,var(--gb-paper-deep,transparent))]",
+					// a photo-tinted wash is screen furniture: print drops it (the plain paper-deep wash stays)
+					(well || plate) && vars && "print:bg-transparent",
 					well && pad && "p-6",
 					plate && "px-4 py-6 sm:px-6",
 				)}

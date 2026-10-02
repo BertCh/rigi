@@ -55,8 +55,10 @@ export const GROUND_CONTRAST = { line: 3, text: 4.5 } as const;
 
 type Rgb = [number, number, number];
 
+/** `#rgb` or `#rrggbb` to channels; anything else (a CSS var, a named colour) is mid grey, never NaN. */
 export function hexToRgb(hex: string): Rgb {
 	let h = hex.trim().replace(/^#/, "");
+	if (!/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(h)) return [128, 128, 128];
 	if (h.length === 3)
 		h = h
 			.split("")
@@ -107,15 +109,29 @@ export function ensureContrast(
 	min: number,
 ): string {
 	if (contrastRatio(ink, ground) >= min) return rgbToHex(hexToRgb(ink));
-	const target = relativeLuminance(ground) > 0.18 ? "#000000" : "#ffffff";
-	let lo = 0;
-	let hi = 1;
-	for (let i = 0; i < 24; i++) {
-		const mid = (lo + hi) / 2;
-		if (contrastRatio(mixHex(ink, target, mid), ground) >= min) hi = mid;
-		else lo = mid;
-	}
-	return mixHex(ink, target, hi);
+	// the smallest move toward black or toward white that reaches the floor; an ink on the ground's dark
+	// side darkens and one on its light side lightens, so it never flips polarity through the ground
+	const reach = (target: string): number | null => {
+		if (contrastRatio(target, ground) < min) return null;
+		let lo = 0;
+		let hi = 1;
+		for (let i = 0; i < 24; i++) {
+			const mid = (lo + hi) / 2;
+			const c = mixHex(ink, target, mid);
+			// toward the ink's own side this is monotonic; on the fallback side (through the ground) it dips
+			// first, and the bisection still ends on a value that passes
+			if (contrastRatio(c, ground) >= min) hi = mid;
+			else lo = mid;
+		}
+		return hi;
+	};
+	const darker = relativeLuminance(ink) <= relativeLuminance(ground);
+	const first = darker ? "#000000" : "#ffffff";
+	const second = darker ? "#ffffff" : "#000000";
+	const t = reach(first);
+	if (t != null) return mixHex(ink, first, t);
+	const u = reach(second);
+	return u != null ? mixHex(ink, second, u) : first;
 }
 
 /** `hex` with its chroma cut to `keep` (0 = its grey, 1 = itself). */
@@ -127,7 +143,8 @@ export function desaturate(hex: string, keep: number): string {
 
 /** The baked palette of a demo photo ("demo-09"), or undefined. */
 export function groundPalette(photoId: string): GroundPalette | undefined {
-	return (GROUND_PALETTES as Record<string, GroundPalette>)[photoId];
+	const all = GROUND_PALETTES as Record<string, GroundPalette>;
+	return Object.hasOwn(all, photoId) ? all[photoId] : undefined;
 }
 
 /**
