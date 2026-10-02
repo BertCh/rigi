@@ -1452,14 +1452,12 @@ function HeroStages({ d }: { d: TerrainData | null }) {
 				stages={[
 					{
 						label: "Photo",
-						frame: "photo",
 						caption:
 							"One photo. A depth model can guess its shape, but not its metres.",
 						render: () => <RealPhoto data={photo} layers={[]} bleed />,
 					},
 					{
 						label: "The ruler",
-						frame: "photo",
 						caption:
 							"Once the camera is solved, the map says how far the ground is at every pixel.",
 						render: () => (
@@ -1470,7 +1468,6 @@ function HeroStages({ d }: { d: TerrainData | null }) {
 					},
 					{
 						label: "Pixels that vote",
-						frame: "photo",
 						caption:
 							"Only ground between 15 m and 3 km is used. Sky and far haze stay out.",
 						render: () => (

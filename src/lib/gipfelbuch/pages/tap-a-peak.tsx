@@ -1139,7 +1139,6 @@ function HeroTaps() {
 				stages={[
 					{
 						label: "Phone sensors",
-						frame: "photo",
 						caption: `The compass is ${f(S && Math.abs(S[0].err.yaw))}° off. Labels miss their peaks by ${f(S?.[0].peakShift.median, 0)} px.`,
 						render: () => (
 							<TapFrame photo={photo} tap={tap} n={0} id="demo-10" bleed />
@@ -1147,7 +1146,6 @@ function HeroTaps() {
 					},
 					{
 						label: "1 tap",
-						frame: "photo",
 						caption: `Yaw snaps to ${f(S && Math.abs(S[1].err.yaw), 2)}° off. Labels now miss by ${f(S?.[1].peakShift.median)} px.`,
 						render: () => (
 							<TapFrame photo={photo} tap={tap} n={1} id="demo-10" bleed />
@@ -1155,7 +1153,6 @@ function HeroTaps() {
 					},
 					{
 						label: "2 taps",
-						frame: "photo",
 						caption: `Roll is fixed too. The median miss drops to ${f(S?.[2].peakShift.median)} px.`,
 						render: () => (
 							<TapFrame photo={photo} tap={tap} n={2} id="demo-10" bleed />
@@ -1163,7 +1160,6 @@ function HeroTaps() {
 					},
 					{
 						label: "3 taps",
-						frame: "photo",
 						caption: `The lens is solved. The median miss is ${f(S?.[3].peakShift.median)} px.`,
 						render: () => (
 							<TapFrame photo={photo} tap={tap} n={3} id="demo-10" bleed />
