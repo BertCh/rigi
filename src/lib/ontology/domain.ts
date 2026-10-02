@@ -20,8 +20,7 @@
 // ---- capture: what the photographer brought: photos, their metadata, rolls -----------------------
 
 /**
- * Photo: One image plus what the device recorded about it (size, time, position, heading, gravity,
- * lens). Bundled, uploaded (local), demo or benchmark.
+ * Photo: One image plus what the phone recorded with it: time, position, heading, tilt and lens.
  * Canonical: `lib/photos.ts#PhotoMeta`.
  * Other shapes: `lib/upload/exif.ts#LocalPhotoMeta`, `lib/upload/store.ts#PhotoRecord`,
  * `lib/geo/photo-meta.ts#ExifPhotoMeta`.
@@ -37,8 +36,8 @@ export type Photo = import("#/lib/photos").PhotoMeta;
 export type RawExif = import("#/lib/upload/exif").ExifTags;
 
 /**
- * Prior: The camera the device's sensors imply before any solving: compass yaw, gravity
- * pitch/roll, EXIF focal, GPS position. A ROLE (fed into solves), not a source.
+ * Prior: The camera the phone's sensors imply before any solving: compass heading, tilt, lens and
+ * GPS position.
  * Is a {@link Camera}.
  * Canonical: `lib/pose6dof/types.ts#Priors`.
  * Other shapes: `lib/geocam/priors/photo-priors.ts#PriorPhoto`.
@@ -54,8 +53,8 @@ export type CameraPrior = import("#/lib/pose6dof/types").Priors;
 export type PriorUnknowns = import("#/lib/integration/unknown-pose").Unknowns;
 
 /**
- * Roll: Photos of one area shown together (mosaic, map drape, panorama). Derived by clustering
- * photos (15 km link), never stored.
+ * Roll: Photos of one area, shown as a mosaic, on the map and as a panorama. Grouped on the fly,
+ * never stored.
  * Canonical: `lib/roll/types.ts#Roll`.
  * Other shapes: `lib/roll/types.ts#RollPhoto`.
  */
@@ -91,7 +90,7 @@ export type Region = import("#/lib/photos").RegionData;
 export type Feature = import("#/lib/overpass").OsmElement;
 
 /**
- * Peak: A named summit (OSM natural=peak) with elevation and, where known, prominence.
+ * Peak: A named summit from OpenStreetMap, with its height and, where known, prominence.
  * Frame: wgs84; ele in metres MSL.
  * Is a {@link Feature}.
  * Canonical: `lib/geo/peaks.ts#Peak`.
@@ -109,15 +108,15 @@ export type Peak = import("#/lib/geo/peaks").Peak;
 export type Trail = import("#/lib/photos").RegionTrail;
 
 /**
- * Terrain: The DEM surface: heights in metres MSL, sampled from tiles at distance-dependent zoom.
+ * Terrain: The ground surface: heights above sea level, read from tiles that get coarser with
+ * distance.
  * Frame: heights MSL (≈ EGM2008).
  * Canonical: `lib/geo/terrain.ts#TerrainSampler`.
  */
 export type Terrain = import("#/lib/geo/terrain").TerrainSampler;
 
 /**
- * DEM source: A tiled elevation dataset (Mapterhorn 512 px, Terrarium 256 px) with zoom levels by
- * distance.
+ * DEM source: A tiled height dataset, Mapterhorn or Terrarium; nearer ground gets finer tiles.
  * Canonical: `lib/dem/sources.ts#DemSource`.
  */
 export type DemSource = import("#/lib/dem/sources").DemSource;
@@ -181,8 +180,8 @@ export type Eye = import("#/lib/geodesy").EnuFrame;
 export type GeoPosition = import("#/lib/geodesy").LatLon;
 
 /**
- * Eye rule: How eye height is set without a solve: max(GPS alt, DEM + 1.6 m); with no altitude the
- * engine uses DEM + 1.8 m while geo/pipeline uses DEM + 1.6 m.
+ * Eye rule: How high the camera sits without a solve: the GPS altitude, but at least standing
+ * height above the ground.
  * Canonical: `lib/concord/priors/altitude.ts#EyePrior`.
  */
 export type EyeRule = import("#/lib/concord/priors/altitude").EyePrior;
@@ -190,8 +189,7 @@ export type EyeRule = import("#/lib/concord/priors/altitude").EyePrior;
 // ---- evidence: what is observed in the photo and matched to the world ----------------------------
 
 /**
- * Horizon: The MODELLED skyline: per-azimuth elevation of the DEM's highest visible ridge from the
- * eye.
+ * Horizon: The skyline the terrain predicts: the highest visible ridge in every direction.
  * Frame: azel; elevation degrees at azimuth i·step.
  * Canonical: `lib/geo/horizon.ts#HorizonProfile`.
  * Other shapes: `lib/pose6dof/eye.ts#EyeHorizon`, `lib/horizon-fast/march.ts#FastHorizonProfile`,
@@ -200,7 +198,7 @@ export type EyeRule = import("#/lib/concord/priors/altitude").EyePrior;
 export type Horizon = import("#/lib/geo/horizon").HorizonProfile;
 
 /**
- * Skyline: The OBSERVED sky/terrain boundary in the photo: per-column row and weight.
+ * Skyline: The line between sky and terrain as seen in the photo.
  * Frame: image; rows in working px (v down).
  * Canonical: `lib/geo/skyline.ts#SkylineObservation`.
  * Other shapes: `lib/pose6dof/eye.ts#SkylineSample`.
@@ -231,7 +229,8 @@ export type ForegroundMask = import("#/lib/segment").ForegroundMask;
 export type Correspondence = import("#/lib/pose6dof/types").Correspondence;
 
 /**
- * Pin: A user's tap tying a named peak to an image point (1 pin: yaw/pitch; 2: + roll; 3: + fov).
+ * Pin: A tap that ties a named peak to a point in the photo. One pin sets direction, two add tilt,
+ * three add the lens.
  * Is a {@link Correspondence}.
  * Canonical: `lib/align.ts#Pin`.
  */
@@ -249,8 +248,8 @@ export type Cue = import("#/lib/concord/core/types").Cue;
 // ---- estimate: solving, judging and choosing camera estimates ------------------------------------
 
 /**
- * Pose estimate: An orientation (and possibly eye) plus its provenance: who/what produced it, from
- * which evidence, and how it was judged.
+ * Pose estimate: Where the camera pointed (sometimes where it stood), plus who found it, from
+ * what, and how sure.
  * Canonical: `lib/roll/types.ts#SolvedPose`.
  * Other shapes: `lib/integration/second-opinion.ts#AppAlign`,
  * `lib/integration/unknown-pose.ts#UnknownPoseOutcome`,
@@ -353,8 +352,8 @@ export type PeakLabel = import("#/lib/settings").PeakLabel;
 export type Reveal = import("#/lib/reveal/config").RevealConfig;
 
 /**
- * Step Inside: The near field rebuilt in 3D (Gaussian splats on the DEM) with photo / orbit / fly
- * / top-down cameras.
+ * Step Inside: The near ground rebuilt in 3D on the terrain; view it from the photo, orbiting,
+ * flying or from above.
  * Canonical: `lib/nearfield/types.ts#NearFieldScene`.
  * Other shapes: `lib/nearfield/types.ts#GaussianCloud`.
  */
