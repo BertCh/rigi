@@ -21,7 +21,7 @@ export function coverageRaster(
 	low: readonly [number, number, number],
 	high: readonly [number, number, number],
 	maxAlpha = 0.7,
-): Uint8ClampedArray {
+): Uint8ClampedArray<ArrayBuffer> {
 	const { size, data } = grid;
 	const peak = Math.max(2, grid.max);
 	const out = new Uint8ClampedArray(size * size * 4);
