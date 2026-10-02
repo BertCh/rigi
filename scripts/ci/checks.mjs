@@ -1195,6 +1195,15 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "aliked-single-forward",
+		tier: "fast",
+		group: "nn",
+		cmd: tsx("src/lib/features/__tests__/aliked-single-forward.check.ts"),
+		needs: ["public/models/aliked-n16.dc5fb7d3.safetensors"],
+		note: "runAliked (one nn forward, soft-argmax / SDDH math as nn ops) vs the staged CPU-helper pipeline it replaced, on the GPU backend over Dawn; SKIPs without DAWN_DIR",
+		timeoutS: 300,
+	},
+	{
 		id: "imhof",
 		tier: "fast",
 		group: "look",
