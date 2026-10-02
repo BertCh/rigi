@@ -1008,6 +1008,19 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "focal-seed-noise",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("src/lib/integration/focal-seed-noise.check.ts"),
+		needs: [
+			"public/photos/IMG_6958.jpg",
+			"tools/bench/harness/out/ablation/manifest.json",
+			".cache/dem-mapterhorn",
+		],
+		timeoutS: 180,
+		note: "unknown-pose accept decision of GT-12 IMG_6958 none+nofocal is identical across 0..1e-3 px skyline-row noise (SEED_REFINE_MIN_SOLVE_CONFIDENCE); SKIPs without the gitignored inputs",
+	},
+	{
 		id: "render-lock-signals",
 		tier: "fast",
 		group: "gpu",

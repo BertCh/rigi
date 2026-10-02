@@ -23,7 +23,7 @@ import {
 	loadScene,
 	sceneHorizon,
 } from "#/lib/geo/pipeline";
-import { detectSkylineAsync } from "#/lib/geo/skyline";
+import { detectSkylineAsync, type SkylineObservation } from "#/lib/geo/skyline";
 import type { CoarseProvider, SolveOptions } from "#/lib/geo/solve";
 import type { TileLoader } from "#/lib/geo/terrain";
 import { solveCoarse } from "#/lib/gpu/solve";
@@ -45,6 +45,16 @@ const FOCAL_UNKNOWN_MIN_CONFIDENCE = 0.75;
  * at 0.66, 124° off.
  */
 const YAW_UNKNOWN_MIN_CONFIDENCE = 0.75;
+/**
+ * A non-best focal seed that only accepted through `refinePose` (its solve stage rejected) counts as an
+ * alternative accepted fit in the `ambiguous` test only when its solve stage reached this confidence.
+ * refinePose from a wrong-focal prior is chaotic at the 1e-5..1e-4 px level of skyline-row noise
+ * (research_notes/wave5/skyline-gpu-flip.md: GT-12 IMG_6958 none+nofocal, solve 0.065 -> refine accept
+ * 0.70 flips with 1e-4 px row noise), so its accept is noise, not evidence of a second fit. 0.25 is half
+ * of solvePose's 0.5 acceptConfidence default (geo/solve.ts): below it the solve stage found no
+ * skyline fit worth a veto, and the observed noise-flipped seeds sat at 0.065..0.07.
+ */
+export const SEED_REFINE_MIN_SOLVE_CONFIDENCE = 0.25;
 /** Most cascade candidates returned as matcher seeds (3 focal seeds × solve/refine = up to 6). */
 const MAX_CANDIDATES = 4;
 
@@ -137,15 +147,45 @@ export async function computeUnknownScene(
 	};
 }
 
+type SeedFit = UnknownPoseResult["seeds"][number];
+
+/**
+ * Unknown focal: does the skyline fit more than one field of view (or fit only weakly)? True when another
+ * focal seed also accepts more than 1 deg of yaw away from the best seed, or the best confidence is under
+ * FOCAL_UNKNOWN_MIN_CONFIDENCE. A seed whose accept came only from `refinePose` after a solve stage under
+ * SEED_REFINE_MIN_SOLVE_CONFIDENCE is ignored (chaotic, see that constant). The best seed itself is never
+ * filtered: it decides `accepted` first. This only ever removes vetoes from refine-only seeds with no
+ * solve-stage support.
+ */
+export function isAmbiguousFocal(
+	seeds: readonly SeedFit[],
+	best: { camera: { yaw: number }; confidence: number },
+	skipUnstableRefine = true,
+): boolean {
+	return (
+		seeds.some(
+			(s) =>
+				s.accepted &&
+				Math.abs(((s.yaw - best.camera.yaw + 540) % 360) - 180) > 1 &&
+				(!skipUnstableRefine ||
+					s.stage === "solve" ||
+					s.solveConfidence >= SEED_REFINE_MIN_SOLVE_CONFIDENCE),
+		) || best.confidence < FOCAL_UNKNOWN_MIN_CONFIDENCE
+	);
+}
+
 /** The cascade for one request on the scene `sceneOf` resolves (the worker's cached horizonAt). */
 export async function solveUnknownPose(
 	req: UnknownPoseRequest,
 	sceneOf: () => Promise<UnknownScene>,
+	/** test seam: rewrite the detected skyline before the cascade (noise-injection checks) */
+	mapSkyline?: (sky: SkylineObservation) => SkylineObservation,
 ): Promise<UnknownPoseResult> {
 	const t0 = performance.now();
 	const { horizon, horizonOn } = await sceneOf();
 	const tHorizon = performance.now() - t0;
-	const sky = await detectSkylineAsync(req.image);
+	const detected = await detectSkylineAsync(req.image);
+	const sky = mapSkyline ? mapSkyline(detected) : detected;
 	const yawKnown = !req.unknown.yaw;
 	const gravKnown = !req.unknown.gravity;
 	// everything known (second opinion on the app's autoAlign, second-opinion.ts): 0f's recommended
@@ -190,6 +230,7 @@ export async function solveUnknownPose(
 			yaw: r.camera.yaw,
 			solvedVfov: vfovFromFocal(r.camera.f, r.camera.height),
 			confidence: r.confidence,
+			solveConfidence: r.candidates[0].confidence,
 			accepted: r.accepted,
 			stage: r.stage,
 		});
@@ -205,13 +246,7 @@ export async function solveUnknownPose(
 	// one field of view (IMG_7068 with nothing known: 66° and 78° vfov both accepted, 1.6° apart). Ambiguous.
 	// And a wrong focal seed can accept at a middling confidence (IMG_7053 focal-only: 0.68 at 40° vfov,
 	// 4° off; a correct one scored 0.66): like solvePose's 360° fallback, demand ≥ 0.75 then.
-	const ambiguous =
-		req.unknown.focal &&
-		(seeds.some(
-			(s) =>
-				s.accepted && Math.abs(((s.yaw - b.camera.yaw + 540) % 360) - 180) > 1,
-		) ||
-			b.confidence < FOCAL_UNKNOWN_MIN_CONFIDENCE);
+	const ambiguous = req.unknown.focal && isAmbiguousFocal(seeds, b);
 	const weak360 = req.unknown.yaw && b.confidence < YAW_UNKNOWN_MIN_CONFIDENCE;
 	// matcher seeds: the chosen focal seed's stages first, then the other focal seeds'. Each wrong seed costs
 	// a local render + match on the server, so drop near-duplicates and cap the count.

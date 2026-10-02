@@ -115,6 +115,8 @@ export type UnknownPoseResult = {
 		yaw: number;
 		solvedVfov: number;
 		confidence: number;
+		/** the seed's solve stage confidence (equals `confidence` unless the seed refined) */
+		solveConfidence: number;
 		accepted: boolean;
 		stage: CascadeStage;
 	}[];

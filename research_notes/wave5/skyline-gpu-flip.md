@@ -44,7 +44,24 @@ The decision flips between 1e-5 and 1e-4 px of row noise, the f32 rounding scale
 the CPU's rows bit for bit on GPU (blur summation order, edge parabola) is not achievable in general, so no GPU change
 can guarantee an identical accept set. Full 77-decision and wild A/B were not re-run: the mechanism makes it moot.
 
-## What would fix it (not done: the CPU path must not change)
+## What would fix it (done below as Fix)
 
 Make the cascade less brittle on wrong-focal seeds, e.g. ignore non-best seeds whose solve confidence is under ~0.1 in
 the `ambiguous` test, or demand a higher refine score for them. That changes CPU behaviour and needs the wild dev A/B.
+
+## Fix (2026-10-02, pod B unit g2)
+
+`isAmbiguousFocal` (`src/lib/integration/unknown-pose-core.ts`) now ignores a non-best focal seed as an
+"alternative accepted fit" when its accept came only from `refinePose` and its solve stage was under
+`SEED_REFINE_MIN_SOLVE_CONFIDENCE` = 0.25 (half of solvePose's 0.5 accept). Seeds expose `solveConfidence` for it.
+A solve-stage accept, a refine accept whose solve reached 0.25, the best seed itself, and the
+`best.confidence < 0.75` rule are untouched. The change can only remove vetoes (from refine-only seeds with no
+solve support), never add one; precision-wise that is the direction to check, see below.
+
+Evidence (dev, GT-12, CPU path, node):
+- `src/lib/integration/focal-seed-noise.check.ts` (row noise 0, 1e-6, 1e-5, 1e-4, 1e-3 px on IMG_6958 none+nofocal):
+  see the result table in the commit message; CI row `focal-seed-noise` (SKIPs without the gitignored inputs).
+- `scripts/gpu/unknown-gpu-node.ts --set gt12 --unknown-gpu off --skyline-gpu off`, before vs after: 60 decisions
+  (12 photos x 5 conditions; the harness's GT-12 set), 0 changed (accept, pose and confidence all identical), 34 accepts
+  before and after, no new accept. The wild set was not run (sealed / out of scope), so a refine-only veto that
+  mattered there is unmeasured: the batch pass should re-run the A/B.
