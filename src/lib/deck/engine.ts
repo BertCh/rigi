@@ -1662,6 +1662,7 @@ export class DeckEngine implements Renderer {
 						widthPx: this.style.trails.width,
 						lineOpacity: this.style.trails.opacity,
 						dash: this.style.trails.dash,
+						stroke: this.style.trails.stroke,
 					}),
 				);
 		}
@@ -3073,6 +3074,7 @@ export class DeckEngine implements Renderer {
 					widthPx: this.style.trails.width,
 					lineOpacity: this.style.trails.opacity,
 					dash: this.style.trails.dash,
+					stroke: this.style.trails.stroke,
 					onCanvas: true,
 				}),
 			);

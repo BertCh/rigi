@@ -13,6 +13,7 @@ import type { Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { TURBO_GLSL } from "../look/glsl/common";
 import { COMP_BLOCK, compositeChunk, HARM_BLOCK } from "../look/glsl/composite";
+import { SKETCH_RIDGES_GLSL } from "../look/sketch-ridges";
 import { REVEAL_GLSL } from "../reveal/glsl";
 
 const uniformBlock = /* glsl */ `\
@@ -62,6 +63,8 @@ layout(std140) uniform compositeUniforms {
   vec4 revealU;
   // concord DSM occluder (?concord=occl): occlOn 0 ⇒ occlTex is never read
   float occlOn;
+  // style.composite.sketch: pencil wobble of the ridge / ink lines (look/sketch-ridges.ts); 0 = off
+  float ridgeSketch;
 } composite;
 `;
 
@@ -110,6 +113,7 @@ export type CompositeModuleProps = {
 	revealR: number[];
 	revealU: number[];
 	occlOn: number;
+	ridgeSketch: number;
 	photoTex: Texture;
 	layerTex: Texture;
 	geoTex: Texture;
@@ -166,6 +170,7 @@ export const compositeModule = {
 		revealR: "vec4<f32>",
 		revealU: "vec4<f32>",
 		occlOn: "f32",
+		ridgeSketch: "f32",
 	},
 } as const satisfies ShaderModule;
 
@@ -206,6 +211,7 @@ vec3 srgbEncode(vec3 c) {
 }
 
 ${TURBO_GLSL}
+${SKETCH_RIDGES_GLSL}
 ${REVEAL_GLSL}
 ${compositeChunk(`uniform sampler2D maskTex;
 uniform sampler2D normalTex;
@@ -268,15 +274,19 @@ void main() {
   if (composite.occlOn > 0.5) fg = max(fg, 0.8 * texture(occlTex, uvT).r);
 
   // silhouettes: discontinuities in log-range
-  float c = lr(uvG);
+  // style.composite.sketch: the lookup is displaced by a smooth pencil wobble and the line strength
+  // modulated (look/sketch-ridges.ts); sketch 0 adds 0.0 and multiplies by 1.0 = unchanged
+  vec3 sk = ridgeSketch(uvG / composite.geoTexel, composite.ridgeSketch);
+  vec2 uvR = uvG + sk.xy * composite.geoTexel;
+  float c = lr(uvR);
   vec2 o = composite.geoTexel * 1.25;
-  float e = max(max(abs(c - lr(uvG + vec2(o.x, 0.0))), abs(c - lr(uvG - vec2(o.x, 0.0)))),
-                max(abs(c - lr(uvG + vec2(0.0, o.y))), abs(c - lr(uvG - vec2(0.0, o.y)))));
-  float isSkyline = (range > 0.0 && texture(geoTex, uvG + vec2(0.0, o.y)).r == 0.0) ? 1.0 : 0.0;
-  float ridge = smoothstep(composite.ridgeThr.x, composite.ridgeThr.y, e);
+  float e = max(max(abs(c - lr(uvR + vec2(o.x, 0.0))), abs(c - lr(uvR - vec2(o.x, 0.0)))),
+                max(abs(c - lr(uvR + vec2(0.0, o.y))), abs(c - lr(uvR - vec2(0.0, o.y)))));
+  float isSkyline = (range > 0.0 && texture(geoTex, uvR + vec2(0.0, o.y)).r == 0.0) ? 1.0 : 0.0;
+  float ridge = smoothstep(composite.ridgeThr.x, composite.ridgeThr.y, e) * sk.z;
   if (composite.nearFade > 0.0) ridge *= range > 0.0 ? smoothstep(composite.nearFade * 0.5, composite.nearFade, range) : 1.0;
 #ifdef LOOK_INK
-  vec2 ink = inkLines(uvG, range, composite.nearFade, cov);
+  vec2 ink = inkLines(uvR, range, composite.nearFade, cov) * sk.z;
 #endif
 #ifdef LOOK_OUTPUT
   float grainA = 0.0;

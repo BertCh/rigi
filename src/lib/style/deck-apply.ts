@@ -294,6 +294,8 @@ export type DeckCompositeStyle = {
 	ridgeGainO: number;
 	ridgeInnerR: Vec3;
 	ridgeGainR: number;
+	/** composite.sketch: pencil wobble of the ridge / ink lines, 0 = off (look/sketch-ridges.ts) */
+	ridgeSketch: number;
 	/** rgb + alpha */
 	hair: [number, number, number, number];
 	/** (log near, 1 / (log far - log near)) with the GLSL compiler's float32 folding */
@@ -324,6 +326,7 @@ export function deckCompositeStyle(style: ViewStyle): DeckCompositeStyle {
 		ridgeGainO: r.gain,
 		ridgeInnerR: rawColor(style.replace.ridges.inner),
 		ridgeGainR: style.replace.ridges.gain,
+		ridgeSketch: style.composite.sketch ?? 0,
 		hair: [hc[0], hc[1], hc[2], h.alpha * hexToRgba01(h.color)[3]],
 		depthLog: depthLog(d.nearM, d.farM),
 		depthGain: d.gain,

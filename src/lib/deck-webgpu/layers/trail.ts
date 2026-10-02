@@ -35,6 +35,14 @@ import type { Buffer, Device } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { TrailSegments } from "#/lib/deck/trail-layer";
+import {
+	strokeKind,
+	strokePadPx,
+	TRAIL_GLOW_WHITEN,
+	TRAIL_STROKE_MODE,
+	TRAIL_STROKE_WGSL,
+	type TrailStrokeKind,
+} from "#/lib/look/trail-stroke";
 import { cameraModule } from "../camera";
 import {
 	type GpuLayerCore,
@@ -58,6 +66,8 @@ export type TrailStyle = {
 	opacity: number;
 	/** [dashM, gapM] metres along the trail (luma pathDash); absent / gap ≤ 0 = solid (default). */
 	dash?: readonly [number, number];
+	/** 'solid' (default) | 'pencil' | 'glow' (look/trail-stroke.ts, luma sketchStroke shading). */
+	stroke?: TrailStrokeKind;
 };
 
 export const DEFAULT_TRAIL_STYLE: TrailStyle = { width: 2.2, opacity: 0.95 };
@@ -77,9 +87,12 @@ export type TrailUniforms = {
 	/** dash length m (pathDash); gap ≤ 0 = solid */
 	dashM: number;
 	gapM: number;
+	/** stroke mode id (TRAIL_STROKE_MODE) and the quad's extra half-width in px */
+	stroke: number;
+	padPx: number;
 };
 
-/** `trail` uniform block: 32 bytes, scalars first so the vec2 lands on offset 16. */
+/** `trail` uniform block: 40 bytes (std layout pads to 40), scalars first so the vec2 lands on offset 16. */
 export const trailModule = {
 	name: "trail",
 	source: /* wgsl */ `\
@@ -91,6 +104,8 @@ struct TrailUniforms {
   viewport: vec2<f32>,
   dashM: f32,
   gapM: f32,
+  stroke: f32,
+  padPx: f32,
 };
 @group(0) @binding(auto) var<uniform> trail: TrailUniforms;
 `,
@@ -102,6 +117,8 @@ struct TrailUniforms {
 		viewport: "vec2<f32>",
 		dashM: "f32",
 		gapM: "f32",
+		stroke: "f32",
+		padPx: "f32",
 	},
 	bindingLayout: [{ name: "trail", group: 0 }],
 } as const satisfies ShaderModule;
@@ -118,6 +135,7 @@ struct Varyings {
   @builtin(position) position: vec4<f32>,
   @location(0) color: vec3<f32>,
   @location(1) dist: f32,
+  @location(2) side: f32,
 };
 
 // LineSegments2 quad: x = 0 start / 1 end, y = -1 / +1 across the line (var<private>: indexed
@@ -161,7 +179,10 @@ var<private> QUAD = array<vec2<f32>, 6>(
   var p = select(b, a, corner.x < 0.5);
   o.dist = select(db, da, corner.x < 0.5);
   // width in target pixels (three: LineMaterial linewidth at resolution = the render target)
-  p = vec4<f32>(p.xy + nrm * corner.y * trail.width * 0.5 / halfRes * p.w, p.z, p.w);
+  // padPx widens the quad for the pencil / glow strokes (0 = solid, unchanged); side = px across the line
+  let halfW = trail.width * 0.5 + trail.padPx;
+  o.side = corner.y * halfW;
+  p = vec4<f32>(p.xy + nrm * corner.y * halfW / halfRes * p.w, p.z, p.w);
   // reversed-Z: a larger depth is closer; relative nudge toward the camera (header)
   p.z = p.z * (1.0 + trail.depthBias);
   o.position = p;
@@ -182,12 +203,18 @@ fn dashCoverage(dist: f32) -> f32 {
   return clamp(coverage, 0.0, 1.0);
 }
 
+${TRAIL_STROKE_WGSL}
 @fragment fn fragmentMain(v: Varyings) -> @location(0) vec4<f32> {
   // derivatives in uniform control flow; trail.gapM <= 0 (the default) = solid, coverage unused
   let dash = dashCoverage(v.dist);
   // linear rgb (vertex colour), premultiplied into the colour target
-  let a = trail.opacity * select(1.0, dash, trail.gapM > 0.0);
-  return vec4<f32>(max(v.color, vec3<f32>(0.0)) * a, a);
+  // stroke style (look/trail-stroke.ts); derivatives here, in uniform control flow
+  let aa = max(fwidth(v.side), 0.0001);
+  let grainFade = 1.0 - smoothstep(0.2, 0.6, fwidth(v.dist));
+  let st = trail_stroke(trail.stroke, v.side, v.dist, trail.width, aa, grainFade);
+  let a = trail.opacity * select(1.0, dash, trail.gapM > 0.0) * st.x;
+  let c = mix(max(v.color, vec3<f32>(0.0)), vec3<f32>(1.0), st.y * ${TRAIL_GLOW_WHITEN});
+  return vec4<f32>(c * a, a);
 }
 `;
 
@@ -248,6 +275,7 @@ export class TrailCore implements GpuLayerCore {
 			width: style.width ?? this.style.width,
 			opacity: style.opacity ?? this.style.opacity,
 			dash: "dash" in style ? style.dash : this.style.dash,
+			stroke: "stroke" in style ? style.stroke : this.style.stroke,
 		};
 	}
 
@@ -308,6 +336,7 @@ export class TrailCore implements GpuLayerCore {
 
 	/** Uniform values for a pass (exported for checks). */
 	uniforms(ctx: Pick<PassContext, "camera" | "target">): TrailUniforms {
+		const kind = strokeKind(this.style.stroke);
 		return {
 			width: this.style.width,
 			opacity: this.style.opacity,
@@ -317,6 +346,8 @@ export class TrailCore implements GpuLayerCore {
 			viewport: [ctx.target.width, ctx.target.height],
 			dashM: Math.max(0, this.style.dash?.[0] ?? 0),
 			gapM: Math.max(0, this.style.dash?.[1] ?? 0),
+			stroke: TRAIL_STROKE_MODE[kind],
+			padPx: strokePadPx(kind, this.style.width),
 		};
 	}
 

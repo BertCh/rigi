@@ -1184,6 +1184,7 @@ export class PhotoCompositor implements Effect {
 			fgTex: this.fgTex ?? empty,
 			occlTex: this.occlTex ?? empty,
 			occlOn: this.occlTex ? 1 : 0,
+			ridgeSketch: st.ridgeSketch,
 			...revealProps(this.reveal),
 		};
 	}

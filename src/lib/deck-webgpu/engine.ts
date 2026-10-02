@@ -2284,6 +2284,7 @@ export class WebGpuEngine implements Renderer {
 			width: this.style.trails.width,
 			opacity: this.style.trails.opacity,
 			dash: this.style.trails.dash,
+			stroke: this.style.trails.stroke,
 		});
 		if (this.relief.current !== g.reliefFrom) {
 			g.styles.setReliefField(this.relief.current);

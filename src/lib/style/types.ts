@@ -220,6 +220,8 @@ export type CompositeLookStyle = {
 	harmonize: number;
 	/** 'classic' = overlay.ridges; 'ink' = anti-aliased silhouettes + refined skyline (LOOK_INK) */
 	ridges: "classic" | "ink";
+	/** Optional pencil / ink wobble of the ridge, skyline and crease lines, 0..1 (luma sketchStroke shading); absent / 0 = off. */
+	sketch?: number;
 	ink: {
 		strength: number;
 		width: number;
@@ -239,6 +241,8 @@ export type TrailStyle = {
 	colors: { hiking: Hex; mountain: Hex; alpine: Hex; other: Hex };
 	/** Optional dashed trails: [dashM, gapM] metres along the path (luma pathDash). Absent / empty = solid. */
 	dash?: readonly [number, number];
+	/** Optional stroke shading: 'solid' (default) | 'pencil' (luma sketchStroke) | 'glow'. Absent = solid. */
+	stroke?: "solid" | "pencil" | "glow";
 };
 
 export type LabelHalo = {

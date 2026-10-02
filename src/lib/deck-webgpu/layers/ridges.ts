@@ -38,6 +38,7 @@
 // Or concatenate RIDGES_WGSL (no bindings) and build a RidgeParams value yourself (compute).
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { compositeValues } from "#/lib/look/composite";
+import { SKETCH_RIDGES_WGSL } from "#/lib/look/sketch-ridges";
 import type { DeckCompositeStyle } from "#/lib/style/deck-apply";
 
 /**
@@ -57,6 +58,7 @@ import type { DeckCompositeStyle } from "#/lib/style/deck-apply";
  */
 export const RIDGES_WGSL = /* wgsl */ `\
 // ---- ridges (layers/ridges.ts) ----
+${SKETCH_RIDGES_WGSL}
 struct RidgeParams {
   inner: vec4<f32>,     // overlay: inner ridge colour (rgb, linear as the style gives it)
   sky: vec4<f32>,       // overlay: skyline colour
@@ -72,7 +74,7 @@ struct RidgeParams {
   inkFade: f32,         // e-folding range of the ink opacity, m
   inkCrease: f32,       // 0 = no creases
   refine: f32,          // 1 = skyline from the refined coverage mask
-  pad0: f32,
+  sketch: f32,          // style.composite.sketch: pencil wobble (look/sketch-ridges.ts); 0 = off
 };
 
 struct RidgeSample {
@@ -94,9 +96,13 @@ fn ridge_texel(pos: vec2<f32>) -> vec2<i32> { return vec2<i32>(floor(pos)); }
 // classic overlay / replace ridges (deck/composite-shader.ts): discontinuities in log-range at a
 // ±1.25 texel cross, skyline where the texel above is sky, faded out below nearFade
 fn ridge_detect(geo: texture_2d<f32>, uv: vec2<f32>, p: RidgeParams) -> RidgeSample {
-  let pos = uv * vec2<f32>(textureDimensions(geo));
-  let range = ridge_range_at(geo, ridge_texel(pos));
-  let c = ridge_lr_of(range);
+  let pos0 = uv * vec2<f32>(textureDimensions(geo));
+  let range = ridge_range_at(geo, ridge_texel(pos0));
+  // pencil wobble: the lookup position is displaced; sketch = 0 adds 0.0 and multiplies by 1.0
+  let sk = ridge_sketch(pos0, p.sketch);
+  let pos = pos0 + sk.xy;
+  let rw = ridge_range_at(geo, ridge_texel(pos));
+  let c = ridge_lr_of(rw);
   let e = max(
     max(abs(c - ridge_lr_of(ridge_range_at(geo, ridge_texel(pos + vec2<f32>(1.25, 0.0))))),
         abs(c - ridge_lr_of(ridge_range_at(geo, ridge_texel(pos - vec2<f32>(1.25, 0.0)))))),
@@ -107,7 +113,7 @@ fn ridge_detect(geo: texture_2d<f32>, uv: vec2<f32>, p: RidgeParams) -> RidgeSam
   var s: RidgeSample;
   s.range = range;
   s.skyline = select(0.0, 1.0, range > 0.0 && above == 0.0);
-  s.ridge = smoothstep(p.thr.x, p.thr.y, e);
+  s.ridge = smoothstep(p.thr.x, p.thr.y, e) * sk.z;
   if (p.nearFade > 0.0 && range > 0.0) {
     s.ridge *= smoothstep(p.nearFade * 0.5, p.nearFade, range);
   }
@@ -222,18 +228,21 @@ fn ink_creases(geo: texture_2d<f32>, normal: texture_2d<f32>, uv: vec2<f32>) -> 
 // coverage. p.nearFade is the GLSL inkLines nearFade argument (composite.nearFade).
 fn ink_lines(geo: texture_2d<f32>, normal: texture_2d<f32>, mask: texture_2d<f32>, maskSampler: sampler,
              uv: vec2<f32>, range: f32, cov: f32, p: RidgeParams) -> vec2<f32> {
-  let sil = ink_silhouettes(geo, uv, p);
+  // pencil wobble (look/sketch-ridges.ts); sketch = 0 leaves uv and the alphas unchanged
+  let sk = ridge_sketch(uv * vec2<f32>(textureDimensions(geo)), p.sketch);
+  let uvR = uv + sk.xy / vec2<f32>(textureDimensions(geo));
+  let sil = ink_silhouettes(geo, uvR, p);
   let lineRange = select(50000.0, sil.z, sil.z > 0.0);
   let fade = sqrt(exp(-lineRange / max(p.inkFade, 1.0)));
   var near = 1.0;
   if (p.nearFade > 0.0) { near = smoothstep(p.nearFade * 0.5, p.nearFade, lineRange); }
   var sky = sil.y;
-  if (p.refine > 0.5) { sky = ink_refined_skyline(mask, maskSampler, uv, 1.5 * p.inkWidth, p); }
+  if (p.refine > 0.5) { sky = ink_refined_skyline(mask, maskSampler, uvR, 1.5 * p.inkWidth, p); }
   let inner = sil.x * (1.0 - sky);
   var crease = 0.0;
-  if (p.inkCrease > 0.0 && range > 0.0) { crease = ink_creases(geo, normal, uv) * (1.0 - inner) * (1.0 - sky) * cov; }
+  if (p.inkCrease > 0.0 && range > 0.0) { crease = ink_creases(geo, normal, uvR) * (1.0 - inner) * (1.0 - sky) * cov; }
   // inner silhouettes stay light: they annotate relief, the skyline carries the drawing
-  return vec2<f32>(max(inner * 0.5, crease * p.inkCrease * 0.4) * fade * near, sky * mix(0.55, 1.0, fade));
+  return vec2<f32>(max(inner * 0.5, crease * p.inkCrease * 0.4) * fade * near, sky * mix(0.55, 1.0, fade)) * sk.z;
 }
 
 fn ink_apply(col: vec3<f32>, ink: vec2<f32>, k0: f32, p: RidgeParams) -> vec3<f32> {
@@ -258,7 +267,8 @@ export type RidgeUniforms = {
 	inkFade: number;
 	inkCrease: number;
 	refine: number;
-	pad0: number;
+	/** style.composite.sketch (0 = off) */
+	sketch: number;
 };
 
 /**
@@ -286,7 +296,7 @@ export const ridgesModule = {
 		inkFade: "f32",
 		inkCrease: "f32",
 		refine: "f32",
-		pad0: "f32",
+		sketch: "f32",
 	},
 	bindingLayout: [{ name: "ridges", group: 0 }],
 } as const satisfies ShaderModule;
@@ -308,7 +318,7 @@ export const DEFAULT_RIDGES: RidgeUniforms = {
 	inkFade: 60000,
 	inkCrease: 0,
 	refine: 0,
-	pad0: 0,
+	sketch: 0,
 };
 
 type Look = ReturnType<typeof compositeValues>;
@@ -330,6 +340,7 @@ export function ridgeUniforms(
 		| "ridgeThr"
 		| "ridgeGainO"
 		| "ridgeGainR"
+		| "ridgeSketch"
 	>,
 	settings: { nearFade: number },
 	look?: Pick<
@@ -366,7 +377,7 @@ export function ridgeUniforms(
 		inkFade: look?.inkFade ?? 60000,
 		inkCrease: look?.inkCrease ?? 0,
 		refine: look?.refine ?? 0,
-		pad0: 0,
+		sketch: style.ridgeSketch,
 	};
 }
 

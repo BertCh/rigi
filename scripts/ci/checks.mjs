@@ -219,6 +219,14 @@ export const CHECKS = [
 		cmd: tsx("src/lib/look/__tests__/labels.check.ts"),
 		timeoutS: 300,
 	},
+	// opt-in stroke looks (LF2): ridge sketch wobble + trail pencil / glow, pure TS reference and shader text
+	{
+		id: "strokes",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/look/__tests__/strokes.check.ts"),
+		timeoutS: 300,
+	},
 	// terroir cartography (src/lib/terroir, reports/terroir-cartography.md): pure-node checks
 	{
 		id: "terroir-labels",

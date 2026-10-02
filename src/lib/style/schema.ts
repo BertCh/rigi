@@ -284,6 +284,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 		refine: bool,
 		harmonize: unit,
 		ridges: en("classic", "ink"),
+		sketch: unit,
 		ink: obj({
 			strength: unit,
 			width: num(0.25, 4),
@@ -299,6 +300,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 		opacity: unit,
 		colors: obj({ hiking: hex, mountain: hex, alpine: hex, other: hex }),
 		dash: tup(num(0.5, 5000), num(0, 5000)),
+		stroke: en("solid", "pencil", "glow"),
 	}),
 	labels: obj({
 		layout: en("classic", "panorama", "inline"),

@@ -250,6 +250,59 @@ export async function runTrailCheck(
 	const sky = at(W - 3, 3);
 	checks.sky = { ok: sky.every((v) => v === 0), rgba: sky };
 
+	// opt-in strokes (look/trail-stroke.ts): same scene, solid stays the reference. Pencil and glow
+	// must be finite, draw the line (colour reaches the red channel) and keep the coverage bounded;
+	// glow spreads wider than solid, pencil stays near the solid width.
+	const solidSum = columnAlpha(pOpen.x, pOpen.y, 20) / opacity;
+	const strokeRuns: Record<string, unknown> = {};
+	let strokesOk = true;
+	for (const stroke of ["pencil", "glow"] as const) {
+		trails.setStyle({ width: lineWidth, opacity, stroke });
+		runColorPass({
+			device,
+			cores: [wall, trails],
+			geometry,
+			color,
+			view,
+			frame: { frame: 0, time: performance.now(), view: "photo" },
+		});
+		device.submit();
+		const sp = await readRgba16f(device, color.color);
+		let bad = 0;
+		let cov = 0;
+		for (let i = 0; i < W * H; i++) {
+			const a = sp[i * 4 + 3];
+			if (!Number.isFinite(a) || !Number.isFinite(sp[i * 4]) || a > 1.001)
+				bad++;
+			if (a > 0.01) cov++;
+		}
+		let sum = 0;
+		let red = 0;
+		for (let dy = -20; dy <= 20; dy++) {
+			const yy = Math.round(pOpen.y) + dy;
+			if (yy < 0 || yy >= H) continue;
+			const i = (yy * W + Math.round(pOpen.x)) * 4;
+			sum += sp[i + 3];
+			red = Math.max(red, sp[i]);
+		}
+		const sumPx = sum / opacity;
+		const ok =
+			bad === 0 &&
+			red > 0.2 &&
+			cov < W * H * 0.75 &&
+			(stroke === "glow" ? sumPx > solidSum * 1.3 : sumPx > 0.3 * solidSum);
+		if (!ok) strokesOk = false;
+		strokeRuns[stroke] = {
+			ok,
+			bad,
+			red,
+			sumPx,
+			solidSum,
+			coveredFrac: cov / (W * H),
+		};
+	}
+	checks.strokes = { ok: strokesOk, ...strokeRuns };
+
 	const stats = { ...trails.stats };
 	trails.destroy();
 	wall.destroy();

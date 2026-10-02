@@ -20,6 +20,14 @@ import type { Buffer } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { distanceM, type EnuFrame } from "../geodesy";
+import type { TrailStrokeKind } from "../look/trail-stroke";
+import {
+	strokeKind,
+	strokePadPx,
+	TRAIL_GLOW_WHITEN,
+	TRAIL_STROKE_GLSL,
+	TRAIL_STROKE_MODE,
+} from "../look/trail-stroke";
 import type { RegionData } from "../photos";
 import { trailClass, trailPalette } from "../style/deck-apply";
 import { CLASSIC } from "../style/defaults";
@@ -127,6 +135,8 @@ layout(std140) uniform trailUniforms {
   float srgbOut;
   float dashLength;
   float gapLength;
+  float stroke;
+  float padPx;
 } trail;
 `;
 
@@ -141,6 +151,8 @@ const trailModule = {
 		srgbOut: "f32",
 		dashLength: "f32",
 		gapLength: "f32",
+		stroke: "f32",
+		padPx: "f32",
 	},
 } as const satisfies ShaderModule;
 
@@ -153,6 +165,7 @@ in vec3 instanceColor;
 in vec2 instanceDist;
 out vec3 vColor;
 out float vDist;
+out float vSide;
 out float vLogW;
 void main() {
   vec4 pc;
@@ -188,7 +201,10 @@ void main() {
   vec4 p = positions.x < 0.5 ? a : b;
   vDist = positions.x < 0.5 ? da : db;
   // width in target pixels (three: LineMaterial linewidth at resolution = the render target)
-  p.xy += nrm * positions.y * trail.width * 0.5 / half_res * p.w;
+  // padPx widens the quad for the pencil / glow strokes (0 = solid, unchanged); vSide = px across the line
+  float halfW = trail.width * 0.5 + trail.padPx;
+  vSide = positions.y * halfW;
+  p.xy += nrm * positions.y * halfW / half_res * p.w;
   gl_Position = p;
   vLogW = 1.0 + max(p.w, 1e-6);
 }
@@ -200,7 +216,9 @@ precision highp float;
 in vec3 vColor;
 in float vLogW;
 in float vDist;
+in float vSide;
 out vec4 fragColor;
+${TRAIL_STROKE_GLSL}
 // luma pathDash_getCoverage (visgl/luma.gl #3322): filtered dash coverage of the metres along the path
 float dashIntegral(float coordinate, float fraction) {
   return floor(coordinate) * fraction + min(fract(coordinate), fraction);
@@ -218,6 +236,11 @@ void main() {
   // derivatives before any divergent branch; trail.gapLength <= 0 (the default) = solid, coverage unused
   float dash = dashCoverage(vDist);
   if (trail.gapLength > 0.0 && dash < 0.004) discard;
+  // stroke style (look/trail-stroke.ts); derivatives here, in uniform control flow
+  float aa = max(fwidth(vSide), 0.0001);
+  float grainFade = 1.0 - smoothstep(0.2, 0.6, fwidth(vDist));
+  float core;
+  float cover = trailStroke(trail.stroke, vSide, vDist, trail.width, aa, grainFade, core);
   gl_FragDepth = log2(vLogW) * trail.logDepthFC;
   // linear rgb, straight alpha: the colour pass target (composite.ts); sRGB-encoded when drawn
   // straight to the canvas (the world view, like three's LineMaterial colorspace_fragment)
@@ -226,7 +249,8 @@ void main() {
     c = max(c, vec3(0.0));
     c = mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
   }
-  fragColor = vec4(c, trail.opacity * (trail.gapLength > 0.0 ? dash : 1.0));
+  c = mix(c, vec3(1.0), core * ${TRAIL_GLOW_WHITEN});
+  fragColor = vec4(c, trail.opacity * (trail.gapLength > 0.0 ? dash : 1.0) * cover);
 }
 `;
 
@@ -238,6 +262,8 @@ export type TrailLayerProps = LayerProps & {
 	lineOpacity?: number;
 	/** [dashM, gapM] metres along the trail (style.trails.dash); absent / gap ≤ 0 = solid. */
 	dash?: readonly [number, number];
+	/** style.trails.stroke: 'solid' (default) | 'pencil' | 'glow' (look/trail-stroke.ts). */
+	stroke?: TrailStrokeKind;
 	/**
 	 * Draw in the normal canvas pass (sRGB output) instead of the offscreen colour pass: the world
 	 * view, where the terrain goes straight to the canvas.
@@ -323,14 +349,18 @@ export class TrailLayer extends Layer<TrailLayerProps> {
 		if (!model || pass !== (this.props.onCanvas ? null : "color")) return;
 		// deck resets instanceCount from getNumInstances() (no `data` here): set it per draw
 		model.setInstanceCount(this.props.segments?.count ?? 0);
+		const kind = strokeKind(this.props.stroke);
+		const width = this.props.widthPx ?? 2.2;
 		model.shaderInputs.setProps({
 			trail: {
-				width: this.props.widthPx ?? 2.2,
+				width,
 				opacity: this.props.lineOpacity ?? 0.95,
 				logDepthFC: 1 / Math.log2(LOG_DEPTH_FAR + 1),
 				srgbOut: this.props.onCanvas ? 1 : 0,
 				dashLength: this.props.dash?.[0] ?? 0,
 				gapLength: Math.max(0, this.props.dash?.[1] ?? 0),
+				stroke: TRAIL_STROKE_MODE[kind],
+				padPx: strokePadPx(kind, width),
 			},
 		});
 		model.draw(this.context.renderPass);
