@@ -2,29 +2,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
-import * as THREE from "three";
-import {
-	type AlignResult,
-	type EdgeMap,
-	type Pin,
-	solvePins,
-} from "#/lib/align";
-import * as cam from "#/lib/camera";
-import { hfovFromAspect, type Pose } from "#/lib/camera";
-import { CpuGeometrySource, TerrainProfiles } from "#/lib/deck/cpu-geometry";
-import {
-	type OccPlan,
-	planOcclusion,
-	resolveOcclusion,
-	skylineFromRows,
-	texelOf,
-} from "#/lib/deck/geo-query";
-import type {
-	GeometrySource,
-	GeometrySourceFactory,
-} from "#/lib/deck/geometry-source";
-import { logRange } from "#/lib/deck/geometry-source";
 // WebGpuEngine: the Renderer surface (src/lib/renderer.ts) on WebGPU, the port of the WebGL
 // DeckEngine (deck/engine.ts). Same inputs, same queries, same look; the frame is drawn by the
 // host-agnostic WGSL cores of this directory (README.md "Layer contract") on a host:
@@ -72,6 +49,30 @@ import { logRange } from "#/lib/deck/geometry-source";
 //
 // luma 10: nothing here touches luma beyond Device / Texture / Buffer / Framebuffer; deck only
 // through hosts/deck.ts (dynamically imported).
+
+import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
+import * as THREE from "three";
+import {
+	type AlignResult,
+	type EdgeMap,
+	type Pin,
+	solvePins,
+} from "#/lib/align";
+import * as cam from "#/lib/camera";
+import { hfovFromAspect, type Pose } from "#/lib/camera";
+import { CpuGeometrySource, TerrainProfiles } from "#/lib/deck/cpu-geometry";
+import {
+	type OccPlan,
+	planOcclusion,
+	resolveOcclusion,
+	skylineFromRows,
+	texelOf,
+} from "#/lib/deck/geo-query";
+import type {
+	GeometrySource,
+	GeometrySourceFactory,
+} from "#/lib/deck/geometry-source";
+import { logRange } from "#/lib/deck/geometry-source";
 import {
 	evictImagery,
 	IMAGERY_CACHE_CAP_BYTES,
