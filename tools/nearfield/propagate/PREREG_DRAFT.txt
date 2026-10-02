@@ -136,7 +136,7 @@ are labelled "dev, from REPORT.txt" and only motivate the design.
   sensitivity (all unsure = wrong is the main result).
 
 12. Suggestion-only product contract that the result is allowed to change
-  Passing allows the product to SHOW suggestions by default (still opt-in-free but still with a
+  Passing allows the product to SHOW suggestions by default (still labelled with a
   "from neighbouring photo" provenance). It never allows auto-accept, HIGH confidence or anchoring from a
   propagated pose. Those need their own prereg. The invariants that already hold in code are listed in
   src/lib/roll/propagate/README.md with the specs that test them.
