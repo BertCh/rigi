@@ -692,6 +692,7 @@ ok(
 		"store starts at the default look",
 	);
 	s.setPreset("night");
+	s.flush(); // persistence is debounced
 	ok(
 		s.getState().preset === "night" &&
 			JSON.parse(mem.get(STYLE_STORAGE_KEY) ?? "{}").preset === "night" &&
@@ -705,6 +706,7 @@ ok(
 		"no-op set does not notify; snapshot stable",
 	);
 	s.patch({ trails: { width: 4 } });
+	s.flush();
 	ok(
 		s.getStyle().trails.width === 4 &&
 			eq(JSON.parse(mem.get(STYLE_STORAGE_KEY) ?? "{}").overrides, {
@@ -741,11 +743,13 @@ ok(
 	);
 	s.setPreset("night");
 	s.setState({ preset: DEFAULT_STYLE_STATE.preset, overrides: {} });
+	s.flush();
 	ok(
 		!mem.has(STYLE_STORAGE_KEY),
 		"the default look with no overrides removes the key",
 	);
 	s.setState({ preset: "classic", overrides: {} });
+	s.flush();
 	ok(
 		mem.has(STYLE_STORAGE_KEY),
 		"classic is stored once it is not the default",
@@ -765,6 +769,7 @@ ok(
 		"?style= wins over storage (no overrides)",
 	);
 	u.setPreset("night");
+	u.flush();
 	ok(
 		JSON.parse(mem.get(STYLE_STORAGE_KEY) ?? "{}").preset === "minimal",
 		"?style= edits are not saved",
