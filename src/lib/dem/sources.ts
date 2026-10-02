@@ -45,6 +45,14 @@ export const TERRARIUM_AWS: DemSource = {
  * at z+1, hence one zoom lower than TERRAIN_LEVELS, plus two finer near-field
  * levels. Missing fine tiles fall back to coarser levels in
  * TerrainSampler.sampleAt.
+ *
+ * Heights (checked 2026-10-02 against the Mapterhorn pipeline, pipelines/utils.py, and decoded tiles):
+ * - The WebP is lossless; heights are rounded to min(1, 2^(19 − z) / 256) m, so 1 m at z ≤ 11 and
+ *   1/16 m at z15 (at most 0.5 m off: < 0.001° at 40 km, negligible for a skyline).
+ * - Each source keeps its own vertical reference (no geoid step in the pipeline): swissALTI3D is
+ *   LN02 (levelled, within 0.4 m of LHN95 orthometric), Copernicus GLO-30 is EGM2008. Both are
+ *   "above sea level", which is what Height<"msl"> means here; steps at source seams are expected to
+ *   be metre-scale but are unmeasured. Ellipsoidal heights differ by about 50 m (tiles3d/geoid.ts).
  */
 export const MAPTERHORN_DEFAULT_URL =
 	"https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
@@ -67,15 +75,20 @@ function mapterhornTemplate(): string {
 }
 const MAPTERHORN_TEMPLATE = mapterhornTemplate();
 
+/** An XYZ tile URL from a `{z}/{x}/{y}` template (every occurrence of each placeholder). */
+export function tileUrlFromTemplate(template: string, k: TileKey): string {
+	return template
+		.replaceAll("{z}", String(k.z))
+		.replaceAll("{x}", String(k.x))
+		.replaceAll("{y}", String(k.y));
+}
+
 export const MAPTERHORN: DemSource = {
 	name: "mapterhorn",
 	url:
 		MAPTERHORN_TEMPLATE === MAPTERHORN_DEFAULT_URL
 			? (k) => `https://tiles.mapterhorn.com/${k.z}/${k.x}/${k.y}.webp`
-			: (k) =>
-					MAPTERHORN_TEMPLATE.replace("{z}", String(k.z))
-						.replace("{x}", String(k.x))
-						.replace("{y}", String(k.y)),
+			: (k) => tileUrlFromTemplate(MAPTERHORN_TEMPLATE, k),
 	tileSize: 512,
 	maxZoom: 17,
 	levels: [

@@ -9,6 +9,7 @@ import {
 	MAPTERHORN_DEFAULT_URL,
 	TERRAIN_LEVELS,
 	TERRARIUM_AWS,
+	tileUrlFromTemplate,
 } from "../sources";
 
 describe("DEM sources", () => {
@@ -23,6 +24,20 @@ describe("DEM sources", () => {
 				MAPTERHORN_DEFAULT_URL.replace("{z}", "12")
 					.replace("{x}", "2144")
 					.replace("{y}", "1435"),
+			);
+	});
+	it("fills a self-host template, every placeholder occurrence", () => {
+		const k = { z: 15, x: 17087, y: 11554 };
+		expect(tileUrlFromTemplate(MAPTERHORN_DEFAULT_URL, k)).toBe(
+			"https://tiles.mapterhorn.com/15/17087/11554.webp",
+		);
+		expect(
+			tileUrlFromTemplate("http://h:8080/rigi-dem/{z}/{x}/{y}.webp?z={z}", k),
+		).toBe("http://h:8080/rigi-dem/15/17087/11554.webp?z=15");
+		// the default fast path and the template agree
+		if (!process.env.MAPTERHORN_URL && !process.env.VITE_MAPTERHORN_URL)
+			expect(MAPTERHORN.url(k)).toBe(
+				tileUrlFromTemplate(MAPTERHORN_DEFAULT_URL, k),
 			);
 	});
 	it("is registered by name", () => {
