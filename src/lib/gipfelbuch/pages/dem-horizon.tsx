@@ -241,9 +241,9 @@ function RayMarch() {
 	return (
 		<Figure
 			label="Fig. D1"
-			bleed
 			pinned={SCENE.id}
-			caption={`Real ground, real method: the terrain under the landing photo's view, from the Niederhorn (${SCENE.eye.m.toLocaleString("en")} m) across Lake Thun, along the solved bearing (116.1°, 0.9° left of the Schreckhorn). One bearing, marched step by step (here every 1 % of distance, in the app 0.4 %). Top: ground height with Earth curvature and refraction, and the best sight line so far. Bottom: the elevation angle of each sample; the running maximum becomes the horizon. Curvature lowers this horizon from ${RAY.off.samples[RAY.off.samples.length - 1].best.toFixed(2)}° to ${RAY.on.samples[RAY.on.samples.length - 1].best.toFixed(2)}°.`}
+			bleed
+			caption="Invented terrain, real method (the real ray is Fig. 2). One bearing, marched step by step (here every 1 % of distance, in the app 0.4 %). Top: ground height with Earth curvature and refraction, and the best sight line so far. Bottom: the elevation angle of each sample; the running maximum becomes the horizon. Scrub the slider; toggle the Earth to watch the horizon jump."
 		>
 			<div ref={ref}>
 				<svg
@@ -1990,10 +1990,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					Earth drops, on the same crest 29 km out.
 				</p>
 				<Callout tone="result" title="Why curvature earns its place">
-					On the real ground of Fig. D1 the drop lowers the 29 km crest by 0.11°
-					and keeps the same crest; with farther, lower ridges behind it, the
-					drop can hand the horizon to a nearer ridge. On the real photo in Fig.
-					2 the curve moves it by about 1.5 px. The angular shift is
+					In the invented ray, the horizon sits on the 26 km ridge with the
+					Earth&rsquo;s drop and on a 50 km summit without it. On the real photo
+					in Fig. 2 the curve moves it by about 1.5 px. The angular shift is
 					d/2R&prime;, linear in distance (about 0.004° per km), so far horizons
 					and long lenses are where it bites.
 				</Callout>
