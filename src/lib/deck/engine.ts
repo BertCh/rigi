@@ -31,6 +31,12 @@ import {
 import type { Device, Texture } from "@luma.gl/core";
 import { deckFrameTimingsProps } from "#/lib/deck-webgpu/frame-timings";
 import { getFlag } from "#/lib/flags";
+import type { LiveSource } from "#/lib/live/contract";
+import {
+	LabelThrottle,
+	LIVE_REFRESH_MS,
+	startVideoLoop,
+} from "#/lib/renderer-live";
 import {
 	type AlignResult,
 	buildEdgeMap,
@@ -383,6 +389,14 @@ export class DeckEngine implements Renderer {
 	private geoGen = 0;
 	private geoBufGen = -1;
 	private geoTimer = 0;
+	// ---- live mode (setLiveSource / setLiveMode, src/lib/live/contract.ts) ----
+	private liveSource: LiveSource | null = null;
+	private liveMode = false;
+	private stopLiveLoop: (() => void) | null = null;
+	private liveLabelThrottle = new LabelThrottle();
+	private liveLabelTimer = 0;
+	private liveRefreshTimer = 0;
+	private liveRefreshing = false;
 	private silTiming: {
 		renders: number;
 		ms: number;
@@ -855,7 +869,98 @@ export class DeckEngine implements Renderer {
 
 	private emit() {
 		if (this.disposed) return;
+		if (this.liveMode) {
+			// live mode: listeners (labels) at most ~15 Hz and only for a pose that moved; a trailing
+			// emit delivers the last state
+			const now = performance.now();
+			if (!this.liveLabelThrottle.allow(now, this.pose)) {
+				if (!this.liveLabelTimer)
+					this.liveLabelTimer = window.setTimeout(
+						() => {
+							this.liveLabelTimer = 0;
+							this.liveLabelThrottle.reset();
+							this.emit();
+						},
+						Math.max(1, this.liveLabelThrottle.waitMs(now)),
+					);
+				return;
+			}
+		}
 		for (const cb of this.listeners) cb();
+	}
+
+	// ---- live video (the functional twin of the WebGPU engine's setLiveSource / setLiveMode) ----
+
+	/** Copy the live source into the shared photo texture (texSubImage2D), then redraw the composite. */
+	private pushLiveFrame() {
+		const device = (this.deck as unknown as { device?: Device }).device;
+		if (!device || this.contextLost) return;
+		if (this.photoShared.refreshLive(device)) this.compositor.touchPhoto();
+	}
+
+	setLiveSource(source: LiveSource | null) {
+		if (source && source === this.liveSource) {
+			this.pushLiveFrame();
+			return;
+		}
+		this.stopLiveLoop?.();
+		this.stopLiveLoop = null;
+		this.liveSource = source;
+		this.photoShared.setLive(source);
+		if (!source) {
+			this.compositor.touchPhoto();
+			return;
+		}
+		if (
+			typeof HTMLVideoElement !== "undefined" &&
+			source instanceof HTMLVideoElement
+		)
+			this.stopLiveLoop = startVideoLoop(source, () => {
+				if (this.liveSource === source && !this.disposed) this.pushLiveFrame();
+			});
+		this.pushLiveFrame();
+	}
+
+	setLiveMode(on: boolean) {
+		if (on === this.liveMode) return;
+		this.liveMode = on;
+		this.liveLabelThrottle.reset();
+		clearTimeout(this.liveLabelTimer);
+		clearTimeout(this.liveRefreshTimer);
+		this.liveRefreshTimer = 0;
+		if (on) {
+			clearTimeout(this.idleTimer);
+			this.idleTimer = 0;
+			this.interactive = true;
+			this.compositor.setInteractive?.(true);
+			this.scheduleLiveRefresh();
+			return;
+		}
+		this.interactive = false;
+		this.compositor.setInteractive?.(false);
+		this.fitHaze();
+		this.updateLook();
+		this.invalidateGeometry();
+	}
+
+	/** ~3 Hz geometry refresh while the pose keeps moving (the 90 ms debounce never fires then). */
+	private scheduleLiveRefresh() {
+		if (!this.liveMode || this.disposed || this.liveRefreshTimer) return;
+		this.liveRefreshTimer = window.setTimeout(() => {
+			this.liveRefreshTimer = 0;
+			if (!this.liveMode || this.disposed) return;
+			if (this.liveRefreshing || !this.terrain || this.geometryReady()) {
+				this.scheduleLiveRefresh();
+				return;
+			}
+			this.liveRefreshing = true;
+			void this.refreshGeometry()
+				.catch(() => false)
+				.finally(() => {
+					this.liveRefreshing = false;
+					this.scheduleLiveRefresh();
+				});
+		}, LIVE_REFRESH_MS);
 	}
 
 	async init(
@@ -898,17 +1003,20 @@ export class DeckEngine implements Renderer {
 					),
 				};
 		const terrainLoad = this.startStreaming(wedge, onProgress);
-		const img = new Image();
-		img.crossOrigin = "anonymous";
-		img.src = this.photo.src;
-		await img.decode();
-		if (this.disposed) return;
-		this.photoImg = img;
-		this.photoShared.setSource(img);
-		this.compositor.setPhoto(img);
-		const fgPromise = segment
-			? segment(img).catch(() => null)
-			: Promise.resolve(null);
+		// photo.src "" = a live-video placeholder: no still image, no edge map (auto-align)
+		let img: HTMLImageElement | undefined;
+		if (this.photo.src) {
+			img = new Image();
+			img.crossOrigin = "anonymous";
+			img.src = this.photo.src;
+			await img.decode();
+			if (this.disposed) return;
+			this.photoImg = img;
+			this.photoShared.setSource(img);
+			this.compositor.setPhoto(img);
+		}
+		const fgPromise =
+			segment && img ? segment(img).catch(() => null) : Promise.resolve(null);
 
 		const terrain = await terrainLoad;
 		if (!terrain || this.disposed) return;
@@ -956,8 +1064,10 @@ export class DeckEngine implements Renderer {
 		const fg = await fgPromise;
 		if (this.disposed) return;
 		if (fg) this.setForegroundMask(fg);
-		this.edge = buildEdgeMap(img, 512, fg);
-		void warmAlignGpu(); // W2: compute device + pose-grid kernel ready before autoAlign
+		if (img) {
+			this.edge = buildEdgeMap(img, 512, fg);
+			void warmAlignGpu(); // W2: compute device + pose-grid kernel ready before autoAlign
+		}
 		onProgress?.("Tracing horizon", 1);
 		const dirs = this.takeFastHorizon() ?? (await this.traceHorizon());
 		if (this.disposed) return;
@@ -1091,6 +1201,11 @@ export class DeckEngine implements Renderer {
 		this.imagery.map.clear();
 		clearTimeout(this.geoTimer);
 		clearTimeout(this.wedgeTimer);
+		this.stopLiveLoop?.();
+		this.stopLiveLoop = null;
+		this.liveSource = null;
+		clearTimeout(this.liveLabelTimer);
+		clearTimeout(this.liveRefreshTimer);
 		cancelAnimationFrame(this.worldRaf);
 		cancelAnimationFrame(this.weatherRaf);
 		cancelAnimationFrame(this.flowRaf);
@@ -1231,6 +1346,7 @@ export class DeckEngine implements Renderer {
 	 * last change inputIdle reads the geometry back, then restores the full-quality frame.
 	 */
 	private noteInput() {
+		if (this.liveMode) return; // live mode holds the interactive (no MSAA) state itself
 		const now = performance.now();
 		const burst = now - this.lastInputAt < INPUT_IDLE_MS;
 		this.lastInputAt = now;
@@ -1248,7 +1364,7 @@ export class DeckEngine implements Renderer {
 
 	private inputIdle() {
 		this.idleTimer = 0;
-		if (!this.interactive || this.disposed) return;
+		if (!this.interactive || this.disposed || this.liveMode) return;
 		this.interactive = false;
 		const restore = () => {
 			// a new interaction may have started meanwhile
@@ -1492,6 +1608,7 @@ export class DeckEngine implements Renderer {
 	 * stands (otherwise the newer state is scheduled); export waits for them (trackLook → lookIdle).
 	 */
 	private scheduleStats() {
+		if (this.liveMode) return;
 		const s = this.settings;
 		const amount =
 			s.mode === "world"
@@ -1580,6 +1697,7 @@ export class DeckEngine implements Renderer {
 
 	/** engine.ts fitHaze, from the range buffer and the pixel rays. */
 	private fitHaze() {
+		if (this.liveMode) return; // live: keep the last fit
 		const src = this.geoSrc;
 		if (!this.geometryReady() || !src?.pose) return;
 		const pose = src.pose;
@@ -1975,7 +2093,13 @@ export class DeckEngine implements Renderer {
 		clearTimeout(this.geoTimer);
 		this.geoTimer = 0;
 		// mid-interaction the readback waits for input idle (inputIdle), never a pause in the frames
-		if (!this.terrain || this.disposed || this.interactive || this.contextLost)
+		// (live mode: its own timer refreshes the buffer)
+		if (
+			!this.terrain ||
+			this.disposed ||
+			(this.interactive && !this.liveMode) ||
+			this.contextLost
+		)
 			return;
 		// the float readback (labels, hover) waits until the pose stops changing; readback() forces it
 		this.geoTimer = window.setTimeout(() => {
@@ -2061,11 +2185,17 @@ export class DeckEngine implements Renderer {
 		if (this.disposed) return false;
 		const got = this.geoSrc?.pose; // undefined after a context restore dropped the source
 		// a newer pose / mesh change arrived meanwhile: its own refresh takes over
-		if (gen !== this.geoGen || !got || !samePose(got, pose))
+		if (gen !== this.geoGen || !got || !samePose(got, pose)) {
+			// live mode: the buffer still describes `pose`; take its verdicts for the labels now
+			if (this.liveMode && got && samePose(got, pose)) {
+				this.updateVerdicts(this.snapped(pose), pose);
+				this.emit();
+			}
 			return this.geometryReady();
+		}
 		this.geoBufGen = gen;
 		this.fitHaze();
-		this.updateLook();
+		if (!this.liveMode) this.updateLook();
 		if (this.updateRelief()) this.updateLayers();
 		// the world view's drape reads this buffer (its range map)
 		if (this.world?.controls) this.updateLayers();
@@ -2163,6 +2293,26 @@ export class DeckEngine implements Renderer {
 		);
 	}
 
+	/** Occlusion verdicts of `snapped` against the geometry buffer (rendered from `pose`) into `vis`. */
+	private updateVerdicts(snapped: SnappedPeak[], pose: Pose) {
+		const eyeV = this.eyeArr;
+		for (const p of snapped) {
+			const pr = projectPoint(pose, this.aspect, eyeV, p.position);
+			if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
+			const range = Math.hypot(
+				p.position[0] - this.eye.x,
+				p.position[1] - this.eye.y,
+				p.position[2] - this.eye.z,
+			);
+			let visible = false;
+			for (const dv of OCC_DVS) {
+				const s = this.sampleAt(pr.u, pr.v + dv);
+				if (!s || s.range > occThreshold(range)) visible = true;
+			}
+			this.vis.set(p, visible);
+		}
+	}
+
 	/**
 	 * engine.ts peakLabels: occlusion from the geometry buffer only when it matches the current
 	 * pose (a couple of pixels below the summit); while it lags, a peak keeps the verdict from the
@@ -2179,23 +2329,9 @@ export class DeckEngine implements Renderer {
 		const snapped = this.snapped(this.pose);
 		const eyeV = this.eyeArr;
 		if (this.geometryReady() && !this.occlusionFresh(snapped))
-			for (const p of snapped) {
-				const pr = projectPoint(this.pose, this.aspect, eyeV, p.position);
-				if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
-				const range = Math.hypot(
-					p.position[0] - this.eye.x,
-					p.position[1] - this.eye.y,
-					p.position[2] - this.eye.z,
-				);
-				let visible = false;
-				for (const dv of OCC_DVS) {
-					const s = this.sampleAt(pr.u, pr.v + dv);
-					if (!s || s.range > occThreshold(range)) visible = true;
-				}
-				this.vis.set(p, visible);
-			}
+			this.updateVerdicts(snapped, this.pose);
 		let vis = this.vis;
-		if (this.settings.protectPeople && this.fgMask) {
+		if (this.settings.protectPeople && this.fgMask && !this.liveMode) {
 			vis = new Map(vis);
 			for (const p of snapped) {
 				if (vis.get(p) !== true) continue;

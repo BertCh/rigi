@@ -20,6 +20,7 @@ import {
 import type { Device, Texture } from "@luma.gl/core";
 import type { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import type { LiveSource } from "../live/contract";
 import type { ClearAirValues } from "../look/clear-air";
 import { CLEAR_AIR_OFF } from "../look/clear-air";
 import type { harmonizeValues } from "../look/composite";
@@ -895,6 +896,57 @@ export class SharedPhotoTexture {
 	private src: HTMLImageElement | ImageBitmap | null = null;
 	private tex?: Texture;
 	private device?: Device;
+	/** Live video source (setLiveSource): wins over `src`, one persistent texture without mips. */
+	private live: LiveSource | null = null;
+	private liveTex?: Texture;
+	private liveDevice?: Device;
+
+	/** Use a live video source (null = back to the still photo); the live texture is made on refreshLive. */
+	setLive(source: LiveSource | null) {
+		if (source === this.live) return;
+		this.live = source;
+		if (!source) {
+			this.liveTex?.destroy();
+			this.liveTex = undefined;
+		}
+	}
+
+	/**
+	 * Copy the live source into its texture (texSubImage2D through luma copyExternalImage): allocated
+	 * once at the source's size, no mips, reallocated only when the size changes. False = no frame yet.
+	 */
+	refreshLive(device: Device): boolean {
+		const source = this.live;
+		if (!source) return false;
+		const width =
+			"videoWidth" in source ? source.videoWidth : source.displayWidth;
+		const height =
+			"videoHeight" in source ? source.videoHeight : source.displayHeight;
+		if (!width || !height) return false;
+		if (
+			this.liveTex &&
+			(this.liveTex.width !== width ||
+				this.liveTex.height !== height ||
+				this.liveDevice !== device)
+		) {
+			this.liveTex.destroy();
+			this.liveTex = undefined;
+		}
+		this.liveDevice = device;
+		this.liveTex ??= device.createTexture({
+			width,
+			height,
+			mipLevels: 1,
+			sampler: {
+				minFilter: "linear",
+				magFilter: "linear",
+				addressModeU: "clamp-to-edge",
+				addressModeV: "clamp-to-edge",
+			},
+		});
+		this.liveTex.copyExternalImage({ image: source as never, width, height });
+		return true;
+	}
 
 	/** Point at a new photo (null = none); a changed source frees the texture. */
 	setSource(src: HTMLImageElement | ImageBitmap | null) {
@@ -905,6 +957,7 @@ export class SharedPhotoTexture {
 
 	/** The texture on `device`, uploaded on first use; undefined without a source. */
 	get(device: Device): Texture | undefined {
+		if (this.live) return this.liveTex;
 		if (!this.src) return undefined;
 		if (this.tex && this.device !== device) this.release();
 		if (!this.tex) {
@@ -916,6 +969,8 @@ export class SharedPhotoTexture {
 
 	/** Free the texture (the source stays: the next get() uploads again). */
 	release() {
+		this.liveTex?.destroy();
+		this.liveTex = undefined;
 		this.tex?.destroy();
 		this.tex = undefined;
 		this.device = undefined;

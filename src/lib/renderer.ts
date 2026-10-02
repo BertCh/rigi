@@ -20,6 +20,7 @@ import type { AlignResult, Pin } from "./align";
 import type { Pose } from "./camera";
 import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
+import type { LiveRendererApi } from "./live/contract";
 import type { NearFieldScene, NearFieldViewOpts } from "./nearfield/types";
 import type { ByteMask } from "./ontology/core/geometry";
 import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
@@ -33,7 +34,7 @@ export type { PeakLabel, Sample, Settings };
 /** Foreground (person) mask over the photo. */
 export type FgMask = ByteMask;
 
-export interface Renderer {
+export interface Renderer extends LiveRendererApi {
 	// ---- identity & camera (PW, export) ----
 	readonly photo: PhotoMeta;
 	readonly aspect: number;

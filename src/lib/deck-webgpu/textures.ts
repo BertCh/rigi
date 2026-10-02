@@ -54,6 +54,26 @@ export function imageTexture(
 	return tex;
 }
 
+/**
+ * The live video photo: rgba8unorm-srgb at the source's size, one mip level, no anisotropy. Allocated
+ * once and refilled each frame with copyExternalImage (no mip regeneration per frame).
+ */
+export function liveTexture(
+	device: Device,
+	width: number,
+	height: number,
+): Texture {
+	return device.createTexture({
+		id: "rigi-photo-live",
+		format: "rgba8unorm-srgb",
+		width,
+		height,
+		mipLevels: 1,
+		usage: Texture.SAMPLE | Texture.COPY_DST | Texture.RENDER,
+		sampler: { ...LINEAR_CLAMP, mipmapFilter: "nearest", maxAnisotropy: 1 },
+	});
+}
+
 /** A byte mask (0..255, row 0 = top) as r8unorm, linear-filtered (people / brush / sky masks). */
 export function maskTexture(
 	device: Device,

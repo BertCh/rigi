@@ -295,6 +295,11 @@ export class PhotoCompositor implements Effect {
 		this.bump();
 	}
 
+	/** The photo texture's content changed in place (a live video frame): draw again. */
+	touchPhoto() {
+		this.bump();
+	}
+
 	/** Use the caller's shared photo texture holder (the caller owns and releases it). */
 	sharePhotoTexture(shared: SharedPhotoTexture) {
 		if (shared === this.photoShared) return;

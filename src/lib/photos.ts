@@ -12,6 +12,7 @@ import type { Height } from "./ontology/core/quantity";
 
 export type PhotoMeta = {
 	id: string;
+	/** Image URL. "" = no still photo (a live-video placeholder: width/height/vfov describe the camera feed, the engines skip the image load). */
 	src: string;
 	width: number;
 	height: number;

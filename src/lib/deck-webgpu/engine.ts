@@ -127,6 +127,7 @@ import {
 	startFastHorizon,
 } from "#/lib/integration/horizon-fast-app";
 import { photoUnknowns, type Unknowns } from "#/lib/integration/unknown-pose";
+import type { LiveSource } from "#/lib/live/contract";
 import {
 	clearAirOn,
 	clearAirValues,
@@ -192,6 +193,14 @@ import type {
 	Sample,
 	Settings,
 } from "#/lib/renderer";
+import {
+	LabelThrottle,
+	LIVE_REFRESH_MS,
+	liveFrameScope,
+	liveSourceSize,
+	PoseLatency,
+	startVideoLoop,
+} from "#/lib/renderer-live";
 import type { RevealUniforms } from "#/lib/reveal/config";
 import { defaultSettings } from "#/lib/settings";
 import { hexToRgba01 } from "#/lib/style/color";
@@ -276,7 +285,7 @@ import { readTextureBytes } from "./readback";
 import { SilhouetteMaskGpu } from "./silhouette-gpu";
 import { ColorTargets, GeometryTargets, geometrySize } from "./targets";
 import { gpuDecodeTileLoader } from "./terrain-gpu-decode";
-import { imageTexture } from "./textures";
+import { imageTexture, liveTexture } from "./textures";
 
 type View = "photo" | "world";
 
@@ -415,6 +424,8 @@ type Gpu = {
 	tiles3d: Tiles3DCore | null;
 	photoTex: Texture | null;
 	photoTexFrom: HTMLImageElement | null;
+	/** photoTex is the live video texture (one allocation, no mips, refilled each frame). */
+	photoTexLive: boolean;
 	reliefFrom: ReliefController["current"];
 	/** look passes on the render targets (compute-bridge.ts); null = the readback path */
 	bridge: LookBridge | null;
@@ -603,6 +614,15 @@ export class WebGpuEngine implements Renderer {
 	private poseView = false;
 	private elevRange: [number, number] | null = null;
 	private photoImg?: HTMLImageElement;
+	// ---- live mode (setLiveSource / setLiveMode, src/lib/live/contract.ts) ----
+	private liveSource: LiveSource | null = null;
+	private liveMode = false;
+	private stopLiveLoop: (() => void) | null = null;
+	private liveLabelThrottle = new LabelThrottle();
+	private liveLabelTimer = 0;
+	private liveRefreshTimer = 0;
+	private liveRefreshing = false;
+	private readonly poseLatency = new PoseLatency();
 	private fgMask: FgMask | null = null;
 	private occluder: FgMask | null = null;
 	private glow: GlowMarkers | null = null;
@@ -745,7 +765,8 @@ export class WebGpuEngine implements Renderer {
 			pose: () => this.pose,
 			canRender: () =>
 				!!this.terrain && !!this.gpu && !this.lost && !this.disposed,
-			interactive: () => this.interactive,
+			// live mode keeps `interactive` for the MSAA switch only: its geometry refresh is the timer's
+			interactive: () => this.interactive && !this.liveMode,
 			beforeRender: () => this.ready,
 			onFresh: (gen) => this.onGeometryFresh(gen),
 		});
@@ -900,6 +921,7 @@ export class WebGpuEngine implements Renderer {
 				tiles3d,
 				photoTex: null,
 				photoTexFrom: null,
+				photoTexLive: false,
 				reliefFrom: null,
 				bridge: null,
 			};
@@ -992,6 +1014,7 @@ export class WebGpuEngine implements Renderer {
 		g.composite.setOccluder(this.occluder);
 		g.glow.setMarkers(this.glow);
 		this.ensurePhotoTexture();
+		if (this.liveMode) this.host?.setInteractive(true);
 		if (this.renderSet) g.terrain.setTiles(this.renderSet.tiles);
 		this.pushImagery();
 		g.trails.setSegments(this.trails);
@@ -1003,14 +1026,148 @@ export class WebGpuEngine implements Renderer {
 	/** The photo as one shared sRGB texture (composite, drape, photo sky, gizmo). */
 	private ensurePhotoTexture() {
 		const g = this.gpu;
+		if (g && this.liveSource) {
+			this.uploadLiveFrame();
+			return;
+		}
 		const img = this.photoImg;
-		if (!g || !img || g.photoTexFrom === img) return;
+		if (!g || !img || (g.photoTexFrom === img && !g.photoTexLive)) return;
 		g.photoTex?.destroy();
 		g.photoTex = imageTexture(g.device, img, { id: "rigi-photo" });
 		g.photoTexFrom = img;
-		g.composite.setPhoto(g.photoTex);
-		g.drape.setPhotoTexture(g.photoTex);
-		g.photoSky.setPhoto(g.photoTex);
+		g.photoTexLive = false;
+		this.sharePhotoTexture(g.photoTex);
+	}
+
+	private sharePhotoTexture(tex: Texture | null) {
+		const g = this.gpu;
+		if (!g) return;
+		g.composite.setPhoto(tex);
+		g.drape.setPhotoTexture(tex);
+		g.photoSky.setPhoto(tex);
+	}
+
+	/**
+	 * Copy the live source into the photo texture: allocated once at the source's size (no mips, no
+	 * anisotropy), then refilled in place, so every core keeps the same Texture. A size change
+	 * reallocates. False while the source has no frame yet.
+	 */
+	private uploadLiveFrame(): boolean {
+		const g = this.gpu;
+		const source = this.liveSource;
+		if (!g || !source || this.lost) return false;
+		const { width, height } = liveSourceSize(source);
+		if (!width || !height) return false;
+		if (
+			!g.photoTexLive ||
+			g.photoTex?.width !== width ||
+			g.photoTex.height !== height
+		) {
+			g.photoTex?.destroy();
+			g.photoTex = liveTexture(g.device, width, height);
+			g.photoTexLive = true;
+			g.photoTexFrom = null;
+			this.sharePhotoTexture(g.photoTex);
+		}
+		g.photoTex?.copyExternalImage({ image: source as never, width, height });
+		return true;
+	}
+
+	/** One new live frame: copy it, then draw only what a new photo changes (screen or colour pass). */
+	private pushLiveFrame() {
+		if (!this.uploadLiveFrame()) return;
+		const scope = liveFrameScope({
+			poseChanged: false,
+			photoChanged: true,
+			worldView: !!this.world?.controls,
+		});
+		if (scope) this.schedule(scope);
+	}
+
+	setLiveSource(source: LiveSource | null) {
+		if (source && source === this.liveSource) {
+			this.pushLiveFrame();
+			return;
+		}
+		this.stopLiveLoop?.();
+		this.stopLiveLoop = null;
+		this.liveSource = source;
+		const g = this.gpu;
+		if (!source) {
+			// back to the still photo (or none): drop the live texture, upload the photo again
+			if (g?.photoTexLive) {
+				g.photoTex?.destroy();
+				g.photoTex = null;
+				g.photoTexLive = false;
+				g.photoTexFrom = null;
+				this.sharePhotoTexture(null);
+			}
+			this.ensurePhotoTexture();
+			this.schedule("all");
+			return;
+		}
+		if (
+			typeof HTMLVideoElement !== "undefined" &&
+			source instanceof HTMLVideoElement
+		)
+			this.stopLiveLoop = startVideoLoop(source, () => {
+				if (this.liveSource === source && !this.disposed) this.pushLiveFrame();
+			});
+		this.pushLiveFrame();
+	}
+
+	setLiveMode(on: boolean) {
+		if (on === this.liveMode) return;
+		this.liveMode = on;
+		this.liveLabelThrottle.reset();
+		clearTimeout(this.liveLabelTimer);
+		clearTimeout(this.liveRefreshTimer);
+		this.liveRefreshTimer = 0;
+		if (on) {
+			// MSAA stays off for the whole session: the interactive colour pass, no idle restore
+			clearTimeout(this.idleTimer);
+			this.idleTimer = 0;
+			this.interactive = true;
+			this.host?.setInteractive(true);
+			this.scheduleLiveRefresh();
+			return;
+		}
+		this.interactive = false;
+		this.host?.setInteractive(false);
+		this.refitHaze();
+		this.updateLook();
+		this.invalidateGeometry();
+		this.schedule("all");
+	}
+
+	/**
+	 * Live mode refreshes the geometry (and with it the peak verdicts) at most ~3 Hz while the pose
+	 * keeps moving: the debounce in GeometryGenerations never fires under a continuous setPose. Labels
+	 * between refreshes are projected from the last verdicts (peakLabels).
+	 */
+	private scheduleLiveRefresh() {
+		if (!this.liveMode || this.disposed || this.liveRefreshTimer) return;
+		this.liveRefreshTimer = window.setTimeout(() => {
+			this.liveRefreshTimer = 0;
+			if (!this.liveMode || this.disposed) return;
+			if (this.liveRefreshing || !this.terrain || this.geometryReady()) {
+				this.scheduleLiveRefresh();
+				return;
+			}
+			this.liveRefreshing = true;
+			void this.gens
+				.refresh()
+				.catch(() => false)
+				.finally(() => {
+					this.liveRefreshing = false;
+					this.scheduleLiveRefresh();
+				});
+		}, LIVE_REFRESH_MS);
+	}
+
+	/** setPose to frame latency over the last frames (ms); null unless ?gpuFrameTimings=on has frames. */
+	get poseLatencyMs() {
+		return this.poseLatency.summary();
 	}
 
 	private destroyGpu(g: Gpu) {
@@ -1122,6 +1279,8 @@ export class WebGpuEngine implements Renderer {
 			if (s === "screen") this.counters.framesScreen++;
 			else this.counters.framesAll++; // "color" frames count with the offscreen ones
 			void host.nextFrame(s).then(() => {
+				if (this.liveMode && getFlag("gpuFrameTimings") === "on")
+					this.poseLatency.noteFrame(performance.now());
 				// every waiter of one rendered frame resolves in the same task: emit once for all of them
 				if (this.emitQueued) return;
 				this.emitQueued = true;
@@ -1193,6 +1352,23 @@ export class WebGpuEngine implements Renderer {
 
 	private emit() {
 		if (this.disposed) return;
+		if (this.liveMode) {
+			// live mode: labels (and every other onRender listener) at most ~15 Hz and only for a pose
+			// that moved; a trailing emit delivers the last state
+			const now = performance.now();
+			if (!this.liveLabelThrottle.allow(now, this.pose)) {
+				if (!this.liveLabelTimer)
+					this.liveLabelTimer = window.setTimeout(
+						() => {
+							this.liveLabelTimer = 0;
+							this.liveLabelThrottle.reset();
+							this.emit();
+						},
+						Math.max(1, this.liveLabelThrottle.waitMs(now)),
+					);
+				return;
+			}
+		}
 		for (const cb of this.listeners) cb();
 	}
 
@@ -1235,18 +1411,23 @@ export class WebGpuEngine implements Renderer {
 			? { headingDeg: this.prior.yaw, halfAngleDeg: 180 }
 			: this.wedgeFor(this.prior);
 		const terrainLoad = this.startStreaming(wedge, onProgress);
-		const img = new Image();
-		img.crossOrigin = "anonymous";
-		img.src = this.photo.src;
-		await Promise.all([img.decode(), this.ready]);
+		// photo.src "" = a live-video placeholder: no still image, no photo prep (edge planes, auto-align)
+		let img: HTMLImageElement | undefined;
+		if (this.photo.src) {
+			img = new Image();
+			img.crossOrigin = "anonymous";
+			img.src = this.photo.src;
+			await Promise.all([img.decode(), this.ready]);
+		} else await this.ready;
 		if (this.disposed) return;
-		// edge-map kernels compile while the terrain streams (buildEdgeMapAsync never waits for them)
-		void warmPhotoPrep();
-		this.photoImg = img;
+		if (img) {
+			// edge-map kernels compile while the terrain streams (buildEdgeMapAsync never waits for them)
+			void warmPhotoPrep();
+			this.photoImg = img;
+		}
 		this.ensurePhotoTexture();
-		const fgPromise = segment
-			? segment(img).catch(() => null)
-			: Promise.resolve(null);
+		const fgPromise =
+			segment && img ? segment(img).catch(() => null) : Promise.resolve(null);
 
 		const terrain = await terrainLoad;
 		if (!terrain || this.disposed) return;
@@ -1308,20 +1489,22 @@ export class WebGpuEngine implements Renderer {
 		if (fg) this.setForegroundMask(fg);
 		// buildEdgeMap with the post-canvas work on the GPU (bit-identical; CPU fallback inside); the
 		// planes stay on the device and the CPU map is read when autoAlign first needs it
-		const prep = await buildPhotoPrepAsync(img, 512, fg);
-		if (this.disposed) {
-			prep.retire();
-			return;
+		if (img) {
+			const prep = await buildPhotoPrepAsync(img, 512, fg);
+			if (this.disposed) {
+				prep.retire();
+				return;
+			}
+			this.photoPrep = prep;
+			// read the CPU map in idle time, so sync readers (picker) rarely compute it themselves
+			const prefetch = () => {
+				if (!this.disposed) void prep.cpu();
+			};
+			if (typeof requestIdleCallback === "function")
+				requestIdleCallback(prefetch, { timeout: 2000 });
+			else setTimeout(prefetch, 50);
+			void warmAlignGpu();
 		}
-		this.photoPrep = prep;
-		// read the CPU map in idle time, so sync readers (picker) rarely compute it themselves
-		const prefetch = () => {
-			if (!this.disposed) void prep.cpu();
-		};
-		if (typeof requestIdleCallback === "function")
-			requestIdleCallback(prefetch, { timeout: 2000 });
-		else setTimeout(prefetch, 50);
-		void warmAlignGpu();
 		onProgress?.("Tracing horizon", 1);
 		const dirs = this.takeFastHorizon() ?? (await this.traceHorizon());
 		if (this.disposed) return;
@@ -1596,6 +1779,11 @@ export class WebGpuEngine implements Renderer {
 		this.step?.cam.dispose();
 		this.step = null;
 		this.world?.dispose();
+		this.stopLiveLoop?.();
+		this.stopLiveLoop = null;
+		this.liveSource = null;
+		clearTimeout(this.liveLabelTimer);
+		clearTimeout(this.liveRefreshTimer);
 		this.gens.dispose();
 		this.dropGeometrySources();
 		this.silMask?.destroy();
@@ -1728,6 +1916,7 @@ export class WebGpuEngine implements Renderer {
 
 	setPose(p: Pose) {
 		this.pose = { ...p };
+		if (this.liveMode) this.poseLatency.notePose(performance.now());
 		this.noteInput();
 		this.sync();
 		this.invalidateGeometry();
@@ -1764,6 +1953,7 @@ export class WebGpuEngine implements Renderer {
 	 * (host.setInteractive; luma pipelines per sample count are cached, pass.ts ModelCache) and the
 	 * readback waits; inputIdle restores 4× MSAA with one full "all" frame. */
 	private noteInput() {
+		if (this.liveMode) return; // live mode holds the interactive (no MSAA) state itself
 		const now = performance.now();
 		const burst = now - this.lastInputAt < INPUT_IDLE_MS;
 		this.lastInputAt = now;
@@ -1778,7 +1968,7 @@ export class WebGpuEngine implements Renderer {
 
 	private inputIdle() {
 		this.idleTimer = 0;
-		if (!this.interactive || this.disposed) return;
+		if (!this.interactive || this.disposed || this.liveMode) return;
 		this.interactive = false;
 		// the full-quality frame follows the geometry readback (bounded), so the readback waits for
 		// no heavy frame; a new interaction meanwhile keeps the reduced mode
@@ -1927,6 +2117,17 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/** deck/engine.ts updateLook (refined masks, photo noise, the composite's look). */
+	/** The photo-derived inputs of the look: absent in live mode (the video has no still-photo masks). */
+	private get lookImg() {
+		return this.liveMode ? undefined : this.photoImg;
+	}
+	private get lookFg() {
+		return this.liveMode ? null : this.fgMask;
+	}
+	private get lookSky() {
+		return this.liveMode ? null : this.skyMaskStore;
+	}
+
 	private updateLook() {
 		const composite = this.gpu?.composite;
 		const defines = lookKey(this.style).filter((d) =>
@@ -1947,8 +2148,8 @@ export class WebGpuEngine implements Renderer {
 			!bridged ||
 			cut !== null ||
 			(this.style.composite.output === "neutral" &&
-				!!this.photoImg &&
-				!this.skyMaskStore);
+				!!this.lookImg &&
+				!this.lookSky);
 		if (defines.length && ready && !grid && wantsGrid) {
 			// no CPU copy of this render: read it (once) and come back
 			void this.needRange().then((ok) => ok && this.updateLook());
@@ -1957,9 +2158,9 @@ export class WebGpuEngine implements Renderer {
 			bridge.updateMasks({
 				style: this.style,
 				gen: this.geoBufGen,
-				img: this.photoImg,
-				fg: this.fgMask,
-				sky: this.skyMaskStore,
+				img: this.lookImg,
+				fg: this.lookFg,
+				sky: this.lookSky,
 				cut,
 				geometry: geoTex,
 				geometrySeq:
@@ -1970,19 +2171,19 @@ export class WebGpuEngine implements Renderer {
 			});
 			this.compLook.updateNoise(
 				this.style,
-				this.photoImg,
+				this.lookImg,
 				() => grid ?? NO_GRID,
 			);
 		} else if (!bridged && defines.length && grid) {
 			this.compLook.updateMasks({
 				style: this.style,
 				gen: this.geoBufGen,
-				img: this.photoImg,
-				fg: this.fgMask,
+				img: this.lookImg,
+				fg: this.lookFg,
 				cut,
 				geo: () => grid,
 			});
-			this.compLook.updateNoise(this.style, this.photoImg, () => grid);
+			this.compLook.updateNoise(this.style, this.lookImg, () => grid);
 		}
 		if (!composite) return;
 		if (!defines.length && !composite.look.defines.length) return;
@@ -2031,7 +2232,7 @@ export class WebGpuEngine implements Renderer {
 		if (
 			!bridge ||
 			this.opts.settleFusion === false ||
-			!this.photoImg ||
+			!this.lookImg ||
 			(s.mode === "replace" &&
 				(s.method === "range" || s.method === "brush")) ||
 			!lookKey(this.style).some((d) =>
@@ -2042,9 +2243,9 @@ export class WebGpuEngine implements Renderer {
 		return bridge.prepareMasks({
 			seq,
 			style: this.style,
-			img: this.photoImg,
-			fg: this.fgMask,
-			sky: this.skyMaskStore,
+			img: this.lookImg,
+			fg: this.lookFg,
+			sky: this.lookSky,
 			geometry,
 			encoder,
 		});
@@ -2055,6 +2256,7 @@ export class WebGpuEngine implements Renderer {
 	 * ≤ 256 px through the photo camera (classic photo-view shading: no drape) once the pose settles.
 	 */
 	private scheduleStats() {
+		if (this.liveMode) return;
 		const s = this.settings;
 		const amount =
 			s.mode === "world"
@@ -2140,6 +2342,7 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	private fitHaze() {
+		if (this.liveMode) return; // live: keep the last fit (per-photo fits are skipped)
 		const src = this.geoSrc;
 		if (!this.geometryReady() || !src?.pose) return;
 		const pose = src.pose;
@@ -2719,7 +2922,7 @@ export class WebGpuEngine implements Renderer {
 	private onGeometryFresh(gen: number) {
 		this.geoBufGen = gen;
 		this.fitHaze();
-		this.updateLook();
+		if (!this.liveMode) this.updateLook();
 		if (this.updateRelief()) this.sync();
 		if (this.world?.controls) this.sync();
 		this.scheduleStats();
@@ -2945,6 +3148,20 @@ export class WebGpuEngine implements Renderer {
 		return true;
 	}
 
+	/** Live mode: adopt the last query render's verdicts for the same peak list, whatever pose it had. */
+	private applyLiveVerdicts(snapped: SnappedPeak[]) {
+		const c = this.occGpu;
+		if (
+			!c ||
+			c.applied ||
+			c.snapped.length !== snapped.length ||
+			!c.snapped.every((q, i) => q === snapped[i])
+		)
+			return;
+		for (const [k, v] of c.vis) this.vis.set(k, v);
+		c.applied = true;
+	}
+
 	/** Texel (x y z w) of the render `seq` at buffer pixel (x, y), from the gather cache. */
 	private cachedTexel(seq: number, x: number, y: number) {
 		const c = this.ptCache;
@@ -3141,6 +3358,9 @@ export class WebGpuEngine implements Renderer {
 		const wsrc =
 			this.geoSrc instanceof WebGpuGeometrySource ? this.geoSrc : null;
 		const live = this.geometryReady();
+		// live mode: the newest render's verdicts, even for an older pose (labels project from the
+		// current pose; the geometry never waits for the pose to settle)
+		if (this.liveMode && !live) this.applyLiveVerdicts(snapped);
 		// the GPU verdicts (identical to the loop below, deck/geo-query.ts); without them and without a
 		// CPU copy they are recomputed from the target (kickQueries) and the labels re-emit
 		if (live && this.applyGpuVerdicts(snapped)) {
@@ -3161,7 +3381,7 @@ export class WebGpuEngine implements Renderer {
 				this.vis.set(p, visible);
 			}
 		let vis = this.vis;
-		if (this.settings.protectPeople && this.fgMask) {
+		if (this.settings.protectPeople && this.fgMask && !this.liveMode) {
 			vis = new Map(vis);
 			for (const p of snapped) {
 				if (vis.get(p) !== true) continue;
