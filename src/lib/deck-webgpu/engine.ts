@@ -405,6 +405,8 @@ type Gpu = {
 };
 
 export type WebGpuEngineOptions = {
+	/** Upper bound on the canvas' device pixel ratio (default 2). The landing's Step Inside passes 1.5. */
+	pixelRatioCap?: number;
 	/** Force a host (default: deck when deck's full build is bundled, else direct). */
 	host?: "deck" | "direct";
 	/** The terrain path (default: the ?terrain flag, deck/terrain-mode.ts). */
@@ -830,6 +832,7 @@ export class WebGpuEngine implements Renderer {
 				return await (await import("./hosts/deck")).DeckHost.create(
 					this.canvas,
 					pose,
+					this.opts.pixelRatioCap,
 				);
 			} catch (e) {
 				if (this.opts.host === "deck") throw e;
@@ -838,6 +841,7 @@ export class WebGpuEngine implements Renderer {
 		return (await import("./hosts/direct")).DirectHost.create(
 			this.canvas,
 			pose,
+			this.opts.pixelRatioCap,
 		);
 	}
 

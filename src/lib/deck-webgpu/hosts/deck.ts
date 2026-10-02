@@ -86,7 +86,11 @@ export class DeckHost implements Host {
 	private extraViewState: Record<string, unknown> = {};
 	private readonly baseViews: unknown[];
 
-	static async create(canvas: HTMLCanvasElement, pose: CameraPose) {
+	static async create(
+		canvas: HTMLCanvasElement,
+		pose: CameraPose,
+		pixelRatioCap = 2,
+	) {
 		let host: DeckHost | null = null;
 		const effect = {
 			id: "rigi-offscreen-passes",
@@ -103,7 +107,7 @@ export class DeckHost implements Host {
 		];
 		const { deck, device } = await createWebgpuDeck({
 			canvas,
-			useDevicePixels: Math.min(window.devicePixelRatio || 1, 2),
+			useDevicePixels: Math.min(window.devicePixelRatio || 1, pixelRatioCap),
 			views,
 			viewState: DeckHost.viewState(pose, canvas),
 			effects: [effect],

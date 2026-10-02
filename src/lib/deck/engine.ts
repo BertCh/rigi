@@ -184,6 +184,8 @@ const angleDiff = (a: number, b: number) =>
 	Math.abs(((a - b + 540) % 360) - 180);
 
 export type DeckEngineOptions = {
+	/** Upper bound on the canvas' device pixel ratio (default 2). The landing's Step Inside passes 1.5. */
+	pixelRatioCap?: number;
 	/**
 	 * The world drape's range map straight from the GPU geometry target (default true): a GPU copy
 	 * (GpuGeometrySource.copyRangeTo) instead of rangeMapFrom() over the read-back buffer and a
@@ -494,6 +496,7 @@ export class DeckEngine implements Renderer {
 	 */
 	private drapeTex: Texture[] = [];
 	private readonly gpuDrape: boolean;
+	private readonly pixelRatioCap: number;
 	/** DeckEngineOptions.silhouetteGpu (harnesses flip it for the A/B). */
 	silhouetteGpu: boolean;
 	private silMask: SilhouetteMaskGL | null = null;
@@ -536,6 +539,7 @@ export class DeckEngine implements Renderer {
 		opts: DeckEngineOptions = {},
 	) {
 		this.gpuDrape = opts.gpuDrape ?? true;
+		this.pixelRatioCap = opts.pixelRatioCap ?? 2;
 		this.silhouetteGpu = opts.silhouetteGpu ?? true;
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
@@ -621,7 +625,10 @@ export class DeckEngine implements Renderer {
 			// follows its client size
 			width: null,
 			height: null,
-			useDevicePixels: Math.min(window.devicePixelRatio || 1, 2),
+			useDevicePixels: Math.min(
+				window.devicePixelRatio || 1,
+				this.pixelRatioCap,
+			),
 			// Only applies when the canvas' context is created. preserveDrawingBuffer (luma's default
 			// is true) is not needed: exports render offscreen (composite.ts renderImage) or draw the
 			// world frame and read it in the same task (exportWorld), and no harness reads a deck
@@ -636,7 +643,8 @@ export class DeckEngine implements Renderer {
 				powerPreference: "high-performance",
 				webgl: {
 					preserveDrawingBuffer: false,
-					antialias: (window.devicePixelRatio || 1) < 2,
+					antialias:
+						Math.min(window.devicePixelRatio || 1, this.pixelRatioCap) < 2,
 				},
 			},
 			views: this.world?.controls

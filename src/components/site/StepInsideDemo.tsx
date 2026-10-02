@@ -38,6 +38,9 @@ type StepEngine = Renderer & {
 	readonly stepCamera: import("#/lib/nearfield/step-camera").StepCamera | null;
 };
 
+/** Landing budget, as LiveRollMap's: sway redraws per second and the device pixel ratio cap. */
+const STEP_FPS = 30;
+const STEP_PIXEL_RATIO = 1.5;
 /** Sway (photo-mode orbit about the pivot): amplitude (deg) and period (s). */
 const SWAY_YAW = 22;
 const SWAY_PITCH = 3;
@@ -150,7 +153,10 @@ export function StepInsideDemo({ className }: { className?: string }) {
 					? (await import("#/lib/deck-webgpu/engine")).WebGpuEngine
 					: (await import("#/lib/deck/engine")).DeckEngine;
 			if (!live) return;
-			engine = new Engine(canvas, photo) as unknown as StepEngine;
+			// the same budget as the live map above (LiveRollMap): at most 1.5x device pixels, 30 fps sway
+			engine = new Engine(canvas, photo, {
+				pixelRatioCap: STEP_PIXEL_RATIO,
+			}) as unknown as StepEngine;
 			engineRef.current = engine;
 			engine.resize(canvas.clientWidth, canvas.clientHeight);
 			setStage("terrain");
@@ -193,6 +199,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 			// the sway: a slow figure on the photo-mode orbit, paused while someone drives
 			let shown = { a: 0, b: 0 };
 			let t0 = performance.now();
+			let lastSway = Number.NEGATIVE_INFINITY;
 			// the sway is the only thing redrawing: stop it offscreen or in a hidden tab, restart from the
 			// camera's current pose (t0 reset, ramped in) on return
 			let onScreen = true;
@@ -214,6 +221,8 @@ export function StepInsideDemo({ className }: { className?: string }) {
 				raf = requestAnimationFrame(tick);
 				const cam = engine?.stepCamera;
 				if (!cam || cam.mode !== "photo") return;
+				if (now - lastSway < 1000 / STEP_FPS - 2) return;
+				lastSway = now;
 				if (now - lastInput < RESUME_S * 1000) {
 					// someone moved the camera: restart the sway from wherever they left it
 					shown = { a: 0, b: 0 };

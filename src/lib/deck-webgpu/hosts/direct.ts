@@ -90,8 +90,14 @@ export class DirectHost implements Host {
 	private destroyed = false;
 	private offscreenDirty = true;
 
-	static async create(canvas: HTMLCanvasElement, pose: CameraPose) {
-		const device = await createRenderDevice(canvas);
+	static async create(
+		canvas: HTMLCanvasElement,
+		pose: CameraPose,
+		pixelRatioCap = 2,
+	) {
+		const device = await createRenderDevice(canvas, {
+			useDevicePixels: Math.min(window.devicePixelRatio || 1, pixelRatioCap),
+		});
 		return new DirectHost(device, pose);
 	}
 
