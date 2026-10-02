@@ -69,10 +69,12 @@ export type UploadDraft = {
 export async function prepareUpload(
 	file: File,
 	onStage?: (s: UploadStage) => void,
+	/** Bytes and id the caller already read and hashed (roll import's duplicate check): skips a second read and hash. */
+	known?: { bytes: Uint8Array; id: string },
 ): Promise<UploadDraft> {
 	onStage?.("reading");
-	const bytes = new Uint8Array(await file.arrayBuffer());
-	const id = `${LOCAL_PREFIX}${await contentHash(bytes)}`;
+	const bytes = known?.bytes ?? new Uint8Array(await file.arrayBuffer());
+	const id = known?.id ?? `${LOCAL_PREFIX}${await contentHash(bytes)}`;
 	onStage?.("exif");
 	const exif = await readExif(bytes);
 	onStage?.("decoding");

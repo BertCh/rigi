@@ -48,6 +48,7 @@ import { hexToRgb255 } from "../mosaic/cvd";
 import { vpColor } from "../mosaic/style";
 import type { Roll, RollPhoto } from "../types";
 import { basemapLook, basemapSource, type RollBasemap } from "./basemap";
+import { mapBounded } from "./bounded";
 import { DrapeAtlas, MAX_PHOTOS } from "./drape-atlas";
 import { DrapeClear } from "./drape-clear";
 import { type DrapePhoto, MultiDrapeLayer } from "./multi-drape-layer";
@@ -64,6 +65,8 @@ import { loadRollTerrain } from "./roll-terrain";
 const RANGE_LONG = 512;
 /** Range maps rendered + read back concurrently (the readback is async: overlap the waits). */
 const RANGE_CONCURRENCY = 3;
+/** Photo decodes in flight while loading (each is a full-size bitmap until downscaled). */
+const LOAD_CONCURRENCY = 4;
 /** Frustum-plane image size (long side, px): 150 m in front of the camera needs no more. */
 const GIZMO_THUMB = 384;
 /** WorldCamera's fixed arc over the terrain on a fly-in (world-view.ts tick). */
@@ -377,32 +380,32 @@ export class RollMapEngine {
 	private loadPhotos() {
 		const status = this.opts.onStatus;
 		let done = 0;
-		const n = this.roll.photos.length;
-		return Promise.all(
-			this.roll.photos.map((p) =>
-				new Promise<HTMLImageElement | null>((resolve) => {
-					const img = new Image();
-					img.crossOrigin = "anonymous";
-					img.onload = () => resolve(img);
-					img.onerror = () => resolve(null);
-					img.src = p.meta.src;
-				}).then(async (img) => {
-					// the full-size decode is dropped as soon as the copies exist (uploads can be 12 MP)
-					const px =
-						img && !this.disposed
-							? await scaled(img, PIXELS_LONG).catch(() => null)
-							: null;
-					const thumb = px
-						? await scaled(px, GIZMO_THUMB).catch(() => null)
+		// only the photos the atlas holds (makeAtlas slices the same way); a few decodes in flight
+		const photos = this.roll.photos.slice(0, MAX_PHOTOS);
+		const n = photos.length;
+		return mapBounded(photos, LOAD_CONCURRENCY, (p) =>
+			new Promise<HTMLImageElement | null>((resolve) => {
+				const img = new Image();
+				img.crossOrigin = "anonymous";
+				img.onload = () => resolve(img);
+				img.onerror = () => resolve(null);
+				img.src = p.meta.src;
+			}).then(async (img) => {
+				// the full-size decode is dropped as soon as the copies exist (uploads can be 12 MP)
+				const px =
+					img && !this.disposed
+						? await scaled(img, PIXELS_LONG).catch(() => null)
 						: null;
-					status?.({ stage: "photos", frac: ++done / n });
-					if (!px || this.disposed) return px?.close();
-					if (thumb) this.thumbs.set(p.meta.id, thumb);
-					this.clear.setPixels(p.meta.id, px);
-					this.pixels.set(p.meta.id, px);
-					await this.uploadPhoto(p.meta.id);
-				}),
-			),
+				const thumb = px
+					? await scaled(px, GIZMO_THUMB).catch(() => null)
+					: null;
+				status?.({ stage: "photos", frac: ++done / n });
+				if (!px || this.disposed) return px?.close();
+				if (thumb) this.thumbs.set(p.meta.id, thumb);
+				this.clear.setPixels(p.meta.id, px);
+				this.pixels.set(p.meta.id, px);
+				await this.uploadPhoto(p.meta.id);
+			}),
 		);
 	}
 

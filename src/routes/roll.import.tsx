@@ -22,13 +22,14 @@ import {
 	addToIndex,
 	createPool,
 	DECODE_CONCURRENCY,
-	idForFile,
 	isNameTimeDuplicate,
 	type LatLon,
 	type Placement,
 	placeBatch,
 	placedMeta,
 	provenanceOf,
+	readFileId,
+	reuseIfSame,
 	type SaveEntry,
 	type StoredIndex,
 	saveRoll,
@@ -102,6 +103,7 @@ const isImageFile = (f: File) =>
 
 type Phase =
 	| { kind: "edit" }
+	| { kind: "error"; message: string }
 	| { kind: "saving"; roll: number; of: number; stage: string }
 	| {
 			kind: "done";
@@ -123,6 +125,8 @@ function ImportPage() {
 	const urls = useRef(new Set<string>());
 	const alive = useRef(true);
 	const saveCtl = useRef<AbortController | null>(null);
+	// bumped by reset: results of prepareItem calls from an older batch are dropped
+	const batchToken = useRef(0);
 
 	// one pool per mount; revoke every thumbnail URL and stop queued decodes on leave
 	useEffect(() => {
@@ -142,17 +146,23 @@ function ImportPage() {
 		};
 	}, []);
 
-	const update = useCallback((key: number, patch: Partial<Item>) => {
+	const updateItem = useCallback((key: number, patch: Partial<Item>) => {
 		if (!alive.current) return;
 		setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...patch } : x)));
 	}, []);
 
 	const prepareItem = useCallback(
-		async (key: number, file: File) => {
+		async (key: number, file: File, token: number) => {
+			const stale = () => token !== batchToken.current || !alive.current;
+			const update = (k: number, patch: Partial<Item>) => {
+				if (!stale()) updateItem(k, patch);
+			};
 			try {
 				update(key, { status: "hashing" });
 				const idx = (await stored.current) as StoredIndex;
-				const id = await idForFile(file);
+				const known = await readFileId(file);
+				if (stale()) return;
+				const { id } = known;
 				if (idx.ids.has(id))
 					return update(key, {
 						status: "duplicate",
@@ -166,10 +176,12 @@ function ImportPage() {
 						note: "same file twice in this import",
 					});
 				batch.current.ids.add(id);
-				const draft = await prepareUpload(file, (s) =>
-					update(key, { status: s }),
+				const draft = await prepareUpload(
+					file,
+					(s) => update(key, { status: s }),
+					known,
 				);
-				if (!alive.current) return;
+				if (stale()) return;
 				if (isNameTimeDuplicate(idx, draft.meta))
 					return update(key, {
 						status: "duplicate",
@@ -187,6 +199,7 @@ function ImportPage() {
 				urls.current.add(thumbUrl);
 				update(key, { status: "ready", id, draft, thumbUrl });
 			} catch (e) {
+				if (stale()) return;
 				console.error("[roll import]", file.name, e);
 				update(key, {
 					status: "error",
@@ -197,7 +210,7 @@ function ImportPage() {
 				});
 			}
 		},
-		[update],
+		[updateItem],
 	);
 
 	const addFiles = useCallback(
@@ -210,13 +223,18 @@ function ImportPage() {
 				status: "queued" as Status,
 			}));
 			setItems((xs) => [...xs, ...added]);
+			const token = batchToken.current;
 			for (const it of added)
-				pool.current?.push(() => prepareItem(it.key, it.file));
+				pool.current?.push(() => prepareItem(it.key, it.file, token));
 		},
 		[prepareItem],
 	);
 
 	const reset = () => {
+		// drop queued decodes and ignore the ones in flight: they belong to the old batch
+		batchToken.current++;
+		pool.current?.close();
+		pool.current = createPool(DECODE_CONCURRENCY);
 		for (const u of urls.current) URL.revokeObjectURL(u);
 		urls.current.clear();
 		batch.current = { ids: new Set(), nameTime: new Set() };
@@ -239,25 +257,32 @@ function ImportPage() {
 			),
 		[items],
 	);
+	// item status churn (hashing, decoding, saving) rebuilds `ready`; the drafts only change when a
+	// photo becomes ready or drops out, and only then do placements and clusters need recomputing
+	const draftsRef = useRef<UploadDraft[] | null>(null);
+	const drafts = useMemo(() => {
+		draftsRef.current = reuseIfSame(
+			draftsRef.current,
+			ready.map((i) => i.draft),
+		);
+		return draftsRef.current;
+	}, [ready]);
 	const placements = useMemo(
 		() =>
 			placeBatch(
-				ready.map((i) => i.draft.meta),
+				drafts.map((d) => d.meta),
 				pins,
 			),
-		[ready, pins],
+		[drafts, pins],
 	);
 	const placed = useMemo(() => {
 		const out = new Map<string, LocalPhotoMeta>();
-		for (const i of ready) {
-			const m = placedMeta(
-				i.draft,
-				placements.get(i.draft.id) ?? { kind: "none" },
-			);
-			if (m) out.set(i.draft.id, m);
+		for (const d of drafts) {
+			const m = placedMeta(d, placements.get(d.id) ?? { kind: "none" });
+			if (m) out.set(d.id, m);
 		}
 		return out;
-	}, [ready, placements]);
+	}, [drafts, placements]);
 	const clusters = useMemo(
 		() => clusterPhotos([...placed.values()]) as LocalPhotoMeta[][],
 		[placed],
@@ -287,72 +312,86 @@ function ImportPage() {
 	const saveAll = async () => {
 		const ctl = new AbortController();
 		saveCtl.current = ctl;
-		const byId = new Map(ready.map((i) => [i.draft.id, i]));
-		const warnings: string[] = [];
-		const firstIds: string[] = [];
-		for (let ci = 0; ci < clusters.length; ci++) {
-			const entries: SaveEntry[] = clusters[ci].map((m) => {
-				const it = byId.get(m.id) as Item & { draft: UploadDraft };
-				return {
-					draft: it.draft,
-					meta: m,
-					provenance: provenanceOf(placements.get(m.id) as Placement),
-				};
-			});
-			for (const e of entries) {
-				const it = byId.get(e.meta.id);
-				if (it) update(it.key, { status: "saving" });
+		try {
+			const byId = new Map(ready.map((i) => [i.draft.id, i]));
+			const warnings: string[] = [];
+			const firstIds: string[] = [];
+			for (let ci = 0; ci < clusters.length; ci++) {
+				const entries: SaveEntry[] = clusters[ci].map((m) => {
+					const it = byId.get(m.id) as Item & { draft: UploadDraft };
+					return {
+						draft: it.draft,
+						meta: m,
+						provenance: provenanceOf(placements.get(m.id) as Placement),
+					};
+				});
+				for (const e of entries) {
+					const it = byId.get(e.meta.id);
+					if (it) updateItem(it.key, { status: "saving" });
+				}
+				setPhase({
+					kind: "saving",
+					roll: ci + 1,
+					of: clusters.length,
+					stage: "map data",
+				});
+				const res = await saveRoll(entries, {
+					signal: ctl.signal,
+					onRegion: (stage) =>
+						alive.current &&
+						setPhase({
+							kind: "saving",
+							roll: ci + 1,
+							of: clusters.length,
+							stage: `map data: ${stage}`,
+						}),
+					onSaved: (id, error) => {
+						const it = byId.get(id);
+						if (it)
+							updateItem(
+								it.key,
+								error ? { status: "save-error", error } : { status: "saved" },
+							);
+					},
+				});
+				if (!alive.current) return;
+				if (res.regionError)
+					warnings.push(
+						`Roll ${ci + 1}: peaks and trails unavailable (${res.regionError}); photos saved without them.`,
+					);
+				if (res.saved.length) firstIds.push(res.saved[0]);
 			}
-			setPhase({
-				kind: "saving",
-				roll: ci + 1,
-				of: clusters.length,
-				stage: "map data",
-			});
-			const res = await saveRoll(entries, {
-				signal: ctl.signal,
-				onRegion: (stage) =>
-					alive.current &&
-					setPhase({
-						kind: "saving",
-						roll: ci + 1,
-						of: clusters.length,
-						stage: `map data: ${stage}`,
-					}),
-				onSaved: (id, error) => {
-					const it = byId.get(id);
-					if (it)
-						update(
-							it.key,
-							error ? { status: "save-error", error } : { status: "saved" },
-						);
-				},
-			});
-			if (!alive.current) return;
-			if (res.regionError)
+			// the saved photos may merge with rolls already on this device: link to the rolls they ended up in
+			const { rolls } = await listUploadRolls();
+			const links = new Map<
+				string,
+				{ id: string; name: string; count: number }
+			>();
+			for (const pid of firstIds) {
+				const r = rolls.find((x) => x.photos.some((p) => p.meta.id === pid));
+				if (r)
+					links.set(r.id, { id: r.id, name: r.name, count: r.photos.length });
+			}
+			const left = ready.length - placed.size;
+			if (left > 0)
 				warnings.push(
-					`Roll ${ci + 1}: peaks and trails unavailable (${res.regionError}); photos saved without them.`,
+					`${left} photo${left === 1 ? "" : "s"} without a position ${left === 1 ? "was" : "were"} not saved.`,
 				);
-			if (res.saved.length) firstIds.push(res.saved[0]);
+			if (alive.current)
+				setPhase({ kind: "done", links: [...links.values()], warnings });
+		} catch (e) {
+			if (ctl.signal.aborted || !alive.current) return;
+			console.error("[roll import] save", e);
+			for (const i of ready)
+				if (i.status === "saving")
+					updateItem(i.key, {
+						status: "save-error",
+						error: (e as Error).message,
+					});
+			setPhase({ kind: "error", message: (e as Error).message });
+		} finally {
+			if (saveCtl.current === ctl) saveCtl.current = null;
 		}
-		// the saved photos may merge with rolls already on this device: link to the rolls they ended up in
-		const { rolls } = await listUploadRolls();
-		const links = new Map<
-			string,
-			{ id: string; name: string; count: number }
-		>();
-		for (const pid of firstIds) {
-			const r = rolls.find((x) => x.photos.some((p) => p.meta.id === pid));
-			if (r)
-				links.set(r.id, { id: r.id, name: r.name, count: r.photos.length });
-		}
-		const left = ready.length - placed.size;
-		if (left > 0)
-			warnings.push(
-				`${left} photo${left === 1 ? "" : "s"} without a position ${left === 1 ? "was" : "were"} not saved.`,
-			);
-		if (alive.current)
-			setPhase({ kind: "done", links: [...links.values()], warnings });
 	};
 
 	const pinItem = pinFor ? ready.find((i) => i.draft.id === pinFor) : undefined;
@@ -653,6 +692,23 @@ function ImportPage() {
 							<Loader2 className="size-4 animate-spin" /> Saving roll{" "}
 							{phase.roll} of {phase.of} · {phase.stage}
 						</p>
+					)}
+					{phase.kind === "error" && (
+						<div
+							className="rounded-md bg-amber-400/10 p-4"
+							data-testid="import-error"
+						>
+							<p className="text-sm text-amber-300 light:text-[var(--rigi-lesson)]">
+								Saving failed: {phase.message}
+							</p>
+							<button
+								type="button"
+								onClick={() => setPhase({ kind: "edit" })}
+								className="mt-3 text-xs text-white/60 hover:text-white"
+							>
+								Back to edit
+							</button>
+						</div>
 					)}
 					{phase.kind === "done" && (
 						<div

@@ -39,6 +39,7 @@ export {
 } from "./interpolate";
 export { createPool } from "./pool";
 export { loadProvenance, type PositionProvenance } from "./provenance";
+export { reuseIfSame } from "./stable";
 
 /** Decodes in flight at once (HEIC decode is heavy: ~100 MB of pixels per 12 MP frame). */
 export const DECODE_CONCURRENCY = 2;
@@ -86,10 +87,16 @@ export function addToIndex(idx: StoredIndex, m: LocalPhotoMeta) {
 	for (const k of nameTimeKeys(m)) idx.nameTime.add(k);
 }
 
+/** Read a file once: its bytes and the id prepareUpload gives it (content hash), without decoding. */
+export async function readFileId(file: File) {
+	const { contentHash } = await import("#/lib/upload/decode");
+	const bytes = new Uint8Array(await file.arrayBuffer());
+	return { bytes, id: `${LOCAL_PREFIX}${await contentHash(bytes)}` };
+}
+
 /** The id prepareUpload will give this file (content hash), computed without decoding it. */
 export async function idForFile(file: File) {
-	const { contentHash } = await import("#/lib/upload/decode");
-	return `${LOCAL_PREFIX}${await contentHash(new Uint8Array(await file.arrayBuffer()))}`;
+	return (await readFileId(file)).id;
 }
 
 // ---- positions --------------------------------------------------------------------------
