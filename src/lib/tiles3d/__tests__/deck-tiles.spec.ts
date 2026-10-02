@@ -21,6 +21,7 @@ type FakeSet = {
 	updates: unknown[];
 	disposed: boolean;
 	hasGoogle: boolean;
+	options: { loadOptions?: Record<string, unknown> };
 };
 
 vi.mock("../tiles", () => ({
@@ -35,6 +36,8 @@ vi.mock("../tiles", () => ({
 		constructor(
 			public config: unknown,
 			public at: FakeSet["at"],
+			_uniforms: unknown,
+			public options: { loadOptions?: Record<string, unknown> },
 		) {
 			h.sets.push(this as unknown as FakeSet);
 		}
@@ -55,6 +58,10 @@ vi.mock("../deck-layer", () => ({
 			h.layers.push(props);
 		}
 	},
+}));
+
+vi.mock("../draco-options", () => ({
+	dracoWorkerOptions: () => ({ draco: { workerUrl: "/draco-worker.js" } }),
 }));
 
 import { DeckTiles3D } from "../deck-tiles";
@@ -110,6 +117,10 @@ describe("DeckTiles3D lifecycle", () => {
 		await flush();
 		expect(h.sets).toHaveLength(1);
 		expect(h.sets[0].at).toMatchObject({ lat: 46.7, lon: 7.7 });
+		// Draco decodes in the self-hosted loaders.gl worker
+		expect(h.sets[0].options.loadOptions).toEqual({
+			draco: { workerUrl: "/draco-worker.js" },
+		});
 		expect(onChange).toHaveBeenCalledTimes(1);
 		expect(t.tiles).not.toBeNull();
 		expect(console.info).toHaveBeenCalled();

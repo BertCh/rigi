@@ -103,8 +103,12 @@ export const tileCoreApi = {
 		),
 };
 
+/** The app's base URL, absolute when there is a page: a Draco worker resolves `modules` against its own URL. */
 function baseUrl(): string {
-	return (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
+	const base =
+		(import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
+	const page = globalThis.location?.href;
+	return page ? new URL(base, page).href : base;
 }
 
 type Layer = {
@@ -130,7 +134,7 @@ export type Tiles3DStats = {
 }[];
 
 export type Tiles3DOptions = {
-	/** Replaces the loaders (tests, offline). */
+	/** Merged over the default load options (deck-tiles.ts: the Draco worker; tests, offline). */
 	loadOptions?: Record<string, unknown>;
 	/** Test hook: builds the Tileset3D of a source instead of loading its URL. */
 	createTileset?: (source: Tiles3DSource, url: string) => Tileset3D;

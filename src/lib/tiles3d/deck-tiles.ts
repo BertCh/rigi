@@ -20,7 +20,11 @@ import type { StepView } from "./viewport";
 
 export type { StepView } from "./viewport";
 
-type Mods = [typeof import("./tiles"), typeof import("./deck-layer")];
+type Mods = [
+	typeof import("./tiles"),
+	typeof import("./deck-layer"),
+	typeof import("./draco-options"),
+];
 
 export class DeckTiles3D {
 	private set: Tiles3DSet | null = null;
@@ -41,7 +45,11 @@ export class DeckTiles3D {
 		const config = tiles3dConfig();
 		if (!config) return null;
 		const t = new DeckTiles3D(config, onChange);
-		void Promise.all([import("./tiles"), import("./deck-layer")]).then((m) => {
+		void Promise.all([
+			import("./tiles"),
+			import("./deck-layer"),
+			import("./draco-options"),
+		]).then((m) => {
 			if (t.disposed) return;
 			t.mods = m;
 			const p = t.pending;
@@ -60,7 +68,12 @@ export class DeckTiles3D {
 			return;
 		}
 		if (!this.set) {
-			this.set = new this.mods[0].Tiles3DSet(this.config, { lat, lon, eye });
+			this.set = new this.mods[0].Tiles3DSet(
+				this.config,
+				{ lat, lon, eye },
+				{},
+				{ loadOptions: this.mods[2].dracoWorkerOptions() },
+			);
 			this.set.onChange = () => {
 				if (!this.active || this.raf) return;
 				this.raf = requestAnimationFrame(() => {
