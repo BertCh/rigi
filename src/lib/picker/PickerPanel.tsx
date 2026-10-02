@@ -39,11 +39,13 @@ import {
 import { eyeOf, peakPool, skylineOf, skylineScore } from "./engine-access";
 import type { PickerMode } from "./flags";
 import {
+	clearPickerLog,
+	countPickerLog,
 	downloadPickerLog,
 	type LoggedTap,
 	logPickerEvent,
 	type PickerEvent,
-	readPickerLog,
+	subscribePickerLog,
 } from "./log";
 
 export type PickerPanelProps = {
@@ -232,6 +234,12 @@ export default function PickerPanel(props: PickerPanelProps) {
 	} | null>(null);
 	const [taps, setTaps] = useState<Tap[]>([]);
 	const [tapResults, setTapResults] = useState<TapSolved[] | null>(null);
+	const [logCount, setLogCount] = useState(countPickerLog);
+	const [confirmClear, setConfirmClear] = useState(false);
+	useEffect(() => {
+		setLogCount(countPickerLog());
+		return subscribePickerLog(() => setLogCount(countPickerLog()));
+	}, []);
 	// a new engine (eye move, renderer switch) is a new session
 	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the engine
 	const session = useMemo(
@@ -343,6 +351,19 @@ export default function PickerPanel(props: PickerPanelProps) {
 		};
 	}, [ready, eng, forEngine]);
 
+	const escapeRef = useRef<(() => void) | null>(null);
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key !== "Escape" || e.defaultPrevented || !escapeRef.current)
+				return;
+			e.preventDefault();
+			escapeRef.current();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
+
+	escapeRef.current = null; // set again below once the panel is open
 	if (!eng || eng !== forEngine || !ready) return null;
 
 	// open by default when the result is not an automatic HIGH and the user hasn't taken over
@@ -585,6 +606,25 @@ export default function PickerPanel(props: PickerPanelProps) {
 		</div>
 	);
 
+	const closePanel = () => {
+		if (preview) revert();
+		setTapMode(false);
+		setPendingTap(null);
+		setConfirmClear(false);
+		setOpen(false);
+		log({ kind: "dismiss" });
+	};
+	// Esc steps back one level: close the peak menu, leave tap mode, undo a preview, then close the panel
+	escapeRef.current = !isOpen
+		? null
+		: () => {
+				if (pendingTap) setPendingTap(null);
+				else if (tapMode) setTapMode(false);
+				else if (confirmClear) setConfirmClear(false);
+				else if (preview) revert();
+				else closePanel();
+			};
+
 	if (!isOpen)
 		return (
 			<>
@@ -618,19 +658,14 @@ export default function PickerPanel(props: PickerPanelProps) {
 					<span className="text-[10px] text-white/50">
 						{high
 							? "auto-verified; alternatives for reference"
-							: "not verified: pick one or tap a peak you know"}
+							: "not verified: your pick is your choice, not a check"}
 					</span>
 					<button
 						type="button"
-						onClick={() => {
-							if (preview) revert();
-							setTapMode(false);
-							setPendingTap(null);
-							setOpen(false);
-							log({ kind: "dismiss" });
-						}}
-						className="ml-auto rounded px-1.5 text-white/60 hover:text-white"
-						aria-label="Close picker"
+						onClick={closePanel}
+						className="ml-auto rounded px-1.5 text-white/60 hover:text-white focus-visible:outline-2 focus-visible:outline-cyan-300"
+						aria-label="Close picker (Esc)"
+						title="Close (Esc)"
 					>
 						×
 					</button>
@@ -707,7 +742,7 @@ export default function PickerPanel(props: PickerPanelProps) {
 						data-picker-confirm=""
 						disabled={!preview}
 						onClick={confirm}
-						className="rounded-md bg-cyan-400 px-2 py-1 font-semibold text-slate-950 disabled:opacity-30"
+						className="rounded-md bg-cyan-400 px-2 py-1 font-semibold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white disabled:opacity-30"
 					>
 						Use this
 					</button>
@@ -743,14 +778,35 @@ export default function PickerPanel(props: PickerPanelProps) {
 							Clear taps
 						</button>
 					)}
-					<button
-						type="button"
-						onClick={downloadPickerLog}
-						className="ml-auto rounded-md px-1.5 py-1 text-white/45 hover:text-white/80"
-						title="Download the local correction log (JSON)"
-					>
-						log ({readPickerLog().length})
-					</button>
+				</div>
+				<div className="flex flex-wrap items-center gap-1.5 text-[10px] text-white/50">
+					<span>Picks are saved as your manual choice, never as verified.</span>
+					<span className="ml-auto flex items-center gap-1">
+						<button
+							type="button"
+							data-picker-export=""
+							onClick={downloadPickerLog}
+							disabled={logCount === 0}
+							className="rounded px-1.5 py-0.5 hover:bg-white/10 hover:text-white/80 disabled:opacity-40"
+							title="Download the local correction log (JSON). Stays on this device until you export it."
+						>
+							Export log ({logCount})
+						</button>
+						<button
+							type="button"
+							data-picker-clear=""
+							onClick={() => {
+								if (!confirmClear) return setConfirmClear(true);
+								clearPickerLog();
+								setConfirmClear(false);
+							}}
+							disabled={logCount === 0}
+							className={`rounded px-1.5 py-0.5 hover:bg-white/10 disabled:opacity-40 ${confirmClear ? "bg-amber-400 text-slate-950 hover:bg-amber-300" : "hover:text-white/80"}`}
+							title="Delete the local correction log"
+						>
+							{confirmClear ? "Really clear?" : "Clear log"}
+						</button>
+					</span>
 				</div>
 			</div>
 		</>

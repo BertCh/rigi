@@ -44,8 +44,10 @@ wrong skyline once they can compare.
 
 ## Correction log (`log.ts`)
 
-Every event is appended to `localStorage["rigi.picker.log.v1"]` (ring of 2000, in memory if storage fails);
-the panel's "log (n)" button downloads it as `rigi-picker-log-<date>.json`. Events: `shown` (the 3 candidates
+Every event is appended to `localStorage["rigi.picker.log.v1"]` (a bare array, ring of 2000, in memory if storage
+throws or is corrupt); the panel's "Export log (n)" button downloads it as `rigi-picker-log-<date>.json`
+(`{schema: "rigi.picker.log.v1", version, exportedAt, app, count, events}`), "Clear log" empties it.
+The event types, the version rules and the tolerant parser (corrupt or other-version entries are dropped) are in `schema.ts`. Events: `shown` (the 3 candidates
 with source, source rank, score, pose, separation from the shown pose, and which one was shown), `preview`,
 `pick` (rank, source, before / after pose, taps), `revert`, `tap` (u, v, peaks offered with angular distance,
 which was chosen), `tap-solve` (taps, start pose, re-ranked results with residual and skyline score),
@@ -60,7 +62,9 @@ to be blind-verified before it enters any benchmark.
 | `flags.ts` | `?picker=` via `src/lib/flags` (`flagFrom`) |
 | `candidates.ts` | pure maths: `poseSepDeg`, `topDistinct`, `nearbyPeaks`, `rerankWithTaps`, `isAutoHigh` |
 | `engine-access.ts` | read-only access to both engines' `horizonDirs`, `edge` and peaks (`snapped(pose)`), without widening `Renderer`; missing fields turn features off |
-| `log.ts` | the correction log |
+| `schema.ts` | log event types, version, `parsePickerLog` (pure) |
+| `log.ts` | the correction log: storage ring, export, clear |
+| `summary.ts` | `summarizeLog` / `formatSummary`: the owner-trial counts (pure) |
 | `PickerPanel.tsx` | UI (lazy chunk) |
 | `PickerMount.tsx` | the one PhotoWorkspace call site; null without the flag |
 | `candidates.check.ts` | `npx tsx src/lib/picker/candidates.check.ts` |
@@ -68,6 +72,24 @@ to be blind-verified before it enters any benchmark.
 Browser check: `node scripts/gpu/with-render-lock.mjs -- node scripts/picker-check.mjs IMG_6958 out/picker/6958 [deck|webgpu]` (default `deck`)
 (previews a wrong candidate, taps a visible labelled peak where it is under the shown pose, picks its name,
 checks the re-solve returns to the shown pose, confirms, prints the log).
+
+## Owner trial
+
+1. Open a photo with the flag on: `/photo/<id>?picker=on` (`?picker=always` also expands it on HIGH results).
+   Default is off and stays off; without the flag nothing loads.
+2. On a photo whose result is not an auto-verified HIGH the panel opens. Click a thumbnail to preview a
+   candidate, **Use this** to keep it (**Back** or Esc undoes a preview), or **Tap a peak**, tap a summit you
+   know and choose its name; the pose is re-solved and previewed. Esc steps back one level (peak menu, tap
+   mode, preview, then closes the panel). Keeping the shown pose also counts, so do that when it was right.
+3. A confirmed pick is saved as your manual choice. It is not verified and never becomes an automatic HIGH.
+4. **Export log (n)** downloads `rigi-picker-log-<date>.json`; **Clear log** (two clicks) empties it.
+   Nothing leaves the browser.
+5. Summarise: `npx tsx scripts/picker/summarize-log.ts rigi-picker-log-<date>.json [--json]` prints sessions,
+   photos, how often the shown pose was kept vs a different rank vs tap-a-peak vs dismissed, the pick-rank
+   histogram and the tap-solve outcomes.
+
+Picks are your choice between suggestions, not ground truth: they have to be blind-verified before they
+count as anything in a benchmark, and the summary says how the picker was used, not how often it was right.
 
 ## Limits / next
 
