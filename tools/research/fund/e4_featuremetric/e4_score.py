@@ -41,7 +41,7 @@ def main():
         "medianRefinedPitch": med([abs(r["errRefined"]["pitch"]) for r in prim]),
         "nRefinedBetter": sum(r["errRefined"]["rot"] < r["errStart"]["rot"] for r in prim),
     }
-    res["secondary"] = {}
+    res["secondary"] = {"perRun": [{"id": r["id"], "scaleDeg": r["scaleDeg"], "startErr": r["errStart"]["rot"], "refinedErr": r["errRefined"]["rot"], "sigmaPred": r["sigmaPred"], "fErrRefined": r["errRefined"]["f"]} for r in sec]}
     for s in (1.0, 3.0, 10.0):
         g = [r for r in sec if r["scaleDeg"] == s]
         res["secondary"][f"{int(s)}deg"] = {

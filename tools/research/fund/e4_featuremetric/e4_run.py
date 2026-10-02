@@ -58,8 +58,11 @@ def run_case(case: dict, fx: FE.Features, grids, ortho, photo: np.ndarray, eye_z
     hy = min(math.atan(HB / 2 / fB) + math.radians(MARGIN_DEG), math.radians(75))
     Wr, Hr = int(round(2 * fB * math.tan(hx))), int(round(2 * fB * math.tan(hy)))
     r = R.render(grids, ortho, eye_z, start, fB, Wr, Hr)
-    np.savez_compressed(OUT / "renders" / f"{case['id']}.npz", rgb=r["rgb"], xyz=r["xyz"], status=r["status"],
-                        colour_ok=r["colour_ok"])
+    if case["kind"] == "primary":  # disk budget: full rgb/xyz/status only for the primary set
+        np.savez_compressed(OUT / "renders" / f"{case['id']}.npz", rgb=r["rgb"], xyz=r["xyz"], status=r["status"],
+                            colour_ok=r["colour_ok"])
+    else:
+        Image.fromarray(r["rgb"]).save(OUT / "renders" / f"{case['id']}.jpg", quality=80)
     Rs = G.pose_to_R(start)
     bad = ((r["status"] == 2) | ~r["colour_ok"]).astype(np.float32)
     levels = []

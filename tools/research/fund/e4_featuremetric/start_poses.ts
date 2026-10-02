@@ -13,6 +13,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+	heicToJpeg,
+	listPhotos,
+	loadRGBA,
+	ROOT,
+} from "../../../../scripts/lib/node-io";
+import { photoContext } from "../../../../scripts/lib/pipeline-node";
+import {
 	type Camera,
 	cameraFromAngles,
 	resizeCamera,
@@ -24,13 +31,6 @@ import {
 	solvePose,
 } from "../../../../src/lib/geo/solve";
 import { refinePose } from "../../../../src/lib/refine/index";
-import {
-	heicToJpeg,
-	listPhotos,
-	loadRGBA,
-	ROOT,
-} from "../../../../scripts/lib/node-io";
-import { photoContext } from "../../../../scripts/lib/pipeline-node";
 
 const HERE = path.join(ROOT, "tools/research/fund/e4_featuremetric");
 const GT = JSON.parse(
@@ -95,7 +95,11 @@ async function main() {
 		});
 		const img2 = await loadRGBA(jpg, VAL_W);
 		const sky2 = await detectSkyline(img2);
-		const gtRows = projectSkylineRows(resizeCamera(gt, VAL_W), ctx.horizon, VAL_W);
+		const gtRows = projectSkylineRows(
+			resizeCamera(gt, VAL_W),
+			ctx.horizon,
+			VAL_W,
+		);
 		out[name] = {
 			lat: g.lat,
 			lon: g.lon,
@@ -115,14 +119,28 @@ async function main() {
 			},
 			skyline: {
 				width: VAL_W,
-				gtRows: Array.from(gtRows, (v) => (Number.isFinite(v) ? +v.toFixed(1) : null)),
-				photoRows: Array.from(sky2.rows, (v, i) => (sky2.weight[i] > 0.05 ? +v.toFixed(1) : null)),
+				gtRows: Array.from(gtRows, (v) =>
+					Number.isFinite(v) ? +v.toFixed(1) : null,
+				),
+				photoRows: Array.from(sky2.rows, (v, i) =>
+					sky2.weight[i] > 0.05 ? +v.toFixed(1) : null,
+				),
 			},
 		};
-		console.log(name, res.accepted ? "accepted" : `rejected(${res.rejectReason})`, "start yaw", (res.accepted ? res.camera : ctx.prior).yaw.toFixed(2), "gt", g.yaw);
+		console.log(
+			name,
+			res.accepted ? "accepted" : `rejected(${res.rejectReason})`,
+			"start yaw",
+			(res.accepted ? res.camera : ctx.prior).yaw.toFixed(2),
+			"gt",
+			g.yaw,
+		);
 	}
 	fs.mkdirSync(path.join(HERE, "out"), { recursive: true });
-	fs.writeFileSync(path.join(HERE, "out/start_poses.json"), JSON.stringify(out));
+	fs.writeFileSync(
+		path.join(HERE, "out/start_poses.json"),
+		JSON.stringify(out),
+	);
 }
 
 main().catch((e) => {

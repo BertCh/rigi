@@ -64,7 +64,7 @@ def secondary_cases() -> list[dict]:
         cr = refs.correct_refs(pid)
         if not cr or not is_swiss(man[pid]["lat"], man[pid]["lon"]):
             continue
-        e3 = json.load(open(HERE.parent / f"e3_nearfield/out/{pid}.json"))
+        e3 = json.load(open(MAIN / f"tools/research/fund/e3_nearfield/out/{pid}.json"))  # gitignored; main tree
         ref = next((r for r in cr if r["label"] == e3["ref"]), cr[0])
         photo = MAIN / "tools/bench/data" / man[pid]["file"]
         im = upright(photo)

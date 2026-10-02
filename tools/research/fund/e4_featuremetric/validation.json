@@ -1,0 +1,446 @@
+{
+ "IMG_6958": {
+  "reprojMedianPx": 0.00024177656215300464,
+  "reprojMaxPx": 0.004203102932416783,
+  "nCols": 588,
+  "skylineVsApp": {
+   "medianPx": 0.4000000000000057,
+   "p90Px": 1.2999999999999972
+  },
+  "skylineVsPhoto": {
+   "nCols": 563,
+   "medianPx": 5.0
+  },
+  "status": {
+   "0": 220811,
+   "1": 38497,
+   "2": 0
+  },
+  "eyeClamped": true,
+  "eyeUsed": 559.347314453125,
+  "colourMissing": 0.0,
+  "renderSec": 4.5,
+  "totalSec": 13.1,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_6971": {
+  "reprojMedianPx": 0.0006580943991287186,
+  "reprojMaxPx": 0.006435084204164631,
+  "nCols": 564,
+  "skylineVsApp": {
+   "medianPx": 0.30000000000001137,
+   "p90Px": 0.8000000000000114
+  },
+  "skylineVsPhoto": {
+   "nCols": 492,
+   "medianPx": 2.5
+  },
+  "status": {
+   "0": 175959,
+   "1": 80669,
+   "2": 2680
+  },
+  "eyeClamped": false,
+  "eyeUsed": 558.6,
+  "colourMissing": 0.0,
+  "renderSec": 5.1,
+  "totalSec": 15.1,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7018": {
+  "reprojMedianPx": 8.651418203817126e-05,
+  "reprojMaxPx": 0.002281795776915987,
+  "nCols": 588,
+  "skylineVsApp": {
+   "medianPx": 0.30000000000001137,
+   "p90Px": 0.6299999999999994
+  },
+  "skylineVsPhoto": {
+   "nCols": 420,
+   "medianPx": 1.75
+  },
+  "status": {
+   "0": 176404,
+   "1": 81958,
+   "2": 946
+  },
+  "eyeClamped": false,
+  "eyeUsed": 778.8,
+  "colourMissing": 0.0,
+  "renderSec": 4.4,
+  "totalSec": 18.6,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7033": {
+  "reprojMedianPx": 1.547585267487115e-05,
+  "reprojMaxPx": 0.0015972310168979975,
+  "nCols": 552,
+  "skylineVsApp": {
+   "medianPx": 0.29999999999999716,
+   "p90Px": 0.7000000000000028
+  },
+  "skylineVsPhoto": {
+   "nCols": 378,
+   "medianPx": 1.2000000000000028
+  },
+  "status": {
+   "0": 207959,
+   "1": 47412,
+   "2": 3937
+  },
+  "eyeClamped": false,
+  "eyeUsed": 694.2,
+  "colourMissing": 0.0,
+  "renderSec": 8.1,
+  "totalSec": 20.2,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7053": {
+  "reprojMedianPx": 5.514650338628709e-06,
+  "reprojMaxPx": 0.0002003635937593016,
+  "nCols": 321,
+  "skylineVsApp": {
+   "medianPx": 0.30000000000001137,
+   "p90Px": 0.5999999999999943
+  },
+  "skylineVsPhoto": {
+   "nCols": 258,
+   "medianPx": 0.9000000000000057
+  },
+  "status": {
+   "0": 121809,
+   "1": 120794,
+   "2": 16705
+  },
+  "eyeClamped": true,
+  "eyeUsed": 1936.1780029296874,
+  "colourMissing": 0.0,
+  "renderSec": 7.7,
+  "totalSec": 25.5,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7059": {
+  "reprojMedianPx": 0.0006008863298517072,
+  "reprojMaxPx": 0.007570198425224616,
+  "nCols": 402,
+  "skylineVsApp": {
+   "medianPx": 1.0999999999999943,
+   "p90Px": 19.80000000000001
+  },
+  "skylineVsPhoto": {
+   "nCols": 389,
+   "medianPx": 3.9000000000000057
+  },
+  "status": {
+   "0": 142398,
+   "1": 108792,
+   "2": 8118
+  },
+  "eyeClamped": true,
+  "eyeUsed": 1946.2693115234374,
+  "colourMissing": 0.0,
+  "renderSec": 4.2,
+  "totalSec": 12.6,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7063": {
+  "reprojMedianPx": 1.7068717328802335e-05,
+  "reprojMaxPx": 0.005849681480784862,
+  "nCols": 504,
+  "skylineVsApp": {
+   "medianPx": 1.0,
+   "p90Px": 49.66999999999999
+  },
+  "skylineVsPhoto": {
+   "nCols": 493,
+   "medianPx": 4.300000000000011
+  },
+  "status": {
+   "0": 134503,
+   "1": 113527,
+   "2": 11278
+  },
+  "eyeClamped": true,
+  "eyeUsed": 1945.0378662109374,
+  "colourMissing": 0.0,
+  "renderSec": 2.9,
+  "totalSec": 8.8,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7068": {
+  "reprojMedianPx": 6.01156900473157e-05,
+  "reprojMaxPx": 0.00916907164492979,
+  "nCols": 467,
+  "skylineVsApp": {
+   "medianPx": 0.39999999999997726,
+   "p90Px": 1.1400000000000126
+  },
+  "skylineVsPhoto": {
+   "nCols": 466,
+   "medianPx": 2.5
+  },
+  "status": {
+   "0": 286811,
+   "1": 155316,
+   "2": 18865
+  },
+  "eyeClamped": true,
+  "eyeUsed": 1948.91787109375,
+  "colourMissing": 0.0,
+  "renderSec": 4.9,
+  "totalSec": 10.4,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7086": {
+  "reprojMedianPx": 1.0573817472784352e-05,
+  "reprojMaxPx": 0.0052485645435541295,
+  "nCols": 588,
+  "skylineVsApp": {
+   "medianPx": 0.30000000000001137,
+   "p90Px": 0.6999999999999886
+  },
+  "skylineVsPhoto": {
+   "nCols": 486,
+   "medianPx": 0.9500000000000028
+  },
+  "status": {
+   "0": 182382,
+   "1": 76102,
+   "2": 824
+  },
+  "eyeClamped": true,
+  "eyeUsed": 1944.9380126953124,
+  "colourMissing": 0.0,
+  "renderSec": 4.4,
+  "totalSec": 10.5,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7130": {
+  "reprojMedianPx": 0.00015372824503071284,
+  "reprojMaxPx": 0.0012683887329402847,
+  "nCols": 588,
+  "skylineVsApp": {
+   "medianPx": 0.30000000000001137,
+   "p90Px": 0.6999999999999886
+  },
+  "skylineVsPhoto": {
+   "nCols": 323,
+   "medianPx": 6.5
+  },
+  "status": {
+   "0": 176406,
+   "1": 82902,
+   "2": 0
+  },
+  "eyeClamped": false,
+  "eyeUsed": 1295.1,
+  "colourMissing": 0.0,
+  "renderSec": 4.1,
+  "totalSec": 10.5,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7131": {
+  "reprojMedianPx": 4.700483811477302e-05,
+  "reprojMaxPx": 0.0007505305637197537,
+  "nCols": 543,
+  "skylineVsApp": {
+   "medianPx": 0.30000000000001137,
+   "p90Px": 0.5999999999999943
+  },
+  "skylineVsPhoto": {
+   "nCols": 543,
+   "medianPx": 2.0999999999999943
+  },
+  "status": {
+   "0": 153889,
+   "1": 94124,
+   "2": 11295
+  },
+  "eyeClamped": false,
+  "eyeUsed": 1361.3,
+  "colourMissing": 0.0,
+  "renderSec": 5.4,
+  "totalSec": 13.0,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ },
+ "IMG_7155": {
+  "reprojMedianPx": 1.3447767608037023e-05,
+  "reprojMaxPx": 0.0017090255644150846,
+  "nCols": 450,
+  "skylineVsApp": {
+   "medianPx": 0.29999999999999716,
+   "p90Px": 0.7999999999999972
+  },
+  "skylineVsPhoto": {
+   "nCols": 450,
+   "medianPx": 1.4000000000000057
+  },
+  "status": {
+   "0": 176647,
+   "1": 77257,
+   "2": 5404
+  },
+  "eyeClamped": true,
+  "eyeUsed": 1935.39833984375,
+  "colourMissing": 0.0,
+  "renderSec": 5.2,
+  "totalSec": 11.6,
+  "grids": [
+   [
+    13,
+    0.0
+   ],
+   [
+    12,
+    0.0
+   ],
+   [
+    11,
+    0.0
+   ]
+  ]
+ }
+}
