@@ -118,6 +118,7 @@ export const CLASSIC: ViewStyle = {
 		clearAir: { mode: "fitted", amount: 0.85, floor: 0.3 },
 		water: "flat",
 		weather: { mode: "off" },
+		wind: { on: false, direction: 180, speed: 12, density: 0.5 },
 	},
 	composite: {
 		refine: false,

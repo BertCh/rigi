@@ -227,6 +227,14 @@ export const CHECKS = [
 		cmd: tsx("src/lib/look/__tests__/strokes.check.ts"),
 		timeoutS: 300,
 	},
+	{
+		id: "flow",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/look/flow/__tests__/flow.check.ts"),
+		note: "wind-drift field math (terrain-deflected wind), advection twin, WGSL layout (LF4; browser not run)",
+		timeoutS: 120,
+	},
 	// terroir cartography (src/lib/terroir, reports/terroir-cartography.md): pure-node checks
 	{
 		id: "terroir-labels",

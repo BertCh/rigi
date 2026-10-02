@@ -279,6 +279,12 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 				},
 			},
 		},
+		wind: obj({
+			on: bool,
+			direction: num(0, 360),
+			speed: num(0, 60),
+			density: unit,
+		}),
 	}),
 	composite: obj({
 		refine: bool,

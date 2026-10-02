@@ -210,6 +210,13 @@ export type WorldStyle = {
 	 * never the photo overlay, still under webdriver.
 	 */
 	water: "flat" | "waves";
+	/**
+	 * Wind drift (look/flow; WebGPU world view only, default off): GPU particles streaming over the DEM
+	 * in a uniform wind deflected by the terrain gradient (flow goes around and over ridges). `direction`
+	 * is the compass bearing the wind blows FROM in degrees (a south föhn is 180), `speed` m/s, `density`
+	 * the fraction of the particle budget drawn.
+	 */
+	wind: { on: boolean; direction: number; speed: number; density: number };
 };
 
 /** Photo ⊕ render compositing (overlay and replace). CLASSIC sets no LOOK_* define. */

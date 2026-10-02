@@ -140,6 +140,12 @@ import {
 	STATS_LONG_SIDE,
 	trustedRange,
 } from "#/lib/look/composite";
+import {
+	buildFlowGrid,
+	FLOW_EXTENT_M,
+	FLOW_GRID_DIM,
+	flowWindFor,
+} from "#/lib/look/flow/field";
 import { COMPOSITE_DEFINES } from "#/lib/look/glsl/composite";
 import {
 	type BridgedHazeFit,
@@ -228,6 +234,7 @@ import {
 } from "./layers/batched-terrain";
 import { type CompositeCore, createCompositeCore } from "./layers/composite";
 import { createDrape, type DrapePart } from "./layers/drape";
+import { createFlowCore, type FlowCore } from "./layers/flow";
 import {
 	type FusedWork,
 	GeometryGenerations,
@@ -389,6 +396,8 @@ type Gpu = {
 	styles: TerrainStyles;
 	drape: DrapePart;
 	trails: TrailCore;
+	/** wind-drift particles (style.world.wind, world view) */
+	flow: FlowCore;
 	composite: CompositeCore;
 	/** world view present (colour target → canvas) */
 	present: PresentCore;
@@ -516,6 +525,16 @@ export class WebGpuEngine implements Renderer {
 	private relief = new ReliefController();
 	/** Terroir land cover (setTerroirCover) and the terroir shading of it + the style. */
 	private terroirGrid: CoverGrid | null = null;
+	/** Wind drift (style.world.wind): the DEM heights on the flow grid, the tile set they were read from. */
+	private flowHeights: Float32Array | null = null;
+	private flowHeightsSet: TerrainSet | null = null;
+	private flowGridMemo: {
+		core: FlowCore;
+		heights: Float32Array;
+		direction: number;
+		speed: number;
+	} | null = null;
+	private flowRaf = 0;
 	private terroirMemo: {
 		style: ViewStyle;
 		grid: CoverGrid | null;
@@ -877,6 +896,7 @@ export class WebGpuEngine implements Renderer {
 			const styles = made(createTerrainStyles(device));
 			const drape = made(createDrape(device));
 			const trails = made(createTrailCore(device));
+			const flow = made(createFlowCore(device));
 			const composite = made(
 				createCompositeCore({
 					aspect: this.aspect,
@@ -908,6 +928,7 @@ export class WebGpuEngine implements Renderer {
 				styles,
 				drape,
 				trails,
+				flow,
 				composite,
 				present,
 				debug,
@@ -929,6 +950,7 @@ export class WebGpuEngine implements Renderer {
 			host.cores = [
 				new ViewGate(terrain, view),
 				new ViewGate(trails, view),
+				new ViewGate(flow, view, inWorld),
 				...(tiles3d ? [new ViewGate(tiles3d, view, inWorld)] : []),
 				new ViewGate(gizmo, view, inWorld),
 				new ViewGate(atmSky, view, inWorld),
@@ -1609,6 +1631,7 @@ export class WebGpuEngine implements Renderer {
 		clearTimeout(this.warmTimer);
 		clearTimeout(this.wedgeTimer);
 		cancelAnimationFrame(this.worldRaf);
+		cancelAnimationFrame(this.flowRaf);
 		this.loadAbort.abort();
 		this.fastHorizon?.dispose();
 		this.streamer?.dispose();
@@ -2275,6 +2298,7 @@ export class WebGpuEngine implements Renderer {
 			// no drape in this look: the imagery layers go after a grace (imagery.ts releaseWhenIdle)
 			else if (!look.imagery) g.imagery.releaseWhenIdle();
 			g.trails.setEnabled(look.trails && !!this.trails?.count);
+			this.syncFlowTick(false);
 			g.gizmo.setProps({ view: "photo" });
 			g.photoSky.setEnabled(false);
 			g.splats.setEnabled(false);
@@ -2301,6 +2325,101 @@ export class WebGpuEngine implements Renderer {
 	private photoForward(): Vec3 {
 		const d = unprojectDir(this.pose, this.aspect, 0.5, 0.5);
 		return [d.x, d.y, d.z];
+	}
+
+	/**
+	 * Wind drift (style.world.wind, default off: the core is empty and nothing ticks). The flow grid is
+	 * the style's wind deflected by the DEM gradient, from heights read once per settled tile set.
+	 */
+	private syncFlow(g: Gpu) {
+		const wind = flowWindFor(this.style.world.wind);
+		g.flow.setWind(wind);
+		if (!wind || !this.terrain) {
+			this.syncFlowTick(false);
+			return;
+		}
+		const set = this.renderSet;
+		// streaming sets arrive in bursts: read the heights again only once the set has settled
+		if (
+			set &&
+			set !== this.flowHeightsSet &&
+			(!this.flowHeights || (set.stats?.pending ?? 0) === 0)
+		) {
+			this.flowHeightsSet = set;
+			this.flowHeights = this.sampleFlowHeights(this.terrain);
+		}
+		const heights = this.flowHeights;
+		if (!heights) {
+			this.syncFlowTick(false);
+			return;
+		}
+		const m = this.flowGridMemo;
+		if (
+			!m ||
+			m.core !== g.flow ||
+			m.heights !== heights ||
+			m.direction !== wind.direction ||
+			m.speed !== wind.speed
+		) {
+			this.flowGridMemo = {
+				core: g.flow,
+				heights,
+				direction: wind.direction,
+				speed: wind.speed,
+			};
+			g.flow.setGrid(
+				buildFlowGrid(heights, FLOW_GRID_DIM, FLOW_EXTENT_M, wind),
+			);
+		}
+		this.syncFlowTick(true);
+	}
+
+	/** The DEM surface (ENU up) on the flow grid, NaN where the tiles have no height. */
+	private sampleFlowHeights(terrain: TerrainSet): Float32Array {
+		const dim = FLOW_GRID_DIM;
+		const out = new Float32Array(dim * dim);
+		const cell = (2 * FLOW_EXTENT_M) / (dim - 1);
+		for (let iy = 0; iy < dim; iy++) {
+			for (let ix = 0; ix < dim; ix++) {
+				const e = -FLOW_EXTENT_M + ix * cell;
+				const n = -FLOW_EXTENT_M + iy * cell;
+				const geo = this.frame.toGeo(e, n, 0);
+				const h = terrain.heightAt(geo.lat, geo.lon);
+				out[iy * dim + ix] =
+					h == null || !Number.isFinite(h)
+						? Number.NaN
+						: this.frame.fromGeo(geo.lat, geo.lon, h)[2];
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * The wind-drift animation: a frame request per tick (about 30 Hz) while the world view shows it.
+	 * Off under webdriver and for reduced motion: the layer then shows its deterministic warm-up state.
+	 */
+	private syncFlowTick(on: boolean) {
+		const still =
+			(typeof navigator !== "undefined" && navigator.webdriver) ||
+			(typeof matchMedia === "function" &&
+				matchMedia("(prefers-reduced-motion: reduce)").matches);
+		if (!on || still) {
+			cancelAnimationFrame(this.flowRaf);
+			this.flowRaf = 0;
+			return;
+		}
+		if (this.flowRaf) return;
+		let last = performance.now();
+		const tick = (t: number) => {
+			this.flowRaf = requestAnimationFrame(tick);
+			if (this.disposed || this.lost || this.view !== "world" || !this.gpu)
+				return;
+			if (t - last < 33) return;
+			this.gpu.flow.advance((t - last) / 1000);
+			last = t;
+			this.schedule("all");
+		};
+		this.flowRaf = requestAnimationFrame(tick);
 	}
 
 	private syncWorld(g: Gpu, photoU: CameraUniforms, nearDiscard: number) {
@@ -2343,6 +2462,7 @@ export class WebGpuEngine implements Renderer {
 			views: ["world"],
 		});
 		g.trails.setEnabled(s.trails && !!this.trails?.count);
+		this.syncFlow(g);
 		const ws = deckWorldStyle(this.style);
 		g.atmSky.setSky({
 			mode: this.style.world.sky.mode,
