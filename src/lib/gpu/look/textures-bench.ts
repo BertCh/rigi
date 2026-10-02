@@ -23,6 +23,7 @@ import type { ColorStats } from "#/lib/look/color-stats";
 import { photoPixels } from "#/lib/look/composite";
 import { guidedFilter } from "#/lib/look/guided-filter";
 import type { SkyMask } from "#/lib/look/haze-fit";
+import { submittedWorkDone } from "../core/queue";
 import { readBack } from "../core/readback";
 import { adoptRenderDevice, getComputeDevice } from "../device";
 import { captureLookInputs } from "./capture";
@@ -67,12 +68,7 @@ function diff(
 }
 
 const median = (a: number[]) => [...a].sort((x, y) => x - y)[a.length >> 1];
-const idle = (device: Device) =>
-	(
-		device as unknown as {
-			handle: { queue: { onSubmittedWorkDone(): Promise<void> } };
-		}
-	).handle.queue.onSubmittedWorkDone();
+const idle = (device: Device) => submittedWorkDone(device);
 
 async function time(
 	reps: number,

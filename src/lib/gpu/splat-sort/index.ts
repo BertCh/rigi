@@ -32,7 +32,7 @@ import { type ComputeGraph, cachedGraph } from "../core/graph";
 import { type BindKind, defineKernel } from "../core/kernel";
 import { GPUSort } from "../core/luma";
 import { profiling, recordGpuTime } from "../core/profile";
-import { errorChecks, submit, submitted } from "../core/queue";
+import { errorChecks, openErrorScopes, submit, submitted } from "../core/queue";
 import { DEPTH_WGSL, KEYS_WGSL, TILE } from "./splat-sort.wgsl";
 import { packSplatSortParams } from "./uniforms";
 
@@ -74,11 +74,6 @@ const MAX_GRAPHS = 4;
 
 /** How many first sorts get an error check (a broken kernel fails on the first). */
 const CHECKED_SORTS = 2;
-
-type ErrorScopeDevice = {
-	pushErrorScope: (f: "validation" | "out-of-memory") => void;
-	popErrorScope: () => Promise<{ message: string } | null>;
-};
 
 export type GpuSplatSortStats = {
 	sorts: number;
@@ -261,15 +256,10 @@ export class GpuSplatSorter {
 		const check = this.checked++ < CHECKED_SORTS;
 		let verdict: Promise<void> | undefined;
 		if (check && !errorChecks()) {
-			const raw = (device as unknown as { handle?: ErrorScopeDevice }).handle;
-			if (raw?.pushErrorScope) {
-				raw.pushErrorScope("out-of-memory");
-				raw.pushErrorScope("validation");
+			const close = openErrorScopes(device);
+			if (close) {
 				submit(device, enc);
-				const v = raw.popErrorScope();
-				const m = raw.popErrorScope();
-				verdict = Promise.all([v, m]).then(([ve, me]) => {
-					const e = ve ?? me;
+				verdict = close().then((e) => {
 					if (e) throw new Error(e.message);
 				});
 			} else submit(device, enc);

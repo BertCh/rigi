@@ -35,10 +35,56 @@ export class GpuValidationError extends Error {
 /** Whether submits in this realm are wrapped in error scopes. */
 export const errorChecks = () => globalThis.__RIGI_GPU_CHECKS__ === true;
 
-type RawDevice = {
+type ScopedDevice = {
 	pushErrorScope: (f: "validation" | "out-of-memory") => void;
 	popErrorScope: () => Promise<{ message: string } | null>;
 };
+
+/** The first error an error-scope pair caught ('validation' before 'out-of-memory'), or null. */
+export type ScopeError = {
+	kind: "validation" | "out-of-memory";
+	message: string;
+} | null;
+
+/**
+ * Opens an 'out-of-memory' and a 'validation' error scope on a WebGPU device and returns the closer,
+ * which pops both (in reverse order) and resolves to the first error caught; null when `device` is
+ * not a WebGPU device. The one place the app opens native error scopes: luma's public
+ * WebGPUDevice.pushErrorScope / popErrorScope are no-ops unless the device was created with
+ * `debug: true`, and these checks (`__RIGI_GPU_CHECKS__`, the splat sorter's first sorts) are
+ * independent of luma's debug mode.
+ */
+export function openErrorScopes(
+	device: Device,
+): (() => Promise<ScopeError>) | null {
+	if (device.type !== "webgpu") return null;
+	const raw = (device as unknown as { handle?: ScopedDevice }).handle;
+	if (!raw?.pushErrorScope) return null;
+	raw.pushErrorScope("out-of-memory");
+	raw.pushErrorScope("validation");
+	return () => {
+		const v = raw.popErrorScope();
+		const m = raw.popErrorScope();
+		return Promise.all([v, m]).then(([ve, me]): ScopeError => {
+			if (ve) return { kind: "validation", message: ve.message };
+			if (me) return { kind: "out-of-memory", message: me.message };
+			return null;
+		});
+	};
+}
+
+/**
+ * Resolves once the work submitted to `device`'s queue so far has completed (a luma Fence: on
+ * WebGPU, queue.onSubmittedWorkDone). For benches and tests that time GPU work end to end.
+ */
+export async function submittedWorkDone(device: Device): Promise<void> {
+	const fence = device.createFence();
+	try {
+		await fence.signaled;
+	} finally {
+		fence.destroy();
+	}
+}
 
 const checks = new WeakMap<CommandEncoder, Promise<void>>();
 const OK = Promise.resolve();
@@ -80,26 +126,22 @@ export function submit(device: Device, enc: CommandEncoder): void {
 	poolAfterSubmit(device);
 }
 
+/** The check promise of a closed scope pair: rejects with GpuValidationError on an error. */
+function verdict(close: () => Promise<ScopeError>, id?: string): Promise<void> {
+	const p = close().then((e) => {
+		if (e) throw new GpuValidationError(e.kind, e.message, id);
+	});
+	p.catch(() => {});
+	return p;
+}
+
 function finishAndSubmit(device: Device, enc: CommandEncoder) {
-	const raw =
-		errorChecks() && device.type === "webgpu"
-			? (device as unknown as { handle: RawDevice }).handle
-			: null;
-	if (raw) {
-		raw.pushErrorScope("out-of-memory");
-		raw.pushErrorScope("validation");
+	const close = errorChecks() ? openErrorScopes(device) : null;
+	if (close) {
 		try {
 			device.submit(enc.finish());
 		} finally {
-			const v = raw.popErrorScope();
-			const m = raw.popErrorScope();
-			const id = (enc as { id?: string }).id;
-			const p = Promise.all([v, m]).then(([ve, me]) => {
-				if (ve) throw new GpuValidationError("validation", ve.message, id);
-				if (me) throw new GpuValidationError("out-of-memory", me.message, id);
-			});
-			p.catch(() => {});
-			checks.set(enc, p);
+			checks.set(enc, verdict(close, (enc as { id?: string }).id));
 		}
 	} else device.submit(enc.finish());
 }
@@ -158,13 +200,7 @@ export function submitWithDefault(
 		device.submit();
 		return false;
 	}
-	const raw = errorChecks()
-		? (device as unknown as { handle: RawDevice }).handle
-		: null;
-	if (raw) {
-		raw.pushErrorScope("out-of-memory");
-		raw.pushErrorScope("validation");
-	}
+	const close = errorChecks() ? openErrorScopes(device) : null;
 	let sent = false;
 	try {
 		// luma's Device.submit(undefined, extras): finalises the default encoder (time-profiling
@@ -173,15 +209,8 @@ export function submitWithDefault(
 		device.submit(undefined, finished);
 		sent = true;
 	} finally {
-		if (raw) {
-			const v = raw.popErrorScope();
-			const m = raw.popErrorScope();
-			const p = Promise.all([v, m]).then(([ve, me]) => {
-				if (ve) throw new GpuValidationError("validation", ve.message, "fused");
-				if (me)
-					throw new GpuValidationError("out-of-memory", me.message, "fused");
-			});
-			p.catch(() => {});
+		if (close) {
+			const p = verdict(close, "fused");
 			for (const e of extra) checks.set(e, p);
 		}
 		if (!sent) for (const e of extra) failed(e);

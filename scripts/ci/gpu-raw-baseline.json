@@ -26,8 +26,8 @@
 		"why": "WebGPUAdapter.attach(handle: GPUDevice) wrapper for ORT / ownsHandle; the one sanctioned attach point"
 	},
 	"src/lib/gpu/core/queue.ts": {
-		"handle": 2,
-		"why": "submitWithDefault: private WebGPUDevice finalize + multi-buffer queue.submit and opt-in error scopes; needs a luma submit(buffers[]) patch (audit-gpu A7/A8)"
+		"handle": 1,
+		"why": "openErrorScopes: native push/popErrorScope for opt-in checks; luma WebGPUDevice.pushErrorScope/popErrorScope are no-ops unless the device was created with debug: true"
 	},
 	"src/lib/gpu/core/selftest.ts": {
 		"rawWebGpu": 1,
@@ -36,14 +36,6 @@
 	"src/lib/gpu/device.ts": {
 		"rawWebGpu": 1,
 		"why": "sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)"
-	},
-	"src/lib/gpu/look/stats-fold-bench.ts": {
-		"handle": 3,
-		"why": "bench harness, raw device access on purpose"
-	},
-	"src/lib/gpu/look/textures-bench.ts": {
-		"handle": 3,
-		"why": "bench harness, raw device access on purpose"
 	},
 	"src/lib/gpu/sky/bench-graph.ts": {
 		"handle": 1,
@@ -56,10 +48,6 @@
 	"src/lib/gpu/sky/prep.ts": {
 		"handle": 1,
 		"why": "bitmap upload on device.handle; replaceable with Texture.copyExternalImage (audit-gpu A1)"
-	},
-	"src/lib/gpu/splat-sort/index.ts": {
-		"handle": 1,
-		"why": "raw pushErrorScope/popErrorScope region for opt-in checks (audit-gpu A8)"
 	},
 	"src/lib/nearfield/deck-splat-layer.ts": {
 		"rawGl": 40,

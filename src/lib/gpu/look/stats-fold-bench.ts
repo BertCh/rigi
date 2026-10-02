@@ -25,6 +25,7 @@ import {
 	STATS_LONG_SIDE,
 	trustedRange,
 } from "../../look/composite";
+import { submittedWorkDone } from "../core/queue";
 import { getComputeDevice, hasFeature } from "../device";
 import { type BandStatsInput, bandStatsGpu } from "./color-stats";
 import { lastStatsGraphRun } from "./color-stats-graph";
@@ -270,9 +271,7 @@ export async function runStatsFoldBench(
 							subgroups: sg,
 							read: false,
 						});
-						await (
-							device as unknown as { handle: GPUDevice }
-						).handle.queue.onSubmittedWorkDone();
+						await submittedWorkDone(device);
 					});
 				}
 		});
