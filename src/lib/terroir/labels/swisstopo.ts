@@ -12,7 +12,6 @@
 // fonts.css, family "GB Sans"): upright 300 / 400 / 500 / 600 and italic 400. There is no 700 and
 // no italic 500 or 600, so the major peak is set in 600 at a larger size and hydrography in italic
 // 400. SWISSTOPO_FONT_NEEDS lists what a fonts stream could add for a closer match.
-import { BREZINE } from "#/brand/khipu";
 import type { DeepPartial, LabelStyle } from "../../style/types";
 import type { NameTypography } from "../classes";
 import type { NameClass } from "../types";
@@ -33,8 +32,11 @@ export const SWISSTOPO_WATER = "#9fd0ee";
 export const SWISSTOPO_INK = "#ffffff";
 /** Ranges, regions, relief names (warm off-white, as on the sheet's grey relief type). */
 export const SWISSTOPO_RELIEF = "#efe6d6";
-/** Contour numerals: Brezine "Light Yellowish Brown", readable on dark ground and photo. */
-export const SWISSTOPO_CONTOUR_NUMERAL = BREZINE.YB.hex as `#${string}`;
+/**
+ * Contour numerals: Brezine "Light Yellowish Brown" (YB #bb8b54) lifted to a light tan. YB itself is
+ * too dark to read over a photo under the dark label halo.
+ */
+export const SWISSTOPO_CONTOUR_NUMERAL = "#ecd3ad";
 
 const typo = (
 	size: number,
@@ -169,13 +171,13 @@ export const SWISSTOPO_NAME_TYPO: Record<NameClass, NameTypography> = {
 
 /**
  * The labels half of a ViewStyle override (a DeepPartial<LabelStyle>): upright peak names in 600,
- * the elevation line in weight 300, the elevation in the contour-numeral brown. Apply it
+ * the elevation line in weight 400 at 11 px, in the light contour-numeral tan. Apply it
  * with the style overrides; it is not part of any default.
  */
 export const SWISSTOPO_LABELS: DeepPartial<LabelStyle> = {
 	fontFamily: SWISSTOPO_FONT_FAMILY,
 	name: { px: 12, weight: 600, color: SWISSTOPO_INK },
-	sub: { px: 10, weight: 300, color: SWISSTOPO_CONTOUR_NUMERAL, show: "ele" },
+	sub: { px: 11, weight: 400, color: SWISSTOPO_CONTOUR_NUMERAL, show: "ele" },
 	halo: {
 		kind: "shadow",
 		color: [0, 0, 0, 0.85],

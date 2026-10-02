@@ -107,8 +107,8 @@ const local = [
 	},
 	{
 		icon: Globe,
-		title: "Public data only",
-		body: "Elevation, maps, peaks and trails are downloaded for the area in view. Nothing about you is sent.",
+		title: "Public map data",
+		body: "Elevation, maps, peaks and trails come from public tile servers, fetched for the area in view. Those requests show which area you are looking at; your photos stay here.",
 	},
 ];
 
