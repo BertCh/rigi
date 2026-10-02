@@ -78,6 +78,15 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - **Workspace chrome.** Workspace panels, controls and Step Inside chrome move to Brezine tokens. Card rings and shadows are gone, and orange (ember) marks selection and active state only.
 - **Lint.** Biome warnings and infos are at zero outside the Gipfelbuch files.
 - **New fast checks:** `mosaic-mips`, `color-target-dawn`.
+### Gipfelbuch live plates and photo stories (2026-10-02, session 32)
+
+Commit 3587c56. Browser-unverified.
+
+- **Live plates** (`viz/live.tsx`): the landing page's real-image views as notebook figures: overlay reveal, before/after compare, live 3D drape, Step Inside (splats and 3D tiles), panorama, topo board and the how-it-works scene. Each sits on a dark plate with a hand-lettered title, a caption with numbers from the data, hand notes with leaders, and the terrain carried past the frame in contour brown. Preview at `/dev/gipfelbuch-live`.
+- **Photo story** (`viz/PhotoStory.tsx`): the alignment story written by hand on a real photo: the phone's guess (struck through in red), the measured skyline, the correction arc and the snapped peak names. It follows the page's photo picker.
+- **All 19 sheets** carry at least one of these. The photo story is the hero on rigi and camera-prior.
+- **Review fixes:** heroes that follow the picker or say which photo they're fixed to; the tap demo-10 bake rebuilt (peaks paired by name); one visible-peak count (260); median compass error unified at 9.6°; the baseline timings; stale figure references and undefined tokens; the Gipfelbuch print style no longer hides every `<nav>` on the page.
+
 ### Gipfelbuch hand pass (2026-10-01, night)
 
 Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelbuch-hand-sketch-research/` (sketch style, Swiss cartography and swisstopo, an audit of what was lost). Browser-unverified.
