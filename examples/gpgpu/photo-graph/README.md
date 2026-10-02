@@ -11,8 +11,7 @@ The examples resolve `@luma.gl/*` and `@deck.gl/*` from this repository's vendor
 Run `npm start` in this folder (npm puts the ancestor `node_modules/.bin` on `PATH`), or run
 `npx vite examples/gpgpu/photo-graph` from the repository root. No network access is needed.
 `npm run test:visual` runs `scripts/visual-smoke.mjs` (in Rigi, wrap it in
-`node scripts/gpu/with-render-lock.mjs --`). Upstream's codename for the program this graph belongs
-to is Arisia.
+`node scripts/gpu/with-render-lock.mjs --`).
 
 ## What it does
 

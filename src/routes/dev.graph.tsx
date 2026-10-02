@@ -143,8 +143,8 @@ function GraphPage() {
 	return (
 		<main className="min-h-dvh bg-[var(--rigi-ink)] p-8 text-[var(--rigi-paper)]">
 			<p className="mb-2 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--rigi-glow)]">
-				<LensGlyph size={14} />
-				Arisia (luma.gl) · compute graph, observed
+				<LensGlyph size={14} title="Arisia" />
+				compute graph, observed
 			</p>
 			<h1 className="text-xl font-semibold">Compute graphs</h1>
 			<p className="mt-2 max-w-3xl text-sm text-white/55">
