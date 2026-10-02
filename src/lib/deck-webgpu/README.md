@@ -11,8 +11,9 @@ with `?renderer=auto` (or pins it with `?renderer=webgpu`) and falls back to Web
 **deck.gl (vendored from PR #10752) on a WebGPU device hosts the frame; our own pass runner
 draws the 3D passes.**
 Layers are host-agnostic `GpuLayerCore`s on plain luma.gl 10 (`Model`, WGSL). The same cores
-also run under a luma-direct host with no deck at all (`hosts/direct.ts`). That host is the
-fallback when the deck host fails to boot.
+also run under a luma-direct host with no deck at all (`hosts/direct.ts`): the roll map's WebGPU
+backend and the lab (`?host=direct`) use it. The engine runs only on the deck host; when that fails
+to boot, PhotoWorkspace falls back to the WebGL DeckEngine.
 
 What the spike showed with Chrome and Metal (deck 9.4.0 with luma 10.0.0-alpha.2 + the vendored deck
 PR #10752, `vendor/deck/README.md`):

@@ -14,7 +14,7 @@
 //     finalize   BAND_FINALIZE (finalizeBands in f32) -> `stats` (STATS_WORDS f32)
 //
 // It replaced a GPUProgram (GPUProgramSpMV with a 0/1 CSR selection matrix) lowered by
-// core/program.ts; the aggregation is one op, no matrix buffers. The float sums are compare-exchange
+// a since-deleted core/program.ts; the aggregation is one op, no matrix buffers. The float sums are compare-exchange
 // atomics, so the order of the <= 32 adds per value varies run to run (before: a fixed tree): the
 // ColorStats deltas are tolerance-checked (color-stats-fold.check.ts, scripts/gpu/stats-fold-dawn.ts).
 // f32 instead of the f64 fold: the per-workgroup partials were already f32 sums, so the fold adds <= 32

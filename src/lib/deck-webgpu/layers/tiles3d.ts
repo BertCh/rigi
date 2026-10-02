@@ -72,7 +72,7 @@
 // Diagnostics: tiles.stats (meshes drawn per pass, GPU meshes held, triangles, uploads).
 //
 // luma 10: Model / Buffer / Texture / ShaderModule only; nothing deck-specific.
-import type { Buffer, Device, Texture } from "@luma.gl/core";
+import { type Buffer, type Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { getFlag } from "#/lib/flags";
@@ -97,8 +97,7 @@ import {
 	type PassKind,
 	passModelProps,
 } from "../pass";
-import { USAGE } from "../targets";
-import { generateTextureMipmaps, maskTexture } from "../textures";
+import { maskTexture } from "../textures";
 import { colorWGSL } from "../wgsl";
 
 /** GPUBufferUsage bits. */
@@ -448,7 +447,7 @@ export class Tiles3DCore implements GpuLayerCore {
 			format: "rgba8unorm",
 			width: 1,
 			height: 1,
-			usage: USAGE.SAMPLE | USAGE.COPY_DST,
+			usage: Texture.SAMPLE | Texture.COPY_DST,
 		});
 		this.emptyMap.writeData(new Uint8Array([255, 255, 255, 255]) as never, {
 			width: 1,
@@ -467,7 +466,7 @@ export class Tiles3DCore implements GpuLayerCore {
 			format: "rgba32float",
 			width: 1,
 			height: 1,
-			usage: USAGE.SAMPLE | USAGE.COPY_DST,
+			usage: Texture.SAMPLE | Texture.COPY_DST,
 		});
 		this.noGeometry.writeData(new Float32Array(4) as never, {
 			width: 1,
@@ -701,9 +700,7 @@ export class Tiles3DCore implements GpuLayerCore {
 	): Texture | undefined {
 		if (!img || !(img.width > 0)) return undefined;
 		const { width, height } = img;
-		const mipLevels = mips
-			? Math.floor(Math.log2(Math.max(width, height))) + 1
-			: 1;
+		const mipLevels = mips ? this.device.getMipLevelCount(width, height) : 1;
 		try {
 			const tex = this.device.createTexture({
 				id: `${this.id}-${key}-map${mips ? "" : "-l0"}`,
@@ -711,7 +708,7 @@ export class Tiles3DCore implements GpuLayerCore {
 				width,
 				height,
 				mipLevels,
-				usage: USAGE.SAMPLE | USAGE.COPY_DST | USAGE.RENDER,
+				usage: Texture.SAMPLE | Texture.COPY_DST | Texture.RENDER,
 				sampler: {
 					minFilter: "linear",
 					magFilter: "linear",
@@ -724,7 +721,7 @@ export class Tiles3DCore implements GpuLayerCore {
 			if ("data" in img && ArrayBuffer.isView(img.data))
 				tex.writeData(img.data as never, { width, height });
 			else tex.copyExternalImage({ image: img as never, width, height });
-			if (mipLevels > 1) generateTextureMipmaps(this.device, tex);
+			if (mipLevels > 1) this.device.generateMipmapsWebGPU(tex);
 			return tex;
 		} catch (e) {
 			console.warn(`[deck-webgpu tiles3d] texture upload failed: ${String(e)}`);

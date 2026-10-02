@@ -110,7 +110,7 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | GPU horizon for unknown-pose | ~120 ms saved; was opt-in under the 0-false-accept rule until 2026-10-01, now default on (node gate on Dawn: 0 new false or unverified accepts; browser-unverified) | gpu_compute_plan |
 | TS port of the skyglobal polish | Flips 3/50 results; stays in numpy | gpu_compute_plan |
 | deck: world-camera frustum culling alone (`matrixCuller`, no back-face cull) | World orbit 12.5 / 10.1 / 8.9 → 12.6 / 10.2 / 8.4 fps: fill-bound, not vertex-bound. Kept (cheap) but the gain came from back-face culling + vertex log depth | [deck-default.md](deck-default.md) |
-| deck: 16-bit far-tile indices (`index-width.ts`) | Photo drag 27.0 / 21.0 / 20.7 vs 27.0 / 21.3 / 20.7 fps, world orbit identical; kept, harmless | deck-default.md |
+| deck: 16-bit far-tile indices (`index-width.ts`) | Photo drag 27.0 / 21.0 / 20.7 vs 27.0 / 21.3 / 20.7 fps, world orbit identical; kept, harmless (unwired since 422a2c8, deleted 2026-10-02) | deck-default.md |
 | deck: aligning on the coarse-first (z ≤ 14) preview | Not accuracy-neutral: wiring the preview into the query terrain moved auto-align yaw by 0.01–0.04° (IMG_6958, 7155, 7018). Coarse-first is display-only; the query terrain, horizon and auto-align wait for the full set | deck-default.md |
 | deck colour-pass micro-fixes: MSAA RGBA8 instead of RGBA16F, `invalidateFramebuffer` after resolve, polygon offset off, no `discard`, per-tile instead of batched draws | No change (78.6–84 ms vs 80 ms p50). The cost was MSAA fill plus `gl_FragDepth` and no culling | deck-default.md |
 | deck: flight frames swapping only the gizmo (0e206b1) | No fps gain (fly-in 39→40, 38→38): GPU-bound. Kept for CPU | deck-default.md |

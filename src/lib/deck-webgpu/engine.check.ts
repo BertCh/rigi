@@ -28,7 +28,6 @@ import { WebGpuEngine } from "./engine";
 
 export type EngineCheckOptions = {
 	photo?: string;
-	host?: "deck" | "direct";
 	/** Load the region (peaks, trails). Default true. */
 	region?: boolean;
 	/** Compare against the WebGL DeckEngine. Default false. */
@@ -112,7 +111,7 @@ export async function runEngineCheck(o: EngineCheckOptions = {}) {
 	window.addEventListener("unhandledrejection", onErr);
 
 	const canvas = mkCanvas(0);
-	const engine = new WebGpuEngine(canvas, photo, { host: o.host });
+	const engine = new WebGpuEngine(canvas, photo);
 	window.__webgpuEngineCheck = engine;
 	let emitted = 0;
 	engine.onRender(() => emitted++);

@@ -182,8 +182,6 @@ export {
 // GPUGather (haze gathers), GPUCompaction (haze band, terrain cull), GPUGroupAggregation / GPUHistogram
 // (colour-stats fold, photoprep), GPUFiniteDifference2D (relief gradient), GPUConvolution (guided
 // filter). GPUSegmentedReduction is not exported from the gpu-core entry point (rigi.5/6).
-// GPUData: the buffer-backed chunk that binds a GPUProgram external vector (core/program.ts)
-export { GPUData } from "@luma.gl/gpgpu/gpu-data";
 // Vector search (k-means, exact top-k similarity): a sibling experimental subpath over the same
 // gpu-core graph types, so it is re-exported here under the same one-importer rule.
 export type {

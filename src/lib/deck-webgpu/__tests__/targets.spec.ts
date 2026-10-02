@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { Texture } from "@luma.gl/core";
 import { describe, expect, it } from "vitest";
 import {
 	applyColorTargetFormat,
@@ -10,7 +11,6 @@ import {
 	getColorTargetFormat,
 	resolveColorTargetFormat,
 	TARGET_FORMATS,
-	USAGE,
 } from "../targets";
 
 const deviceWith = (...features: string[]) =>
@@ -77,10 +77,10 @@ describe("colour target format", () => {
 			"rg11b10-unsafe",
 		);
 		expect(TARGET_FORMATS.colorMS.format).toBe("rg11b10ufloat");
-		expect(TARGET_FORMATS.color.usage & USAGE.STORAGE).toBe(0);
-		expect(TARGET_FORMATS.color.usage & USAGE.SAMPLE).toBe(USAGE.SAMPLE);
+		expect(TARGET_FORMATS.color.usage & Texture.STORAGE).toBe(0);
+		expect(TARGET_FORMATS.color.usage & Texture.SAMPLE).toBe(Texture.SAMPLE);
 		applyColorTargetFormat(deviceWith(), "rgba16");
-		expect(TARGET_FORMATS.color.usage & USAGE.STORAGE).toBe(USAGE.STORAGE);
+		expect(TARGET_FORMATS.color.usage & Texture.STORAGE).toBe(Texture.STORAGE);
 	});
 });
 

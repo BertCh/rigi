@@ -19,7 +19,7 @@
 // readback after `queue.onSubmittedWorkDone` turns them into a FrameTimings sample. If all four
 // sets still await readback the frame is not timed (never a stall); on the first readback error
 // the feature disables itself and logs once. The deck host's own canvas pass (CoreLayer inside
-// deck's LayersPass) is deck's render pass and is not timed.
+// deck's LayersPass) is not timed here: deck's `_onFrameTimings` reports it as "deck-layers".
 import type { Device, RenderPassProps } from "@luma.gl/core";
 import { getFlag } from "#/lib/flags";
 import {

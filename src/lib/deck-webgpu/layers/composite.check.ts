@@ -17,7 +17,7 @@
 //   defaults         defaultCompositeSettings === deck/composite.ts's
 // Run from a page served by vite (any route), e.g. with playwright:
 //   await page.evaluate(async () => (await import("/src/lib/deck-webgpu/layers/composite.check.ts")).runCompositeCheck())
-import { type Device, luma, type Texture } from "@luma.gl/core";
+import { type Device, luma, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { defaultCompositeSettings as deckDefaults } from "#/lib/deck/composite";
@@ -27,7 +27,7 @@ import type { RevealUniforms } from "#/lib/reveal/config";
 import { deckCompositeStyle } from "#/lib/style/deck-apply";
 import { CLASSIC } from "#/lib/style/defaults";
 import type { PassContext, PassTarget } from "../pass";
-import { ColorTargets, GeometryTargets, USAGE } from "../targets";
+import { ColorTargets, GeometryTargets } from "../targets";
 import {
 	CompositeCore,
 	type CompositeSettings,
@@ -255,7 +255,7 @@ function makeOut(device: Device, withDepth: boolean): Out {
 		format: "bgra8unorm",
 		width: W,
 		height: H,
-		usage: USAGE.RENDER | USAGE.COPY_SRC,
+		usage: Texture.RENDER | Texture.COPY_SRC,
 	});
 	const depth = withDepth
 		? device.createTexture({
@@ -263,7 +263,7 @@ function makeOut(device: Device, withDepth: boolean): Out {
 				format: "depth24plus",
 				width: W,
 				height: H,
-				usage: USAGE.RENDER,
+				usage: Texture.RENDER,
 			})
 		: undefined;
 	return {

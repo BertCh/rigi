@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Pure layout math of gpu/ingest (no luma runtime): which texture format a typed-array raster
+// Pure layout math of gpu/ingest (device-free; luma's textureFormatDecoder is a plain lookup): which texture format a typed-array raster
 // uploads as, byte sizes, and the WebGPU copy alignment rules the upload and copy nodes rely on.
 // Node-checked by ingest.check.ts.
+import { textureFormatDecoder } from "@luma.gl/core";
 
 /** Raster texture formats uploadRaster writes (one entry per typed array kind × band count). */
 export type RasterFormat =
@@ -72,25 +73,9 @@ export function rasterFormatOf(
 	return format;
 }
 
-const BYTES: Record<RasterFormat | BitmapFormat, number> = {
-	r8unorm: 1,
-	r8uint: 1,
-	rg8unorm: 2,
-	rgba8unorm: 4,
-	"rgba8unorm-srgb": 4,
-	rgba8uint: 4,
-	r16uint: 2,
-	r16sint: 2,
-	r32float: 4,
-	r32uint: 4,
-	r32sint: 4,
-	rg32float: 8,
-	rgba32float: 16,
-};
-
 /** Bytes per texel of an ingest format. */
 export const bytesPerTexel = (format: RasterFormat | BitmapFormat) =>
-	BYTES[format];
+	textureFormatDecoder.getInfo(format).bytesPerPixel;
 
 /** Elements a `width × height × layers` raster of `bands` bands must hold. */
 export const rasterLength = (

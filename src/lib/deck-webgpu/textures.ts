@@ -4,8 +4,7 @@
 
 // Texture helpers shared by the layer ports: the photo (sRGB, mipmapped), byte masks (people,
 // brush, sky), float fields. One place for formats / usages so every port samples the same way.
-import type { Device, Texture } from "@luma.gl/core";
-import { USAGE } from "./targets";
+import { type Device, Texture } from "@luma.gl/core";
 
 const LINEAR_CLAMP = {
 	minFilter: "linear",
@@ -40,29 +39,19 @@ export function imageTexture(
 	const width = img.naturalWidth || img.width;
 	const height = img.naturalHeight || img.height;
 	const mips = opts.mips ?? true;
-	const mipLevels = mips
-		? Math.floor(Math.log2(Math.max(width, height))) + 1
-		: 1;
+	const mipLevels = mips ? device.getMipLevelCount(width, height) : 1;
 	const tex = device.createTexture({
 		id: opts.id ?? "image",
 		format: "rgba8unorm-srgb",
 		width,
 		height,
 		mipLevels,
-		usage: USAGE.SAMPLE | USAGE.COPY_DST | USAGE.RENDER,
+		usage: Texture.SAMPLE | Texture.COPY_DST | Texture.RENDER,
 		sampler: { ...LINEAR_CLAMP, maxAnisotropy: mips ? 8 : 1 },
 	});
 	tex.copyExternalImage({ image: image as never, width, height });
-	if (mips) generateTextureMipmaps(device, tex);
+	if (mips) device.generateMipmapsWebGPU(tex);
 	return tex;
-}
-
-/**
- * Fill the mip chain of a WebGPU texture through luma's public Device method. It encodes its own
- * render passes and submits, so never call it while a render pass is open.
- */
-export function generateTextureMipmaps(device: Device, texture: Texture): void {
-	device.generateMipmapsWebGPU(texture);
 }
 
 /** A byte mask (0..255, row 0 = top) as r8unorm, linear-filtered (people / brush / sky masks). */
@@ -78,7 +67,7 @@ export function maskTexture(
 		format: "r8unorm",
 		width,
 		height,
-		usage: USAGE.SAMPLE | USAGE.COPY_DST,
+		usage: Texture.SAMPLE | Texture.COPY_DST,
 		sampler: LINEAR_CLAMP,
 	});
 	tex.writeData(data as never, { width, height, bytesPerRow: width });
@@ -99,7 +88,7 @@ export function floatTexture(
 		format: "r32float",
 		width,
 		height,
-		usage: USAGE.SAMPLE | USAGE.COPY_DST,
+		usage: Texture.SAMPLE | Texture.COPY_DST,
 		sampler: {
 			...LINEAR_CLAMP,
 			minFilter: "nearest",
@@ -118,7 +107,7 @@ export function placeholderTextures(device: Device) {
 		format: "rgba8unorm-srgb",
 		width: 1,
 		height: 1,
-		usage: USAGE.SAMPLE | USAGE.COPY_DST,
+		usage: Texture.SAMPLE | Texture.COPY_DST,
 	});
 	white.writeData(new Uint8Array([255, 255, 255, 255]) as never, {
 		width: 1,
@@ -129,7 +118,7 @@ export function placeholderTextures(device: Device) {
 		format: "r8unorm",
 		width: 1,
 		height: 1,
-		usage: USAGE.SAMPLE | USAGE.COPY_DST,
+		usage: Texture.SAMPLE | Texture.COPY_DST,
 	});
 	zeroMask.writeData(new Uint8Array([0, 0, 0, 0]) as never, {
 		width: 1,

@@ -83,7 +83,7 @@
 // ReliefController.update's `bridged` while the bridge is attached (same gate); a rejection or
 // null (bridge destroyed in flight) falls back to the readback path, and the CPU twin stays the
 // ?gpu=off path.
-import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
+import { type CommandEncoder, type Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
 import { lookGpuOn, trackLook } from "#/lib/gpu/look/opt-in";
@@ -123,7 +123,6 @@ import type {
 import type { ViewStyle } from "#/lib/style/types";
 import type { FusedWork } from "./layers/geometry-source";
 import { readTextureBytes } from "./readback";
-import { USAGE } from "./targets";
 
 const LINEAR_CLAMP = {
 	minFilter: "linear",
@@ -656,7 +655,7 @@ export class LookBridge {
 				format: "rgba8unorm",
 				width: res,
 				height: res,
-				usage: USAGE.SAMPLE | USAGE.COPY_DST | USAGE.COPY_SRC,
+				usage: Texture.SAMPLE | Texture.COPY_DST | Texture.COPY_SRC,
 				sampler: LINEAR_CLAMP,
 			});
 		const textures = { field: tex("relief-field"), gen: tex("relief-gen") };
@@ -732,7 +731,7 @@ export class LookBridge {
 			format: "rgba8unorm",
 			width: w,
 			height: h,
-			usage: USAGE.SAMPLE | USAGE.COPY_DST,
+			usage: Texture.SAMPLE | Texture.COPY_DST,
 		});
 		tex.writeData(photoPixels(img, w, h).data as never, {
 			width: w,
@@ -753,7 +752,7 @@ export class LookBridge {
 			format: "r8unorm",
 			width: m.width,
 			height: m.height,
-			usage: USAGE.SAMPLE | USAGE.COPY_DST,
+			usage: Texture.SAMPLE | Texture.COPY_DST,
 		});
 		// r8 rows need no padding for writeData (the queue path takes any bytesPerRow)
 		tex.writeData(m.data as never, {
@@ -776,7 +775,7 @@ export class LookBridge {
 			format: "rgba8unorm",
 			width: w,
 			height: h,
-			usage: USAGE.SAMPLE | USAGE.COPY_DST | USAGE.COPY_SRC,
+			usage: Texture.SAMPLE | Texture.COPY_DST | Texture.COPY_SRC,
 			sampler: LINEAR_CLAMP,
 		});
 		this.outs[i] = n;

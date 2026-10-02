@@ -5,8 +5,8 @@
 // WebGpuEngine: the Renderer surface (src/lib/renderer.ts) on WebGPU, the port of the WebGL
 // DeckEngine (deck/engine.ts). Same inputs, same queries, same look; the frame is drawn by the
 // host-agnostic WGSL cores of this directory (README.md "Layer contract") on a host:
-//   DeckHost    deck.gl 9.4 on a WebGPU device (views, lifecycle, the frame loop)
-//   DirectHost  plain luma on WebGPU, no deck (the fallback when the deck host fails to boot)
+//   DeckHost    deck.gl 9.4 on a WebGPU device (views, lifecycle, the frame loop); a boot failure
+//               falls back to the WebGL DeckEngine (PhotoWorkspace)
 //
 // Frame (hosts/passes.ts): geometry pass (photo camera → GeometryTargets) → 4× MSAA colour pass
 // (the view camera: the photo camera, or the world orbit camera) → screen pass (the photo
@@ -47,7 +47,7 @@
 // luma 10: nothing here touches luma beyond Device / Texture / Buffer / Framebuffer; deck only
 // through hosts/deck.ts (dynamically imported).
 
-import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
+import { type CommandEncoder, type Device, Texture } from "@luma.gl/core";
 import type { AlignResult, EdgeMap, Pin } from "#/lib/align";
 import * as cam from "#/lib/camera";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
@@ -274,7 +274,7 @@ import {
 import { PresentCore, type PresentMode } from "./present";
 import { readTextureBytes } from "./readback";
 import { SilhouetteMaskGpu } from "./silhouette-gpu";
-import { ColorTargets, GeometryTargets, geometrySize, USAGE } from "./targets";
+import { ColorTargets, GeometryTargets, geometrySize } from "./targets";
 import { gpuDecodeTileLoader } from "./terrain-gpu-decode";
 import { imageTexture } from "./textures";
 
@@ -426,8 +426,6 @@ export type WebGpuEngineOptions = {
 	/** Wraps the terrain stream's tile loader (default: the GPU decode loader, else defaultStreamTile):
 	 * the landing's Step Inside serves far tiles from the roll map's baked seed (deck/seeded-tiles.ts). */
 	terrainTileWrap?: (base: StreamTileLoader) => StreamTileLoader;
-	/** Force a host (default: deck, falling back to direct when it fails to boot). */
-	host?: "deck" | "direct";
 	/** With the bridge on: fewer submits per settle (WAG W1.2, default true). The refined masks are
 	 * recorded on their own encoder and submitted with the query geometry render (one
 	 * queue.submit), then adopted when their inputs still match; the band stats share their layer
@@ -827,21 +825,10 @@ export class WebGpuEngine implements Renderer {
 	private async createHost(): Promise<Host> {
 		const avail = await webgpuAvailable();
 		if (!avail.ok) throw new Error(`WebGPU unavailable: ${avail.reason}`);
-		const pose = this.photoPose();
-		if (this.opts.host !== "direct")
-			try {
-				return await (await import("./hosts/deck")).DeckHost.create(
-					this.canvas,
-					pose,
-					this.opts.pixelRatioCap,
-				);
-			} catch (e) {
-				if (this.opts.host === "deck") throw e;
-				console.warn("[webgpu-engine] deck host failed, using direct", e);
-			}
-		return (await import("./hosts/direct")).DirectHost.create(
+		// A deck host that fails to boot throws: PhotoWorkspace falls back to the WebGL DeckEngine.
+		return (await import("./hosts/deck")).DeckHost.create(
 			this.canvas,
-			pose,
+			this.photoPose(),
 			this.opts.pixelRatioCap,
 		);
 	}
@@ -4316,7 +4303,7 @@ export class WebGpuEngine implements Renderer {
 					format: "rgba8unorm",
 					width: o.width,
 					height: o.height,
-					usage: USAGE.RENDER | USAGE.COPY_SRC | USAGE.SAMPLE,
+					usage: Texture.RENDER | Texture.COPY_SRC | Texture.SAMPLE,
 				});
 				fb = device.createFramebuffer({
 					id: "rigi-offscreen-out-fbo",

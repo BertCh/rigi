@@ -44,7 +44,7 @@
 //   - LOOK_HARMONIZE lives only inside the WebGL photo projection, i.e. the drape port: this file
 //     exports its WGSL + uniform module (terrainHarmonizeModule, TERRAIN_HARMONIZE_WGSL) for it.
 //   - the projective photo drape, projection tint and the Truth toggle are layers/drape.ts.
-import type { Device, Texture } from "@luma.gl/core";
+import { type Device, Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { ATM_CURV } from "#/lib/look/atmosphere";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
@@ -87,7 +87,6 @@ import {
 	terroirWGSL,
 } from "#/lib/terroir/wgsl/terrain";
 import type { PassContext } from "../pass";
-import { USAGE } from "../targets";
 import type { TerrainLook, TerrainShaderPart } from "../terrain";
 import { fogFromLook } from "../wgsl";
 
@@ -963,7 +962,7 @@ export class TerrainStyles {
 				format: "rgba8unorm",
 				width: r.res,
 				height: r.res,
-				usage: USAGE.SAMPLE | USAGE.COPY_DST,
+				usage: Texture.SAMPLE | Texture.COPY_DST,
 				sampler: {
 					minFilter: "linear",
 					magFilter: "linear",
@@ -994,7 +993,7 @@ export class TerrainStyles {
 				format: "rgba8unorm",
 				width: 1,
 				height: 1,
-				usage: USAGE.SAMPLE | USAGE.COPY_DST,
+				usage: Texture.SAMPLE | Texture.COPY_DST,
 			});
 			this.zero.writeData(new Uint8Array(4) as never, {
 				width: 1,
@@ -1078,7 +1077,7 @@ export class TerrainStyles {
 			format: "r8unorm",
 			width: T.fit.texWidth,
 			height: grid.height,
-			usage: USAGE.SAMPLE | USAGE.COPY_DST,
+			usage: Texture.SAMPLE | Texture.COPY_DST,
 			sampler: {
 				minFilter: "nearest",
 				magFilter: "nearest",

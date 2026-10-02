@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import type { Device } from "@luma.gl/core";
+import { type Device, Texture } from "@luma.gl/core";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	applyColorTargetFormat,
@@ -11,7 +11,6 @@ import {
 	MSAA_SAMPLES,
 	PASS_ATTACHMENTS,
 	TARGET_FORMATS,
-	USAGE,
 } from "../targets";
 
 type Res = {
@@ -77,7 +76,12 @@ describe("GeometryTargets", () => {
 		expect(nor.format).toBe("rgba16float");
 		expect(dep.format).toBe(TARGET_FORMATS.geometryDepth.format);
 		// compute reads the geometry target: it must be storage + sampled + copy-src
-		for (const u of [USAGE.STORAGE, USAGE.SAMPLE, USAGE.COPY_SRC, USAGE.RENDER])
+		for (const u of [
+			Texture.STORAGE,
+			Texture.SAMPLE,
+			Texture.COPY_SRC,
+			Texture.RENDER,
+		])
 			expect((geo.usage ?? 0) & u).toBe(u);
 		const [fbo] = byId("geometry-fbo");
 		expect(fbo.attachments).toEqual([geo, nor]);
@@ -110,7 +114,7 @@ describe("ColorTargets", () => {
 		expect(ms.samples).toBe(MSAA_SAMPLES);
 		expect(dms.samples).toBe(MSAA_SAMPLES);
 		expect(res.samples).toBe(1);
-		expect(ms.usage).toBe(USAGE.RENDER);
+		expect(ms.usage).toBe(Texture.RENDER);
 		expect(c.fbo.id).toBe("color-fbo");
 		expect(c.samples).toBe(MSAA_SAMPLES);
 		expect(c.passFbo).toBe(c.fbo);
@@ -171,7 +175,7 @@ describe("ColorTargets", () => {
 		new ColorTargets(device, 8, 8);
 		expect(byId("color-ms")[0].format).toBe("rg11b10ufloat");
 		expect(byId("color-resolve")[0].format).toBe("rg11b10ufloat");
-		expect((byId("color-resolve")[0].usage ?? 0) & USAGE.STORAGE).toBe(0);
+		expect((byId("color-resolve")[0].usage ?? 0) & Texture.STORAGE).toBe(0);
 		expect(PASS_ATTACHMENTS.color.colorAttachmentFormats).toEqual([
 			"rg11b10ufloat",
 		]);

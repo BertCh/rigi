@@ -27,7 +27,7 @@
 // An array is created on the first tile of its tier (WAG W1.6): the photo view's default look
 // drapes none, and a 64-layer mipmapped 512² array is 85 MiB. Until then its `texture` is null and
 // the terrain binds its 1×1 empty array (every row's layer is −1, so the drape is never shown).
-import type { Device, Texture } from "@luma.gl/core";
+import { type Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import {
 	encodeImageryLayer,
@@ -35,7 +35,6 @@ import {
 	imageryTierOf,
 	planImageryOverflow,
 } from "./atlas-layout";
-import { USAGE } from "./targets";
 import { TextureArrayAtlas } from "./texture-array-atlas";
 import { fullscreenWGSL } from "./wgsl";
 
@@ -175,7 +174,8 @@ export class ImageryArray {
 			format: "rgba8unorm-srgb",
 			size: tier,
 			mipLevels: mipLevels(tier),
-			usage: USAGE.SAMPLE | USAGE.COPY_DST | USAGE.COPY_SRC | USAGE.RENDER,
+			usage:
+				Texture.SAMPLE | Texture.COPY_DST | Texture.COPY_SRC | Texture.RENDER,
 			sampler: {
 				minFilter: "linear",
 				magFilter: "linear",

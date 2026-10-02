@@ -21,25 +21,17 @@
 //                             does photo·(1 − a) + rgb and encodes sRGB.
 //
 // Row order: WebGPU textures are top-down (row 0 = top of the image), unlike WebGL readPixels.
-import type {
-	Device,
-	Framebuffer,
+import {
+	type Device,
+	type Framebuffer,
 	Texture,
-	TextureFormat,
+	type TextureFormat,
 } from "@luma.gl/core";
 import { REVERSED_Z } from "./depth";
 
-/** GPUTextureUsage bits (luma's Texture.* statics mirror these). */
-export const USAGE = {
-	COPY_SRC: 0x01,
-	COPY_DST: 0x02,
-	SAMPLE: 0x04,
-	STORAGE: 0x08,
-	RENDER: 0x10,
-} as const;
-
 /** Readable by render passes, compute kernels (storage + sampled) and CPU readback. */
-const SHARED = USAGE.RENDER | USAGE.SAMPLE | USAGE.STORAGE | USAGE.COPY_SRC;
+const SHARED =
+	Texture.RENDER | Texture.SAMPLE | Texture.STORAGE | Texture.COPY_SRC;
 
 /**
  * Opt-in colour-pass format (?colorTarget=rg11b10-unsafe): rg11b10ufloat (4 B/px, no alpha channel) for
@@ -116,19 +108,19 @@ export const TARGET_FORMATS = {
 	normal: { format: "rgba16float" as const, usage: SHARED, samples: 1 },
 	geometryDepth: {
 		format: REVERSED_Z.format as TextureFormat,
-		usage: USAGE.RENDER | USAGE.SAMPLE | USAGE.COPY_SRC,
+		usage: Texture.RENDER | Texture.SAMPLE | Texture.COPY_SRC,
 		samples: 1,
 	},
 	get colorMS() {
 		return {
 			format: colorTargetFormat,
-			usage: USAGE.RENDER,
+			usage: Texture.RENDER,
 			samples: 4,
 		} as const;
 	},
 	colorDepthMS: {
 		format: REVERSED_Z.format as TextureFormat,
-		usage: USAGE.RENDER,
+		usage: Texture.RENDER,
 		samples: 4,
 	},
 	get color() {
@@ -136,7 +128,9 @@ export const TARGET_FORMATS = {
 		return {
 			format: colorTargetFormat,
 			usage:
-				colorTargetFormat === "rgba16float" ? SHARED : SHARED & ~USAGE.STORAGE,
+				colorTargetFormat === "rgba16float"
+					? SHARED
+					: SHARED & ~Texture.STORAGE,
 			samples: 1,
 		} as const;
 	},

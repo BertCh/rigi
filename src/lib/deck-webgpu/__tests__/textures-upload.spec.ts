@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import type { Device, Texture } from "@luma.gl/core";
+import type { Device } from "@luma.gl/core";
 import { describe, expect, it, vi } from "vitest";
 import {
 	floatTexture,
-	generateTextureMipmaps,
 	imageTexture,
 	maskTexture,
 	placeholderTextures,
@@ -27,6 +26,8 @@ function fakeDevice() {
 			};
 		}),
 		generateMipmapsWebGPU: vi.fn(),
+		getMipLevelCount: (w: number, h: number) =>
+			1 + Math.floor(Math.log2(Math.max(w, h))),
 	};
 	return {
 		device: device as unknown as Device & typeof device,
@@ -88,15 +89,6 @@ describe("imageTexture", () => {
 			mips: true,
 		});
 		expect(made[0].mipLevels).toBe(9);
-	});
-});
-
-describe("generateTextureMipmaps", () => {
-	it("delegates to the device", () => {
-		const { device } = fakeDevice();
-		const t = {} as Texture;
-		generateTextureMipmaps(device, t);
-		expect(device.generateMipmapsWebGPU).toHaveBeenCalledWith(t);
 	});
 });
 

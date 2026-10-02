@@ -4,6 +4,7 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- WebGpuEngine runs only on the deck host: the `host` option and the fallback to the luma-direct host are gone, and a deck host that fails to boot falls back to the WebGL DeckEngine. `hosts/direct.ts` stays for the roll map and the lab. Small wrappers replaced by luma API: `USAGE` → `Texture.*`, `device.getMipLevelCount` / `generateMipmapsWebGPU` inline, `textureFormatDecoder` byte sizes in `gpu/ingest/layout.ts`. Dead `deck/index-width.ts` and `gpu/core/program.ts` (no importers; the haze arg-min uses `GPUProgramCompiler` directly) deleted (browser-unverified).
 - Look, photoprep and terrain GPU paths moved onto vendored luma gpgpu primitives (wave F, browser-unverified). This follows the maximalist rule, with Dawn tolerance checks instead of bit identity:
   - haze gathers → `GPUGather`;
   - haze airlight band and terrain cull compaction → `GPUCompaction`;

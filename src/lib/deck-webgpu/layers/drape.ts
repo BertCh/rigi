@@ -66,7 +66,7 @@
 //   });
 // The drape is drawn in the views listed in settings.views (default: world only — the photo
 // view's colour pass stays classic, as the WebGL offscreen passes forced projectPhoto 0).
-import type { Device, Texture } from "@luma.gl/core";
+import { type Device, Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { CLEAR_AIR_OFF, type ClearAirValues } from "#/lib/look/clear-air";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
@@ -80,7 +80,6 @@ import { PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { type CameraUniforms, photoCameraModule } from "../camera";
 import type { PassContext } from "../pass";
-import { USAGE } from "../targets";
 import type { TerrainShaderPart } from "../terrain";
 import { imageTexture, maskTexture, placeholderTextures } from "../textures";
 
@@ -372,7 +371,7 @@ export class DrapePart {
 			format: "rgba32float",
 			width: 1,
 			height: 1,
-			usage: USAGE.SAMPLE | USAGE.COPY_DST,
+			usage: Texture.SAMPLE | Texture.COPY_DST,
 		});
 		this.noGeometry.writeData(new Float32Array(4) as never, {
 			width: 1,

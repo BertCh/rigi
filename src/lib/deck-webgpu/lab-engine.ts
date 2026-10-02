@@ -11,7 +11,7 @@
 //               + gizmo + trails (+ photo sky / splats / 3D tiles when Step Inside is used)
 // The foundation-only lab (terrain + present) is still there with ?core=1 (lab.ts).
 //
-// Query: ?photo=<id> &host=deck|direct &mode=overlay|replace|world &overlay=contours|bands|slope|none
+// Query: ?photo=<id> &mode=overlay|replace|world &overlay=contours|bands|slope|none
 //        &map=satellite|topo|hillshade|bands &debug=geometry|normal|depth
 //        &yaw= &pitch= &roll= &vfov= &align=1 &trails=1 &labels=0 &size=<w>x<h> (fixed CSS size)
 // Harness: window.__engine (the Renderer, like the app's DEV handle) and
@@ -26,7 +26,6 @@ import type { PresentMode } from "./present";
 
 export type EngineLabSearch = {
 	photo?: string;
-	host?: "deck" | "direct";
 	mode?: Settings["mode"];
 	overlay?: Settings["overlayStyle"];
 	map?: Settings["mapStyle"];
@@ -165,9 +164,7 @@ export async function startEngineLab(
 			height: canvas.style.height,
 			pointerEvents: "none",
 		});
-		const engine = new WebGpuEngine(canvas, photo, {
-			host: search.host,
-		});
+		const engine = new WebGpuEngine(canvas, photo);
 		window.__engine = engine;
 		cleanups.push(() => {
 			engine.dispose();

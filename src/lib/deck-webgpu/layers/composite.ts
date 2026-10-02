@@ -37,7 +37,7 @@
 //   composite.setPhoto(imageBitmap); composite.setSettings(compositeFor(settings)); ...
 // Every setter is a composite-only change: it calls requestRender("screen") (one screen pass on the
 // cached offscreen targets, ~1 ms) — never "all".
-import type { Device, Texture } from "@luma.gl/core";
+import { type Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type {
@@ -62,7 +62,6 @@ import {
 	screenModelProps,
 	targetKey,
 } from "../pass";
-import { USAGE } from "../targets";
 import { imageTexture, maskTexture } from "../textures";
 import { colorWGSL, fullscreenWGSL, rampWGSL } from "../wgsl";
 import {
@@ -1287,7 +1286,7 @@ function rgbaTexture(device: Device, data: Uint8Array, w: number, h: number) {
 		format: "rgba8unorm",
 		width: w,
 		height: h,
-		usage: USAGE.SAMPLE | USAGE.COPY_DST,
+		usage: Texture.SAMPLE | Texture.COPY_DST,
 		sampler: LINEAR_CLAMP,
 	});
 	tex.writeData(data as never, { width: w, height: h, bytesPerRow: w * 4 });
@@ -1300,7 +1299,7 @@ function makePlaceholders(device: Device) {
 		format: "rgba8unorm-srgb",
 		width: 1,
 		height: 1,
-		usage: USAGE.SAMPLE | USAGE.COPY_DST,
+		usage: Texture.SAMPLE | Texture.COPY_DST,
 		sampler: LINEAR_CLAMP,
 	});
 	photo.writeData(new Uint8Array([0, 0, 0, 255]) as never, {

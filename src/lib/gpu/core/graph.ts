@@ -1073,8 +1073,7 @@ export function cachedGraph<P, X = undefined>(
 }
 
 /**
- * cachedGraph for a graph the caller creates itself (e.g. core/program.ts compileProgramGraph, whose
- * ComputeGraph adopts a program compiler's graph): `make(id)` returns the graph (id `${group}|${key}`,
+ * cachedGraph for a graph the caller creates itself: `make(id)` returns the graph (id `${group}|${key}`,
  * not compiled) and the extra. Same cache, LRU, lease and device-loss rules as cachedGraph.
  */
 export function cachedGraphFrom<P, X = undefined>(
