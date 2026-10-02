@@ -40,6 +40,7 @@ import { sunColor } from "../../look/sun";
 import { srgbToLinear } from "../../style/color";
 import type { ComputeGraph, GraphBinding } from "../core/graph";
 import { GPUScan, type GraphBufferHandle } from "../core/luma";
+import { LOOK_SUBGROUP_GROUP, statsSubgroupsOn } from "./color-stats";
 import {
 	HZ_BIN,
 	HZ_CNT,
@@ -49,6 +50,7 @@ import {
 	HZ_HIST,
 	HZ_PREP,
 	HZ_SCAN,
+	HZ_SCAN_SG,
 	HZ_SCATTER,
 	HZ_SEL_INIT,
 	HZ_STARTS,
@@ -92,11 +94,21 @@ export const K_HZ_HIST = defineKernel("hz-hist", HZ_HIST, [
 	["state", "read-only-storage"],
 	["hist", "storage"],
 ]);
-export const K_HZ_SCAN = defineKernel("hz-scan", HZ_SCAN, [
+const SCAN_LAYOUT: [string, "uniform" | "read-only-storage" | "storage"][] = [
 	["prm", "uniform"],
 	["hist", "read-only-storage"],
 	["state", "storage"],
-]);
+];
+export const K_HZ_SCAN = defineKernel("hz-scan", HZ_SCAN, SCAN_LAYOUT);
+/** HZ_SCAN by subgroupInclusiveAdd (same bits; needs the "subgroups" feature, its own warm-up group). */
+export const K_HZ_SCAN_SG = defineKernel(
+	"hz-scan-sg",
+	HZ_SCAN_SG,
+	SCAN_LAYOUT,
+	{ group: LOOK_SUBGROUP_GROUP },
+);
+/** The subgroup scan applies: the device has subgroups and ?statsSubgroups is not off. */
+export const hazeScanSubgroupsOn = (device: Device) => statsSubgroupsOn(device);
 export const K_HZ_CNT = defineKernel("hz-cnt", HZ_CNT, [
 	["prm", "uniform"],
 	["bins", "read-only-storage"],

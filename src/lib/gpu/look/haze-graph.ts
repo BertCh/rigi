@@ -78,6 +78,7 @@ import {
 	gridUploads,
 	HM_PRIOR,
 	hazeFitTail,
+	hazeScanSubgroupsOn,
 	K_HZ_BIN,
 	K_HZ_CNT,
 	K_HZ_DILH,
@@ -86,6 +87,7 @@ import {
 	K_HZ_HIST,
 	K_HZ_PREP,
 	K_HZ_SCAN,
+	K_HZ_SCAN_SG,
 	K_HZ_SCATTER,
 	K_HZ_SEL_INIT,
 	NBINS,
@@ -223,10 +225,11 @@ function prepGraphFor(
 	device: Device,
 	N: number,
 ): CachedGraph<PrepParams, undefined> {
+	const scanSg = hazeScanSubgroupsOn(device);
 	return cachedGraph<PrepParams, undefined>(
 		device,
 		"look-haze-prep",
-		`n${N}`,
+		`n${N}${scanSg ? "-sg" : ""}`,
 		(g) => {
 			const nBlk = Math.ceil(N / BLOCK);
 			const uni = (id: string, bytes: number) =>
@@ -300,7 +303,7 @@ function prepGraphFor(
 				});
 				g.addKernel({
 					id: `scan${p}`,
-					spec: K_HZ_SCAN,
+					spec: scanSg ? K_HZ_SCAN_SG : K_HZ_SCAN,
 					bindings: { prm: pass[p], hist, state },
 					workgroups: [SCAN_GROUPS],
 				});

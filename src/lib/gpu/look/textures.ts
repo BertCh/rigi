@@ -106,6 +106,7 @@ import {
 	HZ_HIST,
 	HZ_PREP,
 	HZ_SCAN,
+	HZ_SCAN_SG,
 	HZ_SEL_INIT,
 	SEL,
 } from "./haze.wgsl";
@@ -204,11 +205,17 @@ const K_HZ_HIST = buf("hz-hist", HZ_HIST, [
 	["state", "read-only-storage"],
 	["hist", "storage"],
 ]);
-const K_HZ_SCAN = buf("hz-scan", HZ_SCAN, [
+const HZ_SCAN_LAYOUT: [string, BindKind][] = [
 	["prm", "uniform"],
 	["hist", "read-only-storage"],
 	["state", "storage"],
-]);
+];
+const K_HZ_SCAN = buf("hz-scan", HZ_SCAN, HZ_SCAN_LAYOUT);
+// HZ_SCAN by subgroupInclusiveAdd (same bits); needs the "subgroups" feature: its own warm-up group
+const K_HZ_SCAN_SG = defineKernel("hz-scan-sg", HZ_SCAN_SG, HZ_SCAN_LAYOUT, {
+	group: `${GROUP}-subgroups`,
+	label: "look-tex-hz-scan-sg",
+});
 
 // Kernels that read textures: core/kernel's layout covers buffers only, so these build their own
 // pipeline (explicit layout for the name → location map; the WGSL's auto layout makes the
@@ -1516,7 +1523,8 @@ function hazeGraph(
 		step: number;
 	},
 ) {
-	return cachedGraph(device, key, () => {
+	const scanSg = statsSubgroupsOn(device);
+	return cachedGraph(device, scanSg ? `${key}-sg` : key, () => {
 		const { W, H, pw, ph } = d;
 		const N = W * H;
 		const g = new ComputeGraph(device, `look-tex-${key}`);
@@ -1674,7 +1682,7 @@ function hazeGraph(
 			});
 			g.addKernel({
 				id: `scan${p}`,
-				spec: K_HZ_SCAN,
+				spec: scanSg ? K_HZ_SCAN_SG : K_HZ_SCAN,
 				bindings: { prm: pp, hist, state },
 				// one workgroup per selection (haze.ts SCAN_GROUPS)
 				workgroups: [SEL],

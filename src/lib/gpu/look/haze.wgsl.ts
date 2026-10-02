@@ -235,6 +235,82 @@ fn main(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) l
 }
 `;
 
+/**
+ * HZ_SCAN with the workgroup inclusive scan done by subgroupInclusiveAdd (needs the "subgroups"
+ * feature): each subgroup scans its lanes' sums, its last lane posts the subgroup total, and a lane
+ * adds the totals of the subgroups before its own. u32 adds are associative, so incl / excl are
+ * bit-identical to HZ_SCAN's. Rows are indexed by local_invocation_index / subgroup_size, which
+ * assumes subgroups are contiguous runs of it (true for 1-D workgroups on Metal / Vulkan / D3D, not
+ * guaranteed by WGSL): every subgroup checks that, and when any fails the whole workgroup (uniformly)
+ * redoes the scan with HZ_SCAN's shared-memory steps, so no re-run is needed. Needs subgroup_size >= 4
+ * (else the check fails too). The subgroup ops run in uniform control flow.
+ */
+export const HZ_SCAN_SG = /* wgsl */ `enable subgroups;
+${SEL_COMMON}
+@group(0) @binding(0) var<uniform> prm: S;
+@group(0) @binding(1) var<storage, read> hist: array<u32>;
+@group(0) @binding(2) var<storage, read_write> state: array<vec2<u32>>;
+var<workgroup> part: array<u32, 256>;
+var<workgroup> sgTotal: array<u32, 64>;
+var<workgroup> layoutBad: atomic<u32>;
+var<workgroup> layoutFlag: u32;
+var<workgroup> st0: vec2<u32>;
+@compute @workgroup_size(256)
+fn main(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) lid: u32,
+        @builtin(subgroup_invocation_id) sid: u32, @builtin(subgroup_size) ssz: u32) {
+  let s = wg.x;
+  let p = prm.pass_;
+  let bits = bitsOf(p);
+  let nb = 1u << bits;
+  let per = nb >> 8u;
+  let b0 = select(s, s & ~3u, p == 0u) * ${BUCKETS}u + lid * per;
+  if (lid == 0u) { st0 = state[s]; }
+  var loc = 0u;
+  for (var k = 0u; k < per; k++) { loc += hist[b0 + k]; }
+  // subgroup s covers lanes first .. first + ssz - 1 of the workgroup, first a multiple of ssz
+  let first = subgroupBroadcastFirst(lid);
+  let ok = subgroupAll(ssz >= 4u && lid == first + sid && first % ssz == 0u);
+  let inSub = subgroupInclusiveAdd(loc);
+  let row = lid / ssz;
+  if (sid == ssz - 1u) { sgTotal[row] = inSub; }
+  if (!ok) { atomicStore(&layoutBad, 1u); }
+  workgroupBarrier();
+  if (lid == 0u) { layoutFlag = atomicLoad(&layoutBad); }
+  // workgroupUniformLoad has its own barrier, so the branch below is uniform control flow
+  var incl = 0u;
+  if (workgroupUniformLoad(&layoutFlag) == 0u) {
+    var before = 0u;
+    for (var r = 0u; r < row; r++) { before += sgTotal[r]; }
+    incl = inSub + before;
+  } else {
+    part[lid] = loc;
+    workgroupBarrier();
+    for (var off = 1u; off < 256u; off <<= 1u) {
+      var v = 0u;
+      if (lid >= off) { v = part[lid - off]; }
+      workgroupBarrier();
+      part[lid] += v;
+      workgroupBarrier();
+    }
+    incl = part[lid];
+  }
+  let st = st0;
+  let excl = incl - loc;
+  if (excl <= st.y && st.y < incl) {
+    var cum = excl;
+    var d = 0u;
+    for (; d < per; d++) {
+      let h = hist[b0 + d];
+      if (cum + h > st.y) { break; }
+      cum += h;
+    }
+    state[s] = vec2<u32>((st.x << bits) | (lid * per + d), st.y - cum);
+  } else if (lid == 255u && incl <= st.y) {
+    state[s] = vec2<u32>((st.x << bits) | (nb - 1u), st.y - incl);
+  }
+}
+`;
+
 /** Representative lists: one per (bin, channel), L = bin·3 + channel. */
 export const LISTS = NBINS * 3;
 /** Pixels per compaction block (one invocation each, walked in pixel order). */
