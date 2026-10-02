@@ -9,7 +9,7 @@
  */
 import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
-import { navigatorGpu, peekWebGPUAdapter } from "#/lib/gpu/adapter-peek";
+import { createOrtSessionFromBytes, shareOrtDevice } from "#/lib/models/ort";
 import { type ModelRun, modelSize, normalise, resamplePlanes } from "./core";
 
 /**
@@ -47,125 +47,24 @@ export interface SkyModel {
 	ortDevice?: Device;
 }
 
-/** ORT's GPUDevice when its WebGPU EP has already created one (else undefined). */
-function initialisedOrtDevice(): Promise<GPUDevice> | GPUDevice | undefined {
-	const d = Object.getOwnPropertyDescriptor(ort.env.webgpu, "device");
-	return d && "value" in d && d.value ? d.value : undefined;
-}
-
-/**
- * Makes ORT's WebGPU EP run on `device` (one device for the model and the caller's compute), if ORT
- * has not created its device yet. Returns whether ORT now uses `device`.
- *
- * ORT 1.30's JSEP build (the "onnxruntime-web" bundle) ignores `env.webgpu.device` on the way in:
- * its backend always calls `adapter.requestDevice()` and then overwrites `env.webgpu.device`. It does
- * honour `env.webgpu.adapter` (any object with `limits`, `features` and `requestDevice`), so we hand
- * it an adapter whose requestDevice resolves `device`. Once ORT is initialised, `env.webgpu.device`
- * is ORT's device and `env.webgpu.adapter` is read-only, so a later call only reports the match.
- */
-export async function shareOrtDevice(device: GPUDevice): Promise<boolean> {
-	const env = ort.env.webgpu as unknown as {
-		device?: GPUDevice | Promise<GPUDevice>;
-		adapter?: unknown;
-	};
-	const d = Object.getOwnPropertyDescriptor(env, "device");
-	if (d && "value" in d && d.value) return (await d.value) === device;
-	const info = (device as { adapterInfo?: unknown }).adapterInfo;
-	try {
-		env.adapter = {
-			limits: device.limits,
-			features: device.features,
-			info,
-			requestAdapterInfo: async () => info,
-			requestDevice: async () => device,
-		};
-	} catch {
-		return false;
-	}
-	return true;
-}
-
-/**
- * True when WebGPU has a hardware adapter. Software adapters (SwiftShader,
- * e.g. headless Chromium or blocklisted GPUs) run this model ~40× slower
- * than WASM, so they're skipped unless WebGPU is explicitly requested.
- */
-async function hardwareWebGPU(): Promise<boolean> {
-	type Adapter = {
-		isFallbackAdapter?: boolean;
-		info?: { architecture?: string };
-	};
-	if (!navigatorGpu()) return false;
-	try {
-		const a = (await peekWebGPUAdapter()) as Adapter | null;
-		return (
-			!!a && !a.isFallbackAdapter && a.info?.architecture !== "swiftshader"
-		);
-	} catch {
-		return false;
-	}
-}
+export { shareOrtDevice };
 
 /**
  * Creates the session from model bytes, trying WebGPU first (hardware
- * adapters only, unless `backends` is exactly ["webgpu"]), then WASM.
+ * adapters only, unless `backends` is exactly ["webgpu"]), then WASM
+ * (models/ort.ts createOrtSessionFromBytes, outputs kept on the GPU).
  */
 export async function createSkyModel(
 	bytes: Uint8Array,
 	backends: Backend[] = ["webgpu", "wasm"],
 	opts: { device?: GPUDevice } = {},
 ): Promise<SkyModel> {
-	let lastErr: unknown;
-	for (const backend of backends) {
-		if (
-			backend === "webgpu" &&
-			backends.length > 1 &&
-			!(await hardwareWebGPU())
-		)
-			continue;
-		try {
-			const shared =
-				backend === "webgpu" && opts.device
-					? await shareOrtDevice(opts.device)
-					: false;
-			// ORT already runs on another device (not the caller's): attach it for refine (luma #3313),
-			// ORT keeps ownership. Needs its device now, before the session, to keep the output on the GPU.
-			let attached: Device | undefined;
-			if (backend === "webgpu" && opts.device && !shared) {
-				try {
-					const g = await initialisedOrtDevice();
-					if (g && g !== opts.device) {
-						const { attachWebGPUDevice } = await import("#/lib/gpu/core/luma");
-						attached = await attachWebGPUDevice(g, { id: "rigi-ort" });
-					}
-				} catch (e) {
-					console.warn("[sky] could not attach ORT's device", e);
-				}
-			}
-			const session = await ort.InferenceSession.create(bytes, {
-				executionProviders: [backend],
-				graphOptimizationLevel: "all",
-				...((shared || attached) && {
-					preferredOutputLocation: "gpu-buffer" as const,
-				}),
-			});
-			const ortDevice = shared
-				? await (ort.env.webgpu as unknown as { device?: unknown }).device
-				: undefined;
-			if (shared && ortDevice !== opts.device)
-				console.warn("[sky] ORT did not take the shared WebGPU device");
-			return {
-				session,
-				backend,
-				sharedDevice:
-					shared && ortDevice === opts.device ? opts.device : undefined,
-				ortDevice: attached,
-			};
-		} catch (e) {
-			lastErr = e;
-		}
-	}
-	throw lastErr ?? new Error("no ONNX Runtime backend available");
+	return createOrtSessionFromBytes(bytes, {
+		backends,
+		device: opts.device,
+		outputOnGpu: true,
+		tag: "[sky]",
+	});
 }
 
 /** The model's raw output: on the CPU, or still on the GPU when the session shares the device. */

@@ -1,0 +1,26 @@
+[
+	{
+		"file": "skyseg-u2netp.873ea284.onnx",
+		"sha256": "873ea2849864d564e63711b6ae930c31bd2ba4746770c06510e60f72eb86c94a",
+		"bytes": 4540720,
+		"licence": "MIT",
+		"source": "https://github.com/xiongzhu666/Sky-Segmentation-and-Post-processing (skysegsmall_sim-opt-fp16 ncnn, commit 1f7811b), converted by src/lib/sky/tools/ncnn2onnx.py",
+		"producer": "scripts/models/skyseg.mjs"
+	},
+	{
+		"file": "selfie_multiclass_256x256.c6748b12.tflite",
+		"sha256": "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0",
+		"bytes": 16371837,
+		"licence": "Apache-2.0",
+		"source": "MediaPipe selfie multiclass segmenter (image_segmenter/selfie_multiclass_256x256/float32/1)",
+		"producer": "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite"
+	},
+	{
+		"file": "deeplab_v3.ff36e24d.tflite",
+		"sha256": "ff36e24d40547fe9e645e2f4e8745d1876d6e38b332d39a82f0bf0f5d1d561b3",
+		"bytes": 2780176,
+		"licence": "Apache-2.0",
+		"source": "MediaPipe DeepLab v3 segmenter (image_segmenter/deeplab_v3/float32/1)",
+		"producer": "https://storage.googleapis.com/mediapipe-models/image_segmenter/deeplab_v3/float32/1/deeplab_v3.tflite"
+	}
+]
