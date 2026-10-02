@@ -104,9 +104,16 @@ reached the same wall: every bundled photo is true-north, so declination changes
 
 | Unit | Commit | What |
 |---|---|---|
-| U1 | (sha on landing) | `pose6dof/geo.ts` `priorsFromPhoto`: null heading/pitch/roll = unknown; spec |
-| U2 | (sha on landing) | `tools/research/geo/prior_audit.py`: dev-only prior-error audit (§2 numbers) |
-| U3 | (sha on landing) | `geocam/priors/heading.ts` `headingControlWindow` + the workspace heading slider (browser-unverified, ledger row) |
+| U1 | cd10b22 | `pose6dof/geo.ts` `priorsFromPhoto`: null heading/pitch/roll = unknown; spec |
+| U2 | cd10b22 | `tools/research/geo/prior_audit.py`: dev-only prior-error audit (§2 numbers) |
+| U3 | 6345569 | `geocam/priors/heading.ts` `headingControlWindow` + the workspace heading slider (browser-unverified, ledger row) |
+
+Iterations: (1) review sweepers (live path; priors + WMM) → U1–U3; (2) independent adversarial review of the
+diff: no defects at medium or above; fixed its two low notes (audit docstring: crops treated as uncropped;
+pose6dof README null rule). Fast tier in the worktree: 109 pass, 5 fail, none in touched files (peer biome
+errors in `roll/import`, ontology storage-key rule in `picker`/`roll/propagate` specs, `flow` timing under
+load, `upload/index.spec.tsx` vite "Denied ID" through the symlinked node_modules, python tooling specs).
+Browser-unverified: U3 (ledger row in `reports/batch-ledger.md`).
 
 ## 6. Plan (later / other owners)
 
