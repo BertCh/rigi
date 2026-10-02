@@ -6,7 +6,8 @@
 // (moge/model/v2.py infer() with force_projection and apply_mask, then its _compute_depth): the
 // focal and z shift from the 64 × 64 samples (./focal-shift.ts), depth = (z + shift) · metric scale
 // on mask > 0.5 and depth > 0, normals zeroed off the mask, intrinsics normalised with the centre at
-// (0.5, 0.5). Pure CPU on arrays already read back (an O(W·H) pass).
+// (0.5, 0.5). Without the normal head (the quantized downloads drop it) the normals come from the metric
+// depth instead (normalsFromDepth). Pure CPU on arrays already read back (O(W·H) passes).
 import type { NearFieldDepth } from "../types";
 import {
 	focalShiftSamples,
@@ -21,7 +22,7 @@ export type DepthNetArrays = {
 	z: Float32Array;
 	/** W·H P(geometry) */
 	mask: Float32Array;
-	/** 3·W·H unit normals, or null */
+	/** 3·W·H unit normals, or null (derived from the depth) */
 	normal: Float32Array | null;
 	/** 64·64·3 and 64·64: the nearest downsamples of the point map and mask */
 	points64: Float32Array;
@@ -41,7 +42,9 @@ export function composeDepth(
 	const n = W * H;
 	const depth = new Float32Array(n);
 	const valid = new Uint8Array(n);
-	const normal = a.normal ? new Float32Array(3 * n) : undefined;
+	let normal: Float32Array | undefined = a.normal
+		? new Float32Array(3 * n)
+		: undefined;
 	for (let k = 0; k < n; k++) {
 		const zs = a.z[k] + shift;
 		if (!(a.mask[k] > 0.5) || !(zs > 0)) continue;
@@ -60,16 +63,94 @@ export function composeDepth(
 			}
 		}
 	}
+	const intrinsicsNorm = intrinsicsFromFocal(focal, W, H);
+	normal ??= normalsFromDepth(depth, valid, W, H, intrinsicsNorm);
 	return {
 		width: W,
 		height: H,
 		depth,
 		valid,
 		...(normal ? { normal } : {}),
-		intrinsicsNorm: intrinsicsFromFocal(focal, W, H),
+		intrinsicsNorm,
 		model,
 		seconds,
 		focal,
 		shift,
 	};
+}
+
+/** Pixel offset of the depth differences: two pixels average out the bilinear head upsampling. */
+const NORMAL_STEP = 2;
+/** A neighbour farther than this relative depth step is across an edge, not on the surface. */
+const NORMAL_EDGE = 0.08;
+
+/**
+ * Unit camera-frame normals (OpenCV: x right, y down, z forward; facing the camera, so z < 0 on a
+ * surface seen head-on) from metric depth, by back-projecting each pixel and crossing the vertical and
+ * horizontal tangents. Each tangent takes the side (±NORMAL_STEP) with the smaller depth change, so a
+ * surface next to an occlusion edge keeps its own slope; with no usable side the normal stays 0 (the
+ * lifts read |n| < 0.5 as "no normal").
+ */
+export function normalsFromDepth(
+	depth: Float32Array,
+	valid: Uint8Array,
+	W: number,
+	H: number,
+	K: { fx: number; fy: number; cx: number; cy: number },
+	opts: { step?: number; edge?: number } = {},
+): Float32Array {
+	const { step: s = NORMAL_STEP, edge = NORMAL_EDGE } = opts;
+	const out = new Float32Array(3 * W * H);
+	const ax = new Float32Array(W);
+	const ay = new Float32Array(H);
+	for (let i = 0; i < W; i++) ax[i] = ((i + 0.5) / W - K.cx) / K.fx;
+	for (let j = 0; j < H; j++) ay[j] = ((j + 0.5) / H - K.cy) / K.fy;
+	/** The tangent towards the better of k - d and k + d as [dx, dy, dz], or null. */
+	const tangent = (
+		z: number,
+		i: number,
+		j: number,
+		di: number,
+		dj: number,
+	): [number, number, number] | null => {
+		let best: [number, number, number] | null = null;
+		let bestDz = Number.POSITIVE_INFINITY;
+		for (const sign of [1, -1]) {
+			const ii = i + sign * di;
+			const jj = j + sign * dj;
+			if (ii < 0 || jj < 0 || ii >= W || jj >= H) continue;
+			const kk = jj * W + ii;
+			if (!valid[kk]) continue;
+			const zz = depth[kk];
+			const dz = Math.abs(zz - z);
+			if (dz > edge * z || dz >= bestDz) continue;
+			bestDz = dz;
+			// oriented along +di / +dj whichever side was used
+			best = [
+				sign * (ax[ii] * zz - ax[i] * z),
+				sign * (ay[jj] * zz - ay[j] * z),
+				sign * (zz - z),
+			];
+		}
+		return best;
+	};
+	for (let j = 0; j < H; j++)
+		for (let i = 0; i < W; i++) {
+			const k = j * W + i;
+			if (!valid[k]) continue;
+			const z = depth[k];
+			const tx = tangent(z, i, j, s, 0);
+			const ty = tangent(z, i, j, 0, s);
+			if (!tx || !ty) continue;
+			// ty × tx faces the camera for a head-on surface (x right, y down)
+			const nx = ty[1] * tx[2] - ty[2] * tx[1];
+			const ny = ty[2] * tx[0] - ty[0] * tx[2];
+			const nz = ty[0] * tx[1] - ty[1] * tx[0];
+			const l = Math.hypot(nx, ny, nz);
+			if (!(l > 0)) continue;
+			out[3 * k] = nx / l;
+			out[3 * k + 1] = ny / l;
+			out[3 * k + 2] = nz / l;
+		}
+	return out;
 }

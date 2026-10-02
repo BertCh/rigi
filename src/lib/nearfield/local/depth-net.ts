@@ -36,14 +36,28 @@ export const MOGE2_VITS = {
 	tokens: [1200, 3600],
 } as const;
 
+/**
+ * Weight files of the same network, chosen by the `nearfieldWeights` flag. `fp16` is the checkpoint as
+ * dumped; `q8` and `q8lite` are scripts/models/quantize.ts outputs (int8, one scale per row; q8lite drops
+ * the normal head, so compose.ts derives normals from the depth), expanded to f16 on the GPU at load.
+ * Against fp16 on 24 photos (scripts/nearfield/depth-weights-eval.ts): depth 0.6% median / 2% p90
+ * after scale alignment, focal 0.3%, normals 0.4° (q8). reports/step-inside-download.md.
+ */
+export const MOGE2_WEIGHTS = {
+	fp16: "moge2-vits-normal.6d404d23.safetensors",
+	q8: "moge2-vits-q8.65924691.safetensors",
+	q8lite: "moge2-vits-q8lite.7a9fc5f9.safetensors",
+} as const;
+export type MogeWeights = keyof typeof MOGE2_WEIGHTS;
+
 /** Size of MoGe's focal / shift recovery downsample (recover_focal_shift downsample_size). */
 export const FOCAL_GRID: readonly [number, number] = [64, 64];
 
 export type DepthNetOutput = {
 	/** [1, H, W] z of the camera-frame affine point map (shift unknown) */
 	z: Tensor;
-	/** [1, H, W, 3] unit normals */
-	normal: Tensor;
+	/** [1, H, W, 3] unit normals; null for weights without the normal head (compose derives them) */
+	normal: Tensor | null;
 	/** [1, H, W] P(geometry) */
 	mask: Tensor;
 	/** [1, 64, 64, 3] nearest downsample of the point map (focal / shift recovery) */
@@ -157,11 +171,19 @@ export class MogeDepthNet {
 	static async load(
 		nn: Nn,
 		opts: {
+			/** a MOGE2_WEIGHTS file (default MOGE2_VITS.file) */
+			file?: string;
 			signal?: AbortSignal;
 			onProgress?: (loaded: number, total: number) => void;
 		} = {},
 	): Promise<MogeDepthNet> {
-		return new MogeDepthNet(nn, await nn.loadWeights(MOGE2_VITS.file, opts));
+		const { file = MOGE2_VITS.file, ...rest } = opts;
+		return new MogeDepthNet(nn, await nn.loadWeights(file, rest));
+	}
+
+	/** fp16 and q8 have the normal head; q8lite drops it (MOGE2_WEIGHTS). */
+	get hasNormalHead(): boolean {
+		return this.weights.has("normal_head.input_blocks.0.weight");
 	}
 
 	private w(name: string): Tensor {
@@ -426,11 +448,13 @@ export class MogeDepthNet {
 				nn.interpolate(pointsNchw, { size: FOCAL_GRID, mode: "nearest" }),
 				[0, 2, 3, 1],
 			);
-			const normal = nn.l2Normalize(
-				nn.permute(head("normal_head"), [0, 2, 3, 1]),
-				3,
-				1e-12,
-			);
+			const normal = this.hasNormalHead
+				? nn.l2Normalize(
+						nn.permute(head("normal_head"), [0, 2, 3, 1]),
+						3,
+						1e-12,
+					)
+				: null;
 			const maskNchw = nn.sigmoid(head("mask_head"));
 			const mask = nn.reshape(maskNchw, [1, outSize[0], outSize[1]]);
 			const mask64 = nn.reshape(

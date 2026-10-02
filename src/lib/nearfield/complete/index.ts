@@ -7,7 +7,9 @@
 //   1. slab diagnosis + reclassification of near-camera ground wrongly classed Object (slab.ts);
 //   2. mixed-depth edge snap and soft rim alpha, applied by lift.liftToGaussians (edge-snap.ts) when the client
 //      depth-lift builds the cloud (the controller passes the LiftOpts);
-//   3. (not built) the behind layer, see completeBehindLayer.
+//   3. people volumes: each person in the people mask is closed into a volume by silhouette inflation (people.ts),
+//      added as `generated` splats; observed edge-ramp strays behind the inferred back are dropped;
+//   4. (not built) the behind layer, see completeBehindLayer.
 //
 // DISPLAY-ONLY CONTRACT. Anything this module ADDS is invented and must never be measurable: it passes
 // through appendCompletionSplats, which asserts it. Steps 1 and 2 only drop or move OBSERVED data and invent
@@ -26,6 +28,11 @@ import {
 } from "../types";
 import type { EdgeSnapOpts, RimAlphaOpts } from "./edge-snap";
 import {
+	completePeople,
+	type PeopleCompletionInput,
+	type PeopleCompletionOpts,
+} from "./people";
+import {
 	diagnoseGroundSlabs,
 	reclassifySlabs,
 	type SlabDiagnosis,
@@ -33,6 +40,11 @@ import {
 } from "./slab";
 
 export { computeRimAlpha, snapMixedDepthEdges } from "./edge-snap";
+export {
+	type BackDepthProvider,
+	completePeople,
+	type PersonGridInstance,
+} from "./people";
 export { diagnoseGroundSlabs, reclassifySlabs } from "./slab";
 
 /** True under ?nearfield=complete (the one place that interprets the value for completion). */
@@ -73,17 +85,15 @@ export function assertCompletionNotMeasurable(
 
 /**
  * The only sanctioned way for completion to ADD splats: asserts `extra` is non-measurable, then appends it
- * after the observed ones. Returns the new scene and the added index range. `extra` must be in ENU like
- * the scene's cloud.
+ * after the observed ones. Returns the new cloud and the added index range. Both clouds must be ENU.
  */
-export function appendCompletionSplats(
-	scene: NearFieldScene,
+export function appendCompletionCloud(
+	a: GaussianCloud,
 	extra: GaussianCloud,
-): { scene: NearFieldScene; range: { start: number; count: number } } {
-	if (extra.frame !== "enu" || scene.splats.frame !== "enu")
+): { splats: GaussianCloud; range: { start: number; count: number } } {
+	if (extra.frame !== "enu" || a.frame !== "enu")
 		throw new Error("appendCompletionSplats: ENU clouds only");
 	assertCompletionNotMeasurable(extra);
-	const a = scene.splats;
 	const n = a.count + extra.count;
 	const cat = <T extends Float32Array | Uint8Array>(x: T, y: T): T => {
 		const out = new (x.constructor as new (n: number) => T)(
@@ -110,7 +120,42 @@ export function appendCompletionSplats(
 	}
 	const range = { start: a.count, count: extra.count };
 	assertCompletionNotMeasurable(splats, range);
+	return { splats, range };
+}
+
+/** appendCompletionCloud on a scene's cloud. */
+export function appendCompletionSplats(
+	scene: NearFieldScene,
+	extra: GaussianCloud,
+): { scene: NearFieldScene; range: { start: number; count: number } } {
+	const { splats, range } = appendCompletionCloud(scene.splats, extra);
 	return { scene: { ...scene, splats }, range };
+}
+
+/**
+ * People volumes on an ENU cloud (people.ts): drops the observed strays behind each inferred back and appends
+ * the generated volume splats. Used by completeScene and by the landing demo's baked scene.
+ */
+export function applyPeopleCompletion(
+	input: PeopleCompletionInput,
+	opts: PeopleCompletionOpts = {},
+): { splats: GaussianCloud; added: number; removed: number; people: number } {
+	const res = completePeople(input, opts);
+	let splats = input.cloud;
+	if (res.strays.length) {
+		const drop = new Uint8Array(splats.count);
+		for (const i of res.strays) drop[i] = 1;
+		const keep: number[] = [];
+		for (let i = 0; i < splats.count; i++) if (!drop[i]) keep.push(i);
+		splats = selectSplats(splats, keep);
+	}
+	if (res.added.count) splats = appendCompletionCloud(splats, res.added).splats;
+	return {
+		splats,
+		added: res.added.count,
+		removed: res.strays.length,
+		people: res.instances.length,
+	};
 }
 
 /**
@@ -137,6 +182,8 @@ export type CompleteContext = {
 
 export type CompleteOpts = {
 	slab?: SlabParams | false;
+	/** People volumes (people.ts); needs ctx.peopleMask. False = off. */
+	people?: PeopleCompletionOpts | false;
 	/** Reserved: throws (see completeBehindLayer). */
 	behindLayer?: boolean;
 };
@@ -146,8 +193,10 @@ export type CompleteResult = {
 	slab: SlabDiagnosis | null;
 	/** Observed splats dropped because their cell was reclassified to Terrain. */
 	removedSplats: number;
-	/** Splats added by completion (always 0 until the behind layer exists); all non-measurable. */
+	/** Splats added by completion (people volumes); all non-measurable. */
 	addedSplats: number;
+	/** Person instances closed into volumes. */
+	people: number;
 };
 
 /**
@@ -214,7 +263,33 @@ export function completeScene(
 			};
 		}
 	}
-	return { scene: out, slab, removedSplats: removed, addedSplats: 0 };
+	let added = 0;
+	let people = 0;
+	if (opts.people !== false && ctx.peopleMask) {
+		const res = applyPeopleCompletion(
+			{
+				cloud: out.splats,
+				pose: ctx.pose,
+				eye: ctx.eye,
+				K: ctx.K,
+				// intrinsicsFromPose: fx = 0.5 / (t * aspect), fy = 0.5 / t
+				aspect: ctx.K.fy / ctx.K.fx,
+				peopleMask: ctx.peopleMask,
+			},
+			opts.people || {},
+		);
+		out = { ...out, splats: res.splats };
+		removed += res.removed;
+		added = res.added;
+		people = res.people;
+	}
+	return {
+		scene: out,
+		slab,
+		removedSplats: removed,
+		addedSplats: added,
+		people,
+	};
 }
 
 /** Indices of the splats whose photo-camera cell is NOT in `mask` (off-image splats are kept). */

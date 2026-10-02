@@ -179,7 +179,63 @@ export function StepInsideDemo({ className }: { className?: string }) {
 			if (!live) return;
 			engine.setPose(baked.pose);
 			if (!(await engine.readback()) || !live) return;
-			const splats = splatIo.SplatV1Loader.parseSync(splatBuf);
+			let splats = splatIo.SplatV1Loader.parseSync(splatBuf);
+			// ?nearfield=complete (experiment): close the person into a volume (complete/people.ts). Segments the
+			// photo with the people model, so the default landing never downloads it
+			if (flags.getFlag("nearfield") === "complete") {
+				const [{ segmentForeground }, complete, geom] = await Promise.all([
+					import("#/lib/segment"),
+					import("#/lib/nearfield/complete"),
+					import("#/lib/nearfield/geom"),
+				]);
+				const img = new Image();
+				img.src = baked.photo.src;
+				await img.decode();
+				const mask = await segmentForeground(img);
+				if (!live) return;
+				if (mask) {
+					const input = {
+						cloud: splats,
+						pose: baked.pose,
+						eye: { ...engine.eye },
+						K: geom.intrinsicsFromPose(baked.pose, engine.aspect),
+						aspect: engine.aspect,
+						peopleMask: mask,
+					};
+					// ?peopleBody=on: the back comes from a body fit (ViTPose on nn + Anny, src/lib/body); the
+					// inflation-only pass gives the person boxes. A failure keeps the inflation
+					let backDepth:
+						| import("#/lib/nearfield/complete").BackDepthProvider
+						| null = null;
+					if (flags.getFlag("peopleBody") === "on") {
+						try {
+							const [body, { createNn }, { imageToRGBA }] = await Promise.all([
+								import("#/lib/body/back-depth"),
+								import("#/lib/nn"),
+								import("#/lib/nearfield/scene"),
+							]);
+							const first = complete.completePeople(input);
+							const image = imageToRGBA(img, 2048);
+							if (image && first.instances.length)
+								backDepth = (
+									await body.prepareBodyBackDepth({
+										nn: await createNn(),
+										image,
+										boxes: body.boxesFromInstances(
+											first.instances,
+											first.gridWidth,
+											first.gridHeight,
+										),
+									})
+								).backDepth;
+						} catch (err) {
+							console.warn("[step demo] body fit failed", err);
+						}
+						if (!live) return;
+					}
+					splats = complete.applyPeopleCompletion(input, { backDepth }).splats;
+				}
+			}
 			const cls = new Uint8Array(clsBuf);
 			const scene: import("#/lib/nearfield/measure").MeasurableScene = {
 				photoId: photo.id,

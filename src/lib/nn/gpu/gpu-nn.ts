@@ -19,7 +19,13 @@ import {
 	type UnaryPrim,
 } from "../base";
 import { fetchModel } from "../fetch";
-import { halfToFloat32, parseSafetensors } from "../safetensors";
+import { splitQuantized } from "../quant";
+import {
+	entryF32,
+	halfToFloat32,
+	parseSafetensors,
+	type SafeTensorEntry,
+} from "../safetensors";
 import {
 	broadcastStrides,
 	type ConvParams,
@@ -46,6 +52,7 @@ import {
 	type Epilogue,
 	matmulKernel,
 } from "./k-gemm";
+import { dequantKernel } from "./k-quant";
 import {
 	groupNormKernel,
 	l2NormKernel,
@@ -222,24 +229,91 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			onProgress?: (loaded: number, total: number) => void;
 		} = {},
 	): Promise<Weights> {
-		return this.weightsFromBytes(await fetchModel(file, opts));
+		const w = this.weightsFromBytes(await fetchModel(file, opts));
+		// quantized files: surface a failed dequant submission here, not at the first forward
+		await this.dequantDone;
+		return w;
 	}
+
+	/** The last weightsFromBytes' dequant submission (resolved when it had none). */
+	private dequantDone: Promise<void> = Promise.resolve();
 
 	weightsFromBytes(bytes: ArrayBuffer | Uint8Array): Weights {
 		const st = parseSafetensors(bytes);
+		const { plain, quantized } = splitQuantized(st.entries, st.metadata);
 		const map = new Map<string, GpuTensor>();
-		for (const [name, e] of st.entries) {
+		const upload = (e: SafeTensorEntry) => {
 			let data: ArrayBufferView;
 			let dtype: DType = "f32";
 			if (e.half && this.backend.f16) {
 				data = e.half;
 				dtype = "f16";
-			} else data = e.data ?? halfToFloat32(e.half as Uint16Array);
+			} else data = e.data ?? entryF32(e);
 			const s = this.runtime.upload(data, dtype, true);
-			s.pinned = true;
-			map.set(name, new GpuTensor(e.shape, dtype, s));
+			return new GpuTensor(e.shape, dtype, s);
+		};
+		for (const e of plain) {
+			const t = upload(e);
+			t.st.pinned = true;
+			map.set(e.name, t);
+		}
+		if (quantized.length) {
+			// one dequant node per weight on the implicit recording, submitted right away; the packed
+			// words and scales are freed once that submission is queued
+			const packed: GpuTensor[] = [];
+			const out: DType = this.backend.f16 ? "f16" : "f32";
+			for (const { name, info, q, scale } of quantized) {
+				const numel = info.shape.reduce((a, v) => a * v, 1);
+				const qt = new GpuTensor(
+					[q.byteLength],
+					"f32",
+					this.runtime.upload(q, "f32", true),
+				);
+				const sc = upload(scale);
+				packed.push(qt, sc);
+				const rows = info.shape[0] ?? 1;
+				const call = dequantKernel(
+					info.bits,
+					out,
+					sc.dtype,
+					numel,
+					numel / rows,
+					info.group,
+				);
+				const rec = this.current();
+				const bytesOut = Math.max(
+					4,
+					Math.ceil((numel * (out === "f16" ? 2 : 4)) / 4) * 4,
+				);
+				const s = new Storage(bytesOut, out, rec);
+				s.exact = true;
+				s.pinned = true;
+				rec.produced.push(s);
+				rec.nodes.push({
+					spec: call.spec,
+					inputs: [qt.st, sc.st],
+					outputs: [s],
+					meta: call.meta,
+					wg: call.wg,
+				});
+				map.set(name, new GpuTensor(info.shape, out, s));
+			}
+			const done = this.flushImplicit();
+			this.dequantDone = done;
+			done.then(
+				() => this.freePacked(packed),
+				() => this.freePacked(packed),
+			);
 		}
 		return new GpuWeights(map, st.metadata);
+	}
+
+	private freePacked(ts: GpuTensor[]) {
+		for (const t of ts) {
+			t.st.buffer?.destroy();
+			t.st.buffer = null;
+			t.st.state = "disposed";
+		}
 	}
 
 	fromArray(

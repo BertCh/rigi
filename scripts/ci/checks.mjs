@@ -641,6 +641,23 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "body-vitpose",
+		tier: "fast",
+		group: "nearfield",
+		cmd: tsx("src/lib/body/vitpose.check.ts"),
+		needs: ["public/models/vitpose-b.71b52d25.safetensors"],
+		note: "ViTPose-B on src/lib/nn vs PyTorch (per layer, keypoints; CPU, + GPU with DAWN_DIR); the reference is made by scripts/models/vitpose.py --dump-ref",
+		timeoutS: 300,
+	},
+	{
+		id: "body-anny",
+		tier: "fast",
+		group: "nearfield",
+		cmd: tsx("src/lib/body/anny.check.ts"),
+		needs: ["public/models/anny-lod10.7f7971fa.safetensors"],
+		note: "Anny LOD10 evaluator (shape + LBS) vs its numpy twin and Anny's full rig; reference by scripts/models/anny.py --dump-ref",
+	},
+	{
 		id: "nearfield-lift-dawn",
 		tier: "fast",
 		group: "nearfield",

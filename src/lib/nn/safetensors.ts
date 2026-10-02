@@ -5,15 +5,17 @@
 // safetensors parsing (https://github.com/huggingface/safetensors): an 8-byte little-endian header
 // length, a JSON header { name: { dtype, shape, data_offsets: [begin, end] }, __metadata__? }, then
 // the raw little-endian tensor bytes. F16 tensors stay as raw half words (the GPU backend keeps them
-// f16 when the device has shader-f16); everything else is widened to f32.
+// f16 when the device has shader-f16), U8 tensors as raw bytes (packed quantized weights, ./quant.ts);
+// everything else is widened to f32.
 
 export type SafeTensorEntry = {
 	name: string;
 	shape: number[];
-	/** storage after parsing: "f16" = raw half words in `half`, otherwise f32 in `data` */
-	dtype: "f32" | "f16";
+	/** storage after parsing: "f16" = raw half words in `half`, "u8" = raw bytes in `bytes`, otherwise f32 in `data` */
+	dtype: "f32" | "f16" | "u8";
 	data?: Float32Array;
 	half?: Uint16Array;
+	bytes?: Uint8Array;
 };
 
 export type SafeTensors = {
@@ -123,8 +125,9 @@ export function parseSafetensors(bytes: ArrayBuffer | Uint8Array): SafeTensors {
 		const n = t.shape.reduce((a, v) => a * v, 1);
 		if (e - b !== n * width || base + e > u8.byteLength)
 			throw new Error(`safetensors: bad offsets for ${name}`);
-		// copy so the result is aligned and independent of the source buffer
-		const raw = u8.slice(base + b, base + e);
+		// copy so the result is aligned and independent of the source buffer (Uint8Array's slice: a node
+		// Buffer's own slice is a view, whose .buffer would be the whole file)
+		const raw = Uint8Array.prototype.slice.call(u8, base + b, base + e);
 		const rv = new DataView(raw.buffer);
 		const entry: SafeTensorEntry = { name, shape: [...t.shape], dtype: "f32" };
 		switch (t.dtype) {
@@ -134,6 +137,10 @@ export function parseSafetensors(bytes: ArrayBuffer | Uint8Array): SafeTensors {
 			case "F16":
 				entry.dtype = "f16";
 				entry.half = new Uint16Array(raw.buffer);
+				break;
+			case "U8":
+				entry.dtype = "u8";
+				entry.bytes = raw;
 				break;
 			default: {
 				const out = new Float32Array(n);
@@ -172,15 +179,20 @@ export function parseSafetensors(bytes: ArrayBuffer | Uint8Array): SafeTensors {
 	return { entries, metadata: header.__metadata__ ?? {} };
 }
 
-/** f32 view of an entry (widening f16). */
+/** f32 view of an entry (widening f16 and u8). */
 export const entryF32 = (e: SafeTensorEntry): Float32Array =>
-	e.data ?? halfToFloat32(e.half as Uint16Array);
+	e.data ??
+	(e.half ? halfToFloat32(e.half) : Float32Array.from(e.bytes as Uint8Array));
 
 /** Build a safetensors file (tests, producers in TS). */
 export function encodeSafetensors(
 	tensors: Record<
 		string,
-		{ shape: number[]; data: Float32Array | Uint16Array; dtype?: "F32" | "F16" }
+		{
+			shape: number[];
+			data: Float32Array | Uint16Array | Uint8Array;
+			dtype?: "F32" | "F16" | "U8";
+		}
 	>,
 	metadata?: Record<string, string>,
 ): Uint8Array {
@@ -189,7 +201,13 @@ export function encodeSafetensors(
 	let off = 0;
 	const parts: Uint8Array[] = [];
 	for (const [name, t] of Object.entries(tensors)) {
-		const dtype = t.dtype ?? (t.data instanceof Uint16Array ? "F16" : "F32");
+		const dtype =
+			t.dtype ??
+			(t.data instanceof Uint16Array
+				? "F16"
+				: t.data instanceof Uint8Array
+					? "U8"
+					: "F32");
 		const bytes = new Uint8Array(
 			t.data.buffer.slice(
 				t.data.byteOffset,

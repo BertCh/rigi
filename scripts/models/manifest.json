@@ -70,5 +70,37 @@
 		"licence": "MIT",
 		"source": "MoGe-2 ViT-S normal (Ruicheng/moge-2-vits-normal @ 26b477f4, MIT; DINOv2-S backbone Apache-2.0), state_dict as fp16 safetensors (image mean/std fp32)",
 		"producer": "scripts/models/moge2-vits.py"
+	},
+	{
+		"file": "vitpose-b.71b52d25.safetensors",
+		"sha256": "71b52d25f68bc8df7904691c747894f364f3ec63fbb048849c44255f32103b28",
+		"bytes": 171836482,
+		"licence": "Apache-2.0",
+		"source": "ViTPose-B simple (HF usyd-community/vitpose-base-simple @ a93ac0c6, Apache-2.0; ViTPose code Apache-2.0), qkv fused, pos embed folded, fp16",
+		"producer": "scripts/models/vitpose.py"
+	},
+	{
+		"file": "anny-lod10.7f7971fa.safetensors",
+		"sha256": "7f7971fa1e5312d57174e6d7182186bd711050236b2dda6b3ebe8805ad709919",
+		"bytes": 98882,
+		"licence": "Apache-2.0 AND CC0-1.0",
+		"source": "Anny 0.6.1 (pypi anny, naver/anny: code Apache-2.0, MakeHuman/MPFB2 assets CC0), topology notoes_collapse10pc, linear phenotype basis (height, gender, weight, proportions), 13-bone reduced rig, top-4 skin, COCO-17 keypoint regressor, fp16",
+		"producer": "scripts/models/anny.py"
+	},
+	{
+		"file": "moge2-vits-q8.65924691.safetensors",
+		"sha256": "65924691a583f081af0bbbee07035505dcef66687d00bf74a3e498db0a77d5f3",
+		"bytes": 36112520,
+		"licence": "MIT AND Apache-2.0",
+		"source": "moge2-vits-normal.6d404d23.safetensors (MoGe-2 ViT-S normal, Ruicheng/moge-2-vits-normal @ 26b477f4, MIT; DINOv2-S Apache-2.0), int8 weights with one scale per row",
+		"producer": "scripts/models/quantize.ts --preset moge2-q8"
+	},
+	{
+		"file": "moge2-vits-q8lite.7a9fc5f9.safetensors",
+		"sha256": "7a9fc5f9da6d204fb7da66b71369ef0f809358418ebe54e962a6646bc44fa99e",
+		"bytes": 32960002,
+		"licence": "MIT AND Apache-2.0",
+		"source": "moge2-vits-normal.6d404d23.safetensors (MoGe-2 ViT-S normal, Ruicheng/moge-2-vits-normal @ 26b477f4, MIT; DINOv2-S Apache-2.0), normal head dropped, int8 weights with one scale per row",
+		"producer": "scripts/models/quantize.ts --preset moge2-q8lite"
 	}
 ]

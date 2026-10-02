@@ -26,6 +26,7 @@ import {
 	resizeFast,
 } from "./cpu-fast";
 import { fetchModel } from "./fetch";
+import { dequantize, splitQuantized } from "./quant";
 import { entryF32, parseSafetensors } from "./safetensors";
 import {
 	type ConvParams,
@@ -211,8 +212,11 @@ export class CpuNn extends BaseNn<CpuTensor> {
 	}
 	weightsFromBytes(bytes: ArrayBuffer | Uint8Array): Weights {
 		const st = parseSafetensors(bytes);
+		const { plain, quantized } = splitQuantized(st.entries, st.metadata);
 		const map = new Map<string, CpuTensor>();
-		for (const [name, e] of st.entries) map.set(name, t(e.shape, entryF32(e)));
+		for (const e of plain) map.set(e.name, t(e.shape, entryF32(e)));
+		for (const { name, info, q, scale } of quantized)
+			map.set(name, t(info.shape, dequantize(q, entryF32(scale), info)));
 		return new CpuWeights(map, st.metadata);
 	}
 	fromArray(

@@ -22,6 +22,11 @@ import {
 } from "#/lib/nearfield/controller";
 import { median } from "#/lib/nearfield/geom";
 import type { MeasurableScene, NearFieldSample } from "#/lib/nearfield/measure";
+import {
+	currentConnection,
+	PREFETCH_DELAY_MS,
+	prefetchAllowed,
+} from "#/lib/nearfield/prefetch";
 import type {
 	StepCamera,
 	StepInsideOpts,
@@ -162,6 +167,15 @@ export function useStepInside(opts: {
 		};
 	}, [ready, engineRef, photo, camGone]);
 
+	// fetch the depth model's weights in the background once the pose is accepted (not on slow or
+	// save-data connections), so pressing Step Inside rarely waits on the download
+	useEffect(() => {
+		if (!ctl || !available || !accepted) return;
+		if (!prefetchAllowed(currentConnection())) return;
+		const t = window.setTimeout(() => void ctl.prefetch(), PREFETCH_DELAY_MS);
+		return () => window.clearTimeout(t);
+	}, [ctl, available, accepted]);
+
 	// the engine leaves the step camera on a view switch (overlay / blend / In map): follow it
 	useEffect(() => {
 		void worldMode;
@@ -215,12 +229,13 @@ export function useStepInside(opts: {
 		const engine = engineRef.current as StepEngine | null;
 		if (!c || !engine?.enterStepInside || !acceptedRef.current) return;
 		const sig0 = poseSigRef.current;
-		void (async () => {
-			const scene = await c.build();
-			if (!scene || ctlRef.current !== c || engineRef.current !== engine)
-				return;
-			// the build takes 10-60 s: the pose may have changed (auto-align) or lost its accepted state
-			if (!acceptedRef.current || poseSigRef.current !== sig0) return;
+		// the build takes 10-60 s: the pose may have changed (auto-align) or lost its accepted state
+		const stale = () =>
+			ctlRef.current !== c ||
+			engineRef.current !== engine ||
+			!acceptedRef.current ||
+			poseSigRef.current !== sig0;
+		const stepInto = (scene: MeasurableScene) => {
 			c.show({ truth: truthRef.current, maskDrape: true });
 			engine.enterStepInside?.({
 				radius: scene.confidenceRadius,
@@ -231,6 +246,26 @@ export function useStepInside(opts: {
 				},
 			});
 			camEntered(engine, "step");
+		};
+		// terrain-only preview (DEM range) while the depth model loads: step in on it at once
+		let viaPreview = false;
+		const onPreview = (scene: MeasurableScene) => {
+			if (viaPreview || stale() || engine.steppingInside) return;
+			viaPreview = true;
+			stepInto(scene);
+		};
+		if (c.scene?.preview) onPreview(c.scene);
+		void (async () => {
+			const scene = await c.build(undefined, { onPreview });
+			if (!scene || stale()) return;
+			if (!viaPreview) {
+				stepInto(scene);
+				return;
+			}
+			// the controller swapped the depth scene in place (same camera); widen / narrow the move radius
+			const cam = engine.stepCamera;
+			if (engine.steppingInside && cam)
+				cam.radius = Math.max(0.5, scene.confidenceRadius);
 		})();
 	}, [engineRef, camGone, camEntered]);
 
@@ -300,7 +335,7 @@ export function useStepInside(opts: {
 	const phase = state.phase;
 	const disabledReason = !accepted
 		? "Needs an accepted pose: auto-align must be verified, or pin / save the alignment"
-		: phase === "loading"
+		: phase === "loading" && !state.preview
 			? (state.message ?? "Working")
 			: phase === "low-quality"
 				? (state.message ?? "Terrain anchoring too weak for this photo")

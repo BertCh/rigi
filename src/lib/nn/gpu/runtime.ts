@@ -40,6 +40,8 @@ export class Storage {
 	dropped = false;
 	/** weights: freed with their Weights, not by dispose(tensor) */
 	pinned = false;
+	/** an output that gets its own exactly sized buffer instead of a pooled one (load-time weights) */
+	exact = false;
 	/** an input living in a caller's ComputeGraph (fromView), or the output view of a forwardInto */
 	view: GraphDataView<"float32"> | null = null;
 	viewGraph: ComputeGraph | null = null;
@@ -264,15 +266,18 @@ export class Runtime {
 	}
 
 	/** A ready storage holding `data` (written in queue order). */
+	/** A dedicated buffer of exactly `bytes` (weights; destroyed, never recycled). */
+	allocateExact(bytes: number): Buffer {
+		return this.device.createBuffer({
+			id: "nn-weight",
+			usage: STORAGE,
+			byteLength: bytes,
+		});
+	}
+
 	upload(data: ArrayBufferView, dtype: DType, exact = false): Storage {
 		const st = new Storage(pad4(data.byteLength), dtype, null);
-		if (exact) {
-			st.buffer = this.device.createBuffer({
-				id: "nn-weight",
-				usage: STORAGE,
-				byteLength: st.bytes,
-			});
-		} else st.buffer = this.allocate(st.bytes);
+		st.buffer = exact ? this.allocateExact(st.bytes) : this.allocate(st.bytes);
 		const buf = st.buffer;
 		let bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
 		if (bytes.byteLength % 4) {
@@ -325,7 +330,9 @@ export class Runtime {
 		for (const s of rec.produced) {
 			s.rec = null;
 			if (outputs.has(s)) {
-				s.buffer = this.allocate(s.bytes);
+				s.buffer = s.exact
+					? this.allocateExact(s.bytes)
+					: this.allocate(s.bytes);
 				s.state = "ready";
 			} else s.state = "dead";
 		}

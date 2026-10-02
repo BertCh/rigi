@@ -23,8 +23,11 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 			: state.phase;
 	const loading = state.phase === "loading";
 	const q = state.quality;
-	const chip =
-		status === "stepping"
+	// terrain-only preview while the depth model loads: its progress, also while stepping on it
+	const preview = loading && !!state.preview;
+	const chip = preview
+		? (state.message ?? "terrain preview")
+		: status === "stepping"
 			? "3D view"
 			: status === "not-accepted"
 				? "pose not accepted"
@@ -43,6 +46,7 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 		<div
 			className="pointer-events-none absolute bottom-4 left-3 z-20 flex max-w-[min(22rem,calc(100%-1.5rem))] flex-col items-start gap-1.5"
 			data-nearfield-status={status}
+			data-nearfield-preview={preview ? "" : undefined}
 			data-nearfield-quality={q != null ? q.toFixed(3) : undefined}
 		>
 			<div

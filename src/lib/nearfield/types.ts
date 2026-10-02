@@ -127,6 +127,11 @@ export type NearFieldScene = {
 	confidenceRadius: number;
 	/** Model that produced the splats, e.g. "moge2-lift" or "sharp" (export licence; optional). */
 	model?: string;
+	/**
+	 * Terrain-only preview built from the DEM range while the depth model loads (preview.ts): no splats,
+	 * no measure grid, never exported. Absent on depth-model scenes.
+	 */
+	preview?: boolean;
 };
 
 export type NearFieldViewOpts = {

@@ -4,6 +4,21 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **People volumes in Step Inside, experiment (2026-10-02, browser-unverified).**
+  - Under `?nearfield=complete`, each person is closed from a front shell into a volume (`src/lib/nearfield/complete/people.ts`):
+    - Poisson silhouette inflation gives the thickness;
+    - a back sheet sits on the same photo rays, with side-seam layers;
+    - the back takes the front's colour through-projected, except the head band, which takes the hair-rim colour;
+    - observed edge-ramp strays behind the back are dropped.
+  - Added splats are `generated` (display-only, never measured).
+  - The landing demo applies it under the same flag.
+  - `?peopleBody=on` (demo only) takes the back from a body fit instead. `src/lib/body` adds:
+    - ViTPose-B keypoints on `src/lib/nn` (172 MB fp16, Apache-2.0);
+    - an Anny LOD10 body model (99 KB, Apache-2.0 / CC0), fitted by LM on the CPU.
+  - New check rows `body-vitpose` and `body-anny`.
+  - Evidence: `scripts/nearfield/people-{complete,body}-views.ts`.
+  - Notes: `research_notes/frontend_completion_models_2026-10.md`.
+- **Step Inside downloads half as much and starts sooner (2026-10-02, browser-unverified).** The depth model now ships as int8 weights (36 MB instead of 70 MB). `src/lib/nn` expands them to f16 on the GPU at load (`src/lib/nn/quant.ts`, producer `scripts/models/quantize.ts`), so the network and its outputs are unchanged apart from rounding: 0.6% median depth difference after scale alignment on 24 photos, normals within 0.4°. `?nearfieldWeights=q8|q8lite|fp16` picks the file; `q8lite` (33 MB) drops the normal head and derives normals from depth. The weights are fetched into Cache Storage in the background about 2.5 s after a pose is accepted (not on Save-Data or 2G/3G). If the depth is not ready when Step Inside is pressed, it opens at once on a terrain-only preview and swaps in the depth scene when it arrives. int4 was measured and rejected (16% depth error). `parseSafetensors` no longer aliases the whole file when given a node `Buffer`. See `reports/step-inside-download.md`.
 - **Luma-native wave: ML runtimes removed, more luma operators (2026-10-02, browser-unverified).** Follows `reports/luma-native-dependency-audit-2026-10-02.md` (§8 has the outcome).
   - The sky segmenter (U²-Net-P) and the people segmenter (MediaPipe DeepLab-v3 and selfie-multiclass) run on `src/lib/nn` from fp16 safetensors, on the same GPU device as the rest of the app. `@mediapipe/tasks-vision` is gone and `onnxruntime-web` is a devDependency only (parity oracle); `src/lib/models/ort.ts` / `createOrtSession` are deleted. No ML runtime ships.
   - `src/lib/nn` composes with luma: `fromView` / `forwardInto` / `toView` record a forward into a caller's graph without copies; transpose, same-shape elementwise, long-row reductions and large top-k use luma `GPUTranspose` / `GPUElementwise` / `GPUReduction` / `GPUSort` (`gpu.lumaOps.enabled = false` for A/B); new `rfft2` / `irfft2` on `GPUFFT2D`. The CPU backend (no-WebGPU fallback) has a register-tiled conv and fast resize/pool/elementwise paths (U²-Net-P at 384 px 28 s → 5.7 s), so the sky CPU input is back to 384 px.
@@ -107,7 +122,7 @@ Rigi is unreleased, so compatibility bridges, aliases, old-format readers and fi
 
 ### Research phase 1 (2026-10-02, Pod C)
 
-- FUND E5 ray-cast oracle, `src/lib/raycast/` (not wired, no flag): a per-pixel max-mip heightfield ray caster with curvature + refraction per ray on the horizon-fast mosaics, an f64 CPU reference and a WGSL twin on `gpu/core` (range, ENU xyz, sky per pixel; horizon per azimuth). On dev eyes it matches the horizon-fast march to 0.19 px p95 and renders 1024x768 at 150 km in ~19 ms median on Dawn (PASS; `tools/research/fund/e5_raycast/`, `research_notes/raycast-oracle-2026-10-02/`). Browser-unverified.
+- FUND E5 ray-cast oracle, `src/lib/raycast/` (not wired, no flag): a per-pixel max-mip heightfield ray caster with curvature + refraction per ray on the horizon-fast mosaics, an f64 CPU reference and a WGSL twin on `gpu/core` (range, ENU xyz, sky per pixel; horizon per azimuth). On dev eyes it matches the horizon-fast march to 0.19 px p95 and renders 1024x768 at 150 km in ~19 ms median on Dawn (PASS; `tools/research/fund/e5_raycast/`, `reports/fundamentals-plan.md`). Browser-unverified.
 - FUND E4 step 1 (dense feature-metric refinement, research only, `tools/research/fund/e4_featuremetric/`) killed on dev; E0r (unclipped-skyline rotation observability) and the skyline-parallax eye test killed on dev; C4 label/drape hooks landed unconsumed (see above). Details: `reports/negative-results.md`.
 
 ### Step review (2026-10-02, step pods)
@@ -167,7 +182,7 @@ Rigi is unreleased, so compatibility bridges, aliases, old-format readers and fi
 - **Preset registry.** `PRESET_INFO` holds each preset's label, aliases and the layers it switches to (`PRESET_IDS`, `PRESET_LABELS`, `PRESET_OVERLAY_LAYER` and `PRESET_MAP_LAYERS` are derived from it). Terroir and Field sketch share one layer set, and the Swiss-look presets share one contour definition. `?style=landeskarte` (and a stored "landeskarte") selects the Landeskarte preset, whose id stays `swiss`.
 - **Landeskarte fixes** (swiss-cartography-review D1, D2, D7): Swiss contours sit on a thin dark-brown casing instead of Classic's navy one (Landeskarte, Field sketch), the bands layer uses the `swiss` ramp, and place names can use the swisstopo typography through the new `style.terroir.names.typography` ("terroir" | "swisstopo", switch in the Terroir panel; Landeskarte = swisstopo). Browser-unverified.
 - Labels: one SVG halo-width rule (`svgHaloWidth`) for peak labels and place names; the terroir overlays reuse `LABEL_FONT_FAMILY`; the swisstopo font stack drops Manrope.
-- Report: `reports/cartography-consolidation-2026-10-02.md`.
+- Report: `reports/swiss-cartography-review.md` §3.4 and §5.2.
 - 3D Tiles T2 (pure, flag `?tiles3dObjects=off` default): `nearfield/object-prior.ts` promotes Far/Terrain split cells to Object from nDSM + swisstopo tile evidence (display-only sources throw); optional `objectPrior` input on `buildNearFieldScene`; `googleTilesPublicUseAllowed` gates Google tiles in public builds until the official logo ships.
 
 ### Consolidation pass (2026-10-02)

@@ -410,7 +410,8 @@ export function engineNearFieldScene(
 	} catch {
 		return null;
 	}
-	return s?.splats && s.splats.count > 0 ? s : null;
+	// a terrain-only preview (nearfield/preview.ts) has no photo-measured geometry to export
+	return s?.splats && s.splats.count > 0 && !s.preview ? s : null;
 }
 
 /** Export the engine's near-field scene. Throws when there is none or it belongs to another photo. */

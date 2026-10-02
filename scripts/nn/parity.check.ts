@@ -13,6 +13,7 @@
 import { CpuNn } from "../../src/lib/nn/cpu";
 import { GpuNn } from "../../src/lib/nn/gpu/gpu-nn";
 import { setKernelCaps } from "../../src/lib/nn/gpu/kernel-caps";
+import { quantize } from "../../src/lib/nn/quant";
 import { encodeSafetensors, floatToHalf } from "../../src/lib/nn/safetensors";
 import type { Nn, Tensor } from "../../src/lib/nn/types";
 import { dawnDevice } from "./dawn";
@@ -826,6 +827,64 @@ if (gpu.runtime.stats.graphHits <= before) {
 	const ok = got === "0,0,5,12";
 	if (!ok) failed++;
 	rows.push(`${ok ? "PASS" : "FAIL"} eager ops outside forward: ${got}`);
+}
+// quantized weights (src/lib/nn/quant.ts): the GPU dequant kernel vs the CPU loader, read back and
+// used by a linear inside a forward
+{
+	const specs: [number[], 4 | 8, number][] = [
+		[[7, 64], 8, 64],
+		[[5, 3, 3, 3], 8, 27],
+		[[9, 96], 4, 32],
+		[[3, 5], 4, 5],
+	];
+	const tensors: Parameters<typeof encodeSafetensors>[0] = {
+		plain: { shape: [4], data: Uint16Array.from([1, 2, 3, 4], floatToHalf) },
+	};
+	const table: Record<string, unknown> = {};
+	specs.forEach(([shape, bits, group], i) => {
+		const { q, scale, info } = quantize(randn(n(shape)), shape, bits, group);
+		tensors[`w${i}.qweight`] = { shape: [q.length], data: q };
+		tensors[`w${i}.qscale`] = { shape: [scale.length], data: scale };
+		table[`w${i}`] = info;
+	});
+	const bytes = encodeSafetensors(tensors, { quant: JSON.stringify(table) });
+	const gw = gpu.weightsFromBytes(bytes);
+	const cw = cpu.weightsFromBytes(bytes);
+	for (let i = 0; i < specs.length; i++) {
+		const a = await cpu.read(cw.get(`w${i}`));
+		const b = await gpu.read(gw.get(`w${i}`));
+		let worst = 0;
+		let amax = 0;
+		for (let k = 0; k < a.length; k++) {
+			worst = Math.max(worst, Math.abs(a[k] - b[k]));
+			amax = Math.max(amax, Math.abs(a[k]));
+		}
+		// f16 storage rounds the expanded values (2^-11 relative)
+		const ok = b.length === a.length && worst <= amax * 1e-3;
+		if (!ok) failed++;
+		const [shape, bits, group] = specs[i];
+		rows.push(
+			`${ok ? "PASS" : "FAIL"} dequant int${bits} g${group} [${shape}] ${gw.get(`w${i}`).dtype}  maxAbs ${worst.toExponential(2)}`,
+		);
+	}
+	const x = randn(3 * 64);
+	const ref = await cpu.read(
+		cpu.linear(cpu.fromArray(x, [3, 64]), cw.get("w0"), null),
+	);
+	const out = await gpu.forward(() =>
+		gpu.linear(gpu.fromArray(x, [3, 64]), gw.get("w0"), null),
+	);
+	const got = await gpu.read(out);
+	let worst = 0;
+	for (let k = 0; k < ref.length; k++)
+		worst = Math.max(worst, Math.abs(ref[k] - got[k]));
+	const plain = [...(await gpu.read(gw.get("plain")))].join();
+	const ok = worst < 1e-2 && plain === "1,2,3,4";
+	if (!ok) failed++;
+	rows.push(
+		`${ok ? "PASS" : "FAIL"} dequant weights in a forward (linear) maxAbs ${worst.toExponential(2)}, plain fp16 alongside ${plain}`,
+	);
+	gpu.dispose(gw);
 }
 if (!argv.includes("--no-f16") && gpu.backend.f16) await runPass(true);
 // kernel variants (src/lib/nn/gpu/kernel-caps.ts): each tile / option against the CPU, on a fresh

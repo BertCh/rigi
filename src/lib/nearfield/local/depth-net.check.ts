@@ -154,13 +154,15 @@ for (const head of ["points_head", "normal_head", "mask_head"]) {
 
 // end to end: the network at the input size, then the post-processing
 const out = await net.run(image, aspect, [H, W]);
-await compare("final.normal", out.normal, 2e-3);
+// the reference is the fp16 checkpoint, which has the normal head
+const outNormal = out.normal as Tensor;
+await compare("final.normal", outNormal, 2e-3);
 await compare("final.mask", out.mask, 2e-3);
 await compare("final.metric_scale", out.metricScale);
 const [z, mask, normal, points64, mask64, scale] = await Promise.all([
 	nn.read(out.z),
 	nn.read(out.mask),
-	nn.read(out.normal),
+	nn.read(outNormal),
 	nn.read(out.points64),
 	nn.read(out.mask64),
 	nn.read(out.metricScale),

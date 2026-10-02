@@ -10,18 +10,32 @@
 //   gaussians → the depth lift (./lift-gpu.ts, a graph kernel; ./lift.ts is its CPU twin), on the cached
 //               depth of the same photo. No SHARP (research-only weights) and no DA3 multiview.
 // "Available" = WebGPU compute is there and the weights are reachable (public/models or the Cache
-// Storage copy); the first build downloads them (70 MB, progress through onProgress and the
-// src/lib/models download store). The nn CPU backend runs the same forward (specs, node parity), far
+// Storage copy); the first build downloads them (the int8 file, 36 MB, by default: `nearfieldWeights`,
+// depth-net.ts MOGE2_WEIGHTS; progress through onProgress and the src/lib/models download store), and
+// prefetch() can fetch them into Cache Storage ahead of that. The nn CPU backend runs the same forward (specs, node parity), far
 // too slowly for the page, so without WebGPU Step Inside reports "needs WebGPU".
 // Never throws: failures resolve false / null.
 import type { Device } from "@luma.gl/core";
+import { getFlag } from "#/lib/flags";
 import { getComputeDevice } from "#/lib/gpu/device";
-import { describeModelDownload, modelEntry, modelUrl } from "#/lib/models";
+import {
+	describeModelDownload,
+	fetchModel,
+	modelEntry,
+	modelUrl,
+} from "#/lib/models";
 import type { Nn } from "#/lib/nn";
 import type { DepthModel, GaussianModel, RequestOpts } from "../client";
 import type { GaussianCloud, NearFieldDepth } from "../types";
 import { composeDepth } from "./compose";
-import { FOCAL_GRID, MOGE2_VITS, MogeDepthNet, tokenGrid } from "./depth-net";
+import {
+	FOCAL_GRID,
+	MOGE2_VITS,
+	MOGE2_WEIGHTS,
+	MogeDepthNet,
+	type MogeWeights,
+	tokenGrid,
+} from "./depth-net";
 import { type LiftInput, liftGaussiansCpu } from "./lift";
 import { liftGaussiansGpu } from "./lift-gpu";
 
@@ -127,7 +141,7 @@ export async function estimateDepth(
 			const [z, mask, normal, points64, mask64, scale] = await Promise.all([
 				nn.read(out.z),
 				nn.read(out.mask),
-				nn.read(out.normal),
+				out.normal ? nn.read(out.normal) : null,
 				nn.read(out.points64),
 				nn.read(out.mask64),
 				nn.read(out.metricScale),
@@ -148,7 +162,7 @@ export async function estimateDepth(
 				(performance.now() - t0) / 1000,
 			);
 		} finally {
-			nn.dispose(Object.values(out));
+			nn.dispose(Object.values(out).filter((t) => t !== null));
 		}
 	} finally {
 		nn.dispose(image);
@@ -164,9 +178,34 @@ export class LocalNearFieldClient {
 	private reachable: { ok: boolean; at: number } | null = null;
 	private gpuNn: { device: Device; nn: Promise<Nn | null> } | null = null;
 	private photos = new WeakMap<Blob, Promise<PhotoResult | null>>();
+	/** onProgress of every caller waiting on the shared load (the first caller's is not the only one) */
+	private progress = new Set<(message: string) => void>();
+	private readonly weights: MogeWeights | undefined;
 
-	constructor(opts: { tokens?: number } = {}) {
+	constructor(opts: { tokens?: number; weights?: MogeWeights } = {}) {
 		this.tokens = opts.tokens ?? LOCAL_TOKENS;
+		this.weights = opts.weights;
+	}
+
+	/** The weight file: the constructor's choice, else the `nearfieldWeights` flag (a restart flag). */
+	get weightsFile(): string {
+		return MOGE2_WEIGHTS[this.weights ?? getFlag("nearfieldWeights")];
+	}
+
+	/**
+	 * Downloads the weights into Cache Storage ahead of the first build (bytes only: no device memory
+	 * until a build loads them). A build started meanwhile joins the same download (fetchModel shares
+	 * it). Resolves false on failure or abort; never throws.
+	 */
+	async prefetch(signal?: AbortSignal): Promise<boolean> {
+		if (this.loaded) return true;
+		try {
+			await fetchModel(this.weightsFile, { signal });
+			this.reachable = { ok: true, at: Date.now() };
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	/** Same shape as the service's /health. ok = WebGPU compute + reachable weights. */
@@ -180,7 +219,7 @@ export class LocalNearFieldClient {
 			ok,
 			models: ok ? ["moge2", "lift"] : [],
 			device: device ? "webgpu" : "",
-			version: MOGE2_VITS.file,
+			version: this.weightsFile,
 		};
 	}
 
@@ -195,7 +234,7 @@ export class LocalNearFieldClient {
 		if (!force && r && now - r.at < (r.ok ? 600_000 : 30_000)) return r.ok;
 		let ok = false;
 		try {
-			const url = modelUrl(MOGE2_VITS.file);
+			const url = modelUrl(this.weightsFile);
 			if (typeof caches !== "undefined") {
 				const { MODEL_CACHE } = await import("#/lib/models");
 				ok = !!(await (await caches.open(MODEL_CACHE)).match(url));
@@ -225,24 +264,26 @@ export class LocalNearFieldClient {
 		return this.gpuNn.nn;
 	}
 
-	private load(onProgress?: (message: string) => void) {
+	private load() {
 		if (!this.loaded) {
+			const file = this.weightsFile;
 			const p = (async () => {
 				const device = await getComputeDevice();
 				if (!device) return null;
 				const nn = await this.nnFor(device);
 				if (!nn) return null;
-				const total = modelEntry(MOGE2_VITS.file)?.bytes ?? 0;
+				const total = modelEntry(file)?.bytes ?? 0;
 				const net = await MogeDepthNet.load(nn, {
-					onProgress: (loaded, t) =>
-						onProgress?.(
-							describeModelDownload({
-								file: MOGE2_VITS.file,
-								state: "downloading",
-								loaded,
-								total: t || total,
-							}),
-						),
+					file,
+					onProgress: (loaded, t) => {
+						const message = describeModelDownload({
+							file,
+							state: "downloading",
+							loaded,
+							total: t || total,
+						});
+						for (const f of this.progress) f(message);
+					},
 				});
 				return { net, device };
 			})();
@@ -261,7 +302,11 @@ export class LocalNearFieldClient {
 		let p = this.photos.get(blob);
 		if (!p) {
 			p = (async () => {
-				const loaded = await this.load(opts.onProgress);
+				const onProgress = opts.onProgress;
+				if (onProgress) this.progress.add(onProgress);
+				const loaded = await this.load().finally(() => {
+					if (onProgress) this.progress.delete(onProgress);
+				});
 				if (!loaded || opts.signal?.aborted) return null;
 				opts.onProgress?.("Estimating depth (MoGe-2)");
 				const dec = await decodePhoto(

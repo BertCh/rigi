@@ -13,6 +13,13 @@ import type { Nn } from "./types";
 export { CpuNn, CpuTensor } from "./cpu";
 export { setModelFetcher } from "./fetch";
 export {
+	dequantize,
+	type QuantBits,
+	type QuantInfo,
+	quantize,
+	readQuantTable,
+} from "./quant";
+export {
 	encodeSafetensors,
 	floatToHalf,
 	halfToFloat,

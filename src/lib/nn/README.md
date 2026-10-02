@@ -23,6 +23,8 @@ const s = await nn.read(scores);               // readback through the core ring
 nn.dispose([scores, desc, x]);
 ```
 
+App consumers do not call `createNn` themselves: `getNn(consumer, device?)` (`registry.ts`) returns the GPU runtime per (compute device, consumer), or null without a live WebGPU device, with its own graph group `nn/<consumer>`; an entry is dropped on device loss.
+
 ## Rules for model code
 
 - **One forward = one submission.** Put the whole network (and its pre/post-processing) inside one
@@ -86,18 +88,30 @@ safetensors under `public/models/` (hash-named, a row in `scripts/models/manifes
 the PyTorch `state_dict` in fp16 by a producer under `scripts/models/`. `loadWeights` uses
 `src/lib/models` `fetchModel` (Cache Storage, progress); `setModelFetcher` overrides it in tests.
 
+## Quantized weights (`quant.ts`)
+
+A file can store large tensors as int8 / int4 with per-group f16 scales (`__metadata__.quant` lists
+`{ bits, group, shape }` per name; data in `<name>.qweight` U8 + `<name>.qscale` F16). `loadWeights` /
+`weightsFromBytes` expand them once: GPU in one graph node per weight (`gpu/k-quant.ts`, f16 via
+`pack2x16float` on shader-f16 devices, else f32, exactly sized buffers), CPU in JS (`dequantize`, the
+reference). After loading, a quantized weight is an ordinary f16 / f32 weight: model code and kernels do
+not change, only the download shrinks. Producer: `scripts/models/quantize.ts`; parity: the `dequant`
+rows of `scripts/nn/parity.check.ts`.
+
 ## Kernels (`gpu/`)
 
 | file | ops |
 |---|---|
 | `wgsl.ts` | kernel template: `M` parameter words, f32/f16 inputs read through `ld_<name>()`, f32 outputs; memoised specs (group `nn`) |
 | `runtime.ts` | lazy tensors, recordings, epilogue fusion, dead-code elimination, lowering to a cached `ComputeGraph`, free-list buffer pool, the ordered submit chain |
-| `k-gemm.ts` | 64×64-tile GEMM with pluggable loaders: matmul / linear, implicit-GEMM conv2d, convTranspose2d, deformable conv v2; direct conv for depthwise / small Cout |
+| `k-gemm.ts` | register-blocked vec4 GEMM (tile shape chosen per shape by `gemm-select.ts`) with pluggable loaders: matmul / linear, implicit-GEMM conv2d, convTranspose2d, deformable conv v2; direct conv for depthwise / small Cout |
+| `kernel-caps.ts` | device capabilities and tuning switches the generators read (f16 math opt-in, `legacy: true` forces the old kernels for A/B) |
 | `k-attention.ts` | flash attention (online softmax, K/V tiles in workgroup memory, vec4 rows), optional additive mask |
 | `k-reduce.ts` | softmax / logSoftmax, layerNorm, groupNorm, l2Normalize, sum / mean / max / min / argmax |
 | `k-spatial.ts` | max / avg pool, interpolate (nearest, bilinear, bicubic), gridSample, NMS max-pool, pad, gather, rotary, fromTexture |
 | `k-elementwise.ts` | unary, broadcasting binary / where, strided copies (permute, slice, expand, concat) |
 | `k-topk.ts` | bitonic topk with in-workgroup stages |
+| `k-quant.ts` | load-time int8 / int4 → f16 / f32 weight expansion |
 
 ## Checks
 

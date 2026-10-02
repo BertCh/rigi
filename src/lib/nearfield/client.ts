@@ -21,6 +21,8 @@ export type GaussianMeta = {
 /** What Step Inside and the roll spot need from a near-field source. */
 export type NearFieldSource = {
 	available(force?: boolean): Promise<boolean>;
+	/** Fetch the model weights ahead of the first build (no device work); false on failure. */
+	prefetch?(signal?: AbortSignal): Promise<boolean>;
 	depth(
 		image: Blob,
 		opts?: RequestOpts & {

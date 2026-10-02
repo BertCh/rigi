@@ -77,6 +77,8 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | Eye refinement for roll spots | Spec variant passes 0 pairs; metric variant 1 pair, gain confounded with absolute placement. Default off | `tools/nearfield/eyes/REPORT.txt` |
 | DA3 /multiview and essential matrix for propagation | DA3 median 3.65°, 43° on non-overlap, no confidence; E-matrix degenerate under rotation (up to 179.9°) | `tools/nearfield/propagate/REPORT.txt` |
 | LaMa on large out-of-frame areas (P3) | Smears, ghost backpacks. Thin disocclusions only | `tools/nearfield/generate/NOTES.txt` |
+| int4 MoGe-2 ViT-S download (round to nearest, groups of 32, clip search) | ViT linears int4: depth 16% median off fp16, mask IoU down to 0.64; MLPs only: still 16%. int8 per row kept (0.6% after scale alignment) | [step-inside-download.md](step-inside-download.md) |
+| Normals from depth instead of MoGe's normal head | ~20° median from the head at 2/4/8 px steps (same for fp16 depth): kept the head in the default q8 file; `q8lite` opt-in | step-inside-download.md |
 | Hosted world models (LingBot-World v2, Lyra 2, FlashWorld, HunyuanWorld/Voyager, WorldSplat), VGGT-1B, DA3 GS head | Non-commercial, EU-excluded, or no weights | `research_notes/step_inside_models_2026-09.md` |
 
 ## Concordance (whole-image fit)

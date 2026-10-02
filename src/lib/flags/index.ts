@@ -125,10 +125,18 @@ export const FLAG_SCHEMA = {
 	tiles3dObjects: onOff("off"),
 	// Step Inside near field, computed in the browser (src/lib/nearfield/local; auto: offered when WebGPU
 	// and the depth model are there, never under automation). complete = on + the P0 completion
-	// heuristics (src/lib/nearfield/complete: slab reclassification, edge snap; display-only).
+	// heuristics (src/lib/nearfield/complete: slab reclassification, edge snap, people volumes; display-only).
 	nearfield: oneOf(["auto", "on", "complete", "off"], "auto"),
+	/** Under nearfield=complete: people volumes take their back from a body fit (ViTPose on nn + Anny, src/lib/body). */
+	peopleBody: onOff("off"),
 	/** Step Inside anchor: exclude cliff-lip DEM range discontinuities from the fit (nearfield/cliff-lip.ts). */
 	anchorCliff: onOff("off"),
+	/**
+	 * Step Inside depth weights (nearfield/local/depth-net.ts MOGE2_WEIGHTS), all expanded to f16 on the GPU
+	 * at load: q8 = int8 (36 MB download), q8lite = int8 without the normal head (33 MB, normals derived
+	 * from depth), fp16 = the checkpoint (70 MB, the parity reference).
+	 */
+	nearfieldWeights: oneOf(["q8", "q8lite", "fp16"], "q8"),
 	// alignment aids
 	picker: oneOf(["off", "on", "always"], "off"),
 	/** tap-a-peak pin solve (src/lib/pins/seed.ts): seeded = closed-form start + lens bound, kept only when it fits the taps better */
@@ -362,6 +370,8 @@ export const RESTART_FLAGS: readonly FlagName[] = [
 	"tiles3dDebug",
 	"tiles3dObjects",
 	"nearfield",
+	"nearfieldWeights",
+	"peopleBody",
 	"anchorCliff",
 	"concord",
 	"imagery",
