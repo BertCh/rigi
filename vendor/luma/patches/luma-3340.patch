@@ -1,0 +1,4062 @@
+diff --git a/docs/api-reference/splats/README.md b/docs/api-reference/splats/README.md
+index d12f6e63a..51ed79090 100644
+--- a/docs/api-reference/splats/README.md
++++ b/docs/api-reference/splats/README.md
+@@ -40,7 +40,8 @@ WebGPU projects, orders, and draws each progressively added batch through a GPU
+ 
+ ## Limits and compatibility
+ 
+-The graph renderer, GPU ordering, hierarchy traversal, and storage-backed features require WebGPU.
++The graph renderers, GPU ordering, and storage-backed features require WebGPU. RAD hierarchy
++selection and generic residency can run on CPU-only data, including in an application-owned worker.
+ Use the prepared SplatRenderer path when WebGL 2 compatibility or caller-provided source ordering
+ is required. The package remains an experimental private workspace.
+ 
+diff --git a/docs/api-reference/splats/formats-and-loaders.md b/docs/api-reference/splats/formats-and-loaders.md
+index 18ca1b473..f22908587 100644
+--- a/docs/api-reference/splats/formats-and-loaders.md
++++ b/docs/api-reference/splats/formats-and-loaders.md
+@@ -117,7 +117,8 @@ Use `?loaders=local&scene=fixture` for the lightweight 1,000-splat parser fixtur
+ `source` to select a custom `.ply`, `.splat`, `.ksplat`, `.spz`, or `.rad` file. Full PLY scenes
+ are streamed through their original Arrow record batches, and the showcase reports download,
+ batch, and splat progress while retaining independently owned GPU buffers. The loader remains an
+-application-level dependency; `@luma.gl/splats` continues to own only GPU data and rendering.
++application-level dependency; `@luma.gl/splats` owns source residency, hierarchy selection, GPU data,
++and rendering, while transport and parsing remain external.
+ Both the default WebGPU graph and the explicit `&renderer=cpu` comparison retain and evaluate
+ camera-dependent higher-order spherical harmonics.
+ 
+diff --git a/docs/api-reference/splats/renderers.md b/docs/api-reference/splats/renderers.md
+index 7decc0feb..a236c9f62 100644
+--- a/docs/api-reference/splats/renderers.md
++++ b/docs/api-reference/splats/renderers.md
+@@ -241,6 +241,10 @@ console.log(renderer.stats.segmentCount, renderer.stats.activeRowCount);
+ 
+ `activeRows` contains original batch-local row indices; omit it to render every row in one source
+ page. No source page or GPU column is concatenated, rewritten, or transferred to the renderer.
++For unsplit pages the renderer borrows `activeRows` directly. Keep that array stable until the
++next `setFrontier` call, and resubmit it after changing its contents. Camera-only updates rewrite
++camera uniforms without copying or uploading unchanged row indices. Adding or removing source
++segments can still rebuild the GPU graph; this is not an incremental graph-compilation API.
+ Each sparse source segment projects only its selected rows, evaluates degree-one through
+ degree-three directional harmonics, and applies GPU semantic include/exclude selections. Source
+ bindings, including large harmonic columns, are split into legal device-sized ranges while every
+@@ -271,6 +275,33 @@ borrowed-source and renderer-owned GPU bytes, and one indirect draw per output s
+ caller owns command submission and every source batch; destroy the renderer before releasing
+ source pages.
+ 
++### Drawing inside a host-owned render pass
++
++For composition with a host such as deck.gl, separate compute preparation from drawing:
++
++```ts
++renderer.setProps({modelViewProjectionMatrix, cameraPosition, viewportSize});
++renderer.prepare(commandEncoder); // Projection and sorting; no render pass is opened.
++
++const renderPass = commandEncoder.beginRenderPass({clearColor: [0, 0, 0, 0]});
++// Draw opaque host geometry here if it should occlude splats.
++renderer.draw(renderPass);
++renderPass.end();
++webgpuDevice.submit(commandEncoder.finish());
++```
++
++`prepare(commandEncoder)` returns an encoding only when data, camera, or style changes require
++compute work. Call it before opening the host pass. `draw(renderPass)` draws the prepared frontier
++on every host frame, including frames where `prepare()` returns `undefined`. It never clears,
++ends, or submits the supplied pass. An empty frontier draws nothing, and destroying the renderer
++still leaves caller-owned source pages intact.
++
++The host pass must use compatible canvas color/depth formats and sample count. Splats use their
++prepared camera and viewport; the host owns viewport/scissor configuration. They do not write
++depth, and separate renderer instances do not share a global transparency sort. Standalone callers
++can continue to use `encode(commandEncoder)` to prepare and open the renderer-owned pass together;
++do not use both paths for the same frame.
++
+ ## Related pages
+ 
+ - [Gaussian splats overview](/docs/api-reference/splats)
+diff --git a/docs/api-reference/splats/streaming-and-residency.md b/docs/api-reference/splats/streaming-and-residency.md
+index e796f88d8..d3cb33699 100644
+--- a/docs/api-reference/splats/streaming-and-residency.md
++++ b/docs/api-reference/splats/streaming-and-residency.md
+@@ -136,10 +136,52 @@ state. Relevant page demand remains active across partial retargets; requests ar
+ traversal proves they cannot contribute. Protected parents remain visible when the residency budget
+ cannot admit every required child.
+ 
+-Call `hierarchy.setTraversalBudget(maximumRows)` to switch between a small interactive traversal
+-window and a more detailed settled view without reallocating resident source pages. Browser
+-traversal remains synchronous JavaScript; the showcase debounces its detailed pass so active
+-camera movement does not repeatedly walk the entire authored scene.
++`hierarchy.update(view)` performs synchronous traversal. Use `maxTraversalRows` to bound the
++number of evaluated rows and `continueTraversal(maximumRows)` for subsequent slices of the same
++retained tree. Publishing a frontier still visits its selected rows; a row budget is not a
++wall-clock frame-time guarantee. Changing the configured budget with `setTraversalBudget` resets
++traversal, so it is not a per-frame scheduling control.
++
++For progressive worker-driven camera updates, use `hierarchy.refineView(view, maximumRows)`.
++It starts from the displayed coherent selection and publishes completed sibling replacements
++after each slice, including while a changed view is still refining. It does not merge independent
++cuts or draw parents over their descendants. Retargeting walks the retained cut once to update
++priorities; `maximumRows` bounds subsequent refinement, not that retargeting pass. Keep this work
++off the render thread and coalesce camera inputs to the latest view.
++
++Retargeting may collapse a branch only after its selected descendants are all outside the current
++frustum. A parent's Gaussian support is not a conservative bound on its descendants, so checking
++the parent alone is not sufficient. Under row pressure, visible complete sibling groups can yield
++capacity only to a visible, small-screen-error parent. Page budgets remain hard limits: if retained
++visible detail occupies the available pages, new refinement may wait rather than discard that
++coverage. `selectView(view, maximumRows)` remains available for an independent, whole-cut rebalance.
++With a row budget it retains the previous frontier until the new cut completes; an initially empty
++scene publishes coarse coverage on its first slice. Resume with `continueTraversal(maximumRows)`.
++Omitting the budget completes selection synchronously.
++
++Set `maximumResidentPages` to bound the nominal page indices reserved by selection, including
++ancestors and pending sibling replacements. Leave room in the physical residency window for overlap
++with the displayed view. `maximumPendingPages` is a soft request limit: one complete sibling
++replacement may exceed it when no other requests are pending, so a partial group cannot deadlock
++refinement. Both limits default to unlimited. Set `frustumCulling: false` to retain coarse coverage
++in every direction and let the renderer clip primitives while view-cone foveation selects detail.
++
++### CPU-only selection and worker ownership
++
++`SplatRADHierarchyManager<TData>` defaults to `GPUSplatData` for existing GPU callers. A worker can
++instead provide `TData extends SplatRADHierarchyData`: decoded `source.positions`, `source.scales`,
++`source.opacities`, a `revision`, and the allocation/identity/lifecycle fields from
++`SplatResidencyData`. No rendering device, color columns, spherical harmonics, or GPU buffers are
++required. `SplatResidencyManager<TData>` and its callbacks preserve that exact data type; its byte
++budget accounts for the supplied `byteLength` even when the allocation is CPU-only.
++
++The hierarchy does not create workers or serialize pages. The application must acknowledge GPU
++admission before allowing CPU metadata to participate in selection, preserve original page/row
++identities, and retain the previous rendered pages until a complete coherent replacement is ready.
++Transfer copies of `activeRows`, not the hierarchy's own retained arrays. Send the renderer its
++latest camera independently of worker progress, and coalesce camera requests rather than queuing
++every input event. Eviction of a page unused by the retained traversal does not reset visible detail;
++loss of an actual traversal input still requires rebuilding its selection.
+ 
+ Top-level RAD metadata contains source page ranges, but not spatial page bounds. Bounds are
+ derived conservatively after a page is decoded; missing-page requests use authored global child
+diff --git a/docs/whats-new.md b/docs/whats-new.md
+index 73d3e9cc4..563d2c303 100644
+--- a/docs/whats-new.md
++++ b/docs/whats-new.md
+@@ -118,6 +118,8 @@ Target Release Date: Q3, 2026
+ **@luma.gl/splats**
+ 
+ - **Stable RAD camera retargeting** - `SplatRADHierarchyManager` preserves resolved visible rows while reprioritizing retained branches for a changed camera, traverses offscreen ancestors needed for visible descendants, and keeps bounded traversal, page demand, and active-row capacity coherent across rapid camera updates.
++- **Progressive RAD selection** - `selectView()` selects a fresh complete cut; `refineView()` publishes coherent intermediate replacements while reprioritizing retained detail. Generic CPU-only residency and hierarchy data support worker selection with bounded page demand.
++- **Shared-pass splat rendering** - `GPUPagedSplatRenderer.prepare()` encodes compute work before a host pass, and `draw()` presents inside it without clearing, ending, or submitting the borrowed pass.
+ 
+ **@luma.gl/webgpu**
+ 
+diff --git a/modules/splats/README.md b/modules/splats/README.md
+index 3eb195733..cbb004178 100644
+--- a/modules/splats/README.md
++++ b/modules/splats/README.md
+@@ -9,6 +9,10 @@ graphs, global GPU sorting, and one indirect draw. `GPUPagedSplatRenderer` proje
+ from independently owned source pages into bounded GPU segments while preserving one global
+ cross-page depth order.
+ 
++For host render loops, call `GPUPagedSplatRenderer.prepare(commandEncoder)` before opening the
++host pass, then `draw(renderPass)` inside it. The renderer does not clear, end, or submit a
++borrowed pass. `encode(commandEncoder)` remains available for renderer-owned presentation.
++
+ Prepared batches support degree-one through degree-three spherical harmonics, semantic class IDs,
+ and in-place row updates. Both rendering paths evaluate view-dependent radiance and filter semantic
+ classes. `SplatPicker` and `GPUSplatGraphPicker` resolve original source rows; their corresponding
+@@ -23,6 +27,14 @@ reprioritizes and discovers branches. `SplatResidencyManager` bounds intact stre
+ GPU bytes, rows, or chunks. Structural glTF adapters accept decoded `KHR_gaussian_splatting`
+ attributes, mesh feature IDs, and caller-owned SPZ v2 decoder handoffs.
+ 
++`selectView(view)` selects a fresh best-first complete cut; `refineView(view)` reprioritizes the
++retained cut and publishes coherent intermediate sibling replacements. Both reserve required
++ancestor/sibling pages and bound page demand. Progressive camera retargeting walks the retained
++tree synchronously; run selection in a worker when large cuts would block the render loop.
++Generic `SplatResidencyData` and `SplatRADHierarchyData` allow CPU-only worker metadata without
++allocating a GPU device. The host still owns GPU admission and must acknowledge it before the
++worker treats decoded pages as resident.
++
+ Use optional `expectedSplatCount` and `expectedBatchCount` hints to reserve graph capacity.
+ Renderers borrow source batches, preserve HDR colors, and must be destroyed before their data.
+ 
+diff --git a/modules/splats/src/gpu-paged-splat-renderer.ts b/modules/splats/src/gpu-paged-splat-renderer.ts
+index 505dc7b32..7cd5c5ef4 100644
+--- a/modules/splats/src/gpu-paged-splat-renderer.ts
++++ b/modules/splats/src/gpu-paged-splat-renderer.ts
+@@ -8,6 +8,7 @@ import {
+   type Binding,
+   type CommandEncoder,
+   type Device,
++  type RenderPass,
+   type ShaderLayout
+ } from '@luma.gl/core';
+ import {Computation, Model} from '@luma.gl/engine';
+@@ -140,6 +141,7 @@ type PlannedSourceSegment = {
+ };
+ 
+ type SourceSegment = PlannedSourceSegment & {
++  activeRowsDirty: boolean;
+   activeRowBuffer: Buffer;
+   projectedRecordBuffer: Buffer;
+   uniformBuffer: Buffer;
+@@ -226,6 +228,7 @@ export class GPUPagedSplatRenderer {
+   private readonly outputSegments: OutputSegment[] = [];
+   private readonly pageRevisions = new Map<string, number>();
+   private plannedSegments: PlannedSourceSegment[] = [];
++  private includeRenderPass = true;
+   private model?: Model;
+   private sortedValuesBuffer?: Buffer;
+   private semanticSelectionBuffer?: Buffer;
+@@ -324,7 +327,11 @@ export class GPUPagedSplatRenderer {
+     return this.isDestroyed;
+   }
+ 
+-  /** Replaces the active row frontier while retaining all caller-owned source allocations. */
++  /**
++   * Replaces the active row frontier while retaining caller-owned source allocations.
++   * Unsplit active-row arrays are borrowed until the next call; resubmit after changing their
++   * contents. Camera-only updates do not copy or reupload unchanged active-row indirection.
++   */
+   setFrontier(pages: readonly GPUPagedSplatPage[]): void {
+     if (this.isDestroyed) {
+       throw new Error('Cannot update a destroyed paged Gaussian splat renderer');
+@@ -384,6 +391,7 @@ export class GPUPagedSplatRenderer {
+     if (canReuseGraph) {
+       for (let segmentIndex = 0; segmentIndex < this.sourceSegments.length; segmentIndex++) {
+         Object.assign(this.sourceSegments[segmentIndex], nextSegments[segmentIndex]);
++        this.sourceSegments[segmentIndex].activeRowsDirty = true;
+       }
+     } else if (nextSegments.length > 0) {
+       this.requiresGraphRebuild = true;
+@@ -478,14 +486,55 @@ export class GPUPagedSplatRenderer {
+ 
+   /** Encodes sparse projection, exact cross-page ordering, segmented gather, and one render pass. */
+   encode(commandEncoder: CommandEncoder): GPUCommandGraphEncoding | undefined {
++    return this.encodeFrame(commandEncoder, true);
++  }
++
++  /**
++   * Prepares globally ordered splats without opening or clearing a render pass.
++   * Call before the host begins its render pass, then call {@link draw} inside that pass.
++   */
++  prepare(commandEncoder: CommandEncoder): GPUCommandGraphEncoding | undefined {
++    return this.encodeFrame(commandEncoder, false);
++  }
++
++  /** Draws prepared splats into a caller-owned pass without clearing, ending, or submitting it. */
++  draw(renderPass: RenderPass): void {
++    if (this.isDestroyed || !this.hasPresentedContent || !this.model) {
++      return;
++    }
++    renderPass.setPipeline(this.model.pipeline);
++    renderPass.setVertexArray(this.model.vertexArray);
++    for (const segment of this.outputSegments) {
++      renderPass.setBindings({
++        graphUniforms: this.sourceSegments[0].uniformBuffer,
++        projectedRecords: segment.projectedRecordBuffer
++      });
++      this.drawCommands.draw(renderPass, segment.index + 1);
++    }
++  }
++
++  private encodeFrame(
++    commandEncoder: CommandEncoder,
++    includeRenderPass: boolean
++  ): GPUCommandGraphEncoding | undefined {
+     if (this.isDestroyed) {
+       return undefined;
+     }
++    if (this.includeRenderPass !== includeRenderPass) {
++      this.includeRenderPass = includeRenderPass;
++      this.requiresGraphRebuild = true;
++      this.requiresEncoding = true;
++    }
+     const activeRowCount = this.plannedSegments.reduce(
+       (totalRowCount, segment) => totalRowCount + segment.activeRowCount,
+       0
+     );
+     if (activeRowCount === 0) {
++      if (!includeRenderPass) {
++        this.hasPresentedContent = false;
++        this.requiresEncoding = false;
++        return undefined;
++      }
+       if (!this.requiresEncoding || !this.hasPresentedContent) {
+         return undefined;
+       }
+@@ -533,6 +582,8 @@ export class GPUPagedSplatRenderer {
+       return undefined;
+     }
+     this.writeSourceUniforms();
++    // The graph's optional presentation pass calls draw() during encoding.
++    this.hasPresentedContent = true;
+     this.lastEncoding = this.compiledGraph.encode(commandEncoder, {parameters: undefined});
+     this.hasPresentedContent = true;
+     this.requiresEncoding = false;
+@@ -736,6 +787,7 @@ export class GPUPagedSplatRenderer {
+     );
+     return {
+       ...planned,
++      activeRowsDirty: true,
+       activeRowBuffer,
+       projectedRecordBuffer,
+       uniformBuffer,
+@@ -1122,6 +1174,9 @@ fn main() {
+         blendAlphaDstFactor: 'one-minus-src-alpha'
+       }
+     });
++    if (!this.includeRenderPass) {
++      return;
++    }
+     graph.addRenderPass({
+       id: 'paged-gaussian-segmented-render',
+       resources: [
+@@ -1139,20 +1194,7 @@ fn main() {
+           clearDepth: 1,
+           clearStencil: false
+         }),
+-        encode: ({renderPass, getBuffer}) => {
+-          if (!this.model) {
+-            return;
+-          }
+-          renderPass.setPipeline(this.model.pipeline);
+-          renderPass.setVertexArray(this.model.vertexArray);
+-          for (const segment of this.outputSegments) {
+-            renderPass.setBindings({
+-              graphUniforms: getBuffer(firstUniform),
+-              projectedRecords: getBuffer(segment.graphProjectedRecords)
+-            });
+-            this.drawCommands.draw(renderPass, segment.index + 1);
+-          }
+-        }
++        encode: ({renderPass}) => this.draw(renderPass)
+       })
+     });
+   }
+@@ -1237,9 +1279,10 @@ fn main() {
+       this.semanticSelectionBuffer?.write(this.semanticSelectionValues);
+     }
+     for (const segment of this.sourceSegments) {
+-      if (segment.activeRows) {
++      if (segment.activeRows && segment.activeRowsDirty) {
+         segment.activeRowBuffer.write(segment.activeRows);
+       }
++      segment.activeRowsDirty = false;
+       const uniformData = new ArrayBuffer(GPU_SPLAT_GRAPH_UNIFORM_BYTE_LENGTH);
+       const floatValues = new Float32Array(uniformData);
+       const integerValues = new Uint32Array(uniformData);
+@@ -1348,18 +1391,19 @@ fn main() {
+           );
+           const capacityRowCount = segmentSourceRowEnd - segmentSourceRowStart;
+           const selectedRows = page.activeRows
+-            ? Uint32Array.from(
+-                Array.from(page.activeRows).filter(
+-                  rowIndex => rowIndex >= segmentSourceRowStart && rowIndex < segmentSourceRowEnd
+-                ),
+-                rowIndex => rowIndex - (usesSourceRanges ? sourceWindowStart : 0)
+-              )
++            ? segmentSourceRowStart === 0 && segmentSourceRowEnd === page.data.length
++              ? page.activeRows
++              : page.activeRows
++                  .filter(
++                    rowIndex => rowIndex >= segmentSourceRowStart && rowIndex < segmentSourceRowEnd
++                  )
++                  .map(rowIndex => rowIndex - (usesSourceRanges ? sourceWindowStart : 0))
+             : undefined;
+           const activeRowCount = selectedRows?.length ?? capacityRowCount;
+           plannedSegments.push({
+             id: `${page.id}-${pageSegmentIndex++}`,
+             page,
+-            ...(selectedRows ? {activeRows: selectedRows} : {}),
++            activeRows: selectedRows,
+             capacityRowCount,
+             activeRowCount,
+             sourceRowOffset: usesSourceRanges
+diff --git a/modules/splats/src/index.ts b/modules/splats/src/index.ts
+index cbe186563..b71351d25 100644
+--- a/modules/splats/src/index.ts
++++ b/modules/splats/src/index.ts
+@@ -47,6 +47,7 @@ export {
+   SplatResidencyManager,
+   type SplatResidencyBounds,
+   type SplatResidencyBudget,
++  type SplatResidencyData,
+   type SplatResidencyCallbacks,
+   type SplatResidencyChunk,
+   type SplatResidencyChunkOptions,
+@@ -75,6 +76,7 @@ export {
+   type SplatRADHierarchyFrontierEntry,
+   type SplatRADHierarchyManagerProps,
+   type SplatRADHierarchyPage,
++  type SplatRADHierarchyData,
+   type SplatRADHierarchyRequest,
+   type SplatRADHierarchyStats
+ } from './splat-rad-hierarchy';
+diff --git a/modules/splats/src/splat-rad-hierarchy.ts b/modules/splats/src/splat-rad-hierarchy.ts
+index 4b25a3e14..b709b32a0 100644
+--- a/modules/splats/src/splat-rad-hierarchy.ts
++++ b/modules/splats/src/splat-rad-hierarchy.ts
+@@ -8,7 +8,6 @@
+ import type {GPUSplatData} from './splat-data';
+ import {
+   getSplatHierarchyFoveatedPriority,
+-  isSplatHierarchyNodeVisible,
+   type SplatHierarchyFoveation,
+   type SplatHierarchyNode,
+   type SplatHierarchyView
+@@ -17,9 +16,18 @@ import {
+   SplatResidencyManager,
+   type SplatResidencyBounds,
+   type SplatResidencyBudget,
+-  type SplatResidencyChunk
++  type SplatResidencyChunk,
++  type SplatResidencyData
+ } from './splat-residency';
+ 
++/** CPU-only decoded columns required for RAD traversal; no device or GPU buffers are needed. */
++export type SplatRADHierarchyData = SplatResidencyData & {
++  /** Monotonic source revision used to invalidate retained traversal after in-place edits. */
++  readonly revision: number;
++  /** Original decoded geometry and opacity columns. Color and spherical harmonics are not read. */
++  readonly source: Pick<GPUSplatData['source'], 'positions' | 'scales' | 'opacities'>;
++};
++
+ const DEFAULT_RAD_PAGE_SIZE = 65_536;
+ const GAUSSIAN_SUPPORT_RADIUS = 3;
+ const DEFAULT_RAD_CONE_FOV0_DEGREES = 90;
+@@ -29,11 +37,11 @@ const DEFAULT_RAD_BEHIND_FOVEATION = 0.2;
+ const DEFAULT_RAD_REFINEMENT_HYSTERESIS = 0.15;
+ 
+ /** One independently prepared source page and its untouched per-row hierarchy metadata. */
+-export type SplatRADHierarchyPage = {
++export type SplatRADHierarchyPage<TData extends SplatRADHierarchyData = GPUSplatData> = {
+   /** Stable source-page identity used for residency and renderer page slots. */
+   id: string;
+   /** Original independently prepared batch; source buffers are never copied or repacked. */
+-  data: GPUSplatData;
++  data: TData;
+   /** Number of child source rows represented by each original batch-local parent row. */
+   childCounts?: Uint16Array;
+   /** Global source-row index of the first child of each original batch-local parent row. */
+@@ -47,11 +55,11 @@ export type SplatRADHierarchyPage = {
+ };
+ 
+ /** One source page with only its currently selected, original batch-local hierarchy rows. */
+-export type SplatRADHierarchyFrontierEntry = {
++export type SplatRADHierarchyFrontierEntry<TData extends SplatRADHierarchyData = GPUSplatData> = {
+   /** Stable original source-page identity. */
+   id: string;
+   /** Original independently prepared source batch and all of its intact GPU buffers. */
+-  data: GPUSplatData;
++  data: TData;
+   /** Original batch-local source-row offsets selected for the current camera view. */
+   activeRows: Uint32Array;
+   /** One byte per original batch-local row; selected rows contain one. */
+@@ -99,21 +107,38 @@ export type SplatRADHierarchyStats = {
+ };
+ 
+ /** Loader-neutral row-hierarchy traversal, source-page residency, and integration callbacks. */
+-export type SplatRADHierarchyManagerProps = {
++export type SplatRADHierarchyManagerProps<TData extends SplatRADHierarchyData = GPUSplatData> = {
+   /** Optional initially resident source pages, preserving their original row boundaries. */
+-  pages?: readonly SplatRADHierarchyPage[];
++  pages?: readonly SplatRADHierarchyPage<TData>[];
+   /** Global source hierarchy roots; Spark RAD sources default to the root at row zero. */
+   rootRows?: readonly number[];
+   /** Nominal source rows per independently fetchable page; Spark defaults to 65,536. */
+   pageSize?: number;
+   /** Optional borrowed source residency window, never destroyed by this hierarchy. */
+-  residencyManager?: SplatResidencyManager;
++  residencyManager?: SplatResidencyManager<TData>;
+   /** Limits used when this hierarchy creates its own source residency window. */
+   residencyBudget?: SplatResidencyBudget;
+   /** Maximum accepted projected source-row geometric error in physical pixels. */
+   maximumScreenSpaceError?: number;
+   /** Maximum simultaneously selected original source rows across every active page. */
+   maximumActiveRows?: number;
++  /**
++   * Whether selection omits rows outside the camera frustum. Defaults to true. Disable for
++   * view-cone LoD: retain coarse all-direction coverage and let the renderer clip primitives.
++   */
++  frustumCulling?: boolean;
++  /**
++   * Maximum distinct nominal RAD page indices reserved by complete-cut and progressive selection,
++   * including ancestors and pending complete child replacements. Defaults to unlimited. Keep this
++   * below the physical residency capacity to leave room for overlap with the displayed view.
++   */
++  maximumResidentPages?: number;
++  /**
++   * Soft bound on requested nominal pages during complete-cut and progressive selection. One sibling
++   * replacement can exceed this limit when no other requests are pending, avoiding partial-group
++   * deadlock. Deferred parents resume after page admission. Defaults to unlimited.
++   */
++  maximumPendingPages?: number;
+   /** Whether source opacity uses Spark's already-decoded zero-through-two LoD domain. */
+   lodOpacity?: boolean;
+   /** Spark-compatible multiplier applied to authored source-row refinement importance. */
+@@ -136,7 +161,7 @@ export type SplatRADHierarchyManagerProps = {
+   foveation?: SplatHierarchyFoveation;
+   /** Receives intact source pages plus original batch-local active-row indirection. */
+   onFrontierChange?: (
+-    frontier: readonly SplatRADHierarchyFrontierEntry[],
++    frontier: readonly SplatRADHierarchyFrontierEntry<TData>[],
+     stats: SplatRADHierarchyStats
+   ) => void;
+   /** Requests a missing source page; transport, decoding, workers, and upload remain external. */
+@@ -145,33 +170,42 @@ export type SplatRADHierarchyManagerProps = {
+   onPageCancel?: (request: SplatRADHierarchyRequest) => void;
+ };
+ 
+-type RegisteredSplatRADPage = {
+-  page: SplatRADHierarchyPage;
++type RegisteredSplatRADPage<TData extends SplatRADHierarchyData = GPUSplatData> = {
++  page: SplatRADHierarchyPage<TData>;
+   bounds: SplatResidencyBounds;
+   endRowIndex: number;
+   lastDataRevision: number;
+ };
+ 
+-type SelectedSplatRADPage = {
+-  registeredPage: RegisteredSplatRADPage;
++type SelectedSplatRADPage<TData extends SplatRADHierarchyData = GPUSplatData> = {
++  registeredPage: RegisteredSplatRADPage<TData>;
+   activeRows: number[];
+   activeMask: Uint8Array;
+   geometricError: number;
+   priority: number;
+   isFallback: boolean;
++  fallbackRowCount: number;
++  dependencyPageIds: Set<string>;
++  dependencyRows: Set<number>;
++  selectedRows?: Map<number, SplatRADFrontierCandidate<TData>>;
+ };
+ 
+-type SplatRADTraversalState = {
+-  selectedPages: Map<string, SelectedSplatRADPage>;
++type SplatRADTraversalState<TData extends SplatRADHierarchyData = GPUSplatData> = {
++  selectedPages: Map<string, SelectedSplatRADPage<TData>>;
+   protectedPageIds: Set<string>;
++  dependencyPageIds: Set<string>;
++  dependencyPageCounts: Map<string, number>;
++  inputPageIds: Set<string>;
++  requiredPageIndices: Set<number>;
+   requestedPages: Map<number, SplatRADHierarchyRequest>;
+   allocatedRowCount: number;
+   refinedRows: Set<number>;
+   retainedCapacityRows: Set<number>;
++  capacityPriority: number;
+ };
+ 
+-type SplatRADFrontierCandidate = {
+-  registeredPage: RegisteredSplatRADPage;
++type SplatRADFrontierCandidate<TData extends SplatRADHierarchyData = GPUSplatData> = {
++  registeredPage: RegisteredSplatRADPage<TData>;
+   globalRowIndex: number;
+   localRowIndex: number;
+   node: SplatHierarchyNode;
+@@ -179,14 +213,20 @@ type SplatRADFrontierCandidate = {
+   isFallback: boolean;
+   isCapacityLimited: boolean;
+   isVisible: boolean;
+-  children?: SplatRADFrontierCandidate[];
+-  parent?: SplatRADFrontierCandidate;
++  children?: SplatRADFrontierCandidate<TData>[];
++  parent?: SplatRADFrontierCandidate<TData>;
++  /** Number of direct child subtrees containing visible selected rows. */
++  selectedChildCount?: number;
++  /** Whether this row itself currently contributes visible frontier coverage. */
++  isSelected?: boolean;
++  dependencyPageIds?: string[];
++  suppressRefinement?: boolean;
+ };
+ 
+-type SplatRADRefinementProgress = {
++type SplatRADRefinementProgress<TData extends SplatRADHierarchyData = GPUSplatData> = {
+   nextChildOffset: number;
+   residentChildCount: number;
+-  childCandidates: SplatRADFrontierCandidate[];
++  childCandidates: SplatRADFrontierCandidate<TData>[];
+ };
+ 
+ type SplatRADRetargetProgress = {
+@@ -194,19 +234,19 @@ type SplatRADRetargetProgress = {
+ };
+ 
+ /** One resumable best-first traversal whose retained tree can be retargeted to a changed camera. */
+-type SplatRADIncrementalTraversal = {
+-  state: SplatRADTraversalState;
+-  rootCandidates: SplatRADFrontierCandidate[];
+-  selectedRows: Map<number, SplatRADFrontierCandidate>;
+-  refinementQueue: SplatRADPriorityQueue;
+-  refinementProgress: Map<number, SplatRADRefinementProgress>;
+-  retargetQueue: SplatRADPriorityQueue;
++type SplatRADIncrementalTraversal<TData extends SplatRADHierarchyData = GPUSplatData> = {
++  state: SplatRADTraversalState<TData>;
++  rootCandidates: SplatRADFrontierCandidate<TData>[];
++  selectedRows: Map<number, SplatRADFrontierCandidate<TData>>;
++  refinementQueue: SplatRADPriorityQueue<TData>;
++  refinementProgress: Map<number, SplatRADRefinementProgress<TData>>;
++  retargetQueue: SplatRADPriorityQueue<TData>;
+   retargetProgress: Map<number, SplatRADRetargetProgress>;
+   preferRefinementNext: boolean;
+ };
+ 
+-type SplatRADFrontierSelection = Pick<
+-  SplatRADIncrementalTraversal,
++type SplatRADFrontierSelection<TData extends SplatRADHierarchyData = GPUSplatData> = Pick<
++  SplatRADIncrementalTraversal<TData>,
+   'state' | 'selectedRows' | 'refinementQueue'
+ >;
+ 
+@@ -218,19 +258,30 @@ type SplatRADFrontierSelection = Pick<
+  * Original source pages and their GPU allocations stay intact; only batch-local visibility masks
+  * and active-row indirection change as the camera or residency window changes.
+  */
+-export class SplatRADHierarchyManager {
++export class SplatRADHierarchyManager<TData extends SplatRADHierarchyData = GPUSplatData> {
+   /** Borrowed or independently owned residency window for untouched decoded source pages. */
+-  readonly residencyManager: SplatResidencyManager;
++  readonly residencyManager: SplatResidencyManager<TData>;
+ 
+-  private readonly pagesById = new Map<string, RegisteredSplatRADPage>();
++  private readonly pagesById = new Map<string, RegisteredSplatRADPage<TData>>();
+   private readonly ownedPinnedIds = new Set<string>();
+   private readonly pendingRequests = new Map<number, SplatRADHierarchyRequest>();
+-  private readonly onFrontierChange?: SplatRADHierarchyManagerProps['onFrontierChange'];
+-  private readonly onPageRequest?: SplatRADHierarchyManagerProps['onPageRequest'];
+-  private readonly onPageCancel?: SplatRADHierarchyManagerProps['onPageCancel'];
++  private readonly blockedCandidates = new Map<number, SplatRADFrontierCandidate<TData>>();
++  private readonly deferredCandidates = new Map<number, SplatRADFrontierCandidate<TData>>();
++  private requiresRefinement = false;
++  private protectTraversalDependencies = false;
++  private deferFrontierUntilComplete = false;
++  private progressiveView = false;
++  private coarseningQueue = new SplatRADPriorityQueue<TData>((first, second) =>
++    compareSplatRADCandidates(second, first)
++  );
++  private readonly onFrontierChange?: SplatRADHierarchyManagerProps<TData>['onFrontierChange'];
++  private readonly onPageRequest?: SplatRADHierarchyManagerProps<TData>['onPageRequest'];
++  private readonly onPageCancel?: SplatRADHierarchyManagerProps<TData>['onPageCancel'];
+   private readonly ownsResidencyManager: boolean;
+   private readonly maximumScreenSpaceError: number;
+   private readonly maximumActiveRows: number;
++  private readonly maximumResidentPages: number;
++  private readonly maximumPendingPages: number;
+   private maxTraversalRows: number;
+   private readonly pageSize: number;
+   private readonly foveation?: SplatHierarchyFoveation;
+@@ -242,23 +293,38 @@ export class SplatRADHierarchyManager {
+   private readonly behindFoveate: number;
+   private readonly refinementHysteresis: number;
+ 
+-  private sortedPages: RegisteredSplatRADPage[] = [];
++  private sortedPages: RegisteredSplatRADPage<TData>[] = [];
+   private rootRows: readonly number[];
+   private currentView?: SplatHierarchyView;
+-  private currentFrontier: SplatRADHierarchyFrontierEntry[] = [];
++  private clipPlanes?: Float64Array;
++  private focalLengthPixels = 0;
++  private forwardLength = 0;
++  private currentFrontier: SplatRADHierarchyFrontierEntry<TData>[] = [];
++  private readonly publishedPages = new Map<
++    string,
++    {
++      entry: SplatRADHierarchyFrontierEntry<TData>;
++      dependencyPageIds: ReadonlySet<string>;
++      fallbackRowCount: number;
++    }
++  >();
++  private readonly changedPageIds = new Set<string>();
++  private rebuildPublishedPages = true;
+   private previouslyRefinedRows = new Set<number>();
+   private visibleRowCount = 0;
+   private culledRowCount = 0;
++  private missingRowCount = 0;
+   private fallbackRowCount = 0;
+   private requiresRefresh = true;
++  private readonly frustumCulling: boolean;
+   private requiresRetarget = false;
+-  private incrementalTraversal?: SplatRADIncrementalTraversal;
++  private incrementalTraversal?: SplatRADIncrementalTraversal<TData>;
+   private isDestroyed = false;
+ 
+   /** Creates a loader-neutral global-row hierarchy without fetching or decoding source pages. */
+-  constructor(props: SplatRADHierarchyManagerProps = {}) {
++  constructor(props: SplatRADHierarchyManagerProps<TData> = {}) {
+     this.residencyManager =
+-      props.residencyManager ?? new SplatResidencyManager(props.residencyBudget);
++      props.residencyManager ?? new SplatResidencyManager<TData>(props.residencyBudget);
+     this.ownsResidencyManager = !props.residencyManager;
+     this.rootRows = [...(props.rootRows ?? [0])];
+     this.pageSize = props.pageSize ?? DEFAULT_RAD_PAGE_SIZE;
+@@ -267,6 +333,9 @@ export class SplatRADHierarchyManager {
+       0
+     );
+     this.maximumActiveRows = props.maximumActiveRows ?? Number.POSITIVE_INFINITY;
++    this.frustumCulling = props.frustumCulling ?? true;
++    this.maximumResidentPages = props.maximumResidentPages ?? Number.POSITIVE_INFINITY;
++    this.maximumPendingPages = props.maximumPendingPages ?? Number.POSITIVE_INFINITY;
+     this.maxTraversalRows = props.maxTraversalRows ?? Number.POSITIVE_INFINITY;
+     this.foveation = props.foveation;
+     this.lodOpacity = props.lodOpacity ?? false;
+@@ -310,6 +379,8 @@ export class SplatRADHierarchyManager {
+       throw new RangeError('Gaussian traversal capacity must be a positive safe integer');
+     }
+     this.validateRootRows(this.rootRows);
++    validateSplatRADTraversalBudget(this.maximumResidentPages);
++    validateSplatRADTraversalBudget(this.maximumPendingPages);
+     for (const page of props.pages ?? []) {
+       this.registerPage(page);
+     }
+@@ -321,12 +392,12 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   /** Current intact source pages and original batch-local active-row visibility masks. */
+-  get frontier(): readonly SplatRADHierarchyFrontierEntry[] {
++  get frontier(): readonly SplatRADHierarchyFrontierEntry<TData>[] {
+     return this.currentFrontier;
+   }
+ 
+   /** Original independently prepared batches participating in the current row frontier. */
+-  get frontierBatches(): GPUSplatData[] {
++  get frontierBatches(): TData[] {
+     return this.currentFrontier.map(entry => entry.data);
+   }
+ 
+@@ -341,6 +412,11 @@ export class SplatRADHierarchyManager {
+     );
+   }
+ 
++  /** Whether active-row capacity prevented a requested visible parent replacement. */
++  get isCapacityLimited(): boolean {
++    return (this.incrementalTraversal?.state.capacityPriority ?? 0) > 0;
++  }
++
+   /** Global source rows belonging to the missing pages currently requested by this view. */
+   get requestedRows(): number[] {
+     return Array.from(this.pendingRequests.values(), request => request.rowIndex);
+@@ -369,12 +445,12 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   /** Returns the original metadata and intact GPU allocation for one registered source page. */
+-  getPage(id: string): SplatRADHierarchyPage | undefined {
++  getPage(id: string): SplatRADHierarchyPage<TData> | undefined {
+     return this.pagesById.get(id)?.page;
+   }
+ 
+   /** Resolves the independently resident source page containing one original global source row. */
+-  getPageForRow(rowIndex: number): SplatRADHierarchyPage | undefined {
++  getPageForRow(rowIndex: number): SplatRADHierarchyPage<TData> | undefined {
+     return this.getRegisteredPageForRow(rowIndex)?.page;
+   }
+ 
+@@ -413,7 +489,7 @@ export class SplatRADHierarchyManager {
+    * Returns false when bounded residency cannot accept the page while protecting existing
+    * fallback coverage. Ownership remains with the caller when an incoming page is rejected.
+    */
+-  registerPage(page: SplatRADHierarchyPage): boolean {
++  registerPage(page: SplatRADHierarchyPage<TData>): boolean {
+     this.assertLive();
+     this.validatePage(page);
+     const existingPage = this.pagesById.get(page.id);
+@@ -436,7 +512,7 @@ export class SplatRADHierarchyManager {
+       return false;
+     }
+ 
+-    const registeredPage: RegisteredSplatRADPage = {
++    const registeredPage: RegisteredSplatRADPage<TData> = {
+       page,
+       bounds,
+       endRowIndex: page.data.rowIndexBase + page.data.length,
+@@ -462,7 +538,55 @@ export class SplatRADHierarchyManager {
+       this.invalidateIncrementalTraversal();
+       this.requiresRefresh = true;
+     } else {
+-      this.requiresRetarget = true;
++      // A page changes residency, not the camera. Resume only the parents whose authored
++      // child ranges intersect it instead of reprojecting the entire resolved tree.
++      const traversal = this.incrementalTraversal!;
++      for (const [pageIndex, request] of traversal.state.requestedPages) {
++        if (
++          request.rowIndex >= page.data.rowIndexBase &&
++          request.rowIndex < registeredPage.endRowIndex
++        ) {
++          traversal.state.requestedPages.delete(pageIndex);
++        }
++      }
++      let nextRequestCandidate: SplatRADFrontierCandidate<TData> | undefined;
++      for (const [rowIndex, candidate] of this.deferredCandidates) {
++        if (traversal.selectedRows.get(rowIndex) !== candidate) {
++          this.deferredCandidates.delete(rowIndex);
++          continue;
++        }
++        const childStart = candidate.registeredPage.page.childStarts![candidate.localRowIndex];
++        const childEnd =
++          childStart + candidate.registeredPage.page.childCounts![candidate.localRowIndex];
++        if (childStart < registeredPage.endRowIndex && childEnd > page.data.rowIndexBase) {
++          traversal.refinementQueue.push(candidate);
++          this.deferredCandidates.delete(rowIndex);
++          this.requiresRefinement = true;
++        } else if (
++          (!nextRequestCandidate ||
++            compareSplatRADCandidates(candidate, nextRequestCandidate) > 0) &&
++          this.reserveChildPages(childStart, childEnd - childStart, traversal.state, false)
++        ) {
++          nextRequestCandidate = candidate;
++        }
++      }
++      // One admission frees one demand slot. Wake its best waiting replacement, not every
++      // unrelated deferred row (potentially hundreds of thousands) on every downloaded page.
++      if (nextRequestCandidate) {
++        this.deferredCandidates.delete(nextRequestCandidate.globalRowIndex);
++        traversal.refinementQueue.push(nextRequestCandidate);
++        this.requiresRefinement = true;
++      }
++      for (const candidate of this.blockedCandidates.values()) {
++        const childStart = candidate.registeredPage.page.childStarts![candidate.localRowIndex];
++        const childEnd =
++          childStart + candidate.registeredPage.page.childCounts![candidate.localRowIndex];
++        if (childStart < registeredPage.endRowIndex && childEnd > page.data.rowIndexBase) {
++          traversal.refinementProgress.delete(candidate.globalRowIndex);
++          traversal.refinementQueue.push(candidate);
++          this.requiresRefinement = true;
++        }
++      }
+     }
+     return true;
+   }
+@@ -503,8 +627,11 @@ export class SplatRADHierarchyManager {
+    * Camera changes retarget the retained hierarchy tree instead of restarting from its roots.
+    * Resolved visible detail remains selected until visibility or active capacity requires a change.
+    */
+-  update(view: SplatHierarchyView): readonly SplatRADHierarchyFrontierEntry[] {
++  update(view: SplatHierarchyView): readonly SplatRADHierarchyFrontierEntry<TData>[] {
+     this.assertLive();
++    this.protectTraversalDependencies = false;
++    this.progressiveView = false;
++    this.deferFrontierUntilComplete = false;
+     const removedResidentPage = this.pruneEvictedPages();
+     const sourceRowsChanged = this.haveSourceRowsChanged();
+     const viewChanged = !this.currentView || !areSplatRADViewsEqual(this.currentView, view);
+@@ -512,6 +639,7 @@ export class SplatRADHierarchyManager {
+       this.currentView &&
+       !this.requiresRefresh &&
+       !this.requiresRetarget &&
++      !this.requiresRefinement &&
+       !removedResidentPage &&
+       areSplatRADViewsEqual(this.currentView, view) &&
+       !sourceRowsChanged
+@@ -522,15 +650,202 @@ export class SplatRADHierarchyManager {
+       this.invalidateIncrementalTraversal();
+       this.requiresRefresh = true;
+     }
+-    this.currentView = view;
++    this.prepareView(view);
++    if (viewChanged && this.incrementalTraversal) {
++      // Network demand is small compared with the retained leaf frontier. Retarget it now,
++      // even if a bounded traversal has not finished walking the previous view's tree.
++      for (const candidate of this.blockedCandidates.values()) {
++        this.updateFrontierCandidate(candidate, this.incrementalTraversal, false);
++      }
++    }
+     if (this.requiresRefresh || !this.incrementalTraversal) {
+       this.refresh();
+     } else if (viewChanged || this.requiresRetarget) {
+       this.retarget(this.maxTraversalRows);
++    } else if (this.requiresRefinement) {
++      this.continueTraversal();
+     }
+     return this.currentFrontier;
+   }
+ 
++  /**
++   * Computes a complete best-first cut for the latest viewpoint and resident pages.
++   *
++   * Unlike bounded {@link update}, this redistributes the entire active-row budget from the
++   * roots, allowing distant old-view detail to yield capacity to nearer detail. Run it in a
++   * worker: it publishes only the completed coherent cut. An optional per-call row budget yields
++   * current page demand and residency pins before completion; resume with {@link continueTraversal}.
++   * The previous frontier remains intact between slices; an empty scene publishes coarse coverage
++   * on its first slice. Once that cut completes, later page arrivals publish coherent refinements
++   * after each slice instead of waiting for the entire refinement queue. Omitting the budget
++   * completes synchronously.
++   */
++  selectView(
++    view: SplatHierarchyView,
++    maxTraversalRows = Number.POSITIVE_INFINITY
++  ): readonly SplatRADHierarchyFrontierEntry<TData>[] {
++    this.assertLive();
++    this.progressiveView = false;
++    validateSplatRADTraversalBudget(maxTraversalRows);
++    this.protectTraversalDependencies = true;
++    this.deferFrontierUntilComplete = true;
++    this.prepareView(view);
++    this.refresh(maxTraversalRows);
++    return this.currentFrontier;
++  }
++
++  /**
++   * Retargets the displayed coherent cut and publishes each completed sibling replacement.
++   * Unlike {@link selectView}, camera motion never replaces resolved branches with a root-built
++   * intermediate cut. Offscreen release tests the selected descendants, not the parent bounds;
++   * visible branches are coarsened only when required by the active-row budget.
++   * Run in a worker: retargeting visits the retained cut once;
++   * subsequent refinement is bounded by `maxTraversalRows` and {@link continueTraversal}.
++   */
++  refineView(
++    view: SplatHierarchyView,
++    maxTraversalRows = Number.POSITIVE_INFINITY
++  ): readonly SplatRADHierarchyFrontierEntry<TData>[] {
++    this.assertLive();
++    validateSplatRADTraversalBudget(maxTraversalRows);
++    const canRetain = this.protectTraversalDependencies;
++    this.protectTraversalDependencies = true;
++    this.deferFrontierUntilComplete = false;
++    this.progressiveView = true;
++    const invalidated = this.pruneEvictedPages() || this.haveSourceRowsChanged();
++    const viewChanged = !this.currentView || !areSplatRADViewsEqual(this.currentView, view);
++    this.prepareView(view);
++    if (!canRetain || invalidated || !this.incrementalTraversal || this.requiresRefresh) {
++      this.refresh(maxTraversalRows);
++      return this.currentFrontier;
++    }
++    const traversal = this.incrementalTraversal;
++    if (viewChanged || this.requiresRetarget) {
++      this.requiresRetarget = false;
++      this.requiresRefinement = false;
++      this.blockedCandidates.clear();
++      this.deferredCandidates.clear();
++      traversal.refinementProgress.clear();
++      traversal.retargetProgress.clear();
++      traversal.retargetQueue = this.makeRetargetQueue(traversal.selectedRows);
++      traversal.refinementQueue = new SplatRADPriorityQueue<TData>();
++      this.coarseningQueue = new SplatRADPriorityQueue<TData>((first, second) =>
++        compareSplatRADCandidates(second, first)
++      );
++      traversal.state.protectedPageIds.clear();
++      traversal.state.requestedPages.clear();
++      traversal.state.capacityPriority = 0;
++      this.visibleRowCount = 0;
++      this.culledRowCount = 0;
++      this.missingRowCount = 0;
++      for (const root of traversal.rootCandidates) this.retargetSelectedBranch(root, traversal);
++      // Culling-enabled callers can reveal more retained leaves than the active-row budget.
++      // Enforce capacity only after all visibility changes and offscreen releases are accounted for.
++      for (const candidate of traversal.selectedRows.values()) {
++        if (traversal.state.allocatedRowCount <= this.maximumActiveRows) break;
++        this.collapseFrontierForCapacity(candidate, traversal);
++      }
++      this.resetRequiredPages(traversal.state);
++    }
++    this.advanceTraversal(traversal, maxTraversalRows, false);
++    this.publishTraversal(traversal);
++    return this.currentFrontier;
++  }
++
++  /** Returns visibility of actual selected descendants, never the parent's approximation. */
++  private retargetSelectedBranch(
++    candidate: SplatRADFrontierCandidate<TData>,
++    traversal: SplatRADIncrementalTraversal<TData>
++  ): boolean {
++    const view = this.currentView!;
++    // Explicit post-order frames keep deep retained trees off the JavaScript call stack.
++    const stack = [{candidate, childIndex: -1, hasVisibleDescendant: false}];
++    while (stack.length) {
++      const frame = stack[stack.length - 1];
++      const branchCandidate = frame.candidate;
++      if (frame.childIndex === -1) {
++        branchCandidate.suppressRefinement = false;
++        const screenSpaceError = getSplatRADScreenSpaceError(
++          branchCandidate.node,
++          view,
++          this.focalLengthPixels
++        );
++        const selected =
++          traversal.selectedRows.get(branchCandidate.globalRowIndex) === branchCandidate;
++        const wasVisible = branchCandidate.isVisible;
++        const isVisible = this.isRowVisible(branchCandidate.node);
++        if (selected && wasVisible !== isVisible)
++          this.recordSelectedRow(branchCandidate, traversal.state, false);
++        branchCandidate.isVisible = isVisible;
++        if (selected && wasVisible !== isVisible) {
++          this.recordSelectedRow(branchCandidate, traversal.state, true);
++          traversal.state.allocatedRowCount += Number(isVisible) - Number(wasVisible);
++        }
++        branchCandidate.priority =
++          getSplatHierarchyFoveatedPriority(
++            branchCandidate.node,
++            view,
++            view.foveation ?? this.foveation,
++            screenSpaceError
++          ) *
++          this.getAngularFoveation(branchCandidate.node, view) *
++          this.lodSplatScale;
++        if (selected) {
++          // Dormant children are not display dependencies and may already have been evicted.
++          branchCandidate.children = undefined;
++          frame.hasVisibleDescendant = this.isRowInFrustum(branchCandidate.node);
++          if (
++            branchCandidate.registeredPage.page.childCounts?.[branchCandidate.localRowIndex] &&
++            (!branchCandidate.isVisible ||
++              branchCandidate.priority > this.getRefinementThreshold(branchCandidate))
++          ) {
++            traversal.refinementQueue.push(branchCandidate);
++          }
++        }
++        frame.childIndex = 0;
++      }
++      const children = branchCandidate.children;
++      if (children && frame.childIndex < children.length) {
++        stack.push({
++          candidate: children[frame.childIndex++],
++          childIndex: -1,
++          hasVisibleDescendant: false
++        });
++        continue;
++      }
++      if (!frame.hasVisibleDescendant && children?.length) {
++        this.collapseFrontierCandidate(branchCandidate, traversal);
++        branchCandidate.children = undefined;
++        branchCandidate.suppressRefinement = true;
++      } else if (
++        children?.every(child => traversal.selectedRows.get(child.globalRowIndex) === child)
++      ) {
++        this.coarseningQueue.push(branchCandidate);
++      }
++      stack.pop();
++      if (!stack.length) return frame.hasVisibleDescendant;
++      stack[stack.length - 1].hasVisibleDescendant ||= frame.hasVisibleDescendant;
++    }
++    return false;
++  }
++
++  private resetRequiredPages(state: SplatRADTraversalState<TData>): void {
++    state.requiredPageIndices.clear();
++    for (const rootRow of this.rootRows)
++      state.requiredPageIndices.add(Math.floor(rootRow / this.pageSize));
++    for (const page of state.selectedPages.values()) {
++      if (page.selectedRows?.size)
++        state.requiredPageIndices.add(
++          Math.floor(page.registeredPage.page.data.rowIndexBase / this.pageSize)
++        );
++    }
++    for (const pageId of state.dependencyPageCounts.keys()) {
++      const page = this.pagesById.get(pageId);
++      if (page)
++        state.requiredPageIndices.add(Math.floor(page.page.data.rowIndexBase / this.pageSize));
++    }
++  }
++
+   /**
+    * Advances one bounded best-first slice for an unchanged camera without rebuilding prior work.
+    *
+@@ -540,13 +855,14 @@ export class SplatRADHierarchyManager {
+    */
+   continueTraversal(
+     maxTraversalRows: number = this.maxTraversalRows
+-  ): readonly SplatRADHierarchyFrontierEntry[] {
++  ): readonly SplatRADHierarchyFrontierEntry<TData>[] {
+     this.assertLive();
+     validateSplatRADTraversalBudget(maxTraversalRows);
++    this.requiresRefinement = false;
+     if (!this.currentView) {
+       return this.currentFrontier;
+     }
+-    if (this.haveSourceRowsChanged()) {
++    if (this.pruneEvictedPages() || this.haveSourceRowsChanged()) {
+       this.invalidateIncrementalTraversal();
+       this.requiresRefresh = true;
+     }
+@@ -555,6 +871,7 @@ export class SplatRADHierarchyManager {
+       return this.currentFrontier;
+     }
+     if (this.requiresRetarget) {
++      if (this.progressiveView) return this.refineView(this.currentView, maxTraversalRows);
+       this.retarget(maxTraversalRows);
+       return this.currentFrontier;
+     }
+@@ -562,6 +879,9 @@ export class SplatRADHierarchyManager {
+     if (!traversal) {
+       return this.currentFrontier;
+     }
++    if (traversal.refinementQueue.length === 0 && traversal.retargetQueue.length === 0) {
++      return this.currentFrontier;
++    }
+     this.advanceTraversal(traversal, maxTraversalRows, false);
+     this.publishTraversal(traversal);
+     return this.currentFrontier;
+@@ -577,10 +897,14 @@ export class SplatRADHierarchyManager {
+       this.onPageCancel?.(request);
+     }
+     this.pendingRequests.clear();
++    this.blockedCandidates.clear();
++    this.deferredCandidates.clear();
+     this.releaseInactivePins(new Set());
+     this.pagesById.clear();
+     this.sortedPages = [];
+     this.currentFrontier = [];
++    this.publishedPages.clear();
++    this.changedPageIds.clear();
+     this.incrementalTraversal = undefined;
+     if (this.ownsResidencyManager) {
+       this.residencyManager.destroy();
+@@ -596,6 +920,7 @@ export class SplatRADHierarchyManager {
+     this.invalidateIncrementalTraversal();
+     this.visibleRowCount = 0;
+     this.culledRowCount = 0;
++    this.missingRowCount = 0;
+     this.fallbackRowCount = 0;
+     const traversal = this.makeIncrementalTraversal();
+     this.incrementalTraversal = traversal;
+@@ -613,6 +938,7 @@ export class SplatRADHierarchyManager {
+ 
+     this.visibleRowCount = 0;
+     this.culledRowCount = 0;
++    this.missingRowCount = 0;
+     this.fallbackRowCount = 0;
+     if (traversal.retargetQueue.length > 0 || traversal.refinementQueue.length > 0) {
+       this.requiresRetarget = true;
+@@ -622,7 +948,8 @@ export class SplatRADHierarchyManager {
+     }
+     traversal.state.protectedPageIds.clear();
+     traversal.state.requestedPages.clear();
+-    traversal.refinementQueue = new SplatRADPriorityQueue();
++    traversal.state.capacityPriority = 0;
++    traversal.refinementQueue = new SplatRADPriorityQueue<TData>();
+     traversal.refinementProgress.clear();
+     traversal.retargetQueue = this.makeRetargetQueue(traversal.selectedRows);
+     traversal.retargetProgress.clear();
+@@ -636,20 +963,27 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   /** Starts one deterministic best-first queue from the current roots and resident pages. */
+-  private makeIncrementalTraversal(): SplatRADIncrementalTraversal {
++  private makeIncrementalTraversal(): SplatRADIncrementalTraversal<TData> {
+     const rootRows = this.rootRows.slice(0, this.maximumActiveRows);
+-    const state: SplatRADTraversalState = {
++    const state: SplatRADTraversalState<TData> = {
+       selectedPages: new Map(),
+       protectedPageIds: new Set(),
++      dependencyPageIds: new Set(),
++      dependencyPageCounts: new Map(),
++      inputPageIds: new Set(),
++      requiredPageIndices: new Set(rootRows.map(rowIndex => Math.floor(rowIndex / this.pageSize))),
+       requestedPages: new Map(),
+       allocatedRowCount: 0,
+       refinedRows: new Set(),
+-      retainedCapacityRows: new Set()
++      retainedCapacityRows: new Set(),
++      capacityPriority: 0
+     };
+-    const selectedRows = new Map<number, SplatRADFrontierCandidate>();
+-    const rootCandidates: SplatRADFrontierCandidate[] = [];
+-    const refinementQueue = new SplatRADPriorityQueue();
+-    const refinementProgress = new Map<number, SplatRADRefinementProgress>();
++    const selectedRows = new SplatRADSelectedRows<TData>((candidate, selected) => {
++      if (this.protectTraversalDependencies) this.recordSelectedRow(candidate, state, selected);
++    });
++    const rootCandidates: SplatRADFrontierCandidate<TData>[] = [];
++    const refinementQueue = new SplatRADPriorityQueue<TData>();
++    const refinementProgress = new Map<number, SplatRADRefinementProgress<TData>>();
+     const retargetQueue = this.makeRetargetQueue(selectedRows);
+     const retargetProgress = new Map<number, SplatRADRetargetProgress>();
+ 
+@@ -661,6 +995,7 @@ export class SplatRADHierarchyManager {
+       }
+       const candidate = this.makeFrontierCandidate(rootPage, rootRow);
+       if (candidate) {
++        state.inputPageIds.add(rootPage.page.id);
+         rootCandidates.push(candidate);
+         state.allocatedRowCount += candidate.isVisible ? 1 : 0;
+         this.addFrontierCandidate(candidate, selectedRows, refinementQueue);
+@@ -681,11 +1016,11 @@ export class SplatRADHierarchyManager {
+ 
+   /** Spends one row-evaluation slice while retaining the queue for the next settled frame. */
+   private advanceTraversal(
+-    traversal: SplatRADIncrementalTraversal,
++    traversal: SplatRADIncrementalTraversal<TData>,
+     maxTraversalRows: number,
+     countExistingRows: boolean
+   ): void {
+-    const rowCountAtSliceStart = countExistingRows ? 0 : this.visibleRowCount + this.culledRowCount;
++    const rowCountAtSliceStart = countExistingRows ? 0 : this.getTraversalWorkCount();
+     const {refinementQueue, retargetQueue} = traversal;
+     if (maxTraversalRows === 1) {
+       if (refinementQueue.length > 0 && retargetQueue.length > 0) {
+@@ -739,13 +1074,13 @@ export class SplatRADHierarchyManager {
+ 
+   /** Reserves bounded work for current-view refinement while retained-tree retargeting continues. */
+   private advanceRefinementTraversal(
+-    traversal: SplatRADIncrementalTraversal,
++    traversal: SplatRADIncrementalTraversal<TData>,
+     maxTraversalRows: number,
+     rowCountAtSliceStart: number
+   ): void {
+     const {selectedRows, refinementQueue, refinementProgress, state} = traversal;
+     while (refinementQueue.length > 0) {
+-      const evaluatedRowCount = this.visibleRowCount + this.culledRowCount - rowCountAtSliceStart;
++      const evaluatedRowCount = this.getTraversalWorkCount() - rowCountAtSliceStart;
+       if (evaluatedRowCount >= maxTraversalRows) {
+         break;
+       }
+@@ -764,18 +1099,25 @@ export class SplatRADHierarchyManager {
+         refinementQueue.push(candidate);
+         break;
+       }
++      if (this.protectTraversalDependencies && candidate.isVisible && candidate.isCapacityLimited) {
++        // A best-first complete cut has reached its budget. The remaining heap already
++        // belongs to the selected frontier; exploring lower-priority descendants only creates
++        // unusable page demand and makes the cost scale with residency instead of the cut.
++        traversal.refinementQueue = new SplatRADPriorityQueue<TData>();
++        break;
++      }
+     }
+   }
+ 
+   /** Reprioritizes the retained tree from its roots without replacing its selected leaves. */
+   private advanceRetargetTraversal(
+-    traversal: SplatRADIncrementalTraversal,
++    traversal: SplatRADIncrementalTraversal<TData>,
+     maxTraversalRows: number,
+     rowCountAtSliceStart: number
+   ): void {
+     const {retargetProgress, retargetQueue, refinementQueue, selectedRows} = traversal;
+     while (retargetQueue.length > 0) {
+-      const evaluatedRowCount = this.visibleRowCount + this.culledRowCount - rowCountAtSliceStart;
++      const evaluatedRowCount = this.getTraversalWorkCount() - rowCountAtSliceStart;
+       if (evaluatedRowCount >= maxTraversalRows) {
+         break;
+       }
+@@ -812,7 +1154,7 @@ export class SplatRADHierarchyManager {
+         continue;
+       }
+       const remainingTraversalRows =
+-        maxTraversalRows - (this.visibleRowCount + this.culledRowCount - rowCountAtSliceStart);
++        maxTraversalRows - (this.getTraversalWorkCount() - rowCountAtSliceStart);
+       const childOffsetLimit = Math.min(
+         children.length,
+         progress.nextChildOffset + remainingTraversalRows
+@@ -844,17 +1186,20 @@ export class SplatRADHierarchyManager {
+ 
+   /** Recomputes one retained source row for the current camera without changing tree topology. */
+   private updateFrontierCandidate(
+-    candidate: SplatRADFrontierCandidate,
+-    traversal: SplatRADIncrementalTraversal,
++    candidate: SplatRADFrontierCandidate<TData>,
++    traversal: SplatRADIncrementalTraversal<TData>,
+     countDiagnosticRow: boolean
+   ): void {
+     const view = this.currentView;
+     if (!view) {
+       return;
+     }
++    if (traversal.selectedRows.get(candidate.globalRowIndex) === candidate) {
++      this.changedPageIds.add(candidate.registeredPage.page.id);
++    }
+     const wasVisible = candidate.isVisible;
+     const node = this.makeRowNode(candidate.registeredPage, candidate.localRowIndex);
+-    const isVisible = isSplatHierarchyNodeVisible(node, view.modelViewProjectionMatrix);
++    const isVisible = this.isRowVisible(node);
+     if (countDiagnosticRow) {
+       if (isVisible) {
+         this.visibleRowCount++;
+@@ -862,7 +1207,7 @@ export class SplatRADHierarchyManager {
+         this.culledRowCount++;
+       }
+     }
+-    const screenSpaceError = getSplatRADScreenSpaceError(node, view);
++    const screenSpaceError = getSplatRADScreenSpaceError(node, view, this.focalLengthPixels);
+     candidate.node = node;
+     candidate.isVisible = isVisible;
+     candidate.priority = isVisible
+@@ -891,7 +1236,7 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   /** Clears missing-page diagnostics once every authored direct child is resident. */
+-  private clearResolvedFallback(candidate: SplatRADFrontierCandidate): void {
++  private clearResolvedFallback(candidate: SplatRADFrontierCandidate<TData>): void {
+     if (!candidate.isFallback) {
+       return;
+     }
+@@ -916,31 +1261,88 @@ export class SplatRADHierarchyManager {
+ 
+   /** Coarsens one retained branch only when active-row capacity requires fewer visible leaves. */
+   private collapseFrontierCandidate(
+-    candidate: SplatRADFrontierCandidate,
+-    traversal: SplatRADIncrementalTraversal
++    candidate: SplatRADFrontierCandidate<TData>,
++    traversal: Pick<SplatRADIncrementalTraversal<TData>, 'selectedRows' | 'state'>
+   ): void {
+     const wasSelected = traversal.selectedRows.get(candidate.globalRowIndex) === candidate;
++    // Keep ancestor coverage alive while the parent replaces its selected descendants.
++    traversal.selectedRows.set(candidate.globalRowIndex, candidate);
+     for (const child of candidate.children ?? []) {
+       this.removeSelectedCandidateBranch(child, traversal.selectedRows, traversal.state);
+     }
+     candidate.isFallback = false;
+     candidate.isCapacityLimited = false;
+     traversal.state.refinedRows.delete(candidate.globalRowIndex);
+-    traversal.selectedRows.set(candidate.globalRowIndex, candidate);
++    this.changedPageIds.add(candidate.registeredPage.page.id);
+     if (!wasSelected) {
+       traversal.state.allocatedRowCount += candidate.isVisible ? 1 : 0;
+     }
+   }
+ 
++  /** Trades the least valuable complete sibling group for higher-error newly resident detail. */
++  private reclaimRefinementCapacity(
++    candidate: SplatRADFrontierCandidate<TData>,
++    visibleChildCount: number,
++    selectedRows: Map<number, SplatRADFrontierCandidate<TData>>,
++    state: SplatRADTraversalState<TData>
++  ): void {
++    const additionalRows = visibleChildCount - Number(candidate.isVisible);
++    let availableRows = this.maximumActiveRows - state.allocatedRowCount;
++    const replacements: SplatRADFrontierCandidate<TData>[] = [];
++    const replacementRows = new Set<number>();
++    const deferredAncestors: SplatRADFrontierCandidate<TData>[] = [];
++    while (availableRows < additionalRows) {
++      const replacement = this.coarseningQueue.pop();
++      if (!replacement) break;
++      if (replacement.priority >= candidate.priority) {
++        this.coarseningQueue.push(replacement);
++        break;
++      }
++      if (
++        !replacement.isVisible ||
++        !replacement.children ||
++        replacementRows.has(replacement.globalRowIndex) ||
++        selectedRows.get(replacement.globalRowIndex) === replacement ||
++        !replacement.children.every(child => selectedRows.get(child.globalRowIndex) === child) ||
++        replacement.children.filter(child => child.isVisible).length < 2
++      )
++        continue;
++      if (
++        this.progressiveView &&
++        (!this.isRowInFrustum(replacement.node) ||
++          getSplatRADScreenSpaceError(replacement.node, this.currentView!, this.focalLengthPixels) >
++            Math.max(8, this.maximumScreenSpaceError * 4))
++      )
++        continue;
++      if (hasSplatRADAncestor(candidate, replacement.globalRowIndex)) {
++        deferredAncestors.push(replacement);
++        continue;
++      }
++      replacements.push(replacement);
++      replacementRows.add(replacement.globalRowIndex);
++      availableRows += replacement.children.filter(child => child.isVisible).length - 1;
++    }
++    for (const ancestor of deferredAncestors) this.coarseningQueue.push(ancestor);
++    if (availableRows < additionalRows) {
++      for (const replacement of replacements) this.coarseningQueue.push(replacement);
++      return;
++    }
++    for (const replacement of replacements) {
++      this.collapseFrontierCandidate(replacement, {selectedRows, state});
++      if (replacement.parent) this.coarseningQueue.push(replacement.parent);
++    }
++  }
++
+   /** Reactivates retained direct children as one coherent parent replacement. */
+   private activateFrontierCandidateChildren(
+-    candidate: SplatRADFrontierCandidate,
+-    traversal: SplatRADIncrementalTraversal
++    candidate: SplatRADFrontierCandidate<TData>,
++    traversal: SplatRADIncrementalTraversal<TData>
+   ): boolean {
+     const children = candidate.children;
+     if (!children) {
+       return false;
+     }
++
+     const visibleChildCount = children.reduce(
+       (visibleRowCount, child) => visibleRowCount + (child.isVisible ? 1 : 0),
+       0
+@@ -954,21 +1356,23 @@ export class SplatRADHierarchyManager {
+       return false;
+     }
+     candidate.isCapacityLimited = false;
+-    traversal.selectedRows.delete(candidate.globalRowIndex);
++    this.changedPageIds.add(candidate.registeredPage.page.id);
+     traversal.state.allocatedRowCount = nextAllocatedRowCount;
+     traversal.state.refinedRows.add(candidate.globalRowIndex);
+     for (const child of children) {
+       traversal.selectedRows.set(child.globalRowIndex, child);
++      this.changedPageIds.add(child.registeredPage.page.id);
+     }
++    traversal.selectedRows.delete(candidate.globalRowIndex);
+     return true;
+   }
+ 
+   /** Coarsens the lowest retained branch needed to keep newly visible rows inside capacity. */
+   private collapseFrontierForCapacity(
+-    candidate: SplatRADFrontierCandidate,
+-    traversal: SplatRADIncrementalTraversal
++    candidate: SplatRADFrontierCandidate<TData>,
++    traversal: SplatRADIncrementalTraversal<TData>
+   ): void {
+-    let highestOffscreenAncestor: SplatRADFrontierCandidate | undefined;
++    let highestOffscreenAncestor: SplatRADFrontierCandidate<TData> | undefined;
+     for (let ancestor = candidate.parent; ancestor; ancestor = ancestor.parent) {
+       if (!ancestor.isVisible && ancestor.children) {
+         highestOffscreenAncestor = ancestor;
+@@ -993,9 +1397,9 @@ export class SplatRADHierarchyManager {
+ 
+   /** Keeps the highest-priority visible descendants when their offscreen parent cannot cover them. */
+   private selectCapacityLimitedChildren(
+-    candidate: SplatRADFrontierCandidate,
+-    traversal: SplatRADFrontierSelection,
+-    preferredDescendant?: SplatRADFrontierCandidate
++    candidate: SplatRADFrontierCandidate<TData>,
++    traversal: SplatRADFrontierSelection<TData>,
++    preferredDescendant?: SplatRADFrontierCandidate<TData>
+   ): boolean {
+     const {selectedRows, refinementQueue, state} = traversal;
+     const children = candidate.children;
+@@ -1003,6 +1407,7 @@ export class SplatRADHierarchyManager {
+       return false;
+     }
+     if (selectedRows.delete(candidate.globalRowIndex)) {
++      this.changedPageIds.add(candidate.registeredPage.page.id);
+       state.allocatedRowCount -= candidate.isVisible ? 1 : 0;
+     }
+     const selectedBranchVisibleRowCount = this.getSelectedBranchCounts(
+@@ -1063,8 +1468,8 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private isCandidateInBranch(
+-    branch: SplatRADFrontierCandidate,
+-    candidate?: SplatRADFrontierCandidate
++    branch: SplatRADFrontierCandidate<TData>,
++    candidate?: SplatRADFrontierCandidate<TData>
+   ): boolean {
+     while (candidate) {
+       if (candidate === branch) {
+@@ -1077,20 +1482,20 @@ export class SplatRADHierarchyManager {
+ 
+   /** Retargets dormant retained branches before touching the leaf currently carrying continuity. */
+   private makeRetargetQueue(
+-    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate>
+-  ): SplatRADPriorityQueue {
++    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate<TData>>
++  ): SplatRADPriorityQueue<TData> {
+     const visibleSelectedBranches = new Set<number>();
+     for (const candidate of selectedRows.values()) {
+       if (!candidate.isVisible) {
+         continue;
+       }
+-      let ancestor: SplatRADFrontierCandidate | undefined = candidate;
++      let ancestor: SplatRADFrontierCandidate<TData> | undefined = candidate;
+       while (ancestor) {
+         visibleSelectedBranches.add(ancestor.globalRowIndex);
+         ancestor = ancestor.parent;
+       }
+     }
+-    return new SplatRADPriorityQueue((first, second) => {
++    return new SplatRADPriorityQueue<TData>((first, second) => {
+       const firstHasVisibleSelection = visibleSelectedBranches.has(first.globalRowIndex);
+       const secondHasVisibleSelection = visibleSelectedBranches.has(second.globalRowIndex);
+       return (
+@@ -1101,8 +1506,8 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private getCapacityLimitedAncestor(
+-    candidate: SplatRADFrontierCandidate
+-  ): SplatRADFrontierCandidate | undefined {
++    candidate: SplatRADFrontierCandidate<TData>
++  ): SplatRADFrontierCandidate<TData> | undefined {
+     let ancestor = candidate.parent;
+     while (ancestor) {
+       if (ancestor.isCapacityLimited) {
+@@ -1114,16 +1519,16 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private rememberCapacitySelectedBranch(
+-    candidate: SplatRADFrontierCandidate,
+-    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate>,
+-    state: SplatRADTraversalState
++    candidate: SplatRADFrontierCandidate<TData>,
++    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate<TData>>,
++    state: SplatRADTraversalState<TData>
+   ): void {
+     this.clearCapacityRetainedBranch(candidate, state.retainedCapacityRows);
+     this.captureSelectedBranch(candidate, selectedRows, state.retainedCapacityRows);
+   }
+ 
+   private clearCapacityRetainedBranch(
+-    candidate: SplatRADFrontierCandidate,
++    candidate: SplatRADFrontierCandidate<TData>,
+     retainedRows: Set<number>
+   ): void {
+     this.visitCandidateBranch(candidate, branchCandidate => {
+@@ -1132,8 +1537,8 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private captureSelectedBranch(
+-    candidate: SplatRADFrontierCandidate,
+-    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate>,
++    candidate: SplatRADFrontierCandidate<TData>,
++    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate<TData>>,
+     retainedRows: Set<number>
+   ): void {
+     this.visitCandidateBranch(candidate, branchCandidate => {
+@@ -1147,11 +1552,11 @@ export class SplatRADHierarchyManager {
+ 
+   /** Restores a previously resolved dormant branch without republishing its coarse direct row. */
+   private restoreCapacitySelectedBranch(
+-    candidate: SplatRADFrontierCandidate,
+-    traversal: SplatRADFrontierSelection,
++    candidate: SplatRADFrontierCandidate<TData>,
++    traversal: SplatRADFrontierSelection<TData>,
+     maximumVisibleRows: number
+   ): number | undefined {
+-    const retainedCandidates: SplatRADFrontierCandidate[] = [];
++    const retainedCandidates: SplatRADFrontierCandidate<TData>[] = [];
+     this.collectCapacityRetainedCandidates(
+       candidate,
+       traversal.state.retainedCapacityRows,
+@@ -1180,9 +1585,9 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private collectCapacityRetainedCandidates(
+-    candidate: SplatRADFrontierCandidate,
++    candidate: SplatRADFrontierCandidate<TData>,
+     retainedRows: ReadonlySet<number>,
+-    retainedCandidates: SplatRADFrontierCandidate[]
++    retainedCandidates: SplatRADFrontierCandidate<TData>[]
+   ): void {
+     this.visitCandidateBranch(candidate, branchCandidate => {
+       if (retainedRows.has(branchCandidate.globalRowIndex)) {
+@@ -1194,12 +1599,13 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private removeSelectedCandidateBranch(
+-    candidate: SplatRADFrontierCandidate,
+-    selectedRows: Map<number, SplatRADFrontierCandidate>,
+-    state: SplatRADTraversalState
++    candidate: SplatRADFrontierCandidate<TData>,
++    selectedRows: Map<number, SplatRADFrontierCandidate<TData>>,
++    state: SplatRADTraversalState<TData>
+   ): void {
+     this.visitCandidateBranch(candidate, branchCandidate => {
+       if (selectedRows.delete(branchCandidate.globalRowIndex)) {
++        this.changedPageIds.add(branchCandidate.registeredPage.page.id);
+         state.allocatedRowCount -= branchCandidate.isVisible ? 1 : 0;
+       }
+       state.refinedRows.delete(branchCandidate.globalRowIndex);
+@@ -1207,8 +1613,8 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private getSelectedBranchCounts(
+-    candidate: SplatRADFrontierCandidate,
+-    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate>
++    candidate: SplatRADFrontierCandidate<TData>,
++    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate<TData>>
+   ): {total: number; visible: number} {
+     let total = 0;
+     let visible = 0;
+@@ -1222,8 +1628,8 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private visitCandidateBranch(
+-    candidate: SplatRADFrontierCandidate,
+-    visit: (candidate: SplatRADFrontierCandidate) => boolean | void
++    candidate: SplatRADFrontierCandidate<TData>,
++    visit: (candidate: SplatRADFrontierCandidate<TData>) => boolean | void
+   ): void {
+     const candidates = [candidate];
+     while (candidates.length > 0) {
+@@ -1240,8 +1646,8 @@ export class SplatRADHierarchyManager {
+ 
+   /** Returns whether a queued retained row is now covered by a coherently selected ancestor. */
+   private hasSelectedFrontierAncestor(
+-    candidate: SplatRADFrontierCandidate,
+-    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate>
++    candidate: SplatRADFrontierCandidate<TData>,
++    selectedRows: ReadonlyMap<number, SplatRADFrontierCandidate<TData>>
+   ): boolean {
+     let ancestor = candidate.parent;
+     while (ancestor) {
+@@ -1254,35 +1660,154 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   /** Publishes one coherent partial or complete frontier without changing source ownership. */
+-  private publishTraversal(traversal: SplatRADIncrementalTraversal): void {
++  private publishTraversal(traversal: SplatRADIncrementalTraversal<TData>): void {
+     const {selectedRows, state} = traversal;
+-    state.selectedPages.clear();
++    this.requiresRefresh = false;
++    if (
++      this.deferFrontierUntilComplete &&
++      (traversal.refinementQueue.length > 0 || traversal.retargetQueue.length > 0)
++    ) {
++      if (this.currentFrontier.length === 0) {
++        if (!this.protectTraversalDependencies) state.selectedPages.clear();
++        this.fallbackRowCount = 0;
++        for (const candidate of this.protectTraversalDependencies ? [] : selectedRows.values()) {
++          if (candidate.isVisible) {
++            this.selectRow(
++              candidate.registeredPage,
++              candidate.localRowIndex,
++              candidate.node.geometricError,
++              candidate.priority,
++              candidate.isFallback,
++              state
++            );
++          }
++        }
++        const initialFrontier = this.makeFrontier(state);
++        this.fallbackRowCount = Array.from(state.selectedPages.values()).reduce(
++          (count, page) => count + page.fallbackRowCount,
++          0
++        );
++        this.updateFrontier(initialFrontier);
++      }
++      // A partial current-view search is not a replacement for the displayed cut. Publish
++      // only demand and its small page-level lease, without rescanning millions of selected
++      // rows or withholding requests until the complete search finishes.
++      const protectedIds = new Set([
++        ...state.inputPageIds,
++        ...state.protectedPageIds,
++        ...this.currentFrontier.map(entry => entry.id)
++      ]);
++      for (const pageId of protectedIds) {
++        const chunk = this.residencyManager.getChunk(pageId);
++        if (chunk) this.protectChunk(chunk);
++      }
++      this.releaseInactivePins(protectedIds);
++      for (const [pageIndex, request] of state.requestedPages) {
++        if (this.getRegisteredPageForRow(request.rowIndex)) state.requestedPages.delete(pageIndex);
++      }
++      this.synchronizeRequests(state.requestedPages);
++      for (const page of this.sortedPages) page.lastDataRevision = page.page.data.revision;
++      return;
++    }
++    if (!this.protectTraversalDependencies) state.selectedPages.clear();
++    state.dependencyPageIds.clear();
+     this.fallbackRowCount = 0;
+-    for (const candidate of selectedRows.values()) {
+-      if (!candidate.isVisible) {
++    if (this.protectTraversalDependencies) {
++      if (this.rebuildPublishedPages) this.publishedPages.clear();
++      for (const pageId of this.changedPageIds) this.publishedPages.delete(pageId);
++    } else if (this.rebuildPublishedPages) {
++      for (const candidate of selectedRows.values()) this.collectPublishedRow(candidate, state);
++      this.publishedPages.clear();
++    } else {
++      // Apply a source-page delta to the actual published selection. An arriving page must
++      // not rebuild, sort, compare, or re-lease every unchanged visible source row.
++      for (const pageId of this.changedPageIds) {
++        const page = this.pagesById.get(pageId);
++        if (page) {
++          for (
++            let rowIndex = page.page.data.rowIndexBase;
++            rowIndex < page.endRowIndex;
++            rowIndex++
++          ) {
++            const candidate = selectedRows.get(rowIndex);
++            if (candidate) this.collectPublishedRow(candidate, state);
++          }
++        }
++        this.publishedPages.delete(pageId);
++      }
++    }
++    for (const entry of this.makeFrontier(
++      state,
++      this.protectTraversalDependencies ? this.changedPageIds : undefined
++    )) {
++      const selectedPage = state.selectedPages.get(entry.id)!;
++      this.publishedPages.set(entry.id, {
++        entry,
++        dependencyPageIds: selectedPage.dependencyPageIds,
++        fallbackRowCount: selectedPage.fallbackRowCount
++      });
++    }
++    this.fallbackRowCount = 0;
++    for (const publishedPage of this.publishedPages.values()) {
++      this.fallbackRowCount += publishedPage.fallbackRowCount;
++      for (const pageId of publishedPage.dependencyPageIds) state.dependencyPageIds.add(pageId);
++    }
++    this.changedPageIds.clear();
++    this.rebuildPublishedPages = false;
++    if (!this.protectTraversalDependencies) state.selectedPages.clear();
++    this.previouslyRefinedRows = this.protectTraversalDependencies
++      ? state.refinedRows
++      : new Set(state.refinedRows);
++    const selectedFrontier = Array.from(this.publishedPages.values(), page => page.entry).sort(
++      (first, second) => first.data.rowIndexBase - second.data.rowIndexBase
++    );
++    // Reconstruct current demand and partial replacement pins, not a union of every earlier
++    // view. Completed replacements are already protected by the published frontier.
++    state.protectedPageIds.clear();
++    state.requestedPages.clear();
++    for (const rootRow of this.rootRows) {
++      if (!this.getRegisteredPageForRow(rootRow)) {
++        this.requestRow(state, rootRow, Number.MAX_SAFE_INTEGER);
++      }
++    }
++    for (const [rowIndex, candidate] of this.blockedCandidates) {
++      if (selectedRows.get(rowIndex) !== candidate) {
++        this.blockedCandidates.delete(rowIndex);
+         continue;
+       }
+-      this.selectRow(
+-        candidate.registeredPage,
+-        candidate.localRowIndex,
+-        candidate.node.geometricError,
+-        candidate.priority,
+-        candidate.isFallback,
+-        state
+-      );
++      if (candidate.isVisible && candidate.priority <= this.getRefinementThreshold(candidate)) {
++        continue;
++      }
++      if (candidate.priority < state.capacityPriority) continue;
++      const page = candidate.registeredPage.page;
++      const childStart = page.childStarts![candidate.localRowIndex];
++      const childEnd = childStart + page.childCounts![candidate.localRowIndex];
++      for (let childRow = childStart; childRow < childEnd; ) {
++        const childPage = this.getRegisteredPageForRow(childRow);
++        if (childPage) {
++          state.protectedPageIds.add(childPage.page.id);
++          childRow = Math.min(childEnd, childPage.endRowIndex);
++        } else {
++          this.requestRow(state, childRow, candidate.priority, rowIndex);
++          childRow = Math.min(childEnd, (Math.floor(childRow / this.pageSize) + 1) * this.pageSize);
++        }
++      }
++    }
++    for (const progress of traversal.refinementProgress.values()) {
++      for (const child of progress.childCandidates) {
++        state.protectedPageIds.add(child.registeredPage.page.id);
++      }
+     }
+-
+-    this.previouslyRefinedRows = new Set(state.refinedRows);
+-    const selectedFrontier = this.makeFrontier(state);
+-    const hasPendingTraversal =
+-      this.requiresRetarget ||
+-      traversal.retargetQueue.length > 0 ||
+-      traversal.refinementQueue.length > 0;
+     const activePageIds = new Set([
+       ...state.protectedPageIds,
+-      ...selectedFrontier.map(entry => entry.id),
+-      ...(hasPendingTraversal ? this.ownedPinnedIds : [])
++      ...state.dependencyPageIds,
++      ...(this.protectTraversalDependencies ? state.dependencyPageCounts.keys() : []),
++      ...selectedFrontier.map(entry => entry.id)
+     ]);
++    for (const pageId of activePageIds) {
++      const chunk = this.residencyManager.getChunk(pageId);
++      if (chunk) this.protectChunk(chunk);
++    }
+     for (const entry of selectedFrontier) {
+       const chunk = this.residencyManager.getChunk(entry.id);
+       if (chunk) {
+@@ -1293,21 +1818,22 @@ export class SplatRADHierarchyManager {
+     this.releaseInactivePins(activePageIds);
+     this.requiresRefresh = false;
+     this.updateFrontier(selectedFrontier);
+-    if (hasPendingTraversal) {
+-      this.synchronizeRequests(new Map([...this.pendingRequests, ...state.requestedPages]));
+-    } else {
+-      this.synchronizeRequests(state.requestedPages);
+-    }
++    // Only a new camera cut can downgrade the displayed selection while it is being built.
++    // Subsequent page arrivals replace complete sibling groups within the same view, so their
++    // improvements must be visible now even when more refinement remains queued.
++    this.deferFrontierUntilComplete = false;
++    for (const entry of this.currentFrontier) this.publishedPages.get(entry.id)!.entry = entry;
++    this.synchronizeRequests(state.requestedPages);
+     for (const page of this.sortedPages) {
+       page.lastDataRevision = page.page.data.revision;
+     }
+   }
+ 
+   private makeFrontierCandidate(
+-    registeredPage: RegisteredSplatRADPage,
++    registeredPage: RegisteredSplatRADPage<TData>,
+     globalRowIndex: number,
+-    parent?: SplatRADFrontierCandidate
+-  ): SplatRADFrontierCandidate | undefined {
++    parent?: SplatRADFrontierCandidate<TData>
++  ): SplatRADFrontierCandidate<TData> | undefined {
+     const page = registeredPage.page;
+     const localRowIndex = globalRowIndex - page.data.rowIndexBase;
+     const node = this.makeRowNode(registeredPage, localRowIndex);
+@@ -1315,13 +1841,13 @@ export class SplatRADHierarchyManager {
+     if (!view) {
+       return undefined;
+     }
+-    const isVisible = isSplatHierarchyNodeVisible(node, view.modelViewProjectionMatrix);
++    const isVisible = this.isRowVisible(node);
+     if (isVisible) {
+       this.visibleRowCount++;
+     } else {
+       this.culledRowCount++;
+     }
+-    const screenSpaceError = getSplatRADScreenSpaceError(node, view);
++    const screenSpaceError = getSplatRADScreenSpaceError(node, view, this.focalLengthPixels);
+     const priority = isVisible
+       ? getSplatHierarchyFoveatedPriority(
+           node,
+@@ -1346,11 +1872,12 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private addFrontierCandidate(
+-    candidate: SplatRADFrontierCandidate,
+-    selectedRows: Map<number, SplatRADFrontierCandidate>,
+-    refinementQueue: SplatRADPriorityQueue
++    candidate: SplatRADFrontierCandidate<TData>,
++    selectedRows: Map<number, SplatRADFrontierCandidate<TData>>,
++    refinementQueue: SplatRADPriorityQueue<TData>
+   ): void {
+     selectedRows.set(candidate.globalRowIndex, candidate);
++    this.changedPageIds.add(candidate.registeredPage.page.id);
+     const childCount = candidate.registeredPage.page.childCounts?.[candidate.localRowIndex] ?? 0;
+     if (
+       childCount > 0 &&
+@@ -1361,14 +1888,16 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private refineFrontierCandidate(
+-    candidate: SplatRADFrontierCandidate,
+-    selectedRows: Map<number, SplatRADFrontierCandidate>,
+-    refinementQueue: SplatRADPriorityQueue,
+-    refinementProgress: Map<number, SplatRADRefinementProgress>,
+-    state: SplatRADTraversalState,
++    candidate: SplatRADFrontierCandidate<TData>,
++    selectedRows: Map<number, SplatRADFrontierCandidate<TData>>,
++    refinementQueue: SplatRADPriorityQueue<TData>,
++    refinementProgress: Map<number, SplatRADRefinementProgress<TData>>,
++    state: SplatRADTraversalState<TData>,
+     remainingTraversalRows: number
+   ): boolean {
+     const {registeredPage, globalRowIndex, localRowIndex, priority} = candidate;
++    if (selectedRows.get(globalRowIndex) !== candidate) return false;
++    if (candidate.suppressRefinement) return false;
+     const page = registeredPage.page;
+     const childCount = page.childCounts?.[localRowIndex] ?? 0;
+     const childStart = page.childStarts?.[localRowIndex] ?? 0;
+@@ -1383,6 +1912,24 @@ export class SplatRADHierarchyManager {
+       return false;
+     }
+ 
++    if (
++      this.protectTraversalDependencies &&
++      !this.canRequestChildPages(childStart, childCount, state)
++    ) {
++      this.deferredCandidates.set(globalRowIndex, candidate);
++      refinementProgress.delete(globalRowIndex);
++      return false;
++    }
++    if (
++      this.protectTraversalDependencies &&
++      !this.reserveChildPages(childStart, childCount, state)
++    ) {
++      // Keep this coherent coarse parent. Asking for only part of a replacement can fill every
++      // free slot with pinned siblings while its final child remains permanently inadmissible.
++      refinementProgress.delete(globalRowIndex);
++      return false;
++    }
++
+     const progress = refinementProgress.get(globalRowIndex) ?? {
+       nextChildOffset: 0,
+       residentChildCount: 0,
+@@ -1400,10 +1947,13 @@ export class SplatRADHierarchyManager {
+         continue;
+       }
+       if (!childPage) {
++        this.missingRowCount++;
++        this.blockedCandidates.set(globalRowIndex, candidate);
+         this.requestRow(state, childRowIndex, priority, globalRowIndex);
+         continue;
+       }
+       progress.residentChildCount++;
++      state.inputPageIds.add(childPage.page.id);
+       const child = this.makeFrontierCandidate(childPage, childStart + childOffset, candidate);
+       const childHierarchyCount =
+         childPage.page.childCounts?.[childStart + childOffset - childPage.page.data.rowIndexBase] ??
+@@ -1432,39 +1982,53 @@ export class SplatRADHierarchyManager {
+     }
+     refinementProgress.delete(globalRowIndex);
+     if (progress.residentChildCount !== childCount) {
++      if (!candidate.isFallback) this.changedPageIds.add(page.id);
+       candidate.isFallback = true;
+       return false;
+     }
++    this.blockedCandidates.delete(globalRowIndex);
++    if (candidate.isFallback) this.changedPageIds.add(page.id);
++    candidate.isFallback = false;
+ 
+     const {childCandidates} = progress;
+     const visibleChildCount = childCandidates.reduce(
+       (visibleRowCount, child) => visibleRowCount + (child.isVisible ? 1 : 0),
+       0
+     );
+-    const nextAllocatedRowCount =
+-      state.allocatedRowCount - (candidate.isVisible ? 1 : 0) + visibleChildCount;
+     if (childCandidates.length === 0) {
+       return false;
+     }
+     candidate.children = childCandidates;
++    if (this.protectTraversalDependencies) {
++      this.reclaimRefinementCapacity(candidate, visibleChildCount, selectedRows, state);
++    }
++    const nextAllocatedRowCount =
++      state.allocatedRowCount - (candidate.isVisible ? 1 : 0) + visibleChildCount;
+     if (nextAllocatedRowCount > this.maximumActiveRows) {
++      if (candidate.isVisible) {
++        state.capacityPriority = Math.max(state.capacityPriority, candidate.priority);
++        if (this.protectTraversalDependencies) candidate.isCapacityLimited = true;
++      }
+       if (!candidate.isVisible) {
+         this.selectCapacityLimitedChildren(candidate, {selectedRows, refinementQueue, state});
+       }
+       return false;
+     }
+ 
+-    selectedRows.delete(globalRowIndex);
++    this.changedPageIds.add(page.id);
+     state.allocatedRowCount = nextAllocatedRowCount;
+     state.refinedRows.add(globalRowIndex);
++    if (this.protectTraversalDependencies) this.coarseningQueue.push(candidate);
+     candidate.isCapacityLimited = false;
+     for (const child of childCandidates) {
+       this.addFrontierCandidate(child, selectedRows, refinementQueue);
+     }
++    // Add the replacement before removing its parent so shared ancestor leases never drop to zero.
++    selectedRows.delete(globalRowIndex);
+     return false;
+   }
+ 
+-  private getRefinementThreshold(candidate: SplatRADFrontierCandidate): number {
++  private getRefinementThreshold(candidate: SplatRADFrontierCandidate<TData>): number {
+     const wasRefined = this.previouslyRefinedRows.has(candidate.globalRowIndex);
+     const hysteresisFactor = wasRefined
+       ? 1 - this.refinementHysteresis
+@@ -1472,14 +2036,151 @@ export class SplatRADHierarchyManager {
+     return this.maximumScreenSpaceError * hysteresisFactor;
+   }
+ 
++  private getTraversalWorkCount(): number {
++    return this.visibleRowCount + this.culledRowCount + this.missingRowCount;
++  }
++
++  private reserveChildPages(
++    childStart: number,
++    childCount: number,
++    state: SplatRADTraversalState<TData>,
++    reserve = true
++  ): boolean {
++    if (this.maximumResidentPages === Number.POSITIVE_INFINITY) return true;
++    const firstPageIndex = Math.floor(childStart / this.pageSize);
++    const lastPageIndex = Math.floor((childStart + childCount - 1) / this.pageSize);
++    if (lastPageIndex - firstPageIndex + 1 > this.maximumResidentPages) return false;
++    let requiredPageCount = state.requiredPageIndices.size;
++    for (let pageIndex = firstPageIndex; pageIndex <= lastPageIndex; pageIndex++) {
++      if (
++        !state.requiredPageIndices.has(pageIndex) &&
++        ++requiredPageCount > this.maximumResidentPages
++      ) {
++        return false;
++      }
++    }
++    if (reserve) {
++      for (let pageIndex = firstPageIndex; pageIndex <= lastPageIndex; pageIndex++) {
++        state.requiredPageIndices.add(pageIndex);
++      }
++    }
++    return true;
++  }
++
++  private canRequestChildPages(
++    childStart: number,
++    childCount: number,
++    state: SplatRADTraversalState<TData>
++  ): boolean {
++    if (this.maximumPendingPages === Number.POSITIVE_INFINITY || state.requestedPages.size === 0)
++      return true;
++    let pendingPageCount = state.requestedPages.size;
++    const lastPageIndex = Math.floor((childStart + childCount - 1) / this.pageSize);
++    for (
++      let pageIndex = Math.floor(childStart / this.pageSize);
++      pageIndex <= lastPageIndex;
++      pageIndex++
++    ) {
++      if (
++        !state.requestedPages.has(pageIndex) &&
++        !this.getRegisteredPageForRow(Math.max(childStart, pageIndex * this.pageSize)) &&
++        ++pendingPageCount > this.maximumPendingPages
++      )
++        return false;
++    }
++    return true;
++  }
++
++  /** Maintains the actual page selection and dependency leases as sibling groups change. */
++  private recordSelectedRow(
++    candidate: SplatRADFrontierCandidate<TData>,
++    state: SplatRADTraversalState<TData>,
++    selected: boolean
++  ): void {
++    if (!candidate.isVisible) return;
++    const pageId = candidate.registeredPage.page.id;
++    let selectedPage = state.selectedPages.get(pageId);
++    if (!selectedPage && selected) {
++      selectedPage = {
++        registeredPage: candidate.registeredPage,
++        activeRows: [],
++        activeMask: new Uint8Array(0),
++        geometricError: 0,
++        priority: 0,
++        isFallback: false,
++        fallbackRowCount: 0,
++        dependencyPageIds: new Set(),
++        dependencyRows: new Set(),
++        selectedRows: new Map()
++      };
++      state.selectedPages.set(pageId, selectedPage);
++    }
++    if (selected) selectedPage!.selectedRows!.set(candidate.localRowIndex, candidate);
++    else selectedPage?.selectedRows?.delete(candidate.localRowIndex);
++    this.changedPageIds.add(pageId);
++    candidate.isSelected = selected;
++
++    // Selection can temporarily include both sides of an atomic sibling replacement. If children
++    // already cover this subtree, selecting or deselecting its parent does not change its ancestors.
++    if (candidate.selectedChildCount) return;
++
++    // Count covered child branches, not all descendant leaves. Propagate only a subtree's
++    // zero/nonzero transition; replacing a deep leaf must not revisit every unchanged ancestor.
++    for (let ancestor = candidate.parent; ancestor; ancestor = ancestor.parent) {
++      const previousCount = ancestor.selectedChildCount ?? 0;
++      const nextCount = previousCount + (selected ? 1 : -1);
++      ancestor.selectedChildCount = nextCount;
++      if (previousCount > 0 && nextCount > 0) break;
++      if (nextCount > 0) {
++        ancestor.dependencyPageIds = Array.from(
++          new Set([
++            ancestor.registeredPage.page.id,
++            ...(ancestor.children ?? []).map(child => child.registeredPage.page.id)
++          ])
++        );
++      }
++      for (const dependencyId of ancestor.dependencyPageIds ?? []) {
++        const count = (state.dependencyPageCounts.get(dependencyId) ?? 0) + (selected ? 1 : -1);
++        if (count > 0) state.dependencyPageCounts.set(dependencyId, count);
++        else state.dependencyPageCounts.delete(dependencyId);
++      }
++      if (nextCount === 0) ancestor.dependencyPageIds = undefined;
++      if (ancestor.isSelected) break;
++    }
++  }
++
++  private collectPublishedRow(
++    candidate: SplatRADFrontierCandidate<TData>,
++    state: SplatRADTraversalState<TData>
++  ): void {
++    if (!candidate.isVisible) return;
++    const selectedPage = this.selectRow(
++      candidate.registeredPage,
++      candidate.localRowIndex,
++      candidate.node.geometricError,
++      candidate.priority,
++      candidate.isFallback,
++      state
++    );
++    if (this.protectTraversalDependencies) {
++      for (let ancestor = candidate.parent; ancestor; ancestor = ancestor.parent) {
++        if (selectedPage.dependencyRows.has(ancestor.globalRowIndex)) break;
++        selectedPage.dependencyRows.add(ancestor.globalRowIndex);
++        selectedPage.dependencyPageIds.add(ancestor.registeredPage.page.id);
++        for (const child of ancestor.children ?? [])
++          selectedPage.dependencyPageIds.add(child.registeredPage.page.id);
++      }
++    }
++  }
++
+   private selectRow(
+-    registeredPage: RegisteredSplatRADPage,
++    registeredPage: RegisteredSplatRADPage<TData>,
+     localRowIndex: number,
+     geometricError: number,
+     priority: number,
+     isFallback: boolean,
+-    state: SplatRADTraversalState
+-  ): void {
++    state: SplatRADTraversalState<TData>
++  ): SelectedSplatRADPage<TData> {
+     const page = registeredPage.page;
+     let selectedPage = state.selectedPages.get(page.id);
+     if (!selectedPage) {
+@@ -1489,7 +2190,10 @@ export class SplatRADHierarchyManager {
+         activeMask: new Uint8Array(page.data.length),
+         geometricError: 0,
+         priority: 0,
+-        isFallback: false
++        isFallback: false,
++        fallbackRowCount: 0,
++        dependencyPageIds: new Set(),
++        dependencyRows: new Set()
+       };
+       state.selectedPages.set(page.id, selectedPage);
+     }
+@@ -1498,15 +2202,17 @@ export class SplatRADHierarchyManager {
+       selectedPage.activeMask[localRowIndex] = 1;
+       if (isFallback) {
+         this.fallbackRowCount++;
++        selectedPage.fallbackRowCount++;
+       }
+     }
+     selectedPage.geometricError = Math.max(selectedPage.geometricError, geometricError);
+     selectedPage.priority = Math.max(selectedPage.priority, priority);
+     selectedPage.isFallback ||= isFallback;
++    return selectedPage;
+   }
+ 
+   private requestRow(
+-    state: SplatRADTraversalState,
++    state: SplatRADTraversalState<TData>,
+     rowIndex: number,
+     priority: number,
+     parentRowIndex?: number
+@@ -1540,19 +2246,44 @@ export class SplatRADHierarchyManager {
+     }
+   }
+ 
+-  private makeFrontier(state: SplatRADTraversalState): SplatRADHierarchyFrontierEntry[] {
++  private makeFrontier(
++    state: SplatRADTraversalState<TData>,
++    changedPageIds?: ReadonlySet<string>
++  ): SplatRADHierarchyFrontierEntry<TData>[] {
+     return Array.from(state.selectedPages.values())
++      .filter(
++        page =>
++          (!changedPageIds || changedPageIds.has(page.registeredPage.page.id)) &&
++          (!page.selectedRows || page.selectedRows.size > 0)
++      )
+       .sort(
+         (firstPage, secondPage) =>
+           firstPage.registeredPage.page.data.rowIndexBase -
+           secondPage.registeredPage.page.data.rowIndexBase
+       )
+       .map(selectedPage => {
+-        selectedPage.activeRows.sort((firstRow, secondRow) => firstRow - secondRow);
++        if (selectedPage.selectedRows) {
++          selectedPage.activeRows = [];
++          selectedPage.activeMask = new Uint8Array(selectedPage.registeredPage.page.data.length);
++          selectedPage.geometricError = 0;
++          selectedPage.priority = 0;
++          selectedPage.fallbackRowCount = 0;
++          for (const candidate of selectedPage.selectedRows.values()) {
++            selectedPage.activeRows.push(candidate.localRowIndex);
++            selectedPage.activeMask[candidate.localRowIndex] = 1;
++            selectedPage.geometricError = Math.max(
++              selectedPage.geometricError,
++              candidate.node.geometricError
++            );
++            selectedPage.priority = Math.max(selectedPage.priority, candidate.priority);
++            selectedPage.fallbackRowCount += Number(candidate.isFallback);
++          }
++          selectedPage.isFallback = selectedPage.fallbackRowCount > 0;
++        }
+         return {
+           id: selectedPage.registeredPage.page.id,
+           data: selectedPage.registeredPage.page.data,
+-          activeRows: Uint32Array.from(selectedPage.activeRows),
++          activeRows: Uint32Array.from(selectedPage.activeRows).sort(),
+           activeMask: selectedPage.activeMask,
+           bounds: selectedPage.registeredPage.bounds,
+           geometricError: selectedPage.geometricError,
+@@ -1562,11 +2293,12 @@ export class SplatRADHierarchyManager {
+       });
+   }
+ 
+-  private updateFrontier(selectedFrontier: SplatRADHierarchyFrontierEntry[]): void {
++  private updateFrontier(selectedFrontier: SplatRADHierarchyFrontierEntry<TData>[]): void {
+     const hasChanged =
+       selectedFrontier.length !== this.currentFrontier.length ||
+       selectedFrontier.some((entry, entryIndex) => {
+         const previousEntry = this.currentFrontier[entryIndex];
++        if (entry === previousEntry) return false;
+         return (
+           entry.id !== previousEntry.id ||
+           entry.data !== previousEntry.data ||
+@@ -1589,7 +2321,7 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private makeRowNode(
+-    registeredPage: RegisteredSplatRADPage,
++    registeredPage: RegisteredSplatRADPage<TData>,
+     localRowIndex: number
+   ): SplatHierarchyNode {
+     const {data, geometricError} = registeredPage.page;
+@@ -1622,6 +2354,63 @@ export class SplatRADHierarchyManager {
+     };
+   }
+ 
++  /** Hoists camera-only arithmetic out of the per-source-row traversal. */
++  private prepareView(view: SplatHierarchyView): void {
++    this.currentView = view;
++    const verticalFieldOfView = Math.min(
++      Math.max(view.verticalFieldOfView ?? Math.PI / 3, 1e-6),
++      Math.PI - 1e-6
++    );
++    this.focalLengthPixels =
++      Math.max(view.viewportSize[1], 0) / (2 * Math.tan(verticalFieldOfView / 2));
++    const matrix = view.modelViewProjectionMatrix;
++    this.clipPlanes = matrix ? new Float64Array(30) : undefined;
++    this.forwardLength = matrix ? Math.hypot(matrix[3], matrix[7], matrix[11]) : 0;
++    if (!matrix || !this.clipPlanes) {
++      return;
++    }
++    let planeOffset = 0;
++    for (let coordinateIndex = 0; coordinateIndex < 3; coordinateIndex++) {
++      for (const direction of [-1, 1]) {
++        const planeX = matrix[3] + direction * matrix[coordinateIndex];
++        const planeY = matrix[7] + direction * matrix[4 + coordinateIndex];
++        const planeZ = matrix[11] + direction * matrix[8 + coordinateIndex];
++        this.clipPlanes[planeOffset++] = planeX;
++        this.clipPlanes[planeOffset++] = planeY;
++        this.clipPlanes[planeOffset++] = planeZ;
++        this.clipPlanes[planeOffset++] = matrix[15] + direction * matrix[12 + coordinateIndex];
++        // Preserve unnormalized distances, including degenerate planes, exactly as the
++        // generic isSplatHierarchyNodeVisible predicate does.
++        this.clipPlanes[planeOffset++] = Math.hypot(planeX, planeY, planeZ);
++      }
++    }
++  }
++
++  private isRowVisible(node: SplatHierarchyNode): boolean {
++    if (!this.frustumCulling) return true;
++    return this.isRowInFrustum(node);
++  }
++
++  private isRowInFrustum(node: SplatHierarchyNode): boolean {
++    const planes = this.clipPlanes;
++    if (!planes) {
++      return true;
++    }
++    const radius = Math.max(node.bounds.radius ?? 0, 0);
++    const center = node.bounds.center;
++    for (let planeOffset = 0; planeOffset < planes.length; planeOffset += 5) {
++      const signedDistance =
++        planes[planeOffset] * center[0] +
++        planes[planeOffset + 1] * center[1] +
++        planes[planeOffset + 2] * center[2] +
++        planes[planeOffset + 3];
++      if (signedDistance < -radius * planes[planeOffset + 4]) {
++        return false;
++      }
++    }
++    return true;
++  }
++
+   /**
+    * Maps angular distance from the view axis to the documented full, peripheral, and rear detail
+    * levels. Angle-space easing avoids coupling the hierarchy policy to a renderer implementation.
+@@ -1631,7 +2420,7 @@ export class SplatRADHierarchyManager {
+     if (!matrix) {
+       return 1;
+     }
+-    const forwardLength = Math.hypot(matrix[3], matrix[7], matrix[11]);
++    const forwardLength = this.forwardLength;
+     if (!Number.isFinite(forwardLength) || forwardLength <= Number.EPSILON) {
+       return 1;
+     }
+@@ -1669,7 +2458,10 @@ export class SplatRADHierarchyManager {
+     );
+   }
+ 
+-  private getPagePriority(page: SplatRADHierarchyPage, bounds: SplatResidencyBounds): number {
++  private getPagePriority(
++    page: SplatRADHierarchyPage<TData>,
++    bounds: SplatResidencyBounds
++  ): number {
+     if (!this.currentView) {
+       return 0;
+     }
+@@ -1685,7 +2477,7 @@ export class SplatRADHierarchyManager {
+     );
+   }
+ 
+-  private getRegisteredPageForRow(rowIndex: number): RegisteredSplatRADPage | undefined {
++  private getRegisteredPageForRow(rowIndex: number): RegisteredSplatRADPage<TData> | undefined {
+     let lowerIndex = 0;
+     let upperIndex = this.sortedPages.length - 1;
+     while (lowerIndex <= upperIndex) {
+@@ -1704,7 +2496,7 @@ export class SplatRADHierarchyManager {
+     return undefined;
+   }
+ 
+-  private protectChunk(chunk: SplatResidencyChunk): void {
++  private protectChunk(chunk: SplatResidencyChunk<TData>): void {
+     if (!chunk.pinned && this.residencyManager.pin(chunk)) {
+       this.ownedPinnedIds.add(chunk.id);
+     }
+@@ -1720,18 +2512,36 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private pruneEvictedPages(): boolean {
+-    let removedPage = false;
++    const removedPageIds = new Set<string>();
+     for (const [pageId, registeredPage] of this.pagesById) {
+       if (registeredPage.page.data.destroyed || !this.residencyManager.has(pageId)) {
+         this.pagesById.delete(pageId);
+         this.ownedPinnedIds.delete(pageId);
+-        removedPage = true;
++        removedPageIds.add(pageId);
+       }
+     }
+-    if (removedPage) {
++    if (removedPageIds.size) {
+       this.sortedPages = this.sortedPages.filter(page => this.pagesById.has(page.page.id));
+     }
+-    return removedPage;
++    if (!removedPageIds.size) return false;
++    const traversal = this.incrementalTraversal;
++    if (!traversal) return true;
++    if (!Array.from(removedPageIds).some(pageId => traversal.state.inputPageIds.has(pageId))) {
++      return false;
++    }
++    // Admission may displace unused prefetched pages. Only loss of a retained traversal input
++    // invalidates the tree; restarting for unrelated eviction repeatedly destroys visible detail.
++    const candidates = traversal.rootCandidates.slice();
++    for (const progress of traversal.refinementProgress.values()) {
++      for (const child of progress.childCandidates) candidates.push(child);
++    }
++    while (candidates.length) {
++      const candidate = candidates.pop()!;
++      if (removedPageIds.has(candidate.registeredPage.page.id)) return true;
++      if (traversal.selectedRows.get(candidate.globalRowIndex) === candidate) continue;
++      for (const child of candidate.children ?? []) candidates.push(child);
++    }
++    return false;
+   }
+ 
+   private haveSourceRowsChanged(): boolean {
+@@ -1739,7 +2549,15 @@ export class SplatRADHierarchyManager {
+   }
+ 
+   private invalidateIncrementalTraversal(): void {
++    this.rebuildPublishedPages = true;
++    this.changedPageIds.clear();
+     this.incrementalTraversal = undefined;
++    this.blockedCandidates.clear();
++    this.deferredCandidates.clear();
++    this.requiresRefinement = false;
++    this.coarseningQueue = new SplatRADPriorityQueue<TData>((first, second) =>
++      compareSplatRADCandidates(second, first)
++    );
+     this.requiresRetarget = false;
+   }
+ 
+@@ -1753,7 +2571,7 @@ export class SplatRADHierarchyManager {
+     }
+   }
+ 
+-  private validatePage(page: SplatRADHierarchyPage): void {
++  private validatePage(page: SplatRADHierarchyPage<TData>): void {
+     if (!page.id || page.data.destroyed || page.data.length === 0) {
+       throw new Error('Gaussian source pages require a stable identity and live prepared batch');
+     }
+@@ -1784,14 +2602,46 @@ export class SplatRADHierarchyManager {
+   }
+ }
+ 
++/** A selected row owns one entry in the page frontier and its ancestor-page leases. */
++class SplatRADSelectedRows<TData extends SplatRADHierarchyData> extends Map<
++  number,
++  SplatRADFrontierCandidate<TData>
++> {
++  constructor(
++    private readonly onSelectionChange: (
++      candidate: SplatRADFrontierCandidate<TData>,
++      selected: boolean
++    ) => void
++  ) {
++    super();
++  }
++
++  override set(rowIndex: number, candidate: SplatRADFrontierCandidate<TData>): this {
++    const previous = this.get(rowIndex);
++    if (previous === candidate) return this;
++    if (previous) this.onSelectionChange(previous, false);
++    super.set(rowIndex, candidate);
++    this.onSelectionChange(candidate, true);
++    return this;
++  }
++
++  override delete(rowIndex: number): boolean {
++    const candidate = this.get(rowIndex);
++    if (!candidate) return false;
++    super.delete(rowIndex);
++    this.onSelectionChange(candidate, false);
++    return true;
++  }
++}
++
+ /** Keeps the highest-value original source row at the frontier without sorting every update. */
+-class SplatRADPriorityQueue {
+-  private readonly candidates: SplatRADFrontierCandidate[] = [];
++class SplatRADPriorityQueue<TData extends SplatRADHierarchyData = GPUSplatData> {
++  private readonly candidates: SplatRADFrontierCandidate<TData>[] = [];
+ 
+   constructor(
+     private readonly compareCandidates: (
+-      first: SplatRADFrontierCandidate,
+-      second: SplatRADFrontierCandidate
++      first: SplatRADFrontierCandidate<TData>,
++      second: SplatRADFrontierCandidate<TData>
+     ) => number = compareSplatRADCandidates
+   ) {}
+ 
+@@ -1799,7 +2649,7 @@ class SplatRADPriorityQueue {
+     return this.candidates.length;
+   }
+ 
+-  push(candidate: SplatRADFrontierCandidate): void {
++  push(candidate: SplatRADFrontierCandidate<TData>): void {
+     let index = this.candidates.push(candidate) - 1;
+     while (index > 0) {
+       const parentIndex = Math.floor((index - 1) / 2);
+@@ -1812,7 +2662,7 @@ class SplatRADPriorityQueue {
+     this.candidates[index] = candidate;
+   }
+ 
+-  pop(): SplatRADFrontierCandidate | undefined {
++  pop(): SplatRADFrontierCandidate<TData> | undefined {
+     const first = this.candidates[0];
+     const last = this.candidates.pop();
+     if (!first || !last || this.candidates.length === 0) {
+@@ -1845,9 +2695,9 @@ class SplatRADPriorityQueue {
+   }
+ }
+ 
+-function compareSplatRADCandidates(
+-  first: SplatRADFrontierCandidate,
+-  second: SplatRADFrontierCandidate
++function compareSplatRADCandidates<TData extends SplatRADHierarchyData>(
++  first: SplatRADFrontierCandidate<TData>,
++  second: SplatRADFrontierCandidate<TData>
+ ): number {
+   return first.priority - second.priority || second.globalRowIndex - first.globalRowIndex;
+ }
+@@ -1879,8 +2729,11 @@ function validateSplatRADTraversalBudget(maxTraversalRows: number): void {
+   }
+ }
+ 
+-function hasSplatRADAncestor(candidate: SplatRADFrontierCandidate, rowIndex: number): boolean {
+-  let current: SplatRADFrontierCandidate | undefined = candidate;
++function hasSplatRADAncestor<TData extends SplatRADHierarchyData>(
++  candidate: SplatRADFrontierCandidate<TData>,
++  rowIndex: number
++): boolean {
++  let current: SplatRADFrontierCandidate<TData> | undefined = candidate;
+   while (current) {
+     if (current.globalRowIndex === rowIndex) {
+       return true;
+@@ -1890,7 +2743,11 @@ function hasSplatRADAncestor(candidate: SplatRADFrontierCandidate, rowIndex: num
+   return false;
+ }
+ 
+-function getSplatRADScreenSpaceError(node: SplatHierarchyNode, view: SplatHierarchyView): number {
++function getSplatRADScreenSpaceError(
++  node: SplatHierarchyNode,
++  view: SplatHierarchyView,
++  focalLengthPixels: number
++): number {
+   const distance = Math.max(
+     Math.hypot(
+       node.bounds.center[0] - view.cameraPosition[0],
+@@ -1899,12 +2756,6 @@ function getSplatRADScreenSpaceError(node: SplatHierarchyNode, view: SplatHierar
+     ),
+     1e-6
+   );
+-  const verticalFieldOfView = Math.min(
+-    Math.max(view.verticalFieldOfView ?? Math.PI / 3, 1e-6),
+-    Math.PI - 1e-6
+-  );
+-  const focalLengthPixels =
+-    Math.max(view.viewportSize[1], 0) / (2 * Math.tan(verticalFieldOfView / 2));
+   return (Math.max(node.geometricError, 0) * focalLengthPixels) / distance;
+ }
+ 
+@@ -1941,8 +2792,8 @@ function areSplatRADValuesEqual(
+ }
+ 
+ /** Derives a conservative sphere from original decoded page positions and Gaussian source scales. */
+-export function getSplatRADPageBounds(
+-  page: Pick<SplatRADHierarchyPage, 'data' | 'bounds'>
++export function getSplatRADPageBounds<TData extends SplatRADHierarchyData>(
++  page: Pick<SplatRADHierarchyPage<TData>, 'data' | 'bounds'>
+ ): SplatResidencyBounds {
+   if (page.bounds) {
+     return page.bounds;
+diff --git a/modules/splats/src/splat-residency.ts b/modules/splats/src/splat-residency.ts
+index ec7272b28..cce0ad3bb 100644
+--- a/modules/splats/src/splat-residency.ts
++++ b/modules/splats/src/splat-residency.ts
+@@ -4,6 +4,12 @@
+ 
+ import type {GPUSplatData} from './splat-data';
+ 
++/** Minimal allocation and ownership metadata, usable on the CPU or GPU. */
++export type SplatResidencyData = Pick<
++  GPUSplatData,
++  'length' | 'byteLength' | 'destroyed' | 'destroy' | 'sourceBatchIndex' | 'rowIndexBase'
++>;
++
+ /** Independent limits applied to intact, independently uploaded Gaussian source batches. */
+ export type SplatResidencyBudget = {
+   /** Maximum allocated bytes retained across resident Gaussian source batches. */
+@@ -43,11 +49,11 @@ export type SplatResidencyChunkOptions = {
+ };
+ 
+ /** Explicit residency metadata stored directly on each independently retained source chunk. */
+-export type SplatResidencyChunk = {
++export type SplatResidencyChunk<TData extends SplatResidencyData = GPUSplatData> = {
+   /** Stable caller-supplied tile identity or source batch and global-row identity. */
+   id: string;
+   /** Original independently prepared Gaussian source batch, never copied or combined. */
+-  data: GPUSplatData;
++  data: TData;
+   /** Retention priority; larger values are more valuable. */
+   priority: number;
+   /** Whether automatic and non-forced eviction must preserve this chunk. */
+@@ -96,25 +102,29 @@ export type SplatResidencyStats = {
+ };
+ 
+ /** Optional integration hooks for updating a borrowing renderer or tile scheduler. */
+-export type SplatResidencyCallbacks = {
++export type SplatResidencyCallbacks<TData extends SplatResidencyData = GPUSplatData> = {
+   /** Called after one intact source batch enters the residency window. */
+-  onAdd?: (chunk: SplatResidencyChunk) => void;
+-  /** Called after removal but before manager-owned source GPU buffers are destroyed. */
+-  onEvict?: (chunk: SplatResidencyChunk, reason: SplatResidencyEvictionReason) => void;
++  onAdd?: (chunk: SplatResidencyChunk<TData>) => void;
++  /** Called after removal but before manager-owned source data is destroyed. */
++  onEvict?: (chunk: SplatResidencyChunk<TData>, reason: SplatResidencyEvictionReason) => void;
+   /** Called with the current exact source-batch list after every residency change. */
+-  onResidencyChange?: (batches: readonly GPUSplatData[], stats: SplatResidencyStats) => void;
++  onResidencyChange?: (batches: readonly TData[], stats: SplatResidencyStats) => void;
+ };
+ 
+ /** Allocation budgets, default ownership, and optional renderer or scheduler integration. */
+-export type SplatResidencyManagerProps = SplatResidencyBudget &
+-  SplatResidencyCallbacks & {
+-    /** Whether admitted source batches are owned by default. Borrowing is the default. */
+-    ownsData?: boolean;
+-    /** Optional callback collection, useful when composing renderer integrations. */
+-    callbacks?: SplatResidencyCallbacks;
+-  };
++export type SplatResidencyManagerProps<TData extends SplatResidencyData = GPUSplatData> =
++  SplatResidencyBudget &
++    SplatResidencyCallbacks<TData> & {
++      /** Whether admitted source batches are owned by default. Borrowing is the default. */
++      ownsData?: boolean;
++      /** Optional callback collection, useful when composing renderer integrations. */
++      callbacks?: SplatResidencyCallbacks<TData>;
++    };
+ 
+-type SplatResidencyTarget = string | GPUSplatData | SplatResidencyChunk;
++type SplatResidencyTarget<TData extends SplatResidencyData = GPUSplatData> =
++  | string
++  | TData
++  | SplatResidencyChunk<TData>;
+ 
+ type SplatResidencyReservation = {
+   gpuByteLength: number;
+@@ -129,11 +139,14 @@ type SplatResidencyReservation = {
+  * eviction, and pinned batches are never automatically removed. No source batch is
+  * combined, repacked, or destroyed unless its explicit ownership has been transferred.
+  */
+-export class SplatResidencyManager {
+-  private readonly chunks = new Map<string, SplatResidencyChunk>();
+-  private readonly chunksByData = new Map<GPUSplatData, SplatResidencyChunk>();
+-  private readonly pendingLoads = new Map<string, Promise<SplatResidencyChunk | undefined>>();
+-  private readonly callbacks: SplatResidencyCallbacks;
++export class SplatResidencyManager<TData extends SplatResidencyData = GPUSplatData> {
++  private readonly chunks = new Map<string, SplatResidencyChunk<TData>>();
++  private readonly chunksByData = new Map<TData, SplatResidencyChunk<TData>>();
++  private readonly pendingLoads = new Map<
++    string,
++    Promise<SplatResidencyChunk<TData> | undefined>
++  >();
++  private readonly callbacks: SplatResidencyCallbacks<TData>;
+   private readonly ownsData: boolean;
+   private maxGpuBytes: number;
+   private maxResidentSplats: number;
+@@ -150,7 +163,7 @@ export class SplatResidencyManager {
+   private isDestroyed = false;
+ 
+   /** Creates an initially empty, borrowing residency window with optional finite budgets. */
+-  constructor(props: SplatResidencyManagerProps = {}) {
++  constructor(props: SplatResidencyManagerProps<TData> = {}) {
+     this.maxGpuBytes = normalizeSplatResidencyBudget(props.maxGpuBytes);
+     this.maxResidentSplats = normalizeSplatResidencyBudget(props.maxResidentSplats);
+     this.maxResidentChunks = normalizeSplatResidencyBudget(props.maxResidentChunks);
+@@ -169,12 +182,12 @@ export class SplatResidencyManager {
+   }
+ 
+   /** Original caller-owned source batches in stable admission order. */
+-  get residentBatches(): GPUSplatData[] {
++  get residentBatches(): TData[] {
+     return this.getResidentBatches();
+   }
+ 
+   /** Explicit source chunk, tile, priority, hierarchy, and ownership metadata. */
+-  get residentChunks(): SplatResidencyChunk[] {
++  get residentChunks(): SplatResidencyChunk<TData>[] {
+     return this.getResidentChunks();
+   }
+ 
+@@ -183,23 +196,23 @@ export class SplatResidencyManager {
+     return this.getStats();
+   }
+ 
+-  /** Returns the original intact GPU source batches without copying or combining their buffers. */
+-  getResidentBatches(): GPUSplatData[] {
++  /** Returns the original intact source batches without copying or combining their data. */
++  getResidentBatches(): TData[] {
+     return Array.from(this.chunks.values(), chunk => chunk.data);
+   }
+ 
+   /** Returns every admitted source chunk and its directly stored residency metadata. */
+-  getResidentChunks(): SplatResidencyChunk[] {
++  getResidentChunks(): SplatResidencyChunk<TData>[] {
+     return Array.from(this.chunks.values());
+   }
+ 
+   /** Returns one retained chunk using its tile identity or exact source-batch object. */
+-  getChunk(target: SplatResidencyTarget): SplatResidencyChunk | undefined {
++  getChunk(target: SplatResidencyTarget<TData>): SplatResidencyChunk<TData> | undefined {
+     return this.resolveChunk(target);
+   }
+ 
+   /** Whether the exact source batch or source tile identity is currently resident. */
+-  has(target: SplatResidencyTarget): boolean {
++  has(target: SplatResidencyTarget<TData>): boolean {
+     return this.resolveChunk(target) !== undefined;
+   }
+ 
+@@ -209,9 +222,9 @@ export class SplatResidencyManager {
+    * Returns `undefined` without changing existing residency when the source batch cannot fit.
+    */
+   add(
+-    data: GPUSplatData,
++    data: TData,
+     options: SplatResidencyChunkOptions = {}
+-  ): SplatResidencyChunk | undefined {
++  ): SplatResidencyChunk<TData> | undefined {
+     if (this.isDestroyed || data.destroyed) {
+       throw new Error('Splat residency requires a live manager and source batch');
+     }
+@@ -237,7 +250,7 @@ export class SplatResidencyManager {
+       data.length;
+     let prospectiveChunkCount =
+       this.chunks.size + this.reservedChunkCount + (existingChunk ? 0 : 1);
+-    const evictedChunks: SplatResidencyChunk[] = [];
++    const evictedChunks: SplatResidencyChunk<TData>[] = [];
+ 
+     if (this.exceedsBudget(prospectiveByteLength, prospectiveSplatCount, prospectiveChunkCount)) {
+       for (const candidate of this.getEvictionCandidates(incomingPriority, existingChunk)) {
+@@ -265,7 +278,7 @@ export class SplatResidencyManager {
+       this.removeChunk(candidate, 'budget');
+     }
+ 
+-    const chunk: SplatResidencyChunk = {
++    const chunk: SplatResidencyChunk<TData> = {
+       id: chunkId,
+       data,
+       priority: incomingPriority,
+@@ -292,9 +305,9 @@ export class SplatResidencyManager {
+ 
+   /** Alias for registering one intact source tile or independently prepared streaming batch. */
+   register(
+-    data: GPUSplatData,
++    data: TData,
+     options: SplatResidencyChunkOptions = {}
+-  ): SplatResidencyChunk | undefined {
++  ): SplatResidencyChunk<TData> | undefined {
+     return this.add(data, options);
+   }
+ 
+@@ -308,9 +321,9 @@ export class SplatResidencyManager {
+    */
+   load(
+     id: string,
+-    loadData: () => GPUSplatData | Promise<GPUSplatData>,
++    loadData: () => TData | Promise<TData>,
+     options: Omit<SplatResidencyChunkOptions, 'id'> = {}
+-  ): Promise<SplatResidencyChunk | undefined> {
++  ): Promise<SplatResidencyChunk<TData> | undefined> {
+     if (this.isDestroyed) {
+       return Promise.reject(new Error('Splat residency manager has been destroyed'));
+     }
+@@ -334,7 +347,7 @@ export class SplatResidencyManager {
+       return Promise.resolve(undefined);
+     }
+ 
+-    let requestedLoad: Promise<SplatResidencyChunk | undefined>;
++    let requestedLoad: Promise<SplatResidencyChunk<TData> | undefined>;
+     requestedLoad = Promise.resolve()
+       .then(loadData)
+       .then(data => {
+@@ -367,7 +380,7 @@ export class SplatResidencyManager {
+   }
+ 
+   /** Marks one source tile as recently used without changing its source buffers or identity. */
+-  touch(target: SplatResidencyTarget): boolean {
++  touch(target: SplatResidencyTarget<TData>): boolean {
+     const chunk = this.resolveChunk(target);
+     if (!chunk) {
+       return false;
+@@ -377,7 +390,7 @@ export class SplatResidencyManager {
+   }
+ 
+   /** Updates the eviction priority of one source tile without moving or repacking its data. */
+-  setPriority(target: SplatResidencyTarget, priority: number): boolean {
++  setPriority(target: SplatResidencyTarget<TData>, priority: number): boolean {
+     const chunk = this.resolveChunk(target);
+     if (!chunk) {
+       return false;
+@@ -388,7 +401,7 @@ export class SplatResidencyManager {
+   }
+ 
+   /** Protects a retained source tile against automatic and non-forced explicit eviction. */
+-  pin(target: SplatResidencyTarget, pinned = true): boolean {
++  pin(target: SplatResidencyTarget<TData>, pinned = true): boolean {
+     const chunk = this.resolveChunk(target);
+     if (!chunk) {
+       return false;
+@@ -405,7 +418,7 @@ export class SplatResidencyManager {
+   }
+ 
+   /** Removes explicit eviction protection and immediately enforces any reduced budgets. */
+-  unpin(target: SplatResidencyTarget): boolean {
++  unpin(target: SplatResidencyTarget<TData>): boolean {
+     return this.pin(target, false);
+   }
+ 
+@@ -425,7 +438,7 @@ export class SplatResidencyManager {
+   }
+ 
+   /** Evicts one unpinned source tile, defaulting to the least valuable and oldest resident. */
+-  evict(target?: SplatResidencyTarget): boolean {
++  evict(target?: SplatResidencyTarget<TData>): boolean {
+     const chunk = target
+       ? this.resolveChunk(target)
+       : this.getEvictionCandidates(Number.POSITIVE_INFINITY)[0];
+@@ -437,7 +450,7 @@ export class SplatResidencyManager {
+   }
+ 
+   /** Explicitly removes one source tile, including chunks protected against automatic eviction. */
+-  remove(target: SplatResidencyTarget): boolean {
++  remove(target: SplatResidencyTarget<TData>): boolean {
+     const chunk = this.resolveChunk(target);
+     if (!chunk) {
+       return false;
+@@ -505,7 +518,9 @@ export class SplatResidencyManager {
+     }
+   }
+ 
+-  private resolveChunk(target: SplatResidencyTarget): SplatResidencyChunk | undefined {
++  private resolveChunk(
++    target: SplatResidencyTarget<TData>
++  ): SplatResidencyChunk<TData> | undefined {
+     if (typeof target === 'string') {
+       return this.chunks.get(target);
+     }
+@@ -529,7 +544,7 @@ export class SplatResidencyManager {
+     let prospectiveSplatCount =
+       this.residentSplatCount + this.reservedSplatCount + reservation.splatCount;
+     let prospectiveChunkCount = this.chunks.size + this.reservedChunkCount + 1;
+-    const evictedChunks: SplatResidencyChunk[] = [];
++    const evictedChunks: SplatResidencyChunk<TData>[] = [];
+ 
+     if (this.exceedsBudget(prospectiveByteLength, prospectiveSplatCount, prospectiveChunkCount)) {
+       for (const candidate of this.getEvictionCandidates(options.priority ?? 0)) {
+@@ -568,7 +583,10 @@ export class SplatResidencyManager {
+     this.reservedChunkCount--;
+   }
+ 
+-  private updateChunk(chunk: SplatResidencyChunk, options: SplatResidencyChunkOptions): void {
++  private updateChunk(
++    chunk: SplatResidencyChunk<TData>,
++    options: SplatResidencyChunkOptions
++  ): void {
+     if (options.priority !== undefined) {
+       chunk.priority = options.priority;
+     }
+@@ -595,8 +613,8 @@ export class SplatResidencyManager {
+ 
+   private getEvictionCandidates(
+     maximumPriority: number,
+-    excludedChunk?: SplatResidencyChunk
+-  ): SplatResidencyChunk[] {
++    excludedChunk?: SplatResidencyChunk<TData>
++  ): SplatResidencyChunk<TData>[] {
+     return Array.from(this.chunks.values())
+       .filter(
+         chunk => chunk !== excludedChunk && !chunk.pinned && chunk.priority <= maximumPriority
+@@ -617,7 +635,10 @@ export class SplatResidencyManager {
+     );
+   }
+ 
+-  private removeChunk(chunk: SplatResidencyChunk, reason: SplatResidencyEvictionReason): void {
++  private removeChunk(
++    chunk: SplatResidencyChunk<TData>,
++    reason: SplatResidencyEvictionReason
++  ): void {
+     if (this.chunks.get(chunk.id) !== chunk) {
+       return;
+     }
+@@ -643,7 +664,7 @@ export class SplatResidencyManager {
+   }
+ }
+ 
+-function getSplatResidencyChunkId(data: GPUSplatData): string {
++function getSplatResidencyChunkId(data: SplatResidencyData): string {
+   return `${data.sourceBatchIndex}:${data.rowIndexBase}`;
+ }
+ 
+diff --git a/modules/splats/test/gpu-paged-splat-renderer.node.spec.ts b/modules/splats/test/gpu-paged-splat-renderer.node.spec.ts
+index 312eb2ac3..8fe8d55f1 100644
+--- a/modules/splats/test/gpu-paged-splat-renderer.node.spec.ts
++++ b/modules/splats/test/gpu-paged-splat-renderer.node.spec.ts
+@@ -2,7 +2,7 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+ 
+-import {expect, it} from 'vitest';
++import {expect, it, vi} from 'vitest';
+ import {WgslReflect} from 'wgsl_reflect';
+ import {makeGPUSplatData, type SplatSource} from '@luma.gl/splats';
+ import {NullDevice} from '@luma.gl/test-utils';
+@@ -372,6 +372,37 @@ it('GPUPagedSplatRenderer retains directional SH, semantic controls, and HDR sou
+   void 0;
+ });
+ 
++it('empty external preparation never opens or clears a caller render pass', () => {
++  const device = makePagedWebGPUNullDevice();
++  const renderer = new GPUPagedSplatRenderer(device);
++  const encoder = device.commandEncoder;
++  const beginRenderPass = vi.spyOn(encoder, 'beginRenderPass');
++  expect(renderer.prepare(encoder)).toBeUndefined();
++  expect(beginRenderPass).not.toHaveBeenCalled();
++  const renderPass = device.beginRenderPass({clearColor: false});
++  const end = vi.spyOn(renderPass, 'end');
++  renderer.draw(renderPass);
++  renderer.draw(renderPass);
++  expect(end).not.toHaveBeenCalled();
++  renderer.destroy();
++  renderer.draw(renderPass);
++  expect(end).not.toHaveBeenCalled();
++  renderPass.end();
++  device.destroy();
++});
++
++it('unsplit source selections borrow typed row indices without copying', () => {
++  const device = makePagedWebGPUNullDevice();
++  const data = makeGPUSplatData(device, makePagedSplatSource([0.1, 0.3, 0.8], 0, 0));
++  const activeRows = new Uint32Array([2, 0]);
++  const renderer = new GPUPagedSplatRenderer(device, {pages: [{id: 'page', data, activeRows}]});
++  const planned = renderer['plannedSegments'][0];
++  expect(planned.activeRows).toBe(activeRows);
++  renderer.destroy();
++  data.destroy();
++  device.destroy();
++});
++
+ function makePagedWebGPUNullDevice(): NullDevice {
+   const device = new NullDevice({});
+   Object.defineProperties(device, {
+diff --git a/modules/splats/test/gpu-paged-splat-renderer.spec.ts b/modules/splats/test/gpu-paged-splat-renderer.spec.ts
+index 46b764d34..a03914491 100644
+--- a/modules/splats/test/gpu-paged-splat-renderer.spec.ts
++++ b/modules/splats/test/gpu-paged-splat-renderer.spec.ts
+@@ -2,7 +2,7 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+ 
+-import {expect, it} from 'vitest';
++import {expect, it, vi} from 'vitest';
+ import {Buffer, Texture, type Device} from '@luma.gl/core';
+ import {Model} from '@luma.gl/engine';
+ import {makeGPUSplatData, type SplatSource} from '@luma.gl/splats';
+@@ -14,6 +14,175 @@ import {
+ } from '../src/gpu-paged-splat-shaders';
+ import './gpu-paged-splat-renderer.node.spec';
+ 
++it('camera-only frames skip unchanged sparse row uploads on real WebGPU', async () => {
++  const devices = await getTestDevices(['webgpu']);
++  expect(devices.length).toBeGreaterThan(0);
++  for (const device of devices) {
++    const data = makeGPUSplatData(device, makeBrowserPagedSplatSource([0.1, 0.3, 0.8], 0, 0));
++    const activeRows = new Uint32Array([2, 0]);
++    const renderer = new GPUPagedSplatRenderer(device, {
++      pages: [{id: 'page', data, activeRows}],
++      viewportSize: [16, 16]
++    });
++    renderer.prepare(device.commandEncoder);
++    device.submit();
++    const segment = renderer['sourceSegments'][0];
++    const write = vi.spyOn(segment.activeRowBuffer, 'write');
++    renderer.setProps({cameraPosition: [1, 0, 2]});
++    renderer.prepare(device.commandEncoder);
++    device.submit();
++    expect(write).not.toHaveBeenCalled();
++    // Explicit setFrontier also supports re-submitting a mutated row array.
++    activeRows[0] = 1;
++    renderer.setFrontier([{id: 'page', data, activeRows}]);
++    renderer.prepare(device.commandEncoder);
++    device.submit();
++    expect(write).toHaveBeenCalledTimes(1);
++    renderer.destroy();
++    data.destroy();
++  }
++});
++
++it('sparse-to-dense frontiers clear borrowed row indirection while reusing capacity', async () => {
++  const devices = await getTestDevices(['webgpu']);
++  expect(devices.length).toBeGreaterThan(0);
++  for (const device of devices) {
++    const firstPage = makeGPUSplatData(device, makeBrowserPagedSplatSource([0.1, 0.3, 0.8], 0, 0));
++    const secondPage = makeGPUSplatData(device, makeBrowserPagedSplatSource([0.2, 0.6], 1, 3));
++    const renderer = new GPUPagedSplatRenderer(device, {
++      pages: [
++        {id: 'sparse-page', data: firstPage, activeRows: new Uint32Array([2])},
++        {id: 'capacity-page', data: secondPage}
++      ],
++      viewportSize: [16, 16]
++    });
++
++    // This regression reads compute-produced indirect counts; presentation is tested separately.
++    expect(renderer.prepare(device.commandEncoder)).toBeDefined();
++    device.submit();
++    const originalGraph = renderer.compiledGraph;
++    expect(renderer.stats.globalSortCapacity).toBe(4);
++
++    renderer.setFrontier([
++      {id: 'sparse-page', data: firstPage},
++      {id: 'capacity-page', data: secondPage, activeRows: new Uint32Array([0])}
++    ]);
++    expect(renderer.prepare(device.commandEncoder)).toBeDefined();
++    expect(renderer.compiledGraph, 'reuses the graph within the existing sort bucket').toBe(
++      originalGraph
++    );
++    expect(renderer.stats.globalSortCapacity, 'preserves the reusable sort capacity').toBe(4);
++    expect(
++      renderer.stats.activeRowCount,
++      'selects all dense rows plus the remaining sparse row'
++    ).toBe(4);
++    expect(
++      renderer['sourceSegments'][0].activeRows,
++      'clears stale sparse indirection when the page becomes dense'
++    ).toBeUndefined();
++    device.submit();
++
++    const commandBytes = await renderer.drawCommands.buffer.readAsync();
++    const commands = new Uint32Array(
++      commandBytes.buffer,
++      commandBytes.byteOffset,
++      commandBytes.byteLength / Uint32Array.BYTES_PER_ELEMENT
++    );
++    expect(commands[5], 'publishes the complete dense-plus-sparse draw count').toBe(4);
++
++    renderer.destroy();
++    firstPage.destroy();
++    secondPage.destroy();
++  }
++});
++
++it('GPUPagedSplatRenderer prepares before and draws repeatedly inside host-owned passes', async () => {
++  const devices = await getTestDevices(['webgpu']);
++  expect(devices.length).toBeGreaterThan(0);
++  for (const device of devices) {
++    const page = makeGPUSplatData(device, makeBrowserPagedSplatSource([0.5], 0, 0));
++    const renderer = new GPUPagedSplatRenderer(device, {
++      pages: [{id: 'page', data: page}],
++      viewportSize: [16, 16]
++    });
++    const encoder = device.commandEncoder;
++    const beginRenderPass = vi.spyOn(encoder, 'beginRenderPass');
++    expect(renderer.prepare(encoder)).toBeDefined();
++    expect(beginRenderPass).not.toHaveBeenCalled();
++    beginRenderPass.mockRestore();
++    const renderPass = device.beginRenderPass({clearColor: false, clearDepth: 1});
++    const draw = vi.spyOn(renderPass, 'drawIndirect');
++    const end = vi.spyOn(renderPass, 'end');
++    renderer.draw(renderPass);
++    renderer.draw(renderPass);
++    expect(draw).toHaveBeenCalledTimes(2);
++    expect(end).not.toHaveBeenCalled();
++    renderPass.end();
++    device.submit();
++    expect(renderer.prepare(device.commandEncoder)).toBeUndefined();
++    renderer.setFrontier([]);
++    expect(renderer.prepare(device.commandEncoder)).toBeUndefined();
++    const emptyPass = device.beginRenderPass({clearColor: false, clearDepth: false});
++    const emptyDraw = vi.spyOn(emptyPass, 'drawIndirect');
++    renderer.draw(emptyPass);
++    expect(emptyDraw).not.toHaveBeenCalled();
++    emptyPass.end();
++    device.submit();
++    renderer.destroy();
++    expect(page.destroyed).toBe(false);
++    page.destroy();
++  }
++});
++
++it('GPUPagedSplatRenderer rebuilds the presentation boundary when switching render modes', async () => {
++  const devices = await getTestDevices(['webgpu']);
++  expect(devices.length).toBeGreaterThan(0);
++  for (const device of devices) {
++    const page = makeGPUSplatData(device, makeBrowserPagedSplatSource([0.5], 0, 0));
++    const renderer = new GPUPagedSplatRenderer(device, {
++      pages: [{id: 'page', data: page}],
++      viewportSize: [16, 16]
++    });
++
++    expect(renderer.encode(device.commandEncoder)).toBeDefined();
++    const internalGraph = renderer.compiledGraph;
++    expect(
++      internalGraph?.stats.nodeOrder.includes('paged-gaussian-segmented-render'),
++      'includes the renderer-owned presentation pass in encode mode'
++    ).toBe(true);
++    device.submit();
++
++    expect(renderer.prepare(device.commandEncoder)).toBeDefined();
++    const externalGraph = renderer.compiledGraph;
++    expect(externalGraph, 'rebuilds when the host takes ownership of presentation').not.toBe(
++      internalGraph
++    );
++    expect(
++      externalGraph?.stats.nodeOrder.includes('paged-gaussian-segmented-render'),
++      'omits the renderer-owned presentation pass in prepare mode'
++    ).toBe(false);
++    const renderPass = device.beginRenderPass({clearColor: false, clearDepth: 1});
++    const draw = vi.spyOn(renderPass, 'drawIndirect');
++    renderer.draw(renderPass);
++    expect(draw, 'draws prepared content inside the host-owned pass').toHaveBeenCalledTimes(1);
++    renderPass.end();
++    device.submit();
++
++    expect(renderer.encode(device.commandEncoder)).toBeDefined();
++    expect(renderer.compiledGraph, 'rebuilds again when returning to encode mode').not.toBe(
++      externalGraph
++    );
++    expect(
++      renderer.compiledGraph?.stats.nodeOrder.includes('paged-gaussian-segmented-render'),
++      'restores the renderer-owned presentation pass'
++    ).toBe(true);
++    device.submit();
++
++    renderer.destroy();
++    page.destroy();
++  }
++});
++
+ it('GPUPagedSplatRenderer executes sparse source lifecycle on every browser WebGPU adapter', async () => {
+   const devices = await getTestDevices(['webgpu']);
+   expect(
+diff --git a/modules/splats/test/splat-rad-hierarchy.node.spec.ts b/modules/splats/test/splat-rad-hierarchy.node.spec.ts
+index 566883157..c01db121b 100644
+--- a/modules/splats/test/splat-rad-hierarchy.node.spec.ts
++++ b/modules/splats/test/splat-rad-hierarchy.node.spec.ts
+@@ -2,14 +2,15 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+ 
+-import {expect, it} from 'vitest';
++import {expect, it, vi} from 'vitest';
+ import {makeGPUSplatData, SplatResidencyManager, type GPUSplatData} from '@luma.gl/splats';
+ import {NullDevice} from '@luma.gl/test-utils';
+ import {GPUPagedSplatRenderer} from '../src/gpu-paged-splat-renderer';
+-import type {SplatHierarchyView} from '../src/splat-hierarchy';
++import {isSplatHierarchyNodeVisible, type SplatHierarchyView} from '../src/splat-hierarchy';
+ import {
+   getSplatRADPageBounds,
+   SplatRADHierarchyManager,
++  type SplatRADHierarchyData,
+   type SplatRADHierarchyFrontierEntry,
+   type SplatRADHierarchyPage,
+   type SplatRADHierarchyRequest
+@@ -17,6 +18,748 @@ import {
+ 
+ const IDENTITY_MATRIX = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] as const;
+ 
++it('traverses and owns CPU-only RAD hierarchy data without GPU fields', () => {
++  const positions = new Float32Array([0, 0, 0, -0.1, 0, 0, 0.1, 0, 0]);
++  const scales = new Float32Array(9).fill(0.1);
++  const opacities = new Float32Array([1, 1, 1]);
++  let destroyed = false;
++  const data: SplatRADHierarchyData = {
++    length: 3,
++    byteLength: positions.byteLength + scales.byteLength + opacities.byteLength,
++    sourceBatchIndex: 7,
++    rowIndexBase: 0,
++    revision: 0,
++    source: {positions, scales, opacities},
++    get destroyed() {
++      return destroyed;
++    },
++    destroy() {
++      destroyed = true;
++    }
++  };
++  const page: SplatRADHierarchyPage<SplatRADHierarchyData> = {
++    id: 'cpu-only-tree',
++    data,
++    childCounts: new Uint16Array([2, 0, 0]),
++    childStarts: new Uint32Array([1, 0, 0]),
++    ownsData: true
++  };
++  const manager = new SplatRADHierarchyManager<SplatRADHierarchyData>({
++    pages: [page],
++    frustumCulling: false
++  });
++
++  expect(getSplatRADPageBounds(page).center, 'derives bounds from CPU-only source columns').toEqual(
++    [0, 0, 0]
++  );
++  manager.selectView({...makeRADView(), cameraPosition: [0, 0, 100_000]});
++  expect(manager.frontier[0]?.data, 'publishes the original CPU-only allocation').toBe(data);
++  expect(Array.from(manager.frontier[0]?.activeRows ?? [])).toEqual([0]);
++
++  manager.refineView(makeRADView(), 1);
++  while (manager.hasPendingTraversal) manager.continueTraversal(1);
++  expect(
++    Array.from(manager.frontier[0]?.activeRows ?? []),
++    'refines the CPU-only root to its complete child cut'
++  ).toEqual([1, 2]);
++
++  manager.destroy();
++  expect(destroyed, 'destroys owned CPU-only hierarchy data').toBe(true);
++});
++
++it('publishes changed-camera refinement before the full tree is resolved', () => {
++  const device = new NullDevice({});
++  const tree = makeRADPage(device, {
++    id: 'tree',
++    rowIndexBase: 0,
++    positions: new Array(127 * 3).fill(0),
++    childCounts: Array.from({length: 127}, (_, row) => (row < 63 ? 2 : 0)),
++    childStarts: Array.from({length: 127}, (_, row) => row * 2 + 1)
++  });
++  const manager = new SplatRADHierarchyManager({pages: [tree], frustumCulling: false});
++  manager.selectView({...makeRADView(), cameraPosition: [0, 0, 100_000]});
++  expect(manager.stats.activeRowCount).toBe(1);
++  manager.refineView(makeRADView(), 8);
++  expect(manager.hasPendingTraversal).toBe(true);
++  expect(manager.stats.activeRowCount).toBeGreaterThan(1);
++  const partialCount = manager.stats.activeRowCount;
++  manager.continueTraversal(8);
++  expect(manager.stats.activeRowCount).toBeGreaterThan(partialCount);
++  manager.destroy();
++  tree.data.destroy();
++  device.destroy();
++});
++
++it('retains visible descendants of an offscreen parent and releases only the offscreen branch', () => {
++  const device = new NullDevice({});
++  const roots = makeRADPage(device, {
++    id: 'roots',
++    rowIndexBase: 0,
++    positions: [10, 0, 0, -10, 0, 0],
++    childCounts: [2, 2],
++    childStarts: [2, 4]
++  });
++  const visible = makeRADPage(device, {
++    id: 'tower',
++    rowIndexBase: 2,
++    positions: [0, 0, 0, 0.1, 0, 0]
++  });
++  const outside = makeRADPage(device, {
++    id: 'outside',
++    rowIndexBase: 4,
++    positions: [10, 0, 0, 11, 0, 0]
++  });
++  const manager = new SplatRADHierarchyManager({
++    pages: [roots, visible, outside],
++    rootRows: [0, 1],
++    maximumScreenSpaceError: 0,
++    frustumCulling: false
++  });
++  manager.selectView({...makeRADView(), modelViewProjectionMatrix: undefined});
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([
++    [2, 3],
++    [4, 5]
++  ]);
++  manager.refineView(makeRADView(), 1);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[1], [2, 3]]);
++  expect(manager.residencyManager.getChunk('tower')?.pinned).toBe(true);
++  expect(manager.residencyManager.getChunk('outside')?.pinned).toBe(false);
++  manager.residencyManager.remove('outside');
++  manager.continueTraversal(1);
++  expect(manager.frontier.find(entry => entry.id === 'tower')?.activeRows).toEqual(
++    new Uint32Array([0, 1])
++  );
++  manager.destroy();
++  for (const page of [roots, visible, outside]) page.data.destroy();
++  device.destroy();
++});
++
++it('keeps filling demand slots when a higher-priority deferred group cannot fit residency', () => {
++  const device = new NullDevice({});
++  const roots = makeRADPage(device, {
++    id: 'roots',
++    rowIndexBase: 0,
++    positions: new Array(9).fill(0),
++    childCounts: [1, 2, 1],
++    childStarts: [3, 4, 6]
++  });
++  const child = makeRADPage(device, {id: 'child', rowIndexBase: 3, positions: [0, 0, 0]});
++  const manager = new SplatRADHierarchyManager({
++    pages: [roots],
++    rootRows: [0, 1, 2],
++    pageSize: 1,
++    maximumPendingPages: 1,
++    maximumResidentPages: 5,
++    maximumScreenSpaceError: 0
++  });
++  manager.selectView(makeRADView());
++  expect(manager.requests.map(request => request.rowIndex)).toEqual([3]);
++  manager.registerPage(child);
++  manager.continueTraversal();
++  expect(manager.requests.map(request => request.rowIndex)).toEqual([6]);
++  manager.destroy();
++  roots.data.destroy();
++  child.data.destroy();
++  device.destroy();
++});
++
++it('retains coarse out-of-frustum coverage without descending invisible branches in view-cone mode', () => {
++  const device = new NullDevice({});
++  const root = makeRADPage(device, {
++    id: 'root',
++    rowIndexBase: 0,
++    positions: [100, 0, 0],
++    scales: [0.001, 0.001, 0.001],
++    childCounts: [1],
++    childStarts: [1]
++  });
++  const manager = new SplatRADHierarchyManager({pages: [root], frustumCulling: false});
++  manager.selectView(makeRADView());
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[0]]);
++  expect(manager.requests).toEqual([]);
++  expect(manager.stats.culledRowCount).toBe(0);
++  manager.selectView({...makeRADView(), cameraPosition: [100, 0, 0]});
++  expect(manager.requests.map(request => request.rowIndex)).toEqual([1]);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[0]]);
++  manager.destroy();
++  root.data.destroy();
++  device.destroy();
++});
++
++it('does not rebuild unchanged pages when deferred parents retry after admission', () => {
++  const device = new NullDevice({});
++  const roots = [0, 10, 30].map(rowIndexBase =>
++    makeRADPage(device, {
++      id: `root-${rowIndexBase}`,
++      rowIndexBase,
++      positions: [0, 0, 0],
++      childCounts: [1],
++      childStarts: [rowIndexBase + 100]
++    })
++  );
++  const child = makeRADPage(device, {id: 'child', rowIndexBase: 100, positions: [0, 0, 0]});
++  const manager = new SplatRADHierarchyManager({
++    pages: roots,
++    rootRows: [0, 10, 30],
++    pageSize: 1,
++    maximumPendingPages: 1,
++    maximumScreenSpaceError: 0
++  });
++  const collectPublishedRow = vi.spyOn(
++    manager as unknown as {collectPublishedRow: (...parameters: unknown[]) => void},
++    'collectPublishedRow'
++  );
++  manager.selectView(makeRADView());
++  const unchanged = manager.frontier.find(entry => entry.id === 'root-30');
++  manager.registerPage(child);
++  manager.continueTraversal();
++  expect(manager.frontier.find(entry => entry.id === 'root-30')).toBe(unchanged);
++  expect(manager.requests.map(request => request.pageIndex)).toEqual([110]);
++  expect(collectPublishedRow).not.toHaveBeenCalled();
++  manager.destroy();
++  for (const page of [...roots, child]) page.data.destroy();
++  device.destroy();
++});
++
++it('posts page-arrival refinements before the rest of the current-view queue completes', () => {
++  const device = new NullDevice({});
++  const root = makeRADPage(device, {
++    id: 'root',
++    rowIndexBase: 0,
++    positions: [0, 0, 0],
++    childCounts: [1],
++    childStarts: [1]
++  });
++  const children = makeRADPage(device, {
++    id: 'children',
++    rowIndexBase: 1,
++    positions: new Array(31 * 3).fill(0),
++    childCounts: Array.from({length: 31}, (_, index) => (index < 15 ? 2 : 0)),
++    childStarts: Array.from({length: 31}, (_, index) => index * 2 + 2)
++  });
++  const manager = new SplatRADHierarchyManager({pages: [root], maximumScreenSpaceError: 0});
++  manager.selectView(makeRADView(), 4);
++  expect(manager.hasPendingTraversal).toBe(false);
++  expect(manager.frontier.map(entry => entry.id)).toEqual(['root']);
++  manager.registerPage(children);
++  manager.continueTraversal(4);
++  expect(manager.hasPendingTraversal).toBe(true);
++  expect(manager.frontier.map(entry => entry.id)).toEqual(['children']);
++  expect(manager.stats.activeRowCount).toBeGreaterThan(1);
++  manager.destroy();
++  root.data.destroy();
++  children.data.destroy();
++  device.destroy();
++});
++
++it('finishes an admitted sibling group across slices even above the soft pending-page limit', () => {
++  const device = new NullDevice({});
++  const root = makeRADPage(device, {
++    id: 'root',
++    rowIndexBase: 0,
++    positions: [0, 0, 0],
++    childCounts: [3],
++    childStarts: [1]
++  });
++  const children = [1, 2, 3].map(rowIndexBase =>
++    makeRADPage(device, {
++      id: `child-${rowIndexBase}`,
++      rowIndexBase,
++      positions: [0, 0, 0]
++    })
++  );
++  const manager = new SplatRADHierarchyManager({
++    pages: [root],
++    pageSize: 1,
++    maximumPendingPages: 1,
++    maximumScreenSpaceError: 0
++  });
++  manager.selectView(makeRADView(), 2);
++  for (let slice = 0; manager.hasPendingTraversal && slice < 10; slice++) {
++    manager.continueTraversal(1);
++  }
++  expect(manager.requests.map(request => request.pageIndex).sort()).toEqual([1, 2, 3]);
++  for (const child of children) {
++    manager.registerPage(child);
++    manager.continueTraversal();
++  }
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[1], [2], [3]]);
++  expect(manager.requests).toHaveLength(0);
++  manager.destroy();
++  for (const page of [root, ...children]) page.data.destroy();
++  device.destroy();
++});
++
++it('publishes only changed source-page selections when a blocked branch refines', () => {
++  const device = new NullDevice({});
++  const large = makeRADPage(device, {
++    id: 'large',
++    rowIndexBase: 0,
++    positions: new Array(511 * 3).fill(0),
++    childCounts: Array.from({length: 511}, (_, index) => (index < 255 ? 2 : 0)),
++    childStarts: Array.from({length: 511}, (_, index) => index * 2 + 1)
++  });
++  const pending = makeRADPage(device, {
++    id: 'pending',
++    rowIndexBase: 1000,
++    positions: [0, 0, 0],
++    childCounts: [1],
++    childStarts: [2000]
++  });
++  const child = makeRADPage(device, {id: 'child', rowIndexBase: 2000, positions: [0, 0, 0]});
++  const manager = new SplatRADHierarchyManager({
++    pages: [large, pending],
++    rootRows: [0, 1000],
++    maximumScreenSpaceError: 0
++  });
++  manager.selectView(makeRADView());
++  const unchanged = manager.frontier.find(entry => entry.id === 'large');
++  manager.registerPage(child);
++  manager.continueTraversal();
++  expect(manager.frontier.find(entry => entry.id === 'large')).toBe(unchanged);
++  expect(manager.frontier.map(entry => entry.id)).toEqual(['large', 'child']);
++  expect(manager.stats.activeRowCount).toBe(257);
++  manager.destroy();
++  large.data.destroy();
++  pending.data.destroy();
++  child.data.destroy();
++  device.destroy();
++});
++
++it('bounds missing-child lookups too and publishes initial coarse coverage immediately', () => {
++  const device = new NullDevice({});
++  const rootRows = Array.from({length: 16}, (_, index) => index);
++  const roots = makeRADPage(device, {
++    id: 'roots',
++    rowIndexBase: 0,
++    positions: new Array(48).fill(0),
++    childCounts: new Array(16).fill(1),
++    childStarts: rootRows.map(index => index + 100)
++  });
++  const manager = new SplatRADHierarchyManager({pages: [roots], rootRows, pageSize: 1});
++  manager.selectView(makeRADView(), 20);
++  expect(manager.hasPendingTraversal).toBe(true);
++  expect(manager.requests.length).toBeLessThanOrEqual(4);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([rootRows]);
++  expect(manager.stats.fallbackRowCount).toBe(4);
++  manager.destroy();
++  roots.data.destroy();
++  device.destroy();
++});
++
++it('yields complete-cut work and current demand without publishing an intermediate downgrade', () => {
++  const device = new NullDevice({});
++  const rowCount = 512;
++  const page = makeRADPage(device, {
++    id: 'tree',
++    rowIndexBase: 0,
++    positions: Array.from({length: rowCount * 3}, (_, componentIndex) =>
++      componentIndex === 511 * 3 + 2 ? 1 : 0
++    ),
++    childCounts: Array.from({length: rowCount}, (_, rowIndex) =>
++      rowIndex === 511 ? 1 : rowIndex < 255 ? 2 : 0
++    ),
++    childStarts: Array.from({length: rowCount}, (_, rowIndex) =>
++      rowIndex === 511 ? 1000 : rowIndex < 255 ? rowIndex * 2 + 1 : 0
++    )
++  });
++  const publications = vi.fn();
++  const manager = new SplatRADHierarchyManager({
++    pages: [page],
++    rootRows: [0, 511],
++    pageSize: 1,
++    maximumScreenSpaceError: 0,
++    onFrontierChange: publications
++  });
++  manager.selectView(makeRADView());
++  const resolved = manager.frontier;
++  publications.mockClear();
++  manager.selectView({...makeRADView(), cameraPosition: [0.1, 0, 2]}, 32);
++  expect(manager.stats.visibleRowCount).toBeLessThanOrEqual(32);
++  expect(manager.hasPendingTraversal).toBe(true);
++  expect(manager.frontier).toBe(resolved);
++  expect(manager.requests.map(request => request.pageIndex)).toContain(1000);
++  expect(publications).not.toHaveBeenCalled();
++  let slices = 0;
++  while (manager.hasPendingTraversal && slices++ < 100) {
++    const evaluated = manager.stats.visibleRowCount + manager.stats.culledRowCount;
++    manager.continueTraversal(32);
++    expect(
++      manager.stats.visibleRowCount + manager.stats.culledRowCount - evaluated
++    ).toBeLessThanOrEqual(32);
++    if (manager.hasPendingTraversal) expect(manager.frontier).toBe(resolved);
++  }
++  expect(manager.hasPendingTraversal).toBe(false);
++  expect(manager.stats.activeRowCount).toBe(257);
++  expect(manager.requests.map(request => request.pageIndex)).toContain(1000);
++  manager.destroy();
++  page.data.destroy();
++  device.destroy();
++});
++
++it('does not rebuild a resolved frontier when an unrelated page arrives', () => {
++  const device = new NullDevice({});
++  const root = makeRADPage(device, {id: 'root', rowIndexBase: 0, positions: [0, 0, 0]});
++  const unused = makeRADPage(device, {id: 'unused', rowIndexBase: 1, positions: [0, 0, 0]});
++  const manager = new SplatRADHierarchyManager({pages: [root]});
++  manager.selectView(makeRADView());
++  manager.registerPage(unused);
++  const publish = vi.spyOn(manager.residencyManager, 'setPriority');
++  manager.continueTraversal(32);
++  expect(publish).not.toHaveBeenCalled();
++  manager.destroy();
++  root.data.destroy();
++  unused.data.destroy();
++  device.destroy();
++});
++
++it('prepares camera-invariant projection math once per view, not once per source row', () => {
++  const device = new NullDevice({});
++  const rowCount = 511;
++  const page = makeRADPage(device, {
++    id: 'large-tree',
++    rowIndexBase: 0,
++    positions: Array.from({length: rowCount * 3}, () => 0),
++    childCounts: Array.from({length: rowCount}, (_, rowIndex) => (rowIndex < 255 ? 2 : 0)),
++    childStarts: Array.from({length: rowCount}, (_, rowIndex) =>
++      rowIndex < 255 ? rowIndex * 2 + 1 : 0
++    )
++  });
++  const manager = new SplatRADHierarchyManager({pages: [page], maximumScreenSpaceError: 0});
++  const lengths = vi.spyOn(Math, 'hypot');
++  const tangents = vi.spyOn(Math, 'tan');
++  try {
++    manager.selectView(makeRADView());
++    expect(manager.stats.activeRowCount).toBe(256);
++    expect(lengths.mock.calls.length).toBeLessThan(rowCount * 2);
++    expect(tangents.mock.calls.length).toBe(1);
++  } finally {
++    lengths.mockRestore();
++    tangents.mockRestore();
++    manager.destroy();
++    page.data.destroy();
++    device.destroy();
++  }
++});
++
++it('prepared clip planes preserve conservative source-sphere visibility across view changes', () => {
++  const device = new NullDevice({});
++  const positions = [-2, 0, 0, -1.1, 0, 0, 0, 0, 0, 0, 1.1, 0, 0, 0, -2, 0, 0, 2, 2, 0, 0];
++  const page = makeRADPage(device, {id: 'spheres', rowIndexBase: 0, positions});
++  const rootRows = Array.from({length: positions.length / 3}, (_, index) => index);
++  const manager = new SplatRADHierarchyManager({pages: [page], rootRows});
++  const matrices = [
++    IDENTITY_MATRIX,
++    [2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1.02, -1, 0.5, 0, -0.2, 0],
++    Array.from({length: 16}, () => 0),
++    undefined
++  ];
++  for (const modelViewProjectionMatrix of matrices) {
++    const expected = rootRows.filter(rowIndex =>
++      isSplatHierarchyNodeVisible(
++        {
++          id: String(rowIndex),
++          bounds: {
++            center: [
++              page.data.source.positions[rowIndex * 3],
++              page.data.source.positions[rowIndex * 3 + 1],
++              page.data.source.positions[rowIndex * 3 + 2]
++            ],
++            radius: page.data.source.scales[rowIndex * 3] * 3
++          },
++          geometricError: 0
++        },
++        modelViewProjectionMatrix
++      )
++    );
++    manager.selectView({...makeRADView(), modelViewProjectionMatrix});
++    expect(getFrontierSourceRows(manager.frontier).flat()).toEqual(expected);
++  }
++  manager.destroy();
++  page.data.destroy();
++  device.destroy();
++});
++
++it('complete current-view cuts reassign a full budget to the nearest branch atomically', () => {
++  const device = new NullDevice({});
++  const page = makeRADPage(device, {
++    id: 'two-branches',
++    rowIndexBase: 0,
++    positions: [-0.5, 0, 0, -0.51, 0, 0, -0.49, 0, 0, 0.5, 0, 0, 0.49, 0, 0, 0.51, 0, 0],
++    childCounts: [2, 0, 0, 2, 0, 0],
++    childStarts: [1, 0, 0, 4, 0, 0]
++  });
++  const publications: number[][][] = [];
++  const manager = new SplatRADHierarchyManager({
++    pages: [page],
++    rootRows: [0, 3],
++    maximumActiveRows: 3,
++    maximumScreenSpaceError: 0,
++    maxTraversalRows: 1,
++    onFrontierChange: frontier => publications.push(getFrontierSourceRows(frontier))
++  });
++  const nearLeft = {...makeRADView(), cameraPosition: [-1, 0, 0] as const};
++  const nearRight = {...makeRADView(), cameraPosition: [1, 0, 0] as const};
++  manager.selectView(nearLeft);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[1, 2, 3]]);
++  expect(manager.isCapacityLimited).toBe(true);
++  manager.selectView(nearRight);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[0, 4, 5]]);
++  expect(publications).toEqual([[[1, 2, 3]], [[0, 4, 5]]]);
++  expect(manager.hasPendingTraversal).toBe(false);
++  manager.destroy();
++  page.data.destroy();
++  device.destroy();
++});
++
++it('page admission wakes blocked refinement without retargeting resolved rows', () => {
++  const device = new NullDevice({});
++  const rowCount = 511;
++  const root = makeRADPage(device, {
++    id: 'root',
++    rowIndexBase: 0,
++    positions: Array.from({length: rowCount * 3}, () => 0),
++    childCounts: Array.from({length: rowCount}, (_, row) => (row < 255 ? 2 : Number(row === 255))),
++    childStarts: Array.from({length: rowCount}, (_, row) =>
++      row < 255 ? row * 2 + 1 : row === 255 ? 1000 : 0
++    )
++  });
++  const child = makeRADPage(device, {id: 'child', rowIndexBase: 1000, positions: [0, 0, 0]});
++  const manager = new SplatRADHierarchyManager({
++    pages: [root],
++    pageSize: 1,
++    maximumScreenSpaceError: 0
++  });
++  manager.update(makeRADView());
++  const evaluatedBefore = manager.stats.visibleRowCount + manager.stats.culledRowCount;
++  manager.registerPage(child);
++  manager.continueTraversal();
++  expect(getFrontierSourceRows(manager.frontier).flat()).toContain(1000);
++  // Page arrival is not camera movement: only the newly unlocked child needs projection.
++  expect(manager.stats.visibleRowCount + manager.stats.culledRowCount - evaluatedBefore).toBe(1);
++  expect(manager.hasPendingTraversal).toBe(false);
++  manager.destroy();
++  root.data.destroy();
++  child.data.destroy();
++  device.destroy();
++});
++
++it('complete cuts stop lower-priority exploration at the active-row budget', () => {
++  const device = new NullDevice({});
++  const page = makeRADPage(device, {
++    id: 'large-tree',
++    rowIndexBase: 0,
++    positions: Array.from({length: 511 * 3}, () => 0),
++    childCounts: Array.from({length: 511}, (_, rowIndex) => (rowIndex < 255 ? 2 : 0)),
++    childStarts: Array.from({length: 511}, (_, rowIndex) => (rowIndex < 255 ? rowIndex * 2 + 1 : 0))
++  });
++  const manager = new SplatRADHierarchyManager({
++    pages: [page],
++    maximumActiveRows: 8,
++    maximumScreenSpaceError: 0
++  });
++  manager.selectView(makeRADView());
++  expect(manager.stats.activeRowCount).toBe(8);
++  expect(manager.stats.visibleRowCount).toBe(17);
++  expect(manager.hasPendingTraversal).toBe(false);
++  manager.destroy();
++  page.data.destroy();
++  device.destroy();
++});
++
++it('late near-camera pages replace lower-value detail without rebuilding the cut', () => {
++  const device = new NullDevice({});
++  const roots = makeRADPage(device, {
++    id: 'roots',
++    rowIndexBase: 0,
++    positions: [-0.5, 0, 0, 0.5, 0, 0],
++    childCounts: [2, 2],
++    childStarts: [2, 4]
++  });
++  const near = makeRADPage(device, {
++    id: 'near',
++    rowIndexBase: 2,
++    positions: [-0.51, 0, 0, -0.49, 0, 0]
++  });
++  const far = makeRADPage(device, {
++    id: 'far',
++    rowIndexBase: 4,
++    positions: [0.49, 0, 0, 0.51, 0, 0]
++  });
++  const manager = new SplatRADHierarchyManager({
++    pages: [roots, far],
++    rootRows: [0, 1],
++    pageSize: 2,
++    maximumActiveRows: 3,
++    maximumScreenSpaceError: 0
++  });
++  manager.selectView({...makeRADView(), cameraPosition: [-1, 0, 0]});
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[0], [4, 5]]);
++  const evaluatedBefore = manager.stats.visibleRowCount;
++  manager.registerPage(near);
++  manager.continueTraversal();
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[1], [2, 3]]);
++  expect(manager.stats.visibleRowCount - evaluatedBefore).toBe(2);
++  expect(manager.residencyManager.getChunk('far')?.pinned).toBe(false);
++  expect(manager.residencyManager.getChunk('near')?.pinned).toBe(true);
++  expect(manager.requests).toEqual([]);
++  manager.destroy();
++  roots.data.destroy();
++  near.data.destroy();
++  far.data.destroy();
++  device.destroy();
++});
++
++it('reclaims old-view detail while retaining the new cut and its required source pages', () => {
++  const device = new NullDevice({});
++  const roots = makeRADPage(device, {
++    id: 'roots',
++    rowIndexBase: 0,
++    positions: [0, 0, 0, -0.5, 0, 0, 0.5, 0, 0],
++    scales: [0.4, 0.4, 0.4, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
++    childCounts: [2, 2, 2],
++    childStarts: [1, 3, 5]
++  });
++  const left = makeRADPage(device, {
++    id: 'left',
++    rowIndexBase: 3,
++    positions: [-0.51, 0, 0, -0.49, 0, 0]
++  });
++  const right = makeRADPage(device, {
++    id: 'right',
++    rowIndexBase: 5,
++    positions: [0.49, 0, 0, 0.51, 0, 0]
++  });
++  const manager = new SplatRADHierarchyManager({
++    pages: [roots, {...left, ownsData: true}, right],
++    maximumActiveRows: 3,
++    maximumScreenSpaceError: 150
++  });
++  manager.selectView({...makeRADView(), cameraPosition: [-1, 0, 0]});
++  expect(manager.residencyManager.getChunk('left')?.pinned).toBe(true);
++  const nearRight = {...makeRADView(), cameraPosition: [1, 0, 0] as const};
++  manager.selectView(nearRight);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[1], [5, 6]]);
++  expect(manager.residencyManager.getChunk('left')?.pinned).toBe(false);
++  expect(manager.residencyManager.getChunk('right')?.pinned).toBe(true);
++  expect(manager.residencyManager.getChunk('roots')?.pinned).toBe(true);
++  expect(manager.residencyManager.evict('left')).toBe(true);
++  expect(left.data.destroyed).toBe(true);
++  manager.selectView(nearRight);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[1], [5, 6]]);
++  expect(manager.requests).toEqual([]);
++  manager.destroy();
++  roots.data.destroy();
++  right.data.destroy();
++  device.destroy();
++});
++
++it('an infeasible late-page exchange does not degrade the existing visible cut', () => {
++  const device = new NullDevice({});
++  const roots = makeRADPage(device, {
++    id: 'roots',
++    rowIndexBase: 0,
++    positions: [-0.5, 0, 0, 0.5, 0, 0],
++    childCounts: [5, 2],
++    childStarts: [2, 7]
++  });
++  const near = makeRADPage(device, {
++    id: 'near',
++    rowIndexBase: 2,
++    positions: Array.from({length: 15}, (_, index) => (index % 3 === 0 ? -0.5 : 0))
++  });
++  const far = makeRADPage(device, {
++    id: 'far',
++    rowIndexBase: 7,
++    positions: [0.49, 0, 0, 0.51, 0, 0]
++  });
++  const manager = new SplatRADHierarchyManager({
++    pages: [roots, far],
++    rootRows: [0, 1],
++    pageSize: 1,
++    maximumActiveRows: 3,
++    maximumScreenSpaceError: 0
++  });
++  manager.selectView({...makeRADView(), cameraPosition: [-1, 0, 0]});
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[0], [7, 8]]);
++  manager.registerPage(near);
++  manager.continueTraversal();
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[0], [7, 8]]);
++  expect(manager.residencyManager.getChunk('far')?.pinned).toBe(true);
++  expect(manager.frontier[0].isFallback).toBe(false);
++  manager.destroy();
++  roots.data.destroy();
++  near.data.destroy();
++  far.data.destroy();
++  device.destroy();
++});
++
++it('releases obsolete partial-child pins and demand before a large retarget settles', () => {
++  const device = new NullDevice({});
++  const root = makeRADPage(device, {
++    id: 'root',
++    rowIndexBase: 0,
++    positions: [0, 0, 0],
++    childCounts: [2],
++    childStarts: [1]
++  });
++  const partial = makeRADPage(device, {id: 'partial', rowIndexBase: 1, positions: [0, 0, 0]});
++  const peer = makeRADPage(device, {id: 'peer', rowIndexBase: 3, positions: [0, 0, 0]});
++  const manager = new SplatRADHierarchyManager({
++    pages: [root, partial, peer],
++    rootRows: [0, 3],
++    pageSize: 1,
++    maximumScreenSpaceError: 10,
++    maxTraversalRows: 1
++  });
++  manager.update({...makeRADView(), verticalFieldOfView: Math.PI / 2});
++  manager.continueTraversal(16);
++  expect(manager.residencyManager.getChunk('partial')?.pinned).toBe(true);
++  expect(manager.requestedRows).toEqual([2]);
++  manager.update({...makeRADView(), cameraPosition: [0, 0, 100], verticalFieldOfView: Math.PI / 2});
++  expect(manager.requestedRows).toEqual([]);
++  expect(manager.residencyManager.getChunk('partial')?.pinned).toBe(false);
++  expect(getFrontierSourceRows(manager.frontier)).toEqual([[0], [3]]);
++  manager.destroy();
++  root.data.destroy();
++  partial.data.destroy();
++  peer.data.destroy();
++  device.destroy();
++});
++
++it('evicting an unused page does not restart a resolved visible frontier', () => {
++  const device = new NullDevice({});
++  const root = makeRADPage(device, {
++    id: 'root',
++    rowIndexBase: 0,
++    positions: [0, 0, 0, -0.1, 0, 0, 0.1, 0, 0],
++    childCounts: [2, 0, 0],
++    childStarts: [1, 0, 0]
++  });
++  const unused = makeRADPage(device, {id: 'unused', rowIndexBase: 10, positions: [0, 0, 0]});
++  const manager = new SplatRADHierarchyManager({
++    pages: [root, unused],
++    maxTraversalRows: 1,
++    maximumScreenSpaceError: 0
++  });
++  manager.update(makeRADView());
++  while (manager.hasPendingTraversal) manager.continueTraversal(8);
++  const frontier = manager.frontier;
++  expect([...frontier[0].activeRows]).toEqual([1, 2]);
++  const traversal = (manager as unknown as {incrementalTraversal: {rootCandidates: unknown[]}})
++    .incrementalTraversal;
++  const copyRootCandidates = vi.spyOn(traversal.rootCandidates, 'slice');
++  manager.residencyManager.remove('unused');
++  manager.update(makeRADView());
++  expect(manager.frontier).toBe(frontier);
++  expect(manager.hasPendingTraversal).toBe(false);
++  expect(copyRootCandidates).not.toHaveBeenCalled();
++  manager.destroy();
++  root.data.destroy();
++  unused.data.destroy();
++  device.destroy();
++});
++
+ it('SplatRADHierarchyManager conservatively derives original decoded source-page bounds', () => {
+   const device = new NullDevice({});
+   const page = makeRADPage(device, {
+@@ -1278,7 +2021,47 @@ it('SplatRADHierarchyManager retargets a resolved frontier without collapsing ca
+   void 0;
+ });
+ 
+-it('SplatRADHierarchyManager retargets deep retained branches without recursive tree scans', () => {
++it.each([
++  128, 256
++])('refinement updates dependency leases linearly for a %i-row chain', rowCount => {
++  const device = new NullDevice({});
++  const page = makeRADPage(device, {
++    id: 'linear-dependency-chain',
++    rowIndexBase: 0,
++    positions: new Array(rowCount * 3).fill(0),
++    childCounts: Array.from({length: rowCount}, (_, rowIndex) => Number(rowIndex < rowCount - 1)),
++    childStarts: Array.from({length: rowCount}, (_, rowIndex) => rowIndex + 1)
++  });
++  const manager = new SplatRADHierarchyManager({
++    pages: [page],
++    maximumScreenSpaceError: 0,
++    maximumActiveRows: 1
++  });
++  manager.refineView(makeRADView(), 1);
++  const dependencyCounts = manager['incrementalTraversal']!.state.dependencyPageCounts;
++  const writes = vi.spyOn(dependencyCounts, 'set');
++  try {
++    manager.continueTraversal(Number.POSITIVE_INFINITY);
++    expect(getFrontierSourceRows(manager.frontier)).toEqual([[rowCount - 1]]);
++    expect(dependencyCounts.get(page.id), 'retains every required ancestor lease').toBe(
++      rowCount - 1
++    );
++    expect(
++      writes.mock.calls.length,
++      'does not remove and rebuild unchanged ancestor leases'
++    ).toBeLessThan(rowCount * 4);
++  } finally {
++    writes.mockRestore();
++    manager.destroy();
++    page.data.destroy();
++    device.destroy();
++  }
++});
++
++it.each([
++  'update',
++  'refineView'
++] as const)('SplatRADHierarchyManager %s retargets deep retained branches without recursive tree scans', method => {
+   const device = new NullDevice({});
+   const rowCount = 20_000;
+   const childCounts = new Array(rowCount).fill(0);
+@@ -1304,10 +2087,10 @@ it('SplatRADHierarchyManager retargets deep retained branches without recursive
+     maximumActiveRows: 2
+   });
+ 
+-  manager.update(makeRADView());
++  manager[method](makeRADView());
+   expect(manager.stats.activeRowCount, 'resolves both deep-tree leaves').toBe(2);
+   expect(
+-    () => manager.update({...makeRADView(), cameraPosition: [0.01, 0, 2]}),
++    () => manager[method]({...makeRADView(), cameraPosition: [0.01, 0, 2]}),
+     'retargets without overflowing the JavaScript call stack'
+   ).not.toThrow();
+   expect(manager.stats.activeRowCount, 'retains both visible leaves after retargeting').toBe(2);
+@@ -1318,6 +2101,49 @@ it('SplatRADHierarchyManager retargets deep retained branches without recursive
+   void 0;
+ });
+ 
++it('SplatRADHierarchyManager bounds queue coverage checks during a small camera retarget', () => {
++  const device = new NullDevice({});
++  const rowCount = 8_191;
++  const leafCount = 4_096;
++  const page = makeRADPage(device, {
++    id: 'large-retained-tree',
++    rowIndexBase: 0,
++    positions: Array.from({length: rowCount * 3}, () => 0),
++    childCounts: Array.from({length: rowCount}, (_, rowIndex) =>
++      rowIndex < leafCount - 1 ? 2 : 0
++    ),
++    childStarts: Array.from({length: rowCount}, (_, rowIndex) =>
++      rowIndex < leafCount - 1 ? rowIndex * 2 + 1 : 0
++    )
++  });
++  const manager = new SplatRADHierarchyManager({
++    pages: [page],
++    maximumScreenSpaceError: 0,
++    maximumActiveRows: leafCount,
++    maxTraversalRows: 16
++  });
++  manager.update(makeRADView());
++  manager.continueTraversal(Number.POSITIVE_INFINITY);
++  expect(manager.stats.activeRowCount).toBe(leafCount);
++  // Observe lookup work, not wall time: every queue comparison must stop once coverage is known.
++  const selectedRows = (
++    manager as unknown as {
++      incrementalTraversal: {selectedRows: Map<number, unknown>};
++    }
++  ).incrementalTraversal.selectedRows;
++  const lookups = vi.spyOn(selectedRows, 'get');
++  try {
++    manager.update({...makeRADView(), cameraPosition: [0.01, 0, 2]});
++    expect(lookups.mock.calls.length).toBeLessThan(2_000);
++    expect(manager.stats.activeRowCount).toBe(leafCount);
++  } finally {
++    lookups.mockRestore();
++    manager.destroy();
++    page.data.destroy();
++    device.destroy();
++  }
++});
++
+ it('SplatRADHierarchyManager preserves overlap while retargeting newly visible branches', () => {
+   const device = new NullDevice({});
+   const page = makeRADPage(device, {
+@@ -1822,7 +2648,10 @@ it('SplatRADHierarchyManager progresses across consecutive one-row camera retarg
+   void 0;
+ });
+ 
+-it('SplatRADHierarchyManager coarsens newly visible dormant siblings within active capacity', () => {
++it.each([
++  'update',
++  'refineView'
++] as const)('SplatRADHierarchyManager %s coarsens newly visible dormant siblings within active capacity', method => {
+   const device = new NullDevice({});
+   const page = makeRADPage(device, {
+     id: 'retargeted-capacity',
+@@ -1838,13 +2667,13 @@ it('SplatRADHierarchyManager coarsens newly visible dormant siblings within acti
+     maxTraversalRows: 16
+   });
+ 
+-  manager.update(makeRADView());
++  manager[method](makeRADView());
+   expect(
+     getFrontierSourceRows(manager.frontier),
+     'starts with only the centered visible child'
+   ).toEqual([[1]]);
+ 
+-  manager.update({
++  manager[method]({
+     ...makeRADView(),
+     modelViewProjectionMatrix: [0.2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+   });
+@@ -1856,7 +2685,7 @@ it('SplatRADHierarchyManager coarsens newly visible dormant siblings within acti
+     1
+   );
+ 
+-  manager.update(makeRADView());
++  manager[method](makeRADView());
+   expect(
+     getFrontierSourceRows(manager.frontier),
+     'reactivates the retained centered child without rebuilding discarded topology'
+diff --git a/modules/splats/test/splat-residency.node.spec.ts b/modules/splats/test/splat-residency.node.spec.ts
+index eebf14f7b..54aa450cd 100644
+--- a/modules/splats/test/splat-residency.node.spec.ts
++++ b/modules/splats/test/splat-residency.node.spec.ts
+@@ -8,11 +8,48 @@ import {
+   SplatRenderer,
+   SplatResidencyManager,
+   type GPUSplatData,
++  type SplatResidencyData,
+   type SplatResidencyEvictionReason,
+   type SplatSource
+ } from '@luma.gl/splats';
+ import {NullDevice} from '@luma.gl/test-utils';
+ 
++it('SplatResidencyManager manages CPU-only allocation metadata without GPU fields', () => {
++  const firstData = makeCPUResidencyData(2, 32, 7, 100);
++  const secondData = makeCPUResidencyData(3, 48, 8, 102);
++  const residencyEvents: SplatResidencyData[][] = [];
++  const manager = new SplatResidencyManager<SplatResidencyData>({
++    maxResidentChunks: 1,
++    ownsData: true,
++    onResidencyChange: batches => residencyEvents.push([...batches])
++  });
++
++  const firstChunk = manager.add(firstData, {priority: 1});
++  expect(firstChunk?.id, 'derives identity from CPU-only source metadata').toBe('7:100');
++  expect(firstChunk?.data, 'retains the exact CPU-only allocation object').toBe(firstData);
++  expect(manager.stats.residentGpuByteLength, 'accounts for generic allocation bytes').toBe(32);
++  expect(manager.stats.residentSplatCount, 'accounts for generic logical rows').toBe(2);
++
++  const secondChunk = manager.add(secondData, {priority: 2});
++  expect(secondChunk?.data, 'admits a higher-priority CPU-only allocation').toBe(secondData);
++  expect(firstData.destroyed, 'destroys manager-owned CPU-only data after eviction').toBe(true);
++  expect(manager.getResidentBatches(), 'returns the generic data type without conversion').toEqual([
++    secondData
++  ]);
++  expect(residencyEvents, 'publishes exact CPU-only residency snapshots').toEqual([
++    [firstData],
++    [],
++    [secondData]
++  ]);
++
++  manager.destroy();
++  expect(secondData.destroyed, 'destroys the final owned CPU-only allocation').toBe(true);
++  expect(
++    residencyEvents[residencyEvents.length - 1],
++    'publishes an empty final CPU-only residency snapshot'
++  ).toEqual([]);
++});
++
+ it('SplatResidencyManager preserves independent source batches and exact GPU allocations', () => {
+   const device = new NullDevice({});
+   const firstBatch = makeGPUSplatData(device, makeSplatResidencySource(2, 4, 11));
+@@ -739,3 +776,24 @@ function makeSplatResidencySource(
+ 
+   return {positions, scales, rotations, colors, opacities, sourceBatchIndex, rowIndexBase};
+ }
++
++function makeCPUResidencyData(
++  length: number,
++  byteLength: number,
++  sourceBatchIndex: number,
++  rowIndexBase: number
++): SplatResidencyData {
++  let destroyed = false;
++  return {
++    length,
++    byteLength,
++    sourceBatchIndex,
++    rowIndexBase,
++    get destroyed() {
++      return destroyed;
++    },
++    destroy() {
++      destroyed = true;
++    }
++  };
++}

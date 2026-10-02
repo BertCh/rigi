@@ -1,4 +1,4 @@
-# Vendored deck.gl (luma.gl 10 build), `9.4.0-rigi.2`
+# Vendored deck.gl (luma.gl 10 build), `9.4.0-rigi.3`
 
 No published deck.gl release targets luma.gl 10 yet, so `@deck.gl/core` and `@deck.gl/layers`
 are installed from these tarballs (`package.json`: `file:vendor/deck/<name>.tgz`).
@@ -6,7 +6,7 @@ are installed from these tarballs (`package.json`: `file:vendor/deck/<name>.tgz`
 **Swap to npm when deck publishes on luma 10**: point both deps at the published version,
 delete this directory, and re-run `npm install`. The old `package.json` override
 `"@deck.gl/core": "$@deck.gl/core"` is gone with rigi.1: the layers manifest peers `@deck.gl/core` at
-the exact version `9.4.0-rigi.2`, which is what the core tarball is, and the install prints no peer
+the exact version `9.4.0-rigi.3`, which is what the core tarball is, and the install prints no peer
 warning. (It only existed because `@deck.gl/layers@9.4.0-beta.4` peered `@deck.gl/core@~9.4.0`, which a
 prerelease does not satisfy.) If a published deck brings that peer mismatch back, restore it. luma itself is vendored too
 (see `vendor/luma/README.md`), with fixed manifests, so there is no `.npmrc` and no luma override;
@@ -14,13 +14,38 @@ the one remaining override, `@math.gl/types`, is explained there.
 
 ## Version
 
-`9.4.0-rigi.2` (rigi.1 before; `9.4.0-beta.4` is the repo's own version string). The version is changed in the packed manifests and in the two
+`9.4.0-rigi.3` (rigi.2 and rigi.1 before; `9.4.0-beta.4` is the repo's own version string). The version is changed in the packed manifests and in the two
 places where core embeds it (`dist/lib/init.js` and `dist/index.cjs`, and the same two files in
-`dist.webgl-only/`), so `deck.VERSION` and the init log line report `9.4.0-rigi.2`. The deck repo
+`dist.webgl-only/`), so `deck.VERSION` and the init log line report `9.4.0-rigi.3`. The deck repo
 itself was not modified for this: the rewrite happens in the slim step below. The old `gitHead`,
 `scripts` and `devDependencies` fields are dropped from the packed manifests.
 
 ## Source
+
+**rigi.3 (2026-10-02, luma rigi.6 wave).** Build commit `78469b7dda30d747c35aca18d241eb7f1c393ad6` (branch
+`rigi3`, unofficial local build; bundle `~/mt-image-archive/2026-10-02-rigi6/deck-rigi3.bundle`): the rigi.2
+build commit `0c7f7cdd` plus `--no-ff` merges of
+- #10751 head `98dbf01f7` (`98dbf01f…`, "TerrainExtension: add WebGPU height-map fitting") as `8c1634dc1`. One
+  conflict, `docs/whats-new.md` (not shipped): both sides kept. It also touches core (`deck.ts`,
+  `layer-manager.ts`, `layer.ts`, `pick-layers-pass.ts`, shaderlib) and the layers' WGSL
+  (`deckgl_filter_position` hooks in arc, bitmap, column, icon, line, path, point-cloud, scatterplot,
+  solid-polygon, multi-icon, text-background), so core and layers changed;
+- #10783 head `71ffa8543` ("let TerrainExtension layers follow external terrain") as `78469b7dd`. Real
+  conflicts with #10751 in `extensions/src/terrain/{height-map-builder,shader-module,terrain-effect}.ts`:
+  resolved as the union (#10783's bounds padding before #10751's WebGPU height range, local renamed
+  `heightPadding`; both new TerrainModuleProps fields; both setup lines). Unresolved semantic gap: the WGSL
+  terrain module (#10751) has no `USE_HEIGHT_MAP_METERS` branch and encodes heights as RGBA8 float bytes,
+  so #10783's external terrain (meters in the red channel) works on WebGL only.
+`@deck.gl/extensions` is NOT vendored: nothing in the app imports TerrainExtension (see the coordinator
+README of this wave for why no layer was wired). The other vendored PR heads (#10752, #10780, #10779,
+#10778, #10782, #10753, #10776) had not moved on 2026-10-02 and are all open; deck master is `d1b0ae43`
+(docs only since the base). Not taken: #10627 (worker SplatLayer: an example under
+`examples/experimental/gaussian-splats`, not a module); #10682 (device reuse on an external `gl`: Rigi
+never passes `gl`); globe / custom projection / maplibre / pydeck / website PRs (#10670, #10697, #10698,
+#10737, #10740–#10745, #10749, #10750, #10669 …): no Rigi use. Built with `npx yarn@1.22.19 build`
+(92 s), slimmed and re-versioned exactly as below with `9.4.0-rigi.3`.
+
+### rigi.2
 
 **Re-checked 2026-10-02 (luma rigi.5 bump): no change, no rebuild.** The heads of #10752 (`0d8b1664`), #10780
 (`5b51fb26`), #10779 (`d86a3ab9`), #10778 (`2dad1145`), #10782 (`a6cfed18`), #10753 (`3a946828`) and #10776
@@ -58,11 +83,11 @@ fixes and deck PR #10780 (rigi.1), plus the five PRs below (rigi.2):
 
   Behaviour notes (rigi.2): `Deck` gains the experimental `_onFrameTimings` prop and `deck.debug` /
   `deviceProps.debug` reach the device at init (#10782: with `debug: true` the optional `@luma.gl/webgl/debug`
-  import is what actually loads the tools; Rigi never sets it). On WebGPU, 8/16-bit vertex attributes are
+  import is what actually loads the tools; since rigi.3 Rigi sets it under `?deckDebug=on`). On WebGPU, 8/16-bit vertex attributes are
   padded to 32-bit-aligned formats on upload, and an external luma `Buffer` that would need such padding
   throws instead of rendering garbage (#10753); external float64 buffers (`isDoublePrecisionBuffer`) are read
   as high parts with a shared zero low buffer (#10776); `BinaryAttribute` accepts an optional `version` for
-  invalidation (#10779). Rigi does not use these paths yet (adoption is a follow-up).
+  invalidation (#10779). Since rigi.3 Rigi wires `_onFrameTimings` (under `?gpuFrameTimings=on`, `src/lib/deck-webgpu/frame-timings.ts`) and `debug` (`?deckDebug=on`) on both engines' Deck; it has no in-place-rewritten deck binary attribute for `version` (#10779) to serve, and the #10753 / #10776 paths stay unused.
 
   All five PRs are still open upstream (#10782 is a draft). rigi.1 is composed as follows:
   - Build commit (rigi.1): `4a2223f3c993bc1c41114d33d130b05769d84672` (branch `rigi1`). It is the merge of PR #10780 on top of the WebGPU cherry-pick,
@@ -123,11 +148,11 @@ fixes and deck PR #10780 (rigi.1), plus the five PRs below (rigi.2):
 Kept from the deck repo and checked with `semver.satisfies`:
 
 - `@luma.gl/*`: `^10.0.0-alpha.2` (core's dependencies) and `~10.0.0-alpha.2` (layers' peers).
-  `10.0.0-alpha.2-rigi.5` (and `-rigi.4`, `-rigi.3`, `-rigi.2`) satisfy both: they are prereleases of `10.0.0` on the same
+  `10.0.0-alpha.2-rigi.6` (and `-rigi.5`, `-rigi.4`, `-rigi.3`, `-rigi.2`) satisfy both: they are prereleases of `10.0.0` on the same
   `[10,0,0]` tuple that sort after `alpha.2`.
 - `@math.gl/*`: `^5.0.0-alpha.9`; `5.0.0-alpha.9` and `5.0.0-alpha.10` both satisfy it.
 - `@loaders.gl/*`: `^5.0.0-alpha.7`.
-- `@deck.gl/core` in layers' `peerDependencies`: exactly `9.4.0-rigi.2`.
+- `@deck.gl/core` in layers' `peerDependencies`: exactly `9.4.0-rigi.3`.
 
 ## Licence
 
@@ -136,8 +161,8 @@ MIT, Copyright Vis.gl contributors: see `LICENSE` in this directory (verbatim fr
 ## Checksums (SHA-256)
 
 ```
-45ea4088c563159932a110ab0971926f3fe0dbbdabf835f47c5005e3466bafef  vendor/deck/deck.gl-core-9.4.0-rigi.2.tgz
-795cb898c121e77eeeccd57c2dd88bd9948a777aadeb03c76af80c28b980b1d6  vendor/deck/deck.gl-layers-9.4.0-rigi.2.tgz
+b6a8c84398793b39433bff585475d3bf29de3f31ee77e6b96fe4804c20a79f25  vendor/deck/deck.gl-core-9.4.0-rigi.3.tgz
+5aa63a8150456bdbfc3325f07579b95d5dd6fde8608bdfa8fe32e2ee301027a7  vendor/deck/deck.gl-layers-9.4.0-rigi.3.tgz
 ```
 
 ## Contents
@@ -145,7 +170,7 @@ MIT, Copyright Vis.gl contributors: see `LICENSE` in this directory (verbatim fr
 Only `dist/` (full build, used by the WebGPU lab `scripts/deck-webgpu/vite.webgpu.config.ts`),
 `dist.webgl-only/` (the `visgl:webgl-only` export condition the app's `vite.config.ts` selects),
 `package.json` and `README.md`. `src/` and all `*.map` files were stripped (and the
-`//# sourceMappingURL=` comments removed) to keep the tarballs small (core 536539 B + layers 264533 B,
+`//# sourceMappingURL=` comments removed) to keep the tarballs small (rigi.3: core 537420 B + layers 264820 B; rigi.2 had 536539 B + 264533 B,
 rigi.1 had 516450 B + 264533 B).
 
 ## Rebuild
@@ -153,6 +178,7 @@ rigi.1 had 516450 B + 264533 B).
 ```sh
 git clone https://github.com/visgl/deck.gl deck-src && cd deck-src
 git fetch origin master pull/10752/head:pr-10752 pull/10780/head:pr-10780
+# fastest for rigi.3: git fetch <archive>/2026-10-02-rigi6/deck-rigi3.bundle rigi3 (78469b7d); rigi.3 = rigi.2 + merge pr10751, pr10783 (see Source).
 # fastest for rigi.2: git fetch <archive>/deck-rigi2.bundle rigi2 and check it out (0c7f7cdd); from scratch, build rigi1 as below, then
 # git checkout -b rigi2 && for n in 10779 10778 10782 10753 10776; do git fetch origin pull/$n/head:pr$n; git merge --no-ff --no-edit pr$n; done
 # (conflicts: docs/whats-new.md both sides; deck.md, deck.ts comment and deck.spec.ts imports take master's wording + union of imports;
@@ -178,19 +204,19 @@ for m in core layers; do
   mkdir -p $B/deck-slim/$m && tar xzf $B/deck-tgz/deck.gl-$m-9.4.0-beta.4.tgz -C $B/deck-slim/$m
   (cd $B/deck-slim/$m/package && rm -rf src && find . -name '*.map' -delete \
     && grep -rl 'sourceMappingURL=' dist dist.webgl-only | xargs sed -i '' -E '/^\/\/# sourceMappingURL=.*$/d' \
-    && grep -rl '9\.4\.0-beta\.4' dist dist.webgl-only | xargs sed -i '' 's/9\.4\.0-beta\.4/9.4.0-rigi.2/g' \
+    && grep -rl '9\.4\.0-beta\.4' dist dist.webgl-only | xargs sed -i '' 's/9\.4\.0-beta\.4/9.4.0-rigi.3/g' \
     && node -e '
 const fs = require("fs");
 const p = JSON.parse(fs.readFileSync("package.json"));
-p.version = "9.4.0-rigi.2";
+p.version = "9.4.0-rigi.3";
 delete p.devDependencies; delete p.scripts; delete p.gitHead;
 for (const k of ["dependencies", "peerDependencies"]) {
-  if (p[k] && p[k]["@deck.gl/core"]) p[k]["@deck.gl/core"] = "9.4.0-rigi.2";
+  if (p[k] && p[k]["@deck.gl/core"]) p[k]["@deck.gl/core"] = "9.4.0-rigi.3";
 }
 fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n");' \
     && npm pack --ignore-scripts --pack-destination <repo>/vendor/deck)
 done
-# in <repo>: point package.json at deck.gl-{core,layers}-9.4.0-rigi.2.tgz, delete the two old tarballs, then
+# in <repo>: point package.json at deck.gl-{core,layers}-9.4.0-rigi.3.tgz, delete the two old tarballs, then
 npm install
 git diff package-lock.json            # new file: names/versions and integrity hashes
 ```

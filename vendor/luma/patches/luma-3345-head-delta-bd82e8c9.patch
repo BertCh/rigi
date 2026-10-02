@@ -1,0 +1,145 @@
+From bd82e8c9814e5996ee100e2fcde4810b76475b50 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 12:24:37 -0400
+Subject: [PATCH] rigi: move #3345 to its rebased head 1c70b5e9 (delta over the
+ merged 4cbc25d4: 'compatibility' requests default limits again,
+ 'best-available' requests adapter limits only when it cannot upgrade to core)
+
+---
+ modules/core/src/adapter/device.ts            |  2 +-
+ modules/webgpu/src/adapter/webgpu-adapter.ts  |  7 ++-
+ .../webgpu/adapter/webgpu-adapter.spec.ts     | 45 ++++++++++++-------
+ .../webgpu-compatibility-device.spec.ts       |  4 +-
+ 4 files changed, 38 insertions(+), 20 deletions(-)
+
+diff --git a/modules/core/src/adapter/device.ts b/modules/core/src/adapter/device.ts
+index 152831b4a..52a9bc7a9 100644
+--- a/modules/core/src/adapter/device.ts
++++ b/modules/core/src/adapter/device.ts
+@@ -390,7 +390,7 @@ export type DeviceProps = {
+   powerPreference?: 'default' | 'high-performance' | 'low-power';
+   /** Hints that device creation should fail if no hardware GPU is available (if the system performance is "low"). */
+   failIfMajorPerformanceCaveat?: boolean;
+-  /** WebGPU only: selects the feature/limit profile. Defaults to `'core'`; use `'max'` to request every supported adapter feature and limit, `'compatibility'` to opt into compatibility mode with every supported adapter limit, or `'best-available'` to upgrade a compatibility adapter to core when possible. */
++  /** WebGPU only: selects the feature/limit profile. Defaults to `'core'`; use `'max'` to request every supported adapter feature and limit, `'compatibility'` to use compatibility validation and default limits, or `'best-available'` to upgrade to core or request the compatibility adapter's supported limits if it cannot upgrade. */
+   featureLevel?: WebGPUFeatureLevel;
+   /** WebGPU only: additional supported device features to request without enabling the full `'max'` profile. Unsupported entries are ignored. */
+   optionalFeatures?: readonly WebGPUDeviceFeature[];
+diff --git a/modules/webgpu/src/adapter/webgpu-adapter.ts b/modules/webgpu/src/adapter/webgpu-adapter.ts
+index febad3eb2..4ce985b23 100644
+--- a/modules/webgpu/src/adapter/webgpu-adapter.ts
++++ b/modules/webgpu/src/adapter/webgpu-adapter.ts
+@@ -90,10 +90,14 @@ export function getRequiredWebGPULimits(
+  */
+ export function getRequestedWebGPULimits(
+   supportedLimits: GPUSupportedLimits,
++  supportedFeatures: GPUSupportedFeatures,
+   featureLevel: RequestedWebGPUFeatureLevel,
+   requiredLimits: DeviceProps['requiredLimits'] = {}
+ ): Record<string, number> {
+-  const adapterLimits = featureLevel === 'core' ? {} : getRequiredWebGPULimits(supportedLimits);
++  const requestsAdapterLimits =
++    featureLevel === 'max' ||
++    (featureLevel === 'best-available' && !supportedFeatures.has(CORE_FEATURES_AND_LIMITS));
++  const adapterLimits = requestsAdapterLimits ? getRequiredWebGPULimits(supportedLimits) : {};
+   return {...adapterLimits, ...requiredLimits};
+ }
+ 
+@@ -265,6 +269,7 @@ export class WebGPUAdapter extends Adapter {
+ 
+     const requiredLimits = getRequestedWebGPULimits(
+       adapter.limits,
++      adapter.features,
+       requestedFeatureLevel,
+       props.requiredLimits
+     );
+diff --git a/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts b/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts
+index 2564d5a8f..199fb29c2 100644
+--- a/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts
++++ b/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts
+@@ -42,38 +42,51 @@ it('getRequiredWebGPULimits reads non-enumerable supported limits directly', ()
+   void 0;
+ });
+ 
+-it('getRequestedWebGPULimits requests adapter limits outside the core profile', () => {
++it('getRequestedWebGPULimits keeps compatibility portable and maximizes best-available fallback', () => {
+   const supportedLimits = {
+     maxStorageBuffersInVertexStage: 10,
+     maxStorageBuffersPerShaderStage: 10,
+     maxComputeInvocationsPerWorkgroup: 1024
+   } as unknown as GPUSupportedLimits;
+ 
++  const coreFeatures = new Set(['core-features-and-limits']) as GPUSupportedFeatures;
++  const compatibilityFeatures = new Set() as GPUSupportedFeatures;
++
+   expect(
+-    getRequestedWebGPULimits(supportedLimits, 'core'),
++    getRequestedWebGPULimits(supportedLimits, coreFeatures, 'core'),
+     'core keeps the spec default limits'
+   ).toEqual({});
+   expect(
+-    getRequestedWebGPULimits(supportedLimits, 'core', {maxBufferSize: 4096}),
++    getRequestedWebGPULimits(supportedLimits, coreFeatures, 'core', {maxBufferSize: 4096}),
+     'core forwards explicit limits'
+   ).toEqual({maxBufferSize: 4096});
++  expect(
++    getRequestedWebGPULimits(supportedLimits, compatibilityFeatures, 'compatibility'),
++    'compatibility keeps compatibility default limits'
++  ).toEqual({});
+ 
+-  for (const featureLevel of ['max', 'compatibility', 'best-available'] as const) {
+-    expect(
+-      getRequestedWebGPULimits(supportedLimits, featureLevel),
+-      `${featureLevel} requests adapter limits`
+-    ).toEqual({
+-      maxStorageBuffersInVertexStage: 10,
+-      maxStorageBuffersPerShaderStage: 10,
+-      maxComputeInvocationsPerWorkgroup: 1024
+-    });
+-  }
+-
++  const expectedAdapterLimits = {
++    maxStorageBuffersInVertexStage: 10,
++    maxStorageBuffersPerShaderStage: 10,
++    maxComputeInvocationsPerWorkgroup: 1024
++  };
++  expect(
++    getRequestedWebGPULimits(supportedLimits, coreFeatures, 'max'),
++    'max requests adapter limits'
++  ).toEqual(expectedAdapterLimits);
++  expect(
++    getRequestedWebGPULimits(supportedLimits, compatibilityFeatures, 'best-available'),
++    'best-available requests adapter limits when it must stay compatibility'
++  ).toEqual(expectedAdapterLimits);
++  expect(
++    getRequestedWebGPULimits(supportedLimits, coreFeatures, 'best-available'),
++    'best-available keeps core limits after upgrading'
++  ).toEqual({});
+   expect(
+-    getRequestedWebGPULimits(supportedLimits, 'compatibility', {
++    getRequestedWebGPULimits(supportedLimits, compatibilityFeatures, 'compatibility', {
+       maxStorageBuffersInVertexStage: 4
+     }).maxStorageBuffersInVertexStage,
+-    'explicit limits override adapter limits'
++    'explicit limits override profile defaults'
+   ).toBe(4);
+ });
+ 
+diff --git a/modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts b/modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts
+index 41af9bed8..1c3cc3690 100644
+--- a/modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts
++++ b/modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts
+@@ -6,8 +6,8 @@ import {expect, it} from 'vitest';
+ import {getWebGPUTestDevice} from '@luma.gl/test-utils';
+ import type {WebGPUTexture} from '@luma.gl/webgpu';
+ 
+-it('WebGPU compatibility devices request adapter-supported limits', async () => {
+-  const device = await getWebGPUTestDevice('compatibility');
++it('WebGPU best-available fallback requests adapter-supported limits', async () => {
++  const device = await getWebGPUTestDevice('best-available');
+   if (!device || device.info.featureLevel !== 'compatibility') {
+     return;
+   }
+-- 
+2.44.0
+

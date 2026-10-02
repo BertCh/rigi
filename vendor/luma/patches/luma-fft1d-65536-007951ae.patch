@@ -1,0 +1,174 @@
+From 007951ae8c35ff087d32a0a65d49de71a49c4c15 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 12:25:59 -0400
+Subject: [PATCH] feat(gpgpu): GPUFFT1D lengths up to 65536 (block scratch
+ holds at least one transform)
+
+GPU_FFT1D_MAX_LENGTH is now 2^16, independent of the 2048 bound GPUFFT2D and GPUConvolution keep
+sharing (GPU_FFT_MAX_LENGTH). Every pass is global-memory (no workgroup storage), so the length was
+only bounded by the shared constant; the chunked path's block scratch was capped at 4096 complex
+rows, which would hold zero transforms of 8192, so it now holds max(4096, length) rows within the
+binding/buffer limits. getGPUFFTLengthReason takes an optional maxLength.
+---
+ .../experimental/gpu-core/gpu-fft1d.md          |  6 +++---
+ modules/gpgpu/src/gpu-core/gpu-fft-utils.ts     |  9 +++++----
+ modules/gpgpu/src/gpu-core/gpu-fft1d.ts         | 17 ++++++++++++-----
+ .../gpgpu/test/gpu-core/gpu-fft1d.node.spec.ts  | 17 ++++++++++++++---
+ 4 files changed, 34 insertions(+), 15 deletions(-)
+
+diff --git a/docs/api-reference/experimental/gpu-core/gpu-fft1d.md b/docs/api-reference/experimental/gpu-core/gpu-fft1d.md
+index bf0dff776..acd7bd6a1 100644
+--- a/docs/api-reference/experimental/gpu-core/gpu-fft1d.md
++++ b/docs/api-reference/experimental/gpu-core/gpu-fft1d.md
+@@ -45,7 +45,7 @@ graph.add(new GPUFFT1D({
+ ```
+ 
+ `length` is the number of complex values in each transform and must be a power of two from 2
+-through 2048. `batchCount` defaults to one. Input and output must each contain at least
++through 65536. `batchCount` defaults to one. Input and output must each contain at least
+ `length * batchCount` packed rows, use separate graph buffers, and belong to the graph passed to
+ `getCommandNodes()`.
+ 
+@@ -58,7 +58,7 @@ vec2-aligned byte offsets, and spare capacity are supported. Only the first
+ overlap. Each chunk is packed; strided and interleaved layouts remain future extensions.
+ 
+ The chunked path borrows source spans and bit-reverses them directly into algorithm scratch.
+-It never concatenates caller buffers. One or two scratch buffers hold at most 4096 complex rows,
++It never concatenates caller buffers. One or two scratch buffers hold at most 4096 complex rows (or one transform, when longer),
+ reduced to a whole number of transforms that fits the device's buffer limits. The same scratch
+ is reused across blocks, and the final butterfly writes directly to destination chunks.
+ Atomic views exceeding a binding limit use this path too; each transform must fit in scratch.
+@@ -123,6 +123,6 @@ metadata for each scratch block; routing and crossover tuning remain performance
+ 
+ - WebGPU only; no WebGL fallback.
+ - Complex `float32x2` data only.
+-- Power-of-two lengths from 2 through 2048.
++- Power-of-two lengths from 2 through 65536.
+ - Tightly packed batches and out-of-place input/output only.
+ - No hidden padding, real-input packing, submission, or readback.
+diff --git a/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts b/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts
+index 37596f61a..7541a3d6d 100644
+--- a/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts
++++ b/modules/gpgpu/src/gpu-core/gpu-fft-utils.ts
+@@ -4,7 +4,7 @@
+ 
+ /** Smallest bounded radix-2 transform length shared by GPU FFT primitives. */
+ export const GPU_FFT_MIN_LENGTH = 2;
+-/** Largest bounded radix-2 transform length shared by GPU FFT primitives. */
++/** Largest bounded radix-2 transform length shared by the 2D FFT and convolution primitives. */
+ export const GPU_FFT_MAX_LENGTH = 2048;
+ 
+ /** Transform sign and normalization convention shared by GPU FFT primitives. */
+@@ -54,13 +54,14 @@ export function makeGPUFFTPassPlan(length: number): GPUFFTPassPlan[] {
+ export function getGPUFFTLengthReason(
+   operationName: string,
+   dimensionName: string,
+-  length: number
++  length: number,
++  maxLength: number = GPU_FFT_MAX_LENGTH
+ ): string | undefined {
+   if (!Number.isInteger(length)) {
+     return `${operationName} ${dimensionName} must be an integer.`;
+   }
+-  if (length < GPU_FFT_MIN_LENGTH || length > GPU_FFT_MAX_LENGTH) {
+-    return `${operationName} ${dimensionName} must be from ${GPU_FFT_MIN_LENGTH} through ${GPU_FFT_MAX_LENGTH}.`;
++  if (length < GPU_FFT_MIN_LENGTH || length > maxLength) {
++    return `${operationName} ${dimensionName} must be from ${GPU_FFT_MIN_LENGTH} through ${maxLength}.`;
+   }
+   if ((length & (length - 1)) !== 0) {
+     return `${operationName} ${dimensionName} must be a power of two.`;
+diff --git a/modules/gpgpu/src/gpu-core/gpu-fft1d.ts b/modules/gpgpu/src/gpu-core/gpu-fft1d.ts
+index 861312ceb..368413cbb 100644
+--- a/modules/gpgpu/src/gpu-core/gpu-fft1d.ts
++++ b/modules/gpgpu/src/gpu-core/gpu-fft1d.ts
+@@ -12,7 +12,6 @@ import {getBoundedDispatchLayout, getBoundedInvocationIndexSource} from './gpu-d
+ import {
+   getGPUFFTLengthReason,
+   GPU_FFT_COMMON_SHADER_SOURCE,
+-  GPU_FFT_MAX_LENGTH,
+   GPU_FFT_MIN_LENGTH,
+   makeGPUFFTPassPlan,
+   type GPUFFTDirection,
+@@ -30,7 +29,11 @@ import {
+ /** Smallest supported transform length. */
+ export const GPU_FFT1D_MIN_LENGTH = GPU_FFT_MIN_LENGTH;
+ /** Largest supported transform length. */
+-export const GPU_FFT1D_MAX_LENGTH = GPU_FFT_MAX_LENGTH;
++/**
++ * Largest GPUFFT1D length (2^16). Every pass reads and writes global storage (no workgroup memory),
++ * so the length is bounded by buffer limits and f32 twiddle accuracy, not by the workgroup size.
++ */
++export const GPU_FFT1D_MAX_LENGTH = 65536;
+ /** Number of invocations in every FFT pass workgroup. */
+ export const GPU_FFT1D_WORKGROUP_SIZE = 256;
+ 
+@@ -48,7 +51,7 @@ export type GPUFFT1DProps = {
+   input: GraphDataView<'float32x2'> | GraphVectorView<'float32x2'>;
+   /** Packed complex destination with the same logical transforms and independent chunks. */
+   output: GraphDataView<'float32x2'> | GraphVectorView<'float32x2'>;
+-  /** Complex values per transform. Must be a power of two from 2 through 2048. */
++  /** Complex values per transform. Must be a power of two from 2 through 65536. */
+   length: number;
+   /** Number of tightly packed independent transforms. Defaults to one. */
+   batchCount?: number;
+@@ -320,7 +323,7 @@ function getFFT1DSpans<Parameters>(
+ 
+ /** Builds the immutable radix-2 plan without allocating graph or GPU resources. */
+ export function makeGPUFFT1DStats(length: number, batchCount = 1): GPUFFT1DStats {
+-  const lengthReason = getGPUFFTLengthReason('GPUFFT1D', 'length', length);
++  const lengthReason = getGPUFFTLengthReason('GPUFFT1D', 'length', length, GPU_FFT1D_MAX_LENGTH);
+   if (lengthReason) {
+     throw new Error(lengthReason);
+   }
+@@ -441,7 +444,11 @@ function getGPUFFT1DBlockCapacity(device: Device, stats: GPUFFT1DStats): number
+   return Math.min(
+     stats.elementCount,
+     Math.floor(
+-      Math.min(4096 * 8, device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize) /
++      Math.min(
++        Math.max(4096, stats.length) * 8,
++        device.limits.maxStorageBufferBindingSize,
++        device.limits.maxBufferSize
++      ) /
+         (stats.length * 8)
+     ) * stats.length
+   );
+diff --git a/modules/gpgpu/test/gpu-core/gpu-fft1d.node.spec.ts b/modules/gpgpu/test/gpu-core/gpu-fft1d.node.spec.ts
+index 647ea458d..2472ad1a2 100644
+--- a/modules/gpgpu/test/gpu-core/gpu-fft1d.node.spec.ts
++++ b/modules/gpgpu/test/gpu-core/gpu-fft1d.node.spec.ts
+@@ -30,10 +30,12 @@ it('GPUFFT1D publishes bounded batched radix-2 plans', () => {
+     workgroupSize: 256
+   });
+   expect(GPU_FFT1D_MIN_LENGTH, 'minimum length is explicit').toBe(2);
+-  expect(GPU_FFT1D_MAX_LENGTH, 'maximum length is explicit').toBe(2048);
++  expect(GPU_FFT1D_MAX_LENGTH, 'maximum length is explicit').toBe(65536);
+   expect(makeGPUFFT1DStats(2).passCount, 'minimum plan has one butterfly').toBe(2);
+-  expect(makeGPUFFT1DStats(2048).passCount, 'maximum plan has eleven butterflies').toBe(12);
+-  expect(() => makeGPUFFT1DStats(1)).toThrow(/from 2 through 2048/);
++  expect(makeGPUFFT1DStats(8192).passCount, '8192 plan has thirteen butterflies').toBe(14);
++  expect(makeGPUFFT1DStats(65536).passCount, 'maximum plan has sixteen butterflies').toBe(17);
++  expect(() => makeGPUFFT1DStats(1)).toThrow(/from 2 through 65536/);
++  expect(() => makeGPUFFT1DStats(131072)).toThrow(/from 2 through 65536/);
+   expect(() => makeGPUFFT1DStats(12)).toThrow(/power of two/);
+   expect(() => makeGPUFFT1DStats(8, 0)).toThrow(/positive integer/);
+ });
+@@ -71,6 +73,15 @@ it('GPUFFT1D support selects portable and subgroup strategies explicitly', () =>
+   ).toBe(undefined);
+ });
+ 
++it('GPUFFT1D supports transforms longer than the 4096-row block scratch', () => {
++  const support = getGPUFFT1DSupport(makeSupportDevice(), {length: 8192, batchCount: 3});
++  expect(support.supported, support.reason).toBe(true);
++  expect(support.stats?.elementCount).toBe(8192 * 3);
++  const tightDevice = makeSupportDevice({maxStorageBufferBindingSize: 8192 * 8 - 8});
++  const tightSupport = getGPUFFT1DSupport(tightDevice, {length: 8192});
++  expect(tightSupport.supported, 'one transform must fit in a storage binding').toBe(false);
++});
++
+ it('GPUFFT1D validates packed complex views, capacity, aliasing, and ownership', () => {
+   const graph = new GPUCommandGraph(makeSupportDevice());
+   const inputHandle = graph.importBuffer({
+-- 
+2.44.0
+
