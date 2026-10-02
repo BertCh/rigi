@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { storageKey } from "#/lib/ontology/core/storage";
 import {
+	clearPickerLog,
 	downloadPickerLog,
 	logPickerEvent,
 	PICKER_LOG_KEY,
@@ -31,6 +32,7 @@ beforeEach(() => {
 		setItem: (k: string, v: string) => void store.set(k, v),
 	});
 	vi.stubGlobal("window", globalThis);
+	clearPickerLog(); // the in-memory fallback is module state shared by the tests
 });
 
 describe("picker correction log", () => {

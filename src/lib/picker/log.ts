@@ -27,6 +27,8 @@ export const PICKER_LOG_MAX = 2000;
 
 /** In-memory copy: the fallback when storage throws or is corrupt, so the log still exports this page. */
 const mem: PickerLogEntry[] = [];
+/** setItem threw last time (quota / private mode): an empty store then means "not persisted", not "cleared". */
+let persistFailed = false;
 const listeners = new Set<() => void>();
 
 /** Call `fn` after every append / clear (the panel's counter). Returns the unsubscribe. */
@@ -41,7 +43,7 @@ const notify = () => {
 function read(): PickerLogEntry[] {
 	try {
 		const s = localStorage.getItem(PICKER_LOG_KEY);
-		if (s === null) return [...mem];
+		if (s === null) return persistFailed ? [...mem] : [];
 		const { entries } = parsePickerLog(JSON.parse(s));
 		return entries;
 	} catch {
@@ -64,7 +66,9 @@ export function logPickerEvent(e: PickerLogEntry): void {
 	mem.splice(0, mem.length, ...trimmed);
 	try {
 		localStorage.setItem(PICKER_LOG_KEY, JSON.stringify(trimmed));
+		persistFailed = false;
 	} catch {
+		persistFailed = true;
 		/* private mode / quota: the in-memory copy still downloads */
 	}
 	mirror(trimmed);
@@ -83,6 +87,7 @@ export function countPickerLog(): number {
 /** Forget every event (storage and memory). Never throws. */
 export function clearPickerLog(): void {
 	mem.length = 0;
+	persistFailed = false;
 	try {
 		localStorage.removeItem(PICKER_LOG_KEY);
 	} catch {
