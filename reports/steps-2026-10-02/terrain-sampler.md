@@ -152,4 +152,15 @@ The eye rule (DEM plus standing height) is also written out five times:
 
 ## 7. Landed
 
-(filled in after landing)
+- `6076dcb` U1 + U4: `heightFromTile` and the near-field uv sampler call the shared `sampleGrid` (bit-identical; specs pin it against the removed copies).
+- `b568ed0` U2: conformance spec for the CPU height samplers (interior agreement, seam clamp vs blend, missing-tile fallback). `loadScene` without the finest level pins the P1 throw.
+- `30f95bf` U3: the engines' lake floor gets the DEM at the fix (NaN when there is none), not the GPS-altitude stand-in; flag `geoLakeFloor` stays off. This is browser-unverified and has a ledger row. On rebase, master's db5b4d5 had already split out `demHere`, so the hunk reduces to the `lakeFloor` argument.
+- `68e2c99` this plan.
+
+Gates before landing (worktree, rebased on master): `npx vitest run src/lib/dem src/lib/nearfield src/lib/geocam` 636/636; `npx tsc --noEmit -p .` clean; biome clean on the 8 changed source files; `spdx` and `kernel-binding-use` PASS. The `unit` row failed only on peer and environment specs: `src/lib/upload` (Vite denies the libheif import through the symlinked `node_modules`) and the `tools/matcher` Python suites (their coloured output does not match the `OK` regex).
+
+## 8. Next steps
+
+- **One ground zoom per question.** Eye-rule landed d5cccc1 (`src/lib/geo/eye-rule.ts`, one eye rule), but its plan (`reports/steps-2026-10-02/eye-rule.md` finding 4, unit U5) notes that each consumer reads the ground at the fix from a different DEM zoom: z14 `heightFromTile` (fast horizon), z15 `terrain.sample` at `levels[0]` (baseline and unknown-pose workers), z16 NearDem (Step Inside), z17 `TerrainSet.heightAt` or the GPU gather (engines, roll). That is a sampler concern. The plan: measure the ground-at-fix spread across z14–z17 and the gather for the 12 demo and dev photos (node over the tile cache; report only). Then, if the spread exceeds the eye tolerance, give the sampler one `groundAtFix(lat, lon)` that every consumer calls (finest available zoom, with ancestor fallback). Gate: bit-identity where the zoom already matches, and the precision gate for the solve-path consumers (behind a flag).
+- P1 (baseline-pipeline pod) and P4 (dem-horizon pod) are still proposals (§5.1, §5.4). P2 waits for a flag or a byte-equality scan. P3 is mostly done by d5cccc1; the 1.6 vs 1.8 m constant is still the user's call.
+- P5: verify Mapterhorn registration and datum from its pipeline code.
