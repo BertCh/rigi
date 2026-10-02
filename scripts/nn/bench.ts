@@ -15,11 +15,6 @@ import { dawnDevice } from "./dawn";
 const device = await dawnDevice("nn-bench");
 if (!device) {
 	console.log("SKIP nn-bench: DAWN_DIR not set or no adapter");
-	{
-		// ALIKED keypoint selection: top 4096 of a 1024×768 score map (bitonic, ~78 dispatches)
-		const x = nn.fromArray(rnd(1024 * 768), [1, 1024 * 768]);
-		await time("topk 4096 of 786432", 0, 1, () => nn.topk(x, 4096).indices);
-	}
 	process.exit(0);
 }
 const F16 = process.argv.includes("--f16");
