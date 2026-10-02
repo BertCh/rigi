@@ -68,7 +68,6 @@ Libraries that parse data at run time, with their notable transitive dependencie
 
 | Package (version) | Where (file) | Licence | Notable transitive dependencies | Action |
 |---|---|---|---|---|
-| `@loaders.gl/geotiff` (5.0.0-alpha.7) | `src/lib/concord/occl/cog-loaders.ts` (`?cogReader=loaders`; default `own`) | MIT (vis.gl contributors) | `geotiff` 2.1.3 MIT; `lerc` 3.0.0 **Apache-2.0** (Esri LERC decoder; its package ships no licence file); `web-worker` 1.5.0 **Apache-2.0**; `pako` 2.2.0 MIT AND Zlib; `zstddec` 0.1.0 MIT AND BSD-3-Clause; `xml-utils` 1.10.2 CC0-1.0; `@petamoriken/float16`, `quick-lru`, `parse-headers`, `fast-xml-parser` 5.11.2 (+ `strnum`, `fast-xml-builder` …), `@math.gl/crs`, `@loaders.gl/loader-utils` / `schema` / `worker-utils`, `@probe.gl/*`: MIT | Credit Apache-2.0 components (LICENSE text) in a bundle licence report |
 | `@loaders.gl/splats` (5.0.0-alpha.7) | `src/lib/nearfield/splat-loaders-ext.ts` (SPZ / KSPLAT import) | MIT (vis.gl contributors) | `apache-arrow` 21.2.0 **Apache-2.0** (ships `NOTICE.txt`, which must travel with a distributed bundle); `flatbuffers` 25.9.23 **Apache-2.0**; `tslib` 0BSD; `@loaders.gl/compression` MIT with `fflate` 0.7.4, `fzstd` 0.1.1, `hysnappy`, `snappyjs` (MIT); `zod` 4.6.5 MIT | Reproduce the Arrow NOTICE in the credits / licence report |
 
 ## Register: vendored and bundled files (added 2026-10-01)

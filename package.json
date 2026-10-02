@@ -39,7 +39,6 @@
 		"@deck.gl/core": "file:vendor/deck/deck.gl-core-9.4.0-rigi.2.tgz",
 		"@deck.gl/layers": "file:vendor/deck/deck.gl-layers-9.4.0-rigi.2.tgz",
 		"@loaders.gl/core": "^5.0.0-alpha.7",
-		"@loaders.gl/geotiff": "^5.0.0-alpha.7",
 		"@loaders.gl/images": "^5.0.0-alpha.7",
 		"@loaders.gl/loader-utils": "^5.0.0-alpha.7",
 		"@loaders.gl/schema": "^5.0.0-alpha.7",

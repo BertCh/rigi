@@ -142,17 +142,13 @@ overlapping photos is wired into `/roll` as suggestions only, behind `?propagate
 | `?renderer=auto\|webgpu\|deck` | Engine: `auto` (default) = deck.gl on WebGPU where the browser passes the probe, else WebGL2; `webgpu` / `deck` pin one. `?webgpu=off` forces the WebGL fallback |
 | `?style=<preset>` | View style preset |
 | `?nearfield=off\|on\|sharp` | Step Inside: hide, force on (headless browsers too), or the dev-only SHARP model (research licence). Default `auto` |
-| `?gpu=off` | GPU compute kill switch (CPU twins everywhere) |
-| `?gpuHorizon=off`, `?lookgpu=off` | Turn off the GPU horizon or the GPU look passes (both on by default) |
-| `?eyesearch=on\|auto`, `?unknownGpu=on` | Opt-in GPU eye search / GPU unknown-pose horizon |
+| `?gpu=off` | GPU compute kill switch, the only GPU switch (CPU twins everywhere) |
+| `?eyesearch=on\|auto` | Opt-in GPU eye search |
 | `?reveal=off\|<preset>` | Load animation |
 | `?concord=eye,occl` | Concordance: focal-table eye prior, DSM occluder dimming |
-| `?horizonPrecision=f64`, `?alignPrecision=f64` | Opt out of the certified-f32 GPU horizon / align refine (default `certified-f32`) |
-| `?terrainGpuCull=off`, `?terrainGpuDecode=off` | WebGPU: CPU terrain culling / CPU Terrarium decode (GPU paths on by default) |
 | `?picker=on\|always` | Top-3 picker / tap-a-peak (`src/lib/picker`) |
 | `?propagate=on` | `/roll`: pose propagation suggestions (needs its service) |
 | `?tiles3d=buildings\|swisstopo\|google\|all` | 3D Tiles in Step Inside (`src/lib/tiles3d`) |
-| `?cogReader=loaders` | loaders.gl COG reader instead of the built-in one |
 
 Every flag is declared in `src/lib/flags` (typed, the only reader), carried across navigation by the root route, and settable from the photo sidebar's **Experimental & dev** section. Booleans are `on`/`off`. Harnesses override per realm with `globalThis.__RIGI_FLAGS__ = { gpu: "off", … }`.
 

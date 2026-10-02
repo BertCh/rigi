@@ -67,7 +67,6 @@ Data loaders with non-MIT pieces among their dependencies (detail in `reports/li
 
 | Package | Used for | Licence | Non-MIT dependencies |
 |---|---|---|---|
-| `@loaders.gl/geotiff` 5.0.0-alpha.7 (with `geotiff` 2.1.3) | swisstopo COG reads (`?cogReader=loaders`) | MIT, Copyright (c) vis.gl contributors | `lerc` (Apache-2.0), `web-worker` (Apache-2.0), `pako` (MIT AND Zlib), `zstddec` (MIT AND BSD-3-Clause), `xml-utils` (CC0-1.0) |
 | `@loaders.gl/splats` 5.0.0-alpha.7 | SPZ / KSPLAT splat import | MIT, Copyright (c) vis.gl contributors | `apache-arrow` (Apache-2.0, has a `NOTICE.txt` to reproduce), `flatbuffers` (Apache-2.0), `tslib` (0BSD) |
 
 ## 5. Code copied or ported from other projects
