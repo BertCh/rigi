@@ -7,8 +7,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
-// WAG W3.3 bench: autoAlign with alignPrecision "f64" (the default: GPU grid + bound-screened f64
-// refine) vs "certified-f32" (the opt-in GPU-driven refine, src/lib/gpu/align/cert-refine.ts), per dev
+// WAG W3.3 bench: autoAlign with alignPrecision "f64" (GPU grid + bound-screened f64
+// refine) vs "certified-f32" (the default GPU-driven refine, src/lib/gpu/align/cert-refine.ts), per dev
 // photo, in headless Chromium on the WebGPU engine (?renderer=webgpu, pinned).
 // Decision identity gate: for the photo's prior and `--perturb N` deterministic perturbed priors,
 // every alternative's pose (all fields) and score and the confidence of the certified result equal

@@ -47,7 +47,7 @@
  *   --perf-photos IMG_a,IMG_b,IMG_c   photos for the perf step (default: first, middle, last)
  *   --app-url http://localhost:3100   dev server (env APP_URL also works)
  *   --renderer deck|webgpu|auto       pin the engine on every /photo open (?renderer=; also passed to eval-app.mjs).
- *                                     Default: the app default. The engine that ran (__engine.kind, 'deck'; 'webgpu' when __engine.backend is 'webgpu') is
+ *                                     Default: the app default. The engine that ran ("deck"; "webgpu" when __engine.backend is 'webgpu') is
  *                                     recorded per app/perf row and evalapp row, and as `engines` on those steps.
  *   --concurrency 3                   parallel pages in the app pass
  *   --timeout-scale 1                 multiply every step timeout
@@ -1400,7 +1400,7 @@ async function loadPhoto(
 			engine: window.__engine
 				? window.__engine.backend === "webgpu"
 					? "webgpu"
-					: (window.__engine.kind ?? "unknown")
+					: "deck"
 				: null,
 			loadMs: nav?.loadEventEnd || null,
 			// responseEnd is exposed cross-origin even without Timing-Allow-Origin; transferSize is not

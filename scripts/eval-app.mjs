@@ -8,13 +8,11 @@
 // Usage: node scripts/eval-app.mjs [--renderer deck|webgpu|auto] [IMG_xxxx ...]
 // --renderer pins the engine (?renderer=; deck = WebGL deck, webgpu = deck on WebGPU, auto = WebGPU where
 // available else WebGL deck); without it the app default runs. Either way each row records the engine that
-// actually ran (__engine.kind, "deck"; "webgpu" when __engine.backend is "webgpu"; cross-checked against
+// actually ran ("deck"; "webgpu" when __engine.backend is "webgpu"; cross-checked against
 // the workspace's [data-renderer]) and the summary names it. A pinned engine that did not run fails the
 // run (webgpu falling back to WebGL deck included); auto only reports what ran.
 // webgpu / auto launch Chromium with the WebGPU flags (scripts/deck-webgpu/gpu-args.mjs).
-// --horizon-precision f64|certified-f32 and --align-precision f64|certified-f32 open the pages with
-// ?horizonPrecision= / ?alignPrecision= (opt-in certified-f32 stages; scripts/gpu/precision-gate.mjs);
-// each row then records the path the stages actually took. --json PATH also writes the rows, the raw
+// --json PATH also writes the rows, the raw
 // auto pose and the flags as JSON (stdout is unchanged).
 import fs from "node:fs";
 import path from "node:path";
@@ -28,50 +26,28 @@ const cps = JSON.parse(
 );
 const argv = process.argv.slice(2);
 let renderer = null;
-let horizonPrecision = null;
-let alignPrecision = null;
 let jsonOut = null;
 const only = [];
 for (let i = 0; i < argv.length; i++) {
 	const a = argv[i];
 	if (a === "--renderer") renderer = argv[++i];
 	else if (a.startsWith("--renderer=")) renderer = a.slice(11);
-	else if (a === "--horizon-precision") horizonPrecision = argv[++i];
-	else if (a === "--align-precision") alignPrecision = argv[++i];
 	else if (a === "--json") jsonOut = argv[++i];
 	else only.push(a);
 }
-for (const [name, v] of [
-	["--horizon-precision", horizonPrecision],
-	["--align-precision", alignPrecision],
-])
-	if (v != null && !["f64", "certified-f32"].includes(v)) {
-		console.error(`${name} must be f64 or certified-f32 (got ${v})`);
-		process.exit(2);
-	}
-const precisionSet = horizonPrecision != null || alignPrecision != null;
 if (renderer != null && !["deck", "webgpu", "auto"].includes(renderer)) {
-	console.error(
-		`--renderer must be deck, webgpu or auto (got ${renderer}; the three.js renderer was removed)`,
-	);
+	console.error(`--renderer must be deck, webgpu or auto (got ${renderer})`);
 	process.exit(2);
 }
 const params = new URLSearchParams();
 if (renderer) params.set("renderer", renderer);
-if (horizonPrecision) params.set("horizonPrecision", horizonPrecision);
-if (alignPrecision) params.set("alignPrecision", alignPrecision);
 const query = params.size ? `?${params}` : "";
 const ids = Object.keys(cps).filter((id) => !only.length || only.includes(id));
 
 const browser = await chromium.launch({
 	headless: true,
 	args:
-		renderer == null ||
-		renderer === "webgpu" ||
-		renderer === "auto" || // unset = the app default (auto)
-		// certified-f32 runs on the WebGPU compute device, on the deck renderer too
-		horizonPrecision === "certified-f32" ||
-		alignPrecision === "certified-f32"
+		renderer == null || renderer === "webgpu" || renderer === "auto" // unset = the app default (auto)
 			? GPU_ARGS
 			: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 });
@@ -95,30 +71,6 @@ await Promise.all(
 			null,
 			{ timeout: 180000 },
 		);
-		// with a precision flag: the path the certified stages took on this page's last autoAlign
-		const precision = precisionSet
-			? await page.evaluate(async () => {
-					const a = await import("/src/lib/gpu/align/index.ts").catch(
-						() => null,
-					);
-					const h = await import(
-						"/src/lib/integration/horizon-fast-app.ts"
-					).catch(() => null);
-					const t = a?.lastAlignTiming;
-					return {
-						align: t
-							? {
-									requested: t.precision ?? null,
-									refine: t.refine ?? null,
-									path: t.cert?.path ?? null,
-									reason: t.cert?.reason ?? null,
-									detail: t.cert?.detail ?? null,
-								}
-							: null,
-						horizon: h?.lastFastHorizonStats?.precision ?? null,
-					};
-				})
-			: undefined;
 		const r = await page.evaluate((cp) => {
 			const e = window.__engine;
 			const pins = e.controlPins(cp);
@@ -128,7 +80,7 @@ await Promise.all(
 			const auto = e.pose;
 			const d = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
 			return {
-				engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "unknown"),
+				engine: e.backend === "webgpu" ? "webgpu" : "deck",
 				dataRenderer:
 					document
 						.querySelector("[data-renderer]")
@@ -150,7 +102,7 @@ await Promise.all(
 				},
 			};
 		}, cps[id]);
-		rows.push({ id, ...r, ...(precision ? { precision } : {}) });
+		rows.push({ id, ...r });
 		await page.close();
 	}),
 );
@@ -192,7 +144,7 @@ if (jsonOut) {
 		jsonOut,
 		JSON.stringify(
 			{
-				flags: { renderer, horizonPrecision, alignPrecision },
+				flags: { renderer },
 				engines,
 				within1deg: ok.length,
 				scored: scored.length,

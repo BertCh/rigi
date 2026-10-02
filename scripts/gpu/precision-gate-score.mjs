@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The precision gate's scoring (scripts/gpu/precision-gate.mjs), pure and node-testable
+// The precision gate's scoring (the gate ran 2026-10-01; its browser driver was removed), pure and node-testable
 // (scripts/gpu/precision-gate.check.mjs): the identity arm (every mode of one photo ran on the same
 // page and terrain: base vs base2 = the f64 noise floor, base vs cand), the quality arm (each mode's
 // accepts against the wild set's blind verdicts) and the verdict.

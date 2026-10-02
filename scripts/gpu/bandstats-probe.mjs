@@ -17,7 +17,7 @@
 //   --export IMG_a,...     photos whose settled exportImage(false) is hashed per preset
 //   --stall N              N pose nudges per photo, timing the stats readback's main-thread cost
 //   --poses file.json      pin each photo's pose to a previous run's (pose drift is not the subject)
-//   --query k=v&...        extra URL query (e.g. lookgpu=off for the CPU stats path)
+//   --query k=v&...        extra URL query (e.g. gpu=off for the CPU stats path)
 //   --sync                 set engine.syncStats = true (the synchronous readback, patched build)
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -91,7 +91,6 @@ async function run(id) {
 	const setup = await page.evaluate(
 		async ({ pose, sync }) => {
 			const e = window.__engine;
-			if (e.kind !== "deck") throw new Error(`engine ${e.kind}`);
 			if (sync) {
 				if (!("syncStats" in e)) throw new Error("no engine.syncStats here");
 				e.syncStats = true;

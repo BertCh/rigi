@@ -328,14 +328,10 @@ async function runPhoto(id, sink) {
 				"window.__engine missing: run against the vite dev server",
 			);
 		const kind = await page.evaluate(() =>
-			window.__engine.backend === "webgpu"
-				? "webgpu"
-				: (window.__engine.kind ?? "unknown"),
+			window.__engine.backend === "webgpu" ? "webgpu" : "deck",
 		);
 		if (kind !== "deck")
-			throw new Error(
-				`renderer=deck was asked for but __engine.kind is ${kind}`,
-			);
+			throw new Error(`renderer=deck was asked for but the engine is ${kind}`);
 		plog("ready");
 
 		const waitStable = async (label) => {

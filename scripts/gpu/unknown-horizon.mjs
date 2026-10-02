@@ -15,7 +15,7 @@ import { chromium } from "playwright";
 // bench:    per ablation photo, the worker's scene (loadScene, Mapterhorn): DEM load, CPU sceneHorizon,
 //           GPU sceneHorizonGpu cold/warm, profile parity (per-azimuth elevation differences).
 // ablation: the real worker (UnknownPoseSolver, src/lib/integration/unknown-pose.ts) on each photo under
-//           five conditions, once with ?unknownGpu=off (CPU horizon) and once with ?unknownGpu=on (GPU).
+//           five conditions, once with ?gpu=off (CPU horizon) and once with ?gpu=on (GPU).
 //           Scored against the pin GT (11 photos) and data/ground-truth.json (12) as reports/bench-ablation.md:
 //           accepted at |Δyaw| < 1° = true accept, accepted at ≥ 1° = FALSE accept.
 //
@@ -99,7 +99,7 @@ try {
 		// ABL_MODES=cpu: only the CPU-horizon pass (e.g. A/B of the GPU coarse grid under with-gpu-off.mjs)
 		for (const mode of (process.env.ABL_MODES ?? "cpu,gpu").split(",")) {
 			await page.goto(
-				`${BASE}/favicon.svg?unknownGpu=${mode === "gpu" ? "on" : "off"}`,
+				`${BASE}/favicon.svg?gpu=${mode === "gpu" ? "on" : "off"}`,
 			);
 			for (const e of manifest) {
 				const t0 = Date.now();

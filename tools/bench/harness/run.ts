@@ -218,22 +218,7 @@ async function regionFor(
 
 // ---------- method A: app ----------
 
-/**
- * HARNESS_ALIGN_MODES (JSON [{name, horizonPrecision?, alignPrecision?}], optional): the app method runs
- * every mode on the same page and terrain (render_worker align "modes"); the row's top-level result is
- * the first mode's. HARNESS_SETTLE_MS: the worker waits for the terrain stream to be idle that long
- * before each mode. Used by scripts/gpu/precision-gate.mjs.
- */
-const ALIGN_MODES: { name: string }[] | null = process.env.HARNESS_ALIGN_MODES
-	? JSON.parse(process.env.HARNESS_ALIGN_MODES)
-	: null;
-const SETTLE_MS = Number(process.env.HARNESS_SETTLE_MS ?? 0);
-
 type AlignRun = {
-	/** only when the render worker runs with a precision flag (MATCHER_*_PRECISION) */
-	precision?: unknown;
-	/** the silhouette re-rank's timing and path (engine silTiming), with precision flags or modes */
-	silTiming?: unknown;
 	prior: Pose;
 	ms: number;
 	pose: Pose | null;
@@ -323,59 +308,17 @@ async function runApp(
 			adhoc,
 			priors,
 			fullTerrain: !cp.yawKnown,
-			...(ALIGN_MODES ? { modes: ALIGN_MODES, settleMs: SETTLE_MS } : {}),
 		},
 		900000,
 	);
 	const wallMs = Date.now() - t0;
 	if (!r.ok) throw new Error(r.error);
 	// a 360° search on the initial (prior-wedge) terrain is not the row we asked for: an error, not a result
-	if (!cp.yawKnown && !r.meta?.fullTerrain && !r.meta?.fullTerrainUnsupported)
+	if (!cp.yawKnown && !r.meta?.fullTerrain)
 		throw new Error("fullTerrain requested but the page did not load it");
 	const runs: AlignRun[] = r.runs;
 	const d = decideApp(runs, priors, nativeIdx, nativePrior, cp);
 	const computeMs = runs.reduce((s, x) => s + x.ms, 0);
-	const rawRuns = (xs: AlignRun[]) =>
-		xs.map((x) => ({
-			prior: x.prior,
-			pose: x.pose,
-			score: x.score,
-			confidence: x.confidence,
-			alternatives: x.alternatives,
-			precision: x.precision ?? null,
-			...(x.silTiming ? { silTiming: x.silTiming } : {}),
-		}));
-	type ModeReply = {
-		runs: AlignRun[];
-		horizon: unknown;
-		terrain: unknown;
-		terrainAfter: unknown;
-		settledMs: number;
-	};
-	const modeRows = r.modes
-		? Object.fromEntries(
-				Object.entries(r.modes as Record<string, ModeReply>).map(([k, m]) => {
-					const md = decideApp(m.runs, priors, nativeIdx, nativePrior, cp);
-					return [
-						k,
-						{
-							pose: md.pose,
-							shownPose: md.shownPose,
-							accepted: md.accepted,
-							acceptKind: md.acceptKind,
-							confidence: md.confidence,
-							native: md.native,
-							ms: m.runs.reduce((s, x) => s + x.ms, 0),
-							horizon: m.horizon,
-							terrain: m.terrain,
-							terrainAfter: m.terrainAfter,
-							settledMs: m.settledMs,
-							runs: rawRuns(m.runs),
-						},
-					];
-				}),
-			)
-		: null;
 	return {
 		pose: d.pose,
 		shownPose: d.shownPose,
@@ -400,14 +343,8 @@ async function runApp(
 		},
 		native: d.native,
 		eye: r.meta?.eye,
-		// what the page ran with (render_worker MATCHER_RENDERER / MATCHER_*_PRECISION)
+		// what the page ran with (render_worker MATCHER_RENDERER)
 		page: r.meta?.pageFlags ?? null,
-		...(r.meta?.fullTerrainUnsupported ? { fullTerrainUnsupported: true } : {}),
-		// with a precision flag: every seed's raw result and the path each certified stage took
-		// (scripts/gpu/precision-gate.mjs diffs these bit for bit)
-		...(runs.some((x) => x.precision) ? { precisionRuns: rawRuns(runs) } : {}),
-		// HARNESS_ALIGN_MODES: every mode's decision and raw runs, all on the same page and terrain
-		...(modeRows ? { modes: modeRows } : {}),
 	};
 }
 

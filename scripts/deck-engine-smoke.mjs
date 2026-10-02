@@ -23,7 +23,7 @@
 //        [--out out/lead/deck-parity/deck-engine-smoke.json] [--headed] [--renderer webgpu|auto|deck]
 // Needs the vite dev server (window.__engine is DEV-only). Exit 0 = all pass, 3 = some fail.
 // Both arms pass ?renderer= explicitly (the app default may be either) and each row records the
-// engine that actually ran ("webgpu" when __engine.backend is "webgpu", else __engine.kind, checked
+// engine that actually ran ("webgpu" when __engine.backend is "webgpu", else "deck", checked
 // against [data-renderer]); a run whose engine is not the one asked for fails (auto: whatever resolved).
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -118,8 +118,7 @@ async function run(id, renderer, refPose = null) {
 	);
 	const r = await page.evaluate(async (tp) => {
 		const e = window.__engine;
-		const engineKind =
-			e.backend === "webgpu" ? "webgpu" : (e.kind ?? "unknown");
+		const engineKind = e.backend === "webgpu" ? "webgpu" : "deck";
 		const dataRenderer =
 			document
 				.querySelector("[data-renderer]")
@@ -195,7 +194,7 @@ async function run(id, renderer, refPose = null) {
 		);
 	if (r && renderer !== "auto" && r.engineKind !== renderer)
 		throw new Error(
-			`asked for renderer=${renderer} but __engine.kind is ${r.engineKind}`,
+			`asked for renderer=${renderer} but the engine is ${r.engineKind}`,
 		);
 	return { readyMs, ...r, logs };
 }

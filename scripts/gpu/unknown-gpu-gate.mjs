@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Quality gate for ?unknownGpu (the unknown-pose 360° horizon on the GPU, gpu/horizon/scene-profile.ts
+// Quality gate for the GPU arm (?gpu=on vs ?gpu=off) of (the unknown-pose 360° horizon on the GPU, gpu/horizon/scene-profile.ts
 // and the fused horizon → solve chain, gpu/solve/fused.ts) against the CPU sceneHorizon, through the real
 // unknown-pose worker (UnknownPoseSolver, src/lib/integration/unknown-pose.ts) in headless Chromium.
 // The GPU horizon is not bit-identical to the CPU's (f32 march), so the gate is quality, not identity:
@@ -147,7 +147,7 @@ async function run() {
 				console.error(`[page ${m.type()}]`, m.text().slice(0, 300));
 		});
 		page.on("pageerror", (e) => console.error("[pageerror]", e.message));
-		await page.goto(`${base}/favicon.svg?unknownGpu=${gpu}`);
+		await page.goto(`${base}/favicon.svg?gpu=${gpu}`);
 		for (const e of list) {
 			const t0 = Date.now();
 			const res = await page.evaluate(

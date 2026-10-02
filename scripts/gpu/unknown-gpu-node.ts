@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// One arm of the ?unknownGpu gate (scripts/gpu/unknown-gpu-gate.mjs) in node, without a browser: the
+// One arm of the unknown-pose GPU gate (scripts/gpu/unknown-gpu-gate.mjs) in node, without a browser: the
 // unknown-pose worker's own scene + solve code (src/lib/integration/unknown-pose-core.ts) on a native
 // WebGPU device (Dawn, the `webgpu` npm package) adopted as the compute device. Same photos, conditions
 // and row format as the gate's browser `run`, so its `compare` scores either.
@@ -54,10 +54,6 @@ const solveGpuWanted = opt("solve-gpu", "on") === "on";
 const fusedWanted = opt("fused", "on") === "on";
 // --skyline-gpu on|off: the ?skylineGpu arm (detectSkylineAsync: GPU cost images vs the CPU detector)
 setFlagOverride("skylineGpu", opt("skyline-gpu", "off") as string);
-// --mosaic-gpu on|off: the ?mosaicGpu arm (the march's max-mip pyramid built on the GPU or the CPU)
-setFlagOverride("mosaicGpu", opt("mosaic-gpu", "on") as string);
-// --mosaic-gpu on|off: the ?mosaicGpu arm (the march's max-mip pyramid built on the GPU vs the CPU)
-setFlagOverride("mosaicGpu", opt("mosaic-gpu", "on") as string);
 const jitter = opt("horizon-jitter")?.split(":").map(Number) ?? null;
 
 /** The scene with its elevations jittered by ±amp (seeded LCG), a copy: the cached scene stays exact. */

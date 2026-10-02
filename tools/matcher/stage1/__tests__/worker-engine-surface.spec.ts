@@ -23,7 +23,6 @@ const read = (file: string) =>
 const ENGINE_MEMBERS = [
 	"loadFullTerrain",
 	"autoAlign",
-	"retraceHorizon",
 	"renderSet",
 	"horizonDirs",
 	"silTiming",

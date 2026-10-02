@@ -11,7 +11,7 @@
 //   (switch the tree, restart the dev server)
 //   … --save out/atlas/after.json
 //   node scripts/deck-webgpu/atlas-frames-check.mjs --compare out/atlas/before.json out/atlas/after.json
-// A flag A/B on one tree: --query terrainGpuDecode=on on the second run (WAG W2.3; its counters are saved).
+// A flag A/B on one tree: --query gpu=off on one run (CPU decode and cull; the GPU decode counters are saved).
 // Each run walks a fixed pose sequence per photo (/photo/<id>?renderer=webgpu): base, pans that
 // stream new tiles and grow the 256² height array (yaw +30/+60/+90/-60), back to base (the tiles
 // resident before the grow must survive it), then world mode with the imagery drape (grows the
@@ -62,9 +62,7 @@ if (process.argv.includes("--compare")) {
 		}
 		console.log(`  atlas stats (second run): ${JSON.stringify(pb.atlas)}`);
 		if (pb.gpuDecode)
-			console.log(
-				`  terrainGpuDecode (second run): ${JSON.stringify(pb.gpuDecode)}`,
-			);
+			console.log(`  GPU decode (second run): ${JSON.stringify(pb.gpuDecode)}`);
 	}
 	console.log(
 		`\n${diff ? "FAIL" : "PASS"}: ${same} poses byte-identical, ${diff} differ, ${unstable} non-deterministic (skipped)`,
@@ -73,7 +71,7 @@ if (process.argv.includes("--compare")) {
 }
 
 const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3131");
-/** extra page flags, e.g. --query terrainGpuDecode=on (WAG W2.3: the same tree, flag off vs on) */
+/** extra page flags, e.g. --query gpu=off (the same tree, GPU decode off vs on) */
 const QUERY = arg("query", "");
 const IDS = arg("photos", "IMG_7086,IMG_6958,IMG_3304").split(",");
 const SAVE = resolve(arg("save", "out/deck-webgpu/atlas-frames/run.json"));
@@ -204,12 +202,12 @@ async function runPhoto(browser, id) {
 		`${id} world      quiet=${p.isQuiet} stable=${p.stable} tiles ${p.tiles} imagery ${p.imageryLayers} ${p.hash.col.slice(0, 12)}`,
 	);
 	r.atlas = await page.evaluate(() => window.__afc.atlas());
-	// terrainGpuDecode diagnostics (deck-webgpu/terrain-gpu-decode.ts), when the module is loaded
+	// GPU terrain decode diagnostics (deck-webgpu/terrain-gpu-decode.ts), when the module is loaded
 	r.gpuDecode = await page.evaluate(() =>
 		JSON.parse(JSON.stringify(window.__rigiTerrainGpuDecode ?? null)),
 	);
 	if (r.gpuDecode)
-		console.log(`${id} terrainGpuDecode ${JSON.stringify(r.gpuDecode)}`);
+		console.log(`${id} GPU decode ${JSON.stringify(r.gpuDecode)}`);
 	await page.close();
 	return r;
 }

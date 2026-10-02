@@ -28,7 +28,7 @@ const PHOTOS = arg("photos", "IMG_7086,IMG_6958").split(",");
 const REPS = Number(arg("reps", "5"));
 const MOD = arg("module", "/src/lib/gpu/look/bench.ts");
 const FN = arg("fn", "runLookBench");
-// extra page query, e.g. "lookgpu=1&style=swiss&renderer=deck" (lookSmoke checks the hooks)
+// extra page query, e.g. "style=swiss&renderer=deck" (lookSmoke checks the hooks)
 // renderer=deck (WebGL) unless the query names one (webgpu / auto work too: captureLookInputs reads either deck engine)
 const QUERY_ARG = arg("query", "");
 const QUERY = /(^|&)renderer=/.test(QUERY_ARG)

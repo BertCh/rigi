@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Byte-compares the GPU max-mip pyramid (src/lib/gpu/horizon/mosaic-mips.ts, flag mosaicGpu) with the CPU
+// Byte-compares the GPU max-mip pyramid (src/lib/gpu/horizon/mosaic-mips.ts, default path) with the CPU
 // pyramid (horizon-fast buildMips) on a native WebGPU device in node (Dawn), on real DEM mosaics, and checks
-// that the horizon march gives identical profiles with the flag on and off.
+// that the horizon march gives identical profiles with GPU-built and CPU-supplied mips.
 //
 //   (mkdir /tmp/dawn && cd /tmp/dawn && npm i webgpu@0.3.0)   # not an app dependency
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/gpu/mosaic-mips-dawn.ts [IMG_xxxx ...] [--no-march]
@@ -17,7 +17,6 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Device } from "@luma.gl/core";
 import { MAPTERHORN } from "../../src/lib/dem";
-import { setFlagOverride } from "../../src/lib/flags";
 import { REFRACTION_K } from "../../src/lib/geodesy";
 import { adoptRenderDevice } from "../../src/lib/gpu/device";
 import {
@@ -77,7 +76,6 @@ let levels = 0;
 /** Uploads `mosaics` (no CPU mips) on the GPU and compares every level with the CPU pyramid. */
 async function compareMips(label: string, mosaics: Mosaic[]) {
 	const reference = mosaics.map((m) => gridMips(m.data, m.width, m.height));
-	setFlagOverride("mosaicGpu", "on");
 	const set = await uploadMosaics(device, mosaics);
 	for (let r = 0; r < mosaics.length; r++) {
 		const ring = set.rings[r];
@@ -177,14 +175,12 @@ for (const id of ids) {
 		noRidges: true,
 	};
 	const fresh = await loadMosaics(g.lat, g.lon, store, opts);
-	setFlagOverride("mosaicGpu", "on");
 	const on = (await computeHorizonGpu(device, fresh, [eye], mo))[0];
 	releaseHorizonGpu(fresh);
 	const cpuMips = await loadMosaics(g.lat, g.lon, store, {
 		...opts,
 		mips: true,
 	});
-	setFlagOverride("mosaicGpu", "off");
 	const off = (await computeHorizonGpu(device, cpuMips, [eye], mo))[0];
 	releaseHorizonGpu(cpuMips);
 	const same =

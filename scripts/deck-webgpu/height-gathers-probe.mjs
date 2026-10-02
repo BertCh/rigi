@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WAG W2.4 probe: what the WebGPU photo view's synchronous CPU height readers cost under flag
-// terrainGpuDecode. Per photo it loads /photo/<id>?renderer=webgpu&<query>, waits for [data-ready]
+// WAG W2.4 probe: what the WebGPU photo view's synchronous CPU height readers cost under the GPU
+// terrain decode. Per photo it loads /photo/<id>?renderer=webgpu&<query>, waits for [data-ready]
 // plus --settle ms, pans the view through a few yaws (peaks entering view), and reports the
-// terrainGpuDecode counters (tiles per path, lazy tiles materialised on the main thread and their ms),
+// GPU decode counters (tiles per path, lazy tiles materialised on the main thread and their ms),
 // the height-gather counters (GPU gathers, samples, bytes, fallbacks) and the height-atlas stats.
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/height-gathers-probe.mjs \
-//     --url http://localhost:3151 --query terrainGpuDecode=on --save out/height-gathers/on.json
+//     --url http://localhost:3151 --save out/height-gathers/on.json
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -20,7 +20,7 @@ const arg = (k, d) => {
 	return i > 0 ? process.argv[i + 1] : d;
 };
 const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3151");
-const QUERY = arg("query", "terrainGpuDecode=on");
+const QUERY = arg("query", "");
 const IDS = arg("photos", "IMG_7086,IMG_6958,IMG_3304").split(",");
 const SETTLE = Number(arg("settle", "8000"));
 const SAVE = resolve(arg("save", "out/height-gathers/probe.json"));

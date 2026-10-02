@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WAG W1.5 gate: the batched terrain's GPU cull + indirect draws (flag terrainGpuCull,
+// WAG W1.5 gate: the batched terrain's GPU cull + indirect draws (?gpu=off keeps the CPU cull,
 // layers/terrain-cull.ts) against the CPU cull (BatchedTerrainCore.visibleRows), in the real app
 // (/photo/<id>?renderer=webgpu, WebGpuEngine, terrain=batched).
 //   pixels   the same poses rendered with the CPU cull and with the GPU cull: the raw bytes of the
@@ -40,7 +40,7 @@ const INSTALL = () => {
 	const setCull = (on) => {
 		w.__RIGI_FLAGS__ = {
 			...(w.__RIGI_FLAGS__ ?? {}),
-			terrainGpuCull: on ? "on" : "off",
+			gpu: on ? "on" : "off",
 		};
 	};
 	const terrain = () => e.gpu?.terrain;
