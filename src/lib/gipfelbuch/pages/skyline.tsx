@@ -1225,7 +1225,9 @@ function HardCases() {
 			<Gallery
 				ids={HARD_SHORT.map((h) => h.id)}
 				cols={2}
-				tone={() => "failure"}
+				// hard but solved is a caution; a frame the solve rejects says so
+				tone={(d) => (d.solved.accepted ? "caution" : "failure")}
+				tag={(d) => (d.solved.accepted ? "hard" : undefined)}
 				tile={(d) => (
 					<RealPhoto
 						data={d}

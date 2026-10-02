@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import {
+	type ComponentProps,
 	type ComponentType,
 	type CSSProperties,
 	lazy,
@@ -28,6 +29,16 @@ import { type RollData, signedDegrees, useStaticJson } from "../notebook/notes";
 import { SWISS } from "../swiss/inks";
 import { Figure } from "./Figure";
 import { framedNotes } from "./live-notes";
+import {
+	COMPARE_START,
+	compareLeftSpill,
+	mirrorRevealRadius,
+	REVEAL_OPACITY_VAR,
+	REVEAL_VAR,
+	surroundFullRadius,
+	surroundRevealAt,
+	surroundRevealMasks,
+} from "./live-reveal";
 import {
 	type GipfelbuchPhotoId,
 	useGipfelbuchIndex,
@@ -445,14 +456,26 @@ const pct = (v: number) => `${(v * 100).toFixed(3)}%`;
 export function PaperSurround({
 	bake,
 	layerRef,
+	rootRef,
+	reveal = false,
 	className,
 }: {
 	bake: SurroundBake;
 	/** The inner layer, for a frame that pans its content (the topo board). */
 	layerRef?: Ref<HTMLDivElement>;
+	/** The root, which holds `--surround-left` (0..1, default 1): the left side's strength beside a wipe. */
+	rootRef?: RefObject<HTMLDivElement | null>;
+	/**
+	 * Follow a RevealLoop in the same frame: the strokes wait faint and the ruler and names hidden until
+	 * the bloom front passes, as on the landing. Unsynced (poster, print, webdriver) it is fully lit.
+	 */
+	reveal?: boolean;
 	className?: string;
 }) {
 	const { photo } = bake;
+	const ownRoot = useRef<HTMLDivElement>(null);
+	const root = rootRef ?? ownRoot;
+	useRevealSync(root, reveal, photo);
 	const fl = pct(photo.x * 0.6);
 	const fr = pct(1 - (1 - photo.x - photo.w) * 0.6);
 	const bottom = photo.y + photo.h;
@@ -460,7 +483,10 @@ export function PaperSurround({
 	const vertical = bake.fixed
 		? `linear-gradient(to bottom, transparent ${pct(photo.y)}, #000 ${pct(photo.y + 0.06)}, #000 ${pct(1 - (1 - photo.y - photo.h) * 0.6)}, transparent)`
 		: `linear-gradient(to bottom, #000 ${fb}, transparent)`;
-	const mask = `linear-gradient(to right, transparent, #000 ${fl}, #000 ${fr}, transparent), ${vertical}`;
+	// the left side's strength is `--surround-left` (site/Surround's): beside a wipe it shows only once
+	// the divider nears the far left, where the photo's left edge is the overlay too
+	const left = "rgb(0 0 0 / var(--surround-left, 1))";
+	const mask = `linear-gradient(to right, transparent, ${left} ${fl}, ${left} ${pct(photo.x)}, #000 ${pct(photo.x)}, #000 ${fr}, transparent), ${vertical}`;
 	const box: CSSProperties = bake.fixed
 		? {
 				left: `calc(50% - ${bake.fixed.w / 2}px)`,
@@ -482,8 +508,78 @@ export function PaperSurround({
 		WebkitMaskSize: "100% 100%",
 		maskMode: bake.mask ? "luminance" : "alpha",
 	};
+	// a browser without luminance masks would paint the whole fill: it shows nothing instead
+	const strokes = (opacity: string, style?: CSSProperties) => (
+		<div
+			className={cn(
+				"absolute inset-0",
+				opacity,
+				bake.mask && "hidden supports-[mask-mode:luminance]:block",
+			)}
+			style={{ ...strokeMask, ...style }}
+		/>
+	);
+	const labels = (
+		<>
+			{bake.ticks.map((t) => (
+				<span
+					key={t.x}
+					className="absolute top-0"
+					style={{ left: pct(t.x), height: pct(bake.ruler) }}
+				>
+					<span
+						className={`absolute bottom-0 w-px bg-[var(--gb-pencil,#49423d)] ${t.label ? "h-1.5" : "h-1 opacity-60"}`}
+					/>
+					{t.label && (
+						<span
+							className={cn(
+								"absolute top-0.5 -translate-x-1/2 text-[11px] leading-[12px]",
+								t.label.endsWith("°")
+									? "nb-num text-[var(--gb-secondary,#4a545c)]"
+									: "gb-caps text-[var(--gb-red)]",
+							)}
+						>
+							{t.label}
+						</span>
+					)}
+				</span>
+			))}
+			{bake.peaks.map((p) => (
+				<span
+					key={p.name}
+					className="absolute inset-y-0"
+					style={{ left: pct(p.x) }}
+				>
+					<span
+						className="absolute h-3.5 w-px bg-[var(--gb-pencil,#49423d)]"
+						style={{ top: `calc(${pct(p.y)} - 16px)` }}
+					/>
+					<span
+						className="absolute -ml-[2px] size-[4px] bg-[var(--gb-ink,#131313)]"
+						style={{ top: `calc(${pct(p.y)} - 2px)` }}
+					/>
+					<span
+						className="absolute left-1 leading-none whitespace-nowrap"
+						style={{
+							top: `calc(${pct(p.y)} - 44px)`,
+							textShadow: PAPER_HALO,
+						}}
+					>
+						<span className="gb-caps block text-[13px] leading-[14px] text-[var(--gb-ink,#131313)]">
+							{p.name}
+						</span>
+						<span className="nb-num mt-0.5 block text-[11px] leading-[12px] text-[var(--gb-secondary,#4a545c)] italic">
+							{p.ele} m · {p.km < 10 ? p.km.toFixed(1) : Math.round(p.km)} km
+						</span>
+					</span>
+				</span>
+			))}
+		</>
+	);
+	const masks = reveal ? surroundRevealMasks(surroundRevealAt(photo)) : null;
 	return (
 		<div
+			ref={root}
 			aria-hidden
 			className={cn(
 				"pointer-events-none absolute -z-10 hidden select-none md:block",
@@ -498,72 +594,126 @@ export function PaperSurround({
 			}}
 			data-testid="paper-surround"
 		>
+			{masks && <style>{REVEAL_CSS}</style>}
 			<div ref={layerRef} className="absolute inset-0">
-				<div
-					className={cn(
-						"absolute inset-0 opacity-80",
-						// a browser without luminance masks would paint the whole fill: it shows nothing instead
-						bake.mask && "hidden supports-[mask-mode:luminance]:block",
-					)}
-					style={strokeMask}
-				/>
-				{bake.ticks.map((t) => (
-					<span
-						key={t.x}
-						className="absolute top-0"
-						style={{ left: pct(t.x), height: pct(bake.ruler) }}
-					>
-						<span
-							className={`absolute bottom-0 w-px bg-[var(--gb-pencil,#49423d)] ${t.label ? "h-1.5" : "h-1 opacity-60"}`}
-						/>
-						{t.label && (
-							<span
-								className={cn(
-									"absolute top-0.5 -translate-x-1/2 text-[11px] leading-[12px]",
-									t.label.endsWith("°")
-										? "nb-num text-[var(--gb-secondary,#4a545c)]"
-										: "gb-caps text-[var(--gb-red)]",
-								)}
-							>
-								{t.label}
-							</span>
-						)}
-					</span>
-				))}
-				{bake.peaks.map((p) => (
-					<span
-						key={p.name}
-						className="absolute inset-y-0"
-						style={{ left: pct(p.x) }}
-					>
-						<span
-							className="absolute h-3.5 w-px bg-[var(--gb-pencil,#49423d)]"
-							style={{ top: `calc(${pct(p.y)} - 16px)` }}
-						/>
-						<span
-							className="absolute -ml-[2px] size-[4px] bg-[var(--gb-ink,#131313)]"
-							style={{ top: `calc(${pct(p.y)} - 2px)` }}
-						/>
-						<span
-							className="absolute left-1 leading-none whitespace-nowrap"
+				{masks ? (
+					<>
+						{/* waiting: the strokes faint, the ruler and names hidden */}
+						{strokes("opacity-20")}
+						{/* lit behind the front, fading with a replay */}
+						<div
+							className="absolute inset-0"
 							style={{
-								top: `calc(${pct(p.y)} - 44px)`,
-								textShadow: PAPER_HALO,
+								opacity: `var(${REVEAL_OPACITY_VAR}, 1)`,
+								maskImage: masks.fill,
+								WebkitMaskImage: masks.fill,
 							}}
 						>
-							<span className="gb-caps block text-[13px] leading-[14px] text-[var(--gb-ink,#131313)]">
-								{p.name}
-							</span>
-							<span className="nb-num mt-0.5 block text-[11px] leading-[12px] text-[var(--gb-secondary,#4a545c)] italic">
-								{p.ele} m · {p.km < 10 ? p.km.toFixed(1) : Math.round(p.km)} km
-							</span>
-						</span>
-					</span>
-				))}
+							{strokes("opacity-80")}
+							{labels}
+						</div>
+						{/* the front band: full ink where it passes (paper has no screen blend to brighten) */}
+						<div
+							className="absolute inset-0"
+							style={{
+								opacity: `var(${REVEAL_OPACITY_VAR}, 1)`,
+								maskImage: masks.front,
+								WebkitMaskImage: masks.front,
+							}}
+						>
+							{strokes("opacity-100")}
+						</div>
+					</>
+				) : (
+					<>
+						{strokes("opacity-80")}
+						{labels}
+					</>
+				)}
 			</div>
 		</div>
 	);
 }
+
+/**
+ * Mirrors a RevealLoop's bloom (its `--rigi-reveal` / `--rigi-reveal-opacity`, written on its own
+ * frame) onto a PaperSurround in the same plate, so the margin's front is the photo's front. One
+ * MutationObserver on the plate; no React render per tick. Once the photo rests lit, a wide surround
+ * eases on to its own full radius over `settle` (a registered `--gb-reveal`, transitioned).
+ */
+function useRevealSync(
+	root: RefObject<HTMLDivElement | null>,
+	on: boolean,
+	photo: SurroundBake["photo"],
+) {
+	useEffect(() => {
+		const el = root.current;
+		const plate = el?.parentElement;
+		if (!on || !el || !plate || typeof MutationObserver === "undefined") return;
+		const full = surroundFullRadius(photo);
+		let lastR = "";
+		let lastO = "";
+		let watched: HTMLElement | null = null;
+		const copy = () => {
+			const loop = watched;
+			if (!loop) return;
+			const r = Number.parseFloat(loop.style.getPropertyValue("--rigi-reveal"));
+			const o = loop.style.getPropertyValue("--rigi-reveal-opacity");
+			if (Number.isFinite(r)) {
+				const { radius, settle } = mirrorRevealRadius(r, full);
+				const value = `${radius}%`;
+				if (value !== lastR) {
+					lastR = value;
+					// the settle transition is on only for the step past the photo's rest
+					el.toggleAttribute("data-gb-reveal-settle", settle);
+					el.style.setProperty(REVEAL_VAR, value);
+				}
+			}
+			if (o && o !== lastO) {
+				lastO = o;
+				el.style.setProperty(REVEAL_OPACITY_VAR, o);
+			}
+		};
+		// without a RevealLoop (gone, or not yet mounted) the margin is fully lit: the vars' fallback
+		const unsync = () => {
+			lastR = "";
+			lastO = "";
+			el.removeAttribute("data-gb-reveal-settle");
+			el.style.removeProperty(REVEAL_VAR);
+			el.style.removeProperty(REVEAL_OPACITY_VAR);
+		};
+		// watch the plate's children until the (lazy) RevealLoop mounts, then only its frame's style
+		const onStyle = new MutationObserver(copy);
+		const watch = () => {
+			const loop = plate.querySelector<HTMLElement>(
+				'[data-testid="reveal-loop"]',
+			);
+			if (loop === watched) return;
+			onStyle.disconnect();
+			watched = loop;
+			if (loop)
+				onStyle.observe(loop, { attributes: true, attributeFilter: ["style"] });
+			else unsync();
+			copy();
+		};
+		const onMount = new MutationObserver(watch);
+		onMount.observe(plate, { subtree: true, childList: true });
+		watch();
+		return () => {
+			onMount.disconnect();
+			onStyle.disconnect();
+			unsync();
+		};
+	}, [root, on, photo]);
+}
+
+/**
+ * Registers `--gb-reveal` so it can ease (settle 620, EASE.out) past the photo's rest. Rendered with
+ * each reveal surround; repeated identical @property rules are harmless, and without @property the
+ * step past the rest snaps instead.
+ */
+const REVEAL_CSS = `@property ${REVEAL_VAR}{syntax:'<percentage>';inherits:true;initial-value:999%}
+[data-gb-reveal-settle]{transition:${REVEAL_VAR} 620ms cubic-bezier(0.33,1,0.68,1)}`;
 
 // ---- shared posters ---------------------------------------------------------------------------
 
@@ -707,7 +857,8 @@ export function LiveReveal({
 			date={date}
 			spill={spill}
 			className={className}
-			surround={<PaperSurround bake={set.bake} />}
+			// the margins bloom with the photo: the same front, from the same centre
+			surround={<PaperSurround bake={set.bake} reveal />}
 			notes={
 				notes ?? [
 					{
@@ -763,6 +914,7 @@ export function LiveCompare({
 }: FigureProps & { photoId?: LiveRevealId }) {
 	const set = LIVE_REVEAL_SETS[photoId];
 	const claim = usePhotoClaim(photoId, "Drag to compare.");
+	const surroundRef = useRef<HTMLDivElement>(null);
 	return (
 		<LivePlate
 			title={title}
@@ -774,7 +926,7 @@ export function LiveCompare({
 			motion="still"
 			spill={spill}
 			className={className}
-			surround={<PaperSurround bake={set.bake} />}
+			surround={<PaperSurround bake={set.bake} rootRef={surroundRef} />}
 			notes={
 				notes ?? [
 					{ text: "as taken", at: [0.2, 0.6], side: "left" },
@@ -790,7 +942,8 @@ export function LiveCompare({
 			}
 		>
 			{() => (
-				<SiteCompare
+				<CompareWithSides
+					surround={surroundRef}
 					before={set.photo}
 					after={set.overlay}
 					beforeSet={set.photoSet}
@@ -802,6 +955,43 @@ export function LiveCompare({
 			)}
 		</LivePlate>
 	);
+}
+
+/**
+ * site/Compare with the paper surround's left side following the divider, as on the landing hero:
+ * hidden at the start (the photo's left edge is the bare photo), shown near the far left. The poster
+ * (all overlay) leaves the var unset, so both sides show there.
+ */
+function CompareWithSides({
+	surround,
+	...props
+}: ComponentProps<typeof SiteCompare> & {
+	surround: RefObject<HTMLDivElement | null>;
+}) {
+	const moved = useRef<((v: number) => void) | undefined>(undefined);
+	useEffect(() => {
+		const el = surround.current;
+		if (!el) return;
+		let v = COMPARE_START;
+		const show = () =>
+			el.style.setProperty("--surround-left", String(compareLeftSpill(v)));
+		moved.current = (next) => {
+			v = next;
+			show();
+		};
+		// print shows the poster (all overlay), so both sides show there
+		const lift = () => el.style.removeProperty("--surround-left");
+		show();
+		window.addEventListener("beforeprint", lift);
+		window.addEventListener("afterprint", show);
+		return () => {
+			moved.current = undefined;
+			window.removeEventListener("beforeprint", lift);
+			window.removeEventListener("afterprint", show);
+			lift();
+		};
+	}, [surround]);
+	return <SiteCompare {...props} onMove={(v) => moved.current?.(v)} />;
 }
 
 /** The sample roll draped on live 3D terrain (site/LiveRollMap), its contour sides inked brown. */

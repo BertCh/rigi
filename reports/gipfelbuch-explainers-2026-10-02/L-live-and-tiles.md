@@ -81,8 +81,9 @@ On the landing, the side strokes wait faint (25 %) and the summit names wait hid
   - The front band is `brightness` on paper, which darkens nothing. Use the contour ink at full opacity in place of the landing's `brightness(1.8)` + `screen`.
 - RevealLoop writes `--rigi-reveal` and `--rigi-reveal-opacity` on its own frame when it has no surround, and pod L does not edit `site/**`.
   - `LiveReveal` therefore mirrors the two vars from `[data-testid=reveal-loop]` onto the plate frame with one `MutationObserver` on the `style` attribute. That is no React render per tick.
-  - It copies `--rigi-reveal-opacity` as is. It maps `--rigi-reveal` from the photo's ellipse to the surround's. The radius in % is the same physical front in both, since `revealAt` scales the ellipse with the canvas.
-  - When RevealLoop settles on its full radius, the surround goes to its own full radius, so the far corners light too.
+  - It copies `--rigi-reveal-opacity` as is, and copies `--rigi-reveal` unchanged while the bloom runs. A radius in % is the same physical front in both, since the ellipse scales with the canvas.
+  - RevealLoop stops at 135 % (photo lit). That already lights demo-01's whole margin. demo-09's wider surround needs 147.9 %, so once the photo rests, the margin eases on to its own full radius over `settle` 620 with `EASE.out`. That uses a registered `@property --gb-reveal`, with the transition switched on only for that step. Both values are pinned in `live-reveal.spec.ts`.
+  - The vars are the surround's own (`--gb-reveal`, `--gb-reveal-opacity`), so nothing outside the plate reads them.
 - **Static.** With no var (poster, webdriver, print, reduced motion before mount), the masks fall back to fully lit: `var(--rigi-reveal, 999%)` and `var(--rigi-reveal-opacity, 1)`.
 
 ### 3.3 Compare-synced surround (`LiveCompare`)
@@ -112,6 +113,7 @@ As on the landing hero, the left side's spill shows only when the divider is nea
   - On a phone (one column) nothing changes.
 - **Motion that explains.** The order is 1 → 2 → 3, the step order. Nothing loops.
 - **Static.** Reduced motion, webdriver and print show every step at once.
+- **No double fade** (grammar §1.4). A Trio rendered inside a `Figure` that already fades skips its own entrance.
 
 ### 4.2 Gallery
 - Tiles enter with the section (no per-tile animation): a grid of 4–12 photos staggering in would be decoration.
@@ -124,6 +126,8 @@ As on the landing hero, the left side's spill shows only when the divider is nea
 - **Mount.** Near the viewport (margin 400 for the engines, `MOTION.nearMargin` 600 where a plate is the sheet's first figure). Poster → engine crossfade 700.
 - **Reveal.** The landing's arm (0.75) and reset (0.2), lead 80, sweep 4200 on `1-(1-t)^3`, a replay fade of 450 and a hover replay at 350. The surround follows it (§3.2). On a phone, a tap replays it (grammar §4).
 - **Compare.** No auto-sweep (landing). It starts at 0.42, and the left side follows the divider (§3.3).
+  - `LiveCompare` is `site/Compare`. It is a different component from pod C's `Compare` in `viz/explain.tsx`, which plays a `once` guess → split script.
+  - The difference is deliberate: pod L cannot edit `site/**`, and a live plate is the landing's beat. The browser pass should not flag it.
 - **Drape, step and panorama.** The engine's own motion. The line art ink follows `--rigi-paper` = contour, and it is re-read on a theme change.
 - **Notes.** The leaders draw on once the plate is armed, one after another. The notes fade in after their leader.
 
@@ -134,13 +138,19 @@ As on the landing hero, the left side's spill shows only when the divider is nea
 | `result` | The solver accepted this photo (a pose was shown) | ✓ result | none |
 | `failure` | The solver refused or rejected it (no pose shown) | ✗ failure | "rejected" by default, or the page's word for the refusal ("guess", "ask") |
 | `neutral` | No verdict on this figure | none | none |
-| `caution` (new) | Solved, but this tile shows the thing that went wrong or is hard (altitude off, a hard skyline, low score) | ! check | The page's word, **required** (for example "240 m off", "hard", "0.41") |
+| `caution` (new) | Solved, but this tile shows the thing that went wrong or is hard (altitude off, a hard skyline) | ! check, in `--gb-contour` (6:1 on paper; the signal amber is about 2:1) | The page's word, **required**, for example "240 m off" or "hard". It falls back to "check". |
+
+The rule: **the tone is decided per tile from the solver's own verdict** (`d.solved.accepted`), never set to a constant for a whole gallery.
+- A tile the solver rejected is always `failure`.
+- `result` is used only where the figure is about the solver's outcome.
 
 Pages:
-- photo, skyline and pose-estimate move from `failure` to `caution` with their own word.
-- dem-horizon, photo and viewport-inference move "accepted" from `neutral` to `result`.
-- viewport-inference's second solver is `caution` with "2nd solver".
-- accept-rule drops its own chip, and its `tag` keeps "guess".
+- photo (altitude check): more than 200 m off becomes `caution` with "N m off". Every other tile is `neutral`, because an altitude figure gives no solver verdict.
+- skyline (hard frames): accepted is `caution` "hard"; rejected (demo-11) is `failure`.
+- pose-estimate (refused frames): rejected is `failure` ("rejected"); accepted is `caution` with its confidence.
+- viewport-inference: accepted goes from `neutral` to `result`. The second solver is `caution` "2nd solver", and the duplicate words leave its label.
+- dem-horizon (misses): unchanged, accepted `neutral`. The figure is about bad columns, not the verdict, so a green "result" there would be noise (found in review).
+- accept-rule: its own chip is dropped, and its `tag` keeps "guess".
 
 ## 6. Static, print, reduced motion, webdriver, phone
 
@@ -196,4 +206,7 @@ Specs (Vitest, node), round 1:
 
 | Round | sha | What |
 | --- | --- | --- |
-| 0 | (this commit) | live.tsx `spill` opt-out on compare, step and panorama, which also drops notes that point into an undrawn spill (`live-notes.ts` + spec); camera-roll's second GPU plate removed; stale comments corrected |
+| 0 | bde80ce | live.tsx `spill` opt-out on compare, step and panorama, which also drops notes that point into an undrawn spill (`live-notes.ts` + spec); camera-roll's second GPU plate removed; stale comments corrected |
+| 1 | (this commit) | Reveal-synced paper surround (`useRevealSync`, `live-reveal.ts` + spec), compare-synced left side (`CompareWithSides`, print shows both sides); Trio subgrid row band and motion tokens; Gallery `caution` tone and one vocabulary (`tiles.ts` + spec); page tones per tile; step-inside Numbers sourced (the "60 fps" claim, which no file backs, is replaced by the bake's splat count) |
+
+Round 1 review (an independent Sonnet) found no blockers. It found three tone slips, where a constant `caution` or `result` was applied to rejected or off-topic tiles; all three are fixed per tile. It also made three nits: the print state of the left side, a per-tick `querySelector`, and a misleading comment. Not taken: the three stroke layers in reveal mode decode the WebP mask once but paint it three times, which matches the landing's `SurroundLayer`.

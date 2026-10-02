@@ -2234,17 +2234,19 @@ function Verdicts() {
 					!d.solved.accepted
 						? "failure"
 						: d.solved.stage === "refine"
-							? "neutral"
+							? "caution"
 							: "result"
+				}
+				tag={(d) =>
+					d.solved.accepted && d.solved.stage === "refine"
+						? "2nd solver"
+						: undefined
 				}
 				label={(d) => (
 					<>
-						{d.id.slice(-2)}
-						{d.solved.accepted && d.solved.stage === "refine"
-							? " · 2nd solver"
-							: ""}{" "}
-						· {sgn(d.solved.delta.yaw)}° · {d.residual.prior.median.toFixed(0)}{" "}
-						→ {d.residual.solved.median.toFixed(1)} px
+						{d.id.slice(-2)} · {sgn(d.solved.delta.yaw)}° ·{" "}
+						{d.residual.prior.median.toFixed(0)} →{" "}
+						{d.residual.solved.median.toFixed(1)} px
 					</>
 				)}
 			/>

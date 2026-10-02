@@ -1772,12 +1772,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						value: "150 m",
 						label: "near radius, beyond which only terrain is drawn",
 					},
-					{ value: "60 fps", label: "with 200 000 points on screen" },
+					{ value: "17 835", label: "splats rebuilt from the one demo photo" },
 					{
 						value: "15 %",
 						label: "of ground smear removed; the goal was 80 %",
 					},
 				]}
+				source="Radius: DEFAULT_SPLIT in src/lib/nearfield/controller.ts. Splats: public/demo/step/scene.json (IMG_7086). Smear: tools/nearfield/smear/REPORT.txt, deck renderer, 14 hand-labelled photos."
 			/>
 
 			<Details>

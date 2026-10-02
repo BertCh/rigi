@@ -25,6 +25,7 @@ import { FigureSkeleton } from "./FigureSkeleton";
 import { HandFrame, HandLoop, HandSideRule, HandUnderline } from "./hand";
 import { useInView, useReducedMotion } from "./hooks";
 import { dashFor, inkFor, layerOfColor, type PhotoLayer } from "./inks";
+import { EASE, MOTION, stagger } from "./motion";
 import {
 	CrispLine,
 	GIPFELBUCH_PHOTO_IDS,
@@ -46,6 +47,13 @@ import {
 	useSequenceMotion,
 } from "./sequence";
 import { SpillSideContext, useAlignmentStory } from "./story";
+import {
+	type GalleryTone,
+	galleryVerdict,
+	TONE_TAG,
+	toneGlyph,
+	trioClasses,
+} from "./tiles";
 
 // Layout effect on the client (the wipe repaints before paint), plain effect on the server.
 const useIsomorphicLayoutEffect =
@@ -695,13 +703,14 @@ export function Trio({
 	className?: string;
 }) {
 	const [ref, on] = useInView();
+	const c = trioClasses(steps.length);
 	return (
 		<div
 			ref={ref}
 			className={cn(
 				// the wide figure track (as Figure): three visuals need ~240 px each to keep labels legible
-				"my-6 grid gap-4 lg:mr-[calc(-66.667%-16px)]",
-				steps.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3",
+				"my-6 lg:mr-[calc(-66.667%-16px)]",
+				c.grid,
 				className,
 			)}
 		>
@@ -709,17 +718,23 @@ export function Trio({
 				<div
 					key={s.title}
 					className={cn(
-						"flex flex-col transition duration-700 motion-reduce:transition-none",
+						c.step,
+						"transition-[opacity,translate] motion-reduce:transition-none",
 						on
 							? "translate-none opacity-100"
 							: "translate-y-4 opacity-0 print:translate-y-0 print:opacity-100",
 					)}
-					style={{ transitionDelay: `${n * 120}ms` }}
+					style={{
+						// MOTION.enter, EASE.enter, MOTION.stagger per step; the rise is 16 px (translate-y-4)
+						transitionDuration: `${MOTION.enter}ms`,
+						transitionTimingFunction: EASE.enter,
+						transitionDelay: `${stagger(n)}ms`,
+					}}
 				>
-					<div className="overflow-hidden">
+					<div className={c.visual}>
 						<NoImprint>{s.visual}</NoImprint>
 					</div>
-					<div className="mt-3 flex items-start gap-2">
+					<div className={cn(c.text, "flex items-start gap-2")}>
 						<StepNumber value={String(n + 1)} />
 						<div>
 							<div className="nb-hand pt-0.5 text-[21px] leading-[24px] font-bold text-[var(--gb-ink)]">
@@ -781,7 +796,8 @@ export function Gallery({
 	tone?: (d: GipfelbuchPhotoData) => GalleryTone;
 	/**
 	 * The verdict written on the tile, circled: "rejected" by default for a `failure` tone. Return a word
-	 * ("ask", "refused", ...) to override it, or undefined for none (a non-failure tone draws no mark).
+	 * ("ask", "refused", ...) to override it. A `caution` tone needs its word ("240 m off", "hard"; it falls
+	 * back to "check"). Result and neutral tones draw no mark.
 	 */
 	tag?: (d: GipfelbuchPhotoData) => string | undefined;
 	cols?: 2 | 3 | 4;
@@ -810,23 +826,8 @@ export function Gallery({
 	);
 }
 
-export type GalleryTone = "result" | "failure" | "neutral";
-
-const TONE_TAG: Record<GalleryTone, { text: string; color: string } | null> = {
-	result: { text: "result", color: "var(--gb-forest)" },
-	failure: { text: "failure", color: "var(--gb-red)" },
-	neutral: null,
-};
-
-/** The circled hand tag drawn on a tile: a failure tone says "rejected" (or the caller's word); other tones only an explicit word. */
-export function galleryVerdict(
-	tone: GalleryTone,
-	word?: string,
-): { text: string; color: string } | undefined {
-	if (tone === "failure")
-		return { text: word ?? "rejected", color: "var(--gb-red)" };
-	return word ? { text: word, color: "var(--gb-pencil)" } : undefined;
-}
+export type { GalleryTone };
+export { galleryVerdict };
 
 function GalleryTile({
 	id,
@@ -859,7 +860,7 @@ function GalleryTile({
 							{verdict.text}
 							<HandLoop
 								seed={`gallery-verdict-${id}`}
-								color={kind === "failure" ? "red" : "pencil"}
+								color={verdict.color}
 								width={1.5}
 								inset={-2}
 							/>
@@ -874,15 +875,15 @@ function GalleryTile({
 					className="gb-caps relative mt-2 inline-block text-[13px] leading-[16px]"
 					style={{ color: tag.color }}
 				>
-					{tag.text === "result" ? "✓ " : "✗ "}
+					{toneGlyph(kind)}
 					{tag.text}
 					<HandUnderline
 						seed={`gallery-${id}-${tag.text}`}
 						color={tag.color}
 						width={1.3}
 						coverage={1}
-						double={tag.text === "result"}
-						wavy={tag.text === "failure"}
+						double={kind === "result"}
+						wavy={kind === "failure"}
 						offset={-3}
 					/>
 				</p>

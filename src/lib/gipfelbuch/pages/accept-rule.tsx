@@ -1493,21 +1493,11 @@ function Verdicts() {
 			<Gallery
 				cols={4}
 				tile={(d) => (
-					<div className="relative">
-						<RealPhoto
-							data={d}
-							layers={["skyline", "solved"]}
-							crop={skylineBand(d, 260)}
-						/>
-						<span
-							className={`absolute top-1 left-1 px-1 font-mono ${TYPE.micro} text-[var(--gb-paper)]`}
-							style={{
-								background: d.solved.accepted ? "var(--gb-ink)" : SWISS.red,
-							}}
-						>
-							{d.id.slice(-2)} · {d.solved.accepted ? "accepted" : "guess"}
-						</span>
-					</div>
+					<RealPhoto
+						data={d}
+						layers={["skyline", "solved"]}
+						crop={skylineBand(d, 260)}
+					/>
 				)}
 				tone={(d) => (d.solved.accepted ? "result" : "failure")}
 				tag={(d) => (d.solved.accepted ? undefined : "guess")}

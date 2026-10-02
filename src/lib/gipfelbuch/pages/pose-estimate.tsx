@@ -1934,7 +1934,11 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 							crop={skylineBand(d)}
 						/>
 					)}
-					tone={() => "failure"}
+					// both refused: the solver's own verdict, its reason in the label
+					tone={(d) => (d.solved.accepted ? "caution" : "failure")}
+					tag={(d) =>
+						d.solved.accepted ? d.solved.confidence.toFixed(2) : undefined
+					}
 					label={(d) => (
 						<>
 							{d.id.slice(-2)} · confidence {d.solved.confidence.toFixed(2)},

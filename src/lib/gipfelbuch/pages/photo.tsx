@@ -1024,8 +1024,10 @@ function AltitudeCheck() {
 				ids={ALT_IDS}
 				cols={4}
 				tone={(d) =>
-					Math.abs(d.gps.alt - d.gps.ground) > 200 ? "failure" : "neutral"
+					// an altitude check: no solver verdict on the tiles whose fix agrees
+					Math.abs(d.gps.alt - d.gps.ground) > 200 ? "caution" : "neutral"
 				}
+				tag={(d) => `${Math.round(Math.abs(d.gps.alt - d.gps.ground))} m off`}
 				tile={(d) => (
 					<div className="overflow-hidden">
 						<RealPhoto data={d} layers={[]} crop={ridgeCrop(d)} />
@@ -1037,14 +1039,7 @@ function AltitudeCheck() {
 						<span className="gb-num text-[12px]">
 							<span className="gb-ink">{d.id.slice(-2)}</span>
 							{" · "}
-							<span
-								className={
-									Math.abs(diff) > 200 ? "font-bold text-[var(--gb-red)]" : ""
-								}
-							>
-								{signed(diff, 0)} m
-							</span>
-							{" · ±"}
+							{signed(diff, 0)} m{" · ±"}
 							{d.gps.hAccuracy.toFixed(0)} m fix
 						</span>
 					);
