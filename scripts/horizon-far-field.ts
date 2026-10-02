@@ -81,7 +81,8 @@ for (const [id, g] of Object.entries(gt)) {
 	let dK = 0;
 	for (let i = 0; i < base.elevation.length; i++) {
 		const az = i * STEP;
-		if (Math.abs(((az - g.yaw + 540) % 360) - 180) > hfov / 2) continue;
+		if (Math.abs(((((az - g.yaw) % 360) + 540) % 360) - 180) > hfov / 2)
+			continue;
 		n++;
 		if (base.distance[i] > APP_CAP) beyond++;
 		dCap = Math.max(dCap, base.elevation[i] - capped.elevation[i]);

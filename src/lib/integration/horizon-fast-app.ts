@@ -259,12 +259,15 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 				});
 				if (o.signal?.aborted)
 					throw new DOMException("Horizon disposed", "AbortError");
+				// the worker is gone (failure or dispose): stop posting, and let the remaining fetches drain
+				if (terminated) return;
 				post(
 					{ type: "tile", key, source: r?.source ?? null, buf: r?.buf ?? null },
 					r ? [r.buf] : [],
 				);
 			}),
 		);
+		if (terminated) return;
 		post({
 			type: "build",
 			lat: o.lat,

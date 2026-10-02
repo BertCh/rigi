@@ -247,6 +247,18 @@ describe("startFastHorizon", () => {
 		h.dispose();
 	});
 
+	it("no tile is posted to the worker after a dispose during tile fetching", async () => {
+		let h: ReturnType<typeof startFastHorizon> | undefined;
+		mocks.fetchDemBytes.mockImplementation(async (key) => {
+			h?.dispose();
+			return { source: key, buf: new ArrayBuffer(1) };
+		});
+		h = startFastHorizon({ lat: 1, lon: 2 });
+		await flush();
+		expect(worker().terminated).toBe(true);
+		expect(worker().types()).toEqual(["spans"]);
+	});
+
 	it("fail() terminates the worker and rejects every waiter", async () => {
 		const h = startFastHorizon({ lat: 1, lon: 2 });
 		const p = h.dirs(7);

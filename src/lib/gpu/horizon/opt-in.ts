@@ -19,7 +19,9 @@ export function gpuHorizonOptIn(): boolean {
 /**
  * Precision of the worker's tan → degrees and ENU stages (README.md "Certified f32"): the certified GPU
  * stages (?horizonPrecision=certified-f32, the default since 2026-10-01) while the GPU march is on, else
- * "f64" (?horizonPrecision=f64, the CPU). Both are bit-identical by certificate (README "Certified f32"), with random spot checks.
+ * "f64" (?horizonPrecision=f64, the CPU). Wherever its certificate holds, a certified output has the f64 stage's
+ * bits; uncertified outputs are recomputed in f64, and the soundness is checked by the node check and random
+ * spot checks (README "Certified f32"). This is about the post stages only: the march itself is not bit for bit.
  */
 export function horizonPrecisionOptIn(): HorizonPrecision {
 	return getFlag("horizonPrecision") === "certified-f32" && gpuHorizonOptIn()
