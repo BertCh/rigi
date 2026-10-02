@@ -33,11 +33,11 @@ const fmtDt = (s: number) =>
 			: `${(s / 3600).toFixed(1)} h`;
 
 const STATUS_CLASS: Record<string, string> = {
-	suggested: "bg-sky-400/20 text-sky-200",
+	suggested: "bg-sky-400/20 text-sky-200 light:text-[var(--rigi-glow)]",
 	rejected: "bg-white/10 text-white/60",
 	skipped: "bg-white/5 text-white/40",
-	error: "bg-red-400/15 text-red-200",
-	running: "bg-amber-300/20 text-amber-100",
+	error: "bg-red-400/15 text-red-200 light:text-[var(--rigi-trap)]",
+	running: "bg-amber-300/20 text-amber-100 light:text-[var(--rigi-lesson)]",
 	queued: "bg-white/5 text-white/45",
 };
 
@@ -133,7 +133,7 @@ export function PropagatePanel({
 
 	return (
 		<aside
-			className="fixed top-36 right-3 z-40 w-[380px] max-w-[calc(100vw-24px)] rounded-xl bg-[#15181c]/95 text-[11.5px] shadow-2xl ring-1 ring-white/12 backdrop-blur"
+			className="fixed top-36 right-3 z-40 w-[380px] max-w-[calc(100vw-24px)] rounded-xl bg-[#15181c]/95 light:bg-[var(--rigi-slate)]/95 text-[11.5px] shadow-2xl ring-1 ring-white/12 backdrop-blur"
 			data-testid="propagate-panel"
 		>
 			<button
@@ -141,13 +141,13 @@ export function PropagatePanel({
 				onClick={() => setOpen((o) => !o)}
 				className="flex w-full items-center gap-2 px-3 py-2 text-left"
 			>
-				<Waypoints className="size-3.5 text-sky-300" />
+				<Waypoints className="size-3.5 text-sky-300 light:text-[var(--rigi-glow)]" />
 				<span className="font-semibold">Pose propagation</span>
 				<span className="rounded bg-white/10 px-1 font-mono text-[9.5px] uppercase">
 					{mode === "dev" ? "dev" : "suggest only"}
 				</span>
 				<span
-					className={`ml-auto font-mono text-[10px] ${up ? "text-emerald-300" : up === false ? "text-red-300" : "text-white/40"}`}
+					className={`ml-auto font-mono text-[10px] ${up ? "text-emerald-300 light:text-[var(--rigi-result)]" : up === false ? "text-red-300 light:text-[var(--rigi-trap)]" : "text-white/40"}`}
 					data-testid="propagate-service"
 				>
 					{up == null ? "…" : up ? "service up" : "service down"}
@@ -161,7 +161,7 @@ export function PropagatePanel({
 			{open && (
 				<div className="max-h-[calc(100dvh-220px)] space-y-3 overflow-y-auto border-t border-white/10 px-3 py-2.5">
 					{up === false && (
-						<p className="text-amber-200/90">
+						<p className="text-amber-200/90 light:text-[var(--rigi-lesson)]/90">
 							Relative-rotation service not reachable at {propagateServiceUrl()}
 							. Start it with{" "}
 							<code className="font-mono">
@@ -222,7 +222,7 @@ export function PropagatePanel({
 									disabled={up === false || (run != null && !run.done)}
 									onClick={start}
 									data-testid="propagate-run"
-									className="ml-auto rounded-md bg-sky-300 px-2 py-1 font-semibold text-black hover:brightness-110 disabled:opacity-40"
+									className="ml-auto rounded-md bg-sky-300 px-2 py-1 font-semibold text-black light:text-[var(--rigi-paper)] hover:brightness-110 disabled:opacity-40"
 								>
 									{run && !run.done ? "Working…" : "Suggest neighbours"}
 								</button>
@@ -306,7 +306,7 @@ function RunRows({
 								{r.cycleWith &&
 									` · cycle(${r.cycleWith}) ${f1(r.suggestion?.evidence.cycleDeg ?? null, 2)}°`}
 								{mode === "dev" && r.deltaToCurrentDeg != null && (
-									<span className="text-sky-200/80">
+									<span className="text-sky-200/80 light:text-[var(--rigi-glow)]/80">
 										{" "}
 										· Δ{t.poseSource} {f1(r.deltaToCurrentDeg, 2)}°
 									</span>
@@ -322,7 +322,7 @@ function RunRows({
 							</div>
 						)}
 						{r.status === "suggested" && r.proposal?.cautions.length ? (
-							<div className="mt-0.5 text-[10px] text-amber-200/80">
+							<div className="mt-0.5 text-[10px] text-amber-200/80 light:text-[var(--rigi-lesson)]/80">
 								{r.proposal.cautions.join(" · ")}
 							</div>
 						) : null}
@@ -359,11 +359,11 @@ function TargetSuggestions({
 			{items.map((s) => (
 				<li
 					key={s.anchorId}
-					className="rounded-md bg-sky-400/[0.06] px-2 py-1.5 ring-1 ring-sky-300/20"
+					className="rounded-md bg-sky-400/[0.06] px-2 py-1.5 ring-1 ring-sky-300/20 light:ring-[var(--rigi-glow)]/20"
 					data-testid="propagate-suggestion"
 					data-status={s.status}
 				>
-					<div className="text-sky-100">
+					<div className="text-sky-100 light:text-[var(--rigi-glow)]">
 						Suggested pose from <span className="font-mono">{s.anchorId}</span>
 						<span className="text-white/40">
 							{" "}
@@ -376,7 +376,7 @@ function TargetSuggestions({
 						· {fmtM(s.evidence.baselineM)}
 					</div>
 					{s.cautions.length > 0 && (
-						<div className="mt-0.5 text-[10px] text-amber-200/80">
+						<div className="mt-0.5 text-[10px] text-amber-200/80 light:text-[var(--rigi-lesson)]/80">
 							{s.cautions.join(" · ")}
 						</div>
 					)}
@@ -392,7 +392,7 @@ function TargetSuggestions({
 								}
 								onClick={() => onAccept(s)}
 								data-testid="propagate-accept"
-								className="rounded bg-sky-300 px-2 py-0.5 font-semibold text-black disabled:opacity-35"
+								className="rounded bg-sky-300 px-2 py-0.5 font-semibold text-black light:text-[var(--rigi-paper)] disabled:opacity-35"
 							>
 								Accept
 							</button>

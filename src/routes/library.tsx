@@ -286,7 +286,7 @@ function PhotoTile({
 			params={{ id }}
 			className="group overflow-hidden rounded-xl bg-white/[0.04] ring-1 ring-white/8 transition hover:ring-[var(--rigi-glow)]/50"
 		>
-			<div className="aspect-[4/3] overflow-hidden bg-black">
+			<div data-theme="dark" className="aspect-[4/3] overflow-hidden bg-black">
 				{src && (
 					<img
 						src={src}

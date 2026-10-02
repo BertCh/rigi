@@ -24,7 +24,7 @@ npm install
 npm run dev     # http://localhost:3100
 ```
 
-What works on a bare clone: the app builds and runs, `/upload` aligns any photo you drop in (HEIC or JPEG, processed in the browser against Mapterhorn DEM tiles fetched over the network), `/roll/import` builds a camera roll from your photos, `/atlas` and the `/lab/*` benches open, and the standalone [examples](examples/README.md) run. What needs more: the home page and `/library` list the photos in `public/photos/`, which you create with `npm run ingest` from HEIC files in `img/`. The evaluation harnesses (`scripts/eval*.ts`, `scripts/leaderboard.mjs`), `/baseline` and some CI checks read research data under `data/`, `public/photos/` and `public/baseline/`; these are gitignored, so without them those checks report SKIP in `node scripts/ci/run.mjs`. The Niederhorn demo set in `public/demo/` is included in the repository (all rights reserved, see NOTICE.md), so the landing page demo works on a bare clone. Step Inside and the matcher need their Python services (`npm run dev:all`).
+What works on a bare clone: the app builds and runs, `/upload` aligns any photo you drop in (HEIC or JPEG, processed in the browser against Mapterhorn DEM tiles fetched over the network), `/roll/import` builds a camera roll from your photos, `/gipfelbuch` and the `/lab/*` benches open, and the standalone [examples](examples/README.md) run. What needs more: the home page and `/library` list the photos in `public/photos/`, which you create with `npm run ingest` from HEIC files in `img/`. The evaluation harnesses (`scripts/eval*.ts`, `scripts/leaderboard.mjs`), `/baseline` and some CI checks read research data under `data/`, `public/photos/` and `public/baseline/`; these are gitignored, so without them those checks report SKIP in `node scripts/ci/run.mjs`. The Niederhorn demo set in `public/demo/` is included in the repository (all rights reserved, see NOTICE.md), so the landing page demo works on a bare clone. Step Inside and the matcher need their Python services (`npm run dev:all`).
 
 ## Built with luma.gl and deck.gl
 
@@ -62,6 +62,7 @@ by `npm run generate-routes`).
 | `/baseline` | Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
 | `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
 | `/lab/deck-webgpu` | The WebGPU deck renderer in isolation (`WebGpuEngine`, `src/lib/deck-webgpu`); the app uses it by default via `?renderer=auto` |
+| `/gipfelbuch`, `/gipfelbuch/$concept` | Explainer pages: a small curated concept graph with one page per concept (`src/components/gipfelbuch`) |
 | `/dev/graph`, `/dev/meta`, `/dev/how-scene`, `/dev/export-roll` | Dev pages: the GPU app-graph inspector, the explainer figures, the "how it works" scene, and the demo-roll exporter |
 
 **Renderers.** `src/lib/renderer.ts` is the engine interface that PhotoWorkspace and the export layer

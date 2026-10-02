@@ -22,6 +22,7 @@ import {
 	X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ThemeToggle } from "#/components/site/ThemeToggle";
 import { AlignRollButton } from "#/lib/roll/align";
 import { downloadRollGeoJSON } from "#/lib/roll/export";
 import { RollMap } from "#/lib/roll/map/RollMap";
@@ -199,6 +200,7 @@ function RollPage() {
 						</button>
 					))}
 				</div>
+				<ThemeToggle />
 			</header>
 			<div className="mx-auto max-w-[1600px] px-4 pb-4 sm:px-8">
 				<TimeScrubber
@@ -320,9 +322,10 @@ function DetailStrip({
 			data-testid="roll-detail"
 		>
 			<div
-				className={`flex items-center gap-3 rounded-xl bg-[#15181c]/95 p-2.5 ring-1 ring-white/12 ${inline ? "" : "mx-auto max-w-4xl shadow-2xl backdrop-blur"}`}
+				className={`flex items-center gap-3 rounded-xl bg-[#15181c]/95 light:bg-[var(--rigi-slate)]/95 p-2.5 ring-1 ring-white/12 ${inline ? "" : "mx-auto max-w-4xl shadow-2xl backdrop-blur"}`}
 			>
 				<div
+					data-theme="dark"
 					className="h-16 shrink-0 overflow-hidden rounded-md bg-black"
 					style={{ width: 64 * aspectOf(photo) }}
 				>
@@ -434,7 +437,7 @@ function DeleteLocalRoll({ roll }: { roll: Roll }) {
 				onClick={() => setState("confirm")}
 				data-testid="delete-roll"
 				title={error ?? "Delete this roll from this device"}
-				className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/55 ring-1 ring-white/10 hover:text-red-300 hover:ring-red-300/40"
+				className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/55 ring-1 ring-white/10 hover:text-red-300 light:hover:text-[var(--rigi-trap)] hover:ring-red-300/40 light:hover:ring-[var(--rigi-trap)]/40"
 			>
 				<Trash2 className="size-3.5" />{" "}
 				{error ? "Delete failed, retry" : "Delete roll"}
@@ -442,10 +445,10 @@ function DeleteLocalRoll({ roll }: { roll: Roll }) {
 		);
 	return (
 		<div
-			className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-2.5 py-1 text-xs ring-1 ring-red-300/30"
+			className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-2.5 py-1 text-xs ring-1 ring-red-300/30 light:ring-[var(--rigi-trap)]/30"
 			data-testid="delete-roll-confirm"
 		>
-			<span className="text-red-200">
+			<span className="text-red-200 light:text-[var(--rigi-trap)]">
 				Delete {roll.photos.length} photo{roll.photos.length === 1 ? "" : "s"}{" "}
 				from this device?
 			</span>
@@ -454,7 +457,7 @@ function DeleteLocalRoll({ roll }: { roll: Roll }) {
 				disabled={state === "deleting"}
 				onClick={del}
 				data-testid="delete-roll-yes"
-				className="rounded-md bg-red-400 px-2 py-1 font-semibold text-black hover:brightness-110 disabled:opacity-50"
+				className="rounded-md bg-red-400 px-2 py-1 font-semibold text-black light:text-[var(--rigi-paper)] hover:brightness-110 disabled:opacity-50"
 			>
 				{state === "deleting" ? "Deleting…" : "Delete"}
 			</button>

@@ -13,11 +13,22 @@ import {
 	ImageIcon,
 	ShieldCheck,
 } from "lucide-react";
-import { lazy, type ReactNode, Suspense } from "react";
+import {
+	type CSSProperties,
+	lazy,
+	type ReactNode,
+	Suspense,
+	useRef,
+} from "react";
 import { Compare } from "#/components/site/Compare";
 import { FadeIn } from "#/components/site/FadeIn";
 import { RevealLoop } from "#/components/site/RevealLoop";
 import { SITE_THEME, SiteNav } from "#/components/site/SiteNav";
+import { Surround, type SurroundBake } from "#/components/site/Surround";
+import story from "#/components/site/surround/demo-01.json";
+import hero from "#/components/site/surround/demo-09.json";
+import how from "#/components/site/surround/how.json";
+import map from "#/components/site/surround/map.json";
 import { NearViewport } from "#/components/site/useNearViewport";
 
 // Everything below the first two sections is split out and mounted only when near the viewport
@@ -92,6 +103,19 @@ const local = [
 ];
 
 function Home() {
+	// the plan around the topo board follows the board's pan
+	const mapLayer = useRef<HTMLDivElement>(null);
+	const panMapSurround = (p: { x: number; y: number }) => {
+		if (mapLayer.current)
+			mapLayer.current.style.transform = `translate(${p.x}px, ${p.y}px)`;
+	};
+	// the hero's terrain spill left of the photo shows only with the divider near the far left, where
+	// the photo's left edge is the overlay too; the right spill always matches the overlay side
+	const heroFrame = useRef<HTMLDivElement>(null);
+	const showHeroLeftSpill = (v: number) => {
+		const t = Math.min(1, Math.max(0, (0.12 - v) / 0.1));
+		heroFrame.current?.style.setProperty("--surround-left", String(t));
+	};
 	return (
 		<main className={`${SITE_THEME} overflow-x-clip pb-10`}>
 			<SiteNav />
@@ -127,17 +151,25 @@ function Home() {
 				</FadeIn>
 				<FadeIn delay={150} cssOnly>
 					<figure>
-						<Compare
-							before="/demo/photos/demo-09.jpg"
-							after="/demo/shots/hero.jpg"
-							beforeSet={variantSet("demo-09")}
-							afterSet={variantSet("hero")}
-							sizes={HERO_SIZES}
-							priority
-							alt="A photo from Niederhorn with the Bernese Alps' peaks named"
-							aspect={4 / 3}
-							className="rounded-xl ring-1 ring-white/10"
-						/>
+						<Surround
+							bake={hero as SurroundBake}
+							eager
+							rootRef={heroFrame}
+							style={{ "--surround-left": 0 } as CSSProperties}
+						>
+							<Compare
+								onMove={showHeroLeftSpill}
+								before="/demo/photos/demo-09.jpg"
+								after="/demo/shots/hero.jpg"
+								beforeSet={variantSet("demo-09")}
+								afterSet={variantSet("hero")}
+								sizes={HERO_SIZES}
+								priority
+								alt="A photo from Niederhorn with the Bernese Alps' peaks named"
+								aspect={4 / 3}
+								className="rounded-xl ring-1 ring-white/10"
+							/>
+						</Surround>
 						<figcaption className="mt-2.5 font-mono text-[10.5px] text-white/40">
 							Niederhorn, Lake Thun · iPhone photo · drag to compare
 						</figcaption>
@@ -162,6 +194,8 @@ function Home() {
 					alt="Contours, ridgelines and peak names blooming out over Lake Thun"
 					aspect={4 / 3}
 					className="rounded-2xl ring-1 ring-white/10"
+					surround={story as SurroundBake}
+					surroundClassName="md:mt-14"
 				/>
 			</Story>
 
@@ -185,11 +219,13 @@ function Home() {
 				title="Positions and view directions."
 				body="Each photo is shown where it was taken, with the direction it faced. Click one to open it."
 			>
-				<NearViewport placeholder={<div className={TOPO_BOX} />} margin={800}>
-					<Suspense fallback={<div className={TOPO_BOX} />}>
-						<TopoSection />
-					</Suspense>
-				</NearViewport>
+				<Surround bake={map as SurroundBake} layerRef={mapLayer}>
+					<NearViewport placeholder={<div className={TOPO_BOX} />} margin={800}>
+						<Suspense fallback={<div className={TOPO_BOX} />}>
+							<TopoSection onPan={panMapSurround} />
+						</Suspense>
+					</NearViewport>
+				</Surround>
 			</Story>
 
 			{/* the live roll map */}
@@ -230,7 +266,7 @@ function Home() {
 			>
 				<NearViewport placeholder={<div className={HOW_BOX} />} margin={600}>
 					<Suspense fallback={<div className={HOW_BOX} />}>
-						<HowItWorksScene />
+						<HowItWorksScene surround={how as SurroundBake} />
 					</Suspense>
 				</NearViewport>
 			</Story>

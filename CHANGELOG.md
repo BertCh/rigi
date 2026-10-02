@@ -4,6 +4,36 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Gipfelbuch: Swiss notebook and explainer fidelity restored (2026-10-01)
+
+- **Concept sheets.** The notebook is back in the shell:
+  - the sheet's contour lines sit behind the title;
+  - the measured field notes sit under the Ledger;
+  - the soft grid is the sheet ground again;
+  - the foot has a "Where it sits" section with the notebook trail and the Leads to / Referenced by links.
+  
+  A sheet whose page opens with its own real-photo hero shows that hero instead of the shell Tafel (`PAGE_HERO`).
+- **Index.** The field notebook (Feldbuch) follows the Blattübersicht again.
+- **Geo bleed.** `RealPhoto bleed` carries a photo's measured terrain, compass ruler and out-of-frame summits past its frame, as on the Tafel. Heroes can sit on a `Figure plate`.
+- **Kit.**
+  - Measured lines and dots are drawn exact: `data` on the pen primitives, and `PlotSeries`.
+  - Peak labels no longer overprint.
+  - Shared helpers: `PrintLabel`, `PrintNote`, `HandRange` and `CrispLine`.
+  - Galleries can tag result or failure, and Callouts take their tone's tint.
+  - Removed the unused `Multiples`, `StationTable`, `PencilFilter` and tape CSS.
+- **Pages.** Pages were restored figure by figure against the committed explainers. All changes are browser-unverified. Record: `reports/gipfelbuch-restore-2026-10-01.md`. Spec: `reports/gipfelbuch-best-of-both.md`.
+
+### Testing policy: batched browser checks (2026-10-01)
+
+- `AGENTS.md`, `CONTRIBUTING.md` and `reports/status.md` now say that changes land on the fast tier and hand checks in `vite dev`. Browser, GPU and bench checks run in one consolidated pass per wave of work rather than per change, and changes stay marked browser-unverified until then. In a pass, the render lock is taken per step, and only timing steps are exclusive.
+
+### Gipfelbuch: a softer sheet (2026-10-01)
+
+- The Gipfelbuch drops its paper texture and notebook props, at the user's request. The ground is a flat warm white (`--gb-paper` and `SWISS.paper`, W 96% + YY 4%, previously the 10% cream with a grain tile), and panels are lighter (paper 91% + LG 9%).
+- The graph-paper grid stays, at about half its strength (`--nb-grid` 6%, index ruling 8%).
+- Removed: the red double margin rule on notebook entries, the tape strips and seeded tilt on `PastedPrint` (prints now sit square on a thin white mat; `seed` is optional), the pencil graticule ticks in `SheetFrame`, and the wavy underline on concept terms (now a faint solid line).
+- The rules are in the Gipfelbuch README ("Soft sheet"), with revision notes in `reports/gipfelbuch-swiss-aesthetic.md`, `reports/gipfelbuch-field-notebook-design.md` and `reports/gipfelbuch-design-book.md`.
+
 ### luma.gl frontier looks and GPU sort (LF2–LF8, 2026-10-01)
 
 All looks are opt-in, default off and byte-identical when off; browser-verified only where noted. Source: `reports/luma-frontier-2026-10-01-late.md`.
@@ -29,6 +59,78 @@ All looks are opt-in, default off and byte-identical when off; browser-verified 
 - luma.gl bumped to `10.0.0-alpha.2-rigi.3`: luma master `7289d961` plus #3313 (`attach()`, now with application-owned devices and canvases), #3302, #3287, #3328, a PipelineFactory compute-hash commit (`c80b7ce6`), #3333, #3334 and #3330 (details, checksums and rebuild recipe in `vendor/luma/README.md`; compute-hash patch in `vendor/luma/patches/`). `DeviceProps._ownsHandle` is gone (attached devices are never destroyed by luma; `attachWebGPUDevice` already destroys the `GPUDevice` itself), the engine comment that still named it is fixed.
 - `@math.gl/core` and the packed luma manifests move to the published `5.0.0-alpha.10`; `@math.gl/polygon` and `@math.gl/web-mercator` are no longer direct dependencies (deck pulls them), and `overrides` pins the types-only `@math.gl/types` to `5.0.0-alpha.10` so one copy is installed. Browser-unverified until the render-lock gates run.
 - deck.gl re-vendored as `9.4.0-rigi.1`: deck master `35854250` + #10752 (luma 10 bump) + luma.gl's deck WebGPU hunks (unchanged) + #10780 (SDF glyphs padded by the distance-field radius, so outlined TextLayer labels in the roll map are no longer clipped). Core `dist/` is byte-identical to the previous build apart from the version string; deck 9.4.0 final (on luma 9.4) adds nothing to core/layers over this base. The `@deck.gl/core` override is gone (layers peers the exact core version). Details in `vendor/deck/README.md`.
+
+### Gipfelbuch: Swiss field-notebook design system (2026-10-01)
+
+- Research and plan: `reports/gipfelbuch-field-notebook-design.md`. It covers alpine field books and Gipfelbücher, sketch and handwriting rendering, Swiss typographic design and LK cartography, and ends with a gap audit and five work packages.
+- Type programme. The closed scale is 11/13/16/20/24/40/56 (`swiss/type.ts`).
+  - Fraunces is used only for the H1; section heads are Fira semibold.
+  - Stats use Fira 300 with tabular lining figures.
+  - The new `--gb-secondary` (Brezine BG) replaces BL for secondary text, which fixed contrast below WCAG AA.
+  - Added `.gb-table`, `.gb-grid` (4/8/12 columns), `.gb-derived` (italic for estimated values) and a forced-colors fallback.
+- Hand faces. Notes are set in Caveat (alternating glyphs) and small figure labels in Shantell Sans; Architects Daughter remains as a fallback. Digits inside hand text are set in print.
+- Ink kit:
+  - furniture strokes are tapered pen outlines with an ink blob at the start (after perfect-freehand, in-house, no dependency);
+  - stipple draws scree stones that grow toward the foot;
+  - data lines stay exact.
+- Furniture and shell:
+  - Standortfeld header, Stand/Ausgabe imprint and signpost distances on concept pages;
+  - SAC route-topo `Steps` with belay circles, pitch column and a certainty line style (solid = measured, dashed = approximate, dotted = open);
+  - a trig-point mark on stats;
+  - `Figure` gains `source`/`reading`/`number` props, and tape is off by default;
+  - LK-grammar marks and a register line in `swiss/Marks.tsx` and `swiss/Register.tsx`.
+- Pages: a mechanical sweep across all 19 pages raised the text contrast floor to 65 %, removed half-pixel sizes and rounded pills, and took Fraunces off non-H1 elements. `gipfelbuch.check.ts` now lints pages so these rules cannot regress.
+
+### Gipfelbuch: one sketched field-book look across every page (2026-10-01)
+
+- Every Gipfelbuch visualization is now hand-sketched in the Swiss sheet inks: the index, all 19 concept pages, the shared `viz/` kit and the `swiss/` sheet furniture. Clean vector strokes became seeded two-pass pen strokes, flat fills became hachure (stipple for uncertain areas), outlined boxes, rings and rounded cards were removed, and markers are pen circles and hand dots. Photos and DEM rasters are never filtered.
+- Sketch toolkit in `src/components/gipfelbuch/notebook/` (no new dependency; approach after rough.js, MIT):
+  - `sketchify.ts`: `sketchPolyline` (jitter bounded by a tolerance, 0.9 px default, so data lines stay on their measured pixels; tested), `sketchify(d)` for any SVG path, `sketchRect`, `hachureFill`, `stippleFill`, and canvas helpers.
+  - `Ink.tsx` React wrappers: `SketchPath`, `SketchPolyline`, `SketchRect`, `Hachure`, `Stipple`, `HandDot`, `PenRule`, `SketchDefs`.
+  - Native range inputs are styled as a pen track with an ink thumb.
+  - The rules are in the Gipfelbuch README ("Field notebook and sketch rules").
+- Concept pages: the force-graph "Connections" became a hand-drawn notebook trail (the concept's notebook page, with incoming and outgoing notes), and a "Feldbuch" field-notes strip under the lede shows that concept's measured values for the selected demo photo. The selected photo is shared across the index and all pages (`useNotebookPhoto`, registered storage key `rigi.gipfelbuch.photo`).
+- Handwriting face is Architects Daughter (Kalam fallback), used only for annotations, captions and margin notes. Headings, body text and numbers stay in print.
+- Research: `reports/gipfelbuch-swiss-sketch-research.md`, `reports/gipfelbuch-sketch-rendering.md`, `reports/gipfelbuch-sketch-inventory.md`. `scripts/gipfelbuch/shot.mjs` screenshots a page (with `<details>` opened) for review.
+
+### Gipfelbuch: the core map becomes a field notebook (2026-10-01)
+
+- On `/gipfelbuch`, the hand-laid node-link CoreMap is replaced by `NotebookMap` (`src/components/gipfelbuch/notebook/`). It has three numbered notebook entries (viewport inference, terrain snapping, what the pose is for) with 16 numbered steps, and every curated concept appears once. Cross-lane data-flow edges become margin notes ("← the predicted horizon from (11) DEM Horizon").
+- The notebook follows one demo photo through the pipeline, and a strip of the 12 thumbnails (or the tally plot) switches photos. Every value is read from `public/demo/gipfelbuch/*.json`: sensor prior vs solved yaw (struck through), median skyline miss before and after the solve, the accept verdict, tiles, ground and eye height, horizon ridge distance, peak counts and the roll span.
+- Figures: the photo's skyline band with the traced, prior and solved skylines; the hillshade with the solved view cone and compass heading; a hachured terrain section along the view axis with the sight line to the skyline ridge; and the 12-photo compass-correction plot with tally marks.
+- Style: graph paper, a red margin rule, Caveat (Google Fonts, OFL) for annotations only, and seeded hand-drawn strokes (`notebook/sketch.ts`, no new dependency). Data lines are drawn exactly; only the furniture (arrows, circles, dimension ticks, hachures, tape) wobbles. Strokes draw on when an entry scrolls into view, except under reduced motion or automation.
+- The entries carry the `#group-<id>` anchors that concept-page breadcrumbs link to (previously missing). New fast check `gipfelbuch-notebook`. Research: `reports/gipfelbuch-notebook-research.md`.
+
+### Landing: terrain continues past the photos (2026-10-01)
+
+- The hero (demo-09) and the "01 · Single photo" frame (demo-01) are set in the roll panorama's look. Ridgelines traced from the photo's eye (`traceViewpoint`) are projected through its solved camera, so each ridge leaves the frame where it does in the photo. They carry on past the edges, with a compass ruler above and peak names past the frame (md and up), fading out at the outer edges.
+- 04 3D and 05 Step inside: the sides are line art redrawn every frame through the live camera, so they turn with the orbit and the sway (`src/components/site/LiveLines.tsx`, codec and camera helpers in `lineArt.ts`, bakes from `scripts/demo/bake-live-lines.ts`). Step inside uses IMG_7086's eye ridgelines (`step-lines.bin`, 36 kB, 24 kB gzipped). Before the engine is ready they are drawn at the photo's rest pose. 3D uses Mapterhorn contours, every 40 m within 5 km and 200 m out to 11 km, faded with camera distance (`live3d-lines.bin`, 78 kB, 67 kB gzipped). They redraw only when the camera moves, are capped at 30 fps, stop offscreen and are off below md; drawing takes about 0.3–0.4 ms of main-thread time per frame.
+- 03 Map: the board's sides carry the map on as a plan, Mapterhorn contours (20 m, index 100 m) in the same ink at the board's own z14 scale and centre (`scripts/demo/bake-surround-map.ts`; shipped as a 254 kB grey coverage WebP used as a luminance mask over a paper fill, hidden where `mask-mode: luminance` is unsupported). It moves with the board's pan (`TopoBoard` `onPan`); the fade stays put, so a pan never brings lines up under the heading.
+- The 02 · Panorama strip's viewpoint terrain is baked (`scripts/demo/bake-pano-terrain.ts` → `public/demo/pano/`, 172 kB, 123 kB gzipped; codec in `src/lib/roll/mosaic/terrainCodec.ts`). `viewpointTerrain` tries a registered lookup (`setBakedTerrain`, set by `loadDemoRoll`) before tracing, so the demo strip's ridgelines are ready in ~10 ms instead of ~1.8 s; a missing or mismatched bake falls back to the live trace.
+- The how-it-works scene gets the same treatment around its photo band (bake `how`), fading in only once the pose has snapped: before that the terrain line is still wrong, and the surround would give the answer away. Dragging the terrain off dims it.
+- Everything is baked by `scripts/demo/bake-surround.ts`: a transparent WebP per frame in `public/demo/surround/` (50, 88 and 51 kB) and a small JSON in `src/components/site/surround/` that the route imports, so there is no fetch, worker or GPU work at runtime. `Surround` (`src/components/site/Surround.tsx`) places it around any photo without changing the photo's size. The strokes are paper on transparency (dark theme only, like the rest of the landing page).
+
+### Gipfelbuch: rename from atlas, math kit, content review (2026-10-01)
+
+- The explainer pages `/atlas` are now the Gipfelbuch (`/gipfelbuch`, `/gipfelbuch/$concept`), named after the summit logbook. Paths moved to `src/lib/gipfelbuch`, `src/components/gipfelbuch`, `scripts/gipfelbuch` and `public/demo/gipfelbuch`; identifiers are `Gipfelbuch*`; the fast check id is `gipfelbuch`. No `/atlas` redirect.
+- `viz/math.tsx`: `Eq`, `Sym`, `Frac`, `Op` set short equations whose symbols carry the colour of the overlay they measure (underlined in the photo colour on the paper theme).
+- All 19 pages reviewed against the code and the literature (`reports/gipfelbuch-review-2026-10-01/`). Corrected claims include: the compass-prior width (15° solver prior, not 7.1°), medians that included rejected solves, the curvature drop (171 m net of refraction, 196 m geometric at 50 km), the wild-set skyline result (60 accepted, 39 correct) shown beside the curated one, terrain hiding most summits (924 of 1181 on demo-10), the default DEM (Mapterhorn) and stale three.js numbers. New real-data figures: solver cost against yaw, a hidden summit and its sight line, a peak at phone vs solved yaw, the Step Inside split; new baked data from `scripts/gipfelbuch/data-{peak,pose-solve}.ts` and an extended `data-step-inside.ts`.
+
+### Light mode foundation (2026-10-01)
+
+- `?theme=auto|light|dark` (flag `theme`, applies live) and a saved choice (`localStorage` `rigi.theme`) set `<html data-theme>`. A pre-paint script (`src/lib/flags/theme-boot.ts`, first in `<head>`) resolves: flag, saved choice, `navigator.webdriver` (dark, so harnesses stay dark unless they pass `?theme=light`), OS `prefers-color-scheme`, dark. `src/lib/theme` has `resolveTheme`/`applyTheme`/`useTheme`/`ThemeSync`; `ThemeToggle` (`src/components/site/`) cycles Auto, Light, Dark.
+- `src/styles.css`: Brezine swatches as `--khipu-*`; `:root[data-theme="light"]` re-inks the `--rigi-*` roles and swaps `--color-white`/`--color-black`, which flips every `white/NN` and `black/NN` utility. `data-theme="dark"` marks an always-dark island. New `light:` variant for off-palette colours; `brandVar(role, alpha?)` and `BRAND_LIGHT` in `src/brand/khipu.ts`. Dark rendering is unchanged except the range-slider thumb glow now follows `--rigi-glow`. Pages are not yet converted; the toggle is not yet mounted.
+
+### Gipfelbuch: Swiss map-sheet aesthetic (2026-10-01)
+
+- `/gipfelbuch` is restyled as a Swiss topographic sheet. Pages sit on warm paper inked in the Landeskarte separations: rock black, contour brown, water blue and route red, all Brezine chart swatches. Each concept page is a numbered "Blatt NN / 19" inside a neatline with graticule ticks and LV95 corners. Its header carries real Niederhorn contours, and its footer has a Zeichenerklärung legend, a scale bar and an imprint. Status shows as SAC waymark blazes, and prev/next links are yellow Wegweiser signposts. Peak labels on photos follow the Heim/Imfeld panorama style.
+- The index opens with a title cartouche and a sheet map of Niederhorn and Thunersee: swisstopo relief shading, 20 m Mapterhorn contours, swissNAMES3D peaks and the 12 demo viewpoints as sight rays. `scripts/gipfelbuch/data-sheet.ts` bakes it into `public/demo/gipfelbuch/sheet/` (about 320 KB).
+- The theme is a scoped class (`GB_THEME`, `src/components/gipfelbuch/swiss/`). It remaps Tailwind's white and black and the `--rigi-*` tokens, so the landing page, library and workspace keep the dark theme. Fonts added: Fira Sans, Fira Sans Condensed, IBM Plex Mono, and the Fraunces italic and 600 weight. The group and status colours are re-tuned for paper. Preview the kit at `/dev/gipfelbuch-sheet` (dev only).
+
+### Roll panorama resizes vertically (2026-10-01)
+
+- On `/roll/$id` the panorama has a grip along its bottom edge: drag it (or focus it and press ↑/↓) to set its height between 160 and 1200 px; double-click returns to the default. The height is remembered per browser (`localStorage` `mt-image:roll:pano-height`). `PanoramaStrip` takes it as an opt-in `resizable` prop, so the landing-page demo keeps its fitted height.
+- Selecting a photo in the roll panorama no longer scrolls the page down to its grid tile; picks from the map still bring the tile into view.
 
 ### WAG wave 4: more of the app on the luma graph, more GPU defaults (2026-10-01)
 

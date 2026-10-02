@@ -18,6 +18,7 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | 360° cascade at the 0.5 bar | IMG_7053 false accept at −123.7°; margin rule recovered 0 photos. Hence the 0.75 unknown-yaw bar | [bench-ablation.md](bench-ablation.md) |
 | App auto-align with no heading | 3/11 correct, 7 false accepts | [bench-ablation.md](bench-ablation.md) |
 | Looser accept rule HIGH ∧ (EXIF ∨ gap ≥ 0.20) | 22/34 recall, not adopted | rigi_internal_audit.md (removed) |
+| VSWEEP: pitch-only vertical pass after the yaw sweep, on matched skyline peaks (2026-10-01) | KILLED as registered: peak arm fires on only 2–5 of 14 GT photos (1–8 peaks per frame) and moves the median ≤ 0.04° (GT noise 0.2–0.4°); dense vertical sweep not clean either (1–2 photos worse > 0.15° on Terrarium). It recovers a ±1° pitch start error but also dragged IMG_7068 0.7–0.9° wrong. Code kept in `scripts/vsweep` | [tools/research/vsweep/REPORT.md](../tools/research/vsweep/REPORT.md) |
 
 ## Registration: render-and-match and fusion
 

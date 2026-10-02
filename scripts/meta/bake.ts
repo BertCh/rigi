@@ -10,7 +10,7 @@
  *
  * Writes public/demo/meta/:
  *   roll.json        all 12 photos: full 360° DEM horizon, photo skyline, prior and solved pose,
- *                    accept verdict (from public/demo/atlas/index.json)
+ *                    accept verdict (from public/demo/gipfelbuch/index.json)
  *   hero.json        one photo in depth: ridge crests across the view, side sections along each
  *                    bearing, a per-pixel depth grid at the solved pose, and the map frame
  *   hero-map.jpg     hillshaded DEM, ±MAP_HALF_KM around the camera, north up
@@ -68,13 +68,16 @@ type Angles = { yaw: number; pitch: number; roll: number; vfov: number };
 const manifest = JSON.parse(
 	fs.readFileSync(path.join(ROOT, "public/demo/manifest.json"), "utf8"),
 );
-const atlasIndex = JSON.parse(
-	fs.readFileSync(path.join(ROOT, "public/demo/atlas/index.json"), "utf8"),
+const gipfelbuchIndex = JSON.parse(
+	fs.readFileSync(path.join(ROOT, "public/demo/gipfelbuch/index.json"), "utf8"),
 );
 const verdict = (id: string) => {
-	const a = atlasIndex.photos.find((p: { id: string }) => p.id === id);
+	const a = gipfelbuchIndex.photos.find((p: { id: string }) => p.id === id);
 	const full = JSON.parse(
-		fs.readFileSync(path.join(ROOT, `public/demo/atlas/${id}.json`), "utf8"),
+		fs.readFileSync(
+			path.join(ROOT, `public/demo/gipfelbuch/${id}.json`),
+			"utf8",
+		),
 	);
 	return {
 		accepted: Boolean(a?.accepted),

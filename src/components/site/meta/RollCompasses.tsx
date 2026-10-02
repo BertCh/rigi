@@ -5,6 +5,15 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { BRAND, brandAlpha } from "#/brand/khipu";
 import {
+	HandDot,
+	HandText,
+	PenArrow,
+	PenCircle,
+	PenLine,
+	PenRule,
+	SketchPolyline,
+} from "#/components/gipfelbuch/notebook/Ink";
+import {
 	type Angles,
 	azEl,
 	camera,
@@ -51,7 +60,7 @@ const CLUSTER_GAP = 50;
 const MARGIN = 2;
 /** Phones scroll a panel sideways rather than shrink it below this (px per degree). */
 const MIN_PPD = 4.5;
-/** What the photos faced: peaks the app labels in them (public/demo/atlas/<id>.json). */
+/** What the photos faced: peaks the app labels in them (public/demo/gipfelbuch/<id>.json). */
 const REGIONS = [
 	{ az: 45, label: "Hohgant" },
 	{ az: 135, label: "Eiger · Mönch · Jungfrau" },
@@ -281,7 +290,15 @@ function clusterPhotos(
 		.sort((a, b) => b.worst - a.worst);
 }
 
-export function RollCompasses({ className }: { className?: string }) {
+/** `sketch` redraws the figure as a pen-and-paper field-book plate (the Gipfelbuch look); the
+ * default keeps the dark /dev/meta rendering. */
+export function RollCompasses({
+	className,
+	sketch = false,
+}: {
+	className?: string;
+	sketch?: boolean;
+}) {
 	const roll = useRoll();
 	const photos = useMemo(
 		() =>
@@ -294,7 +311,11 @@ export function RollCompasses({ className }: { className?: string }) {
 	if (!photos)
 		return (
 			<div
-				className={`aspect-[16/10] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`}
+				className={
+					sketch
+						? `aspect-[16/10] animate-pulse bg-[var(--gb-paper-deep)] ${className ?? ""}`
+						: `aspect-[16/10] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`
+				}
 			/>
 		);
 	const active = hover ?? DEFAULT_ID;
@@ -306,18 +327,31 @@ export function RollCompasses({ className }: { className?: string }) {
 	const rejected = photos.filter((p) => !p.accepted);
 	return (
 		<figure
-			className={`overflow-hidden rounded-2xl bg-white/[0.02] ring-1 ring-white/10 ${className ?? ""}`}
+			className={
+				sketch
+					? `${className ?? ""}`
+					: `overflow-hidden rounded-2xl bg-white/[0.02] ring-1 ring-white/10 ${className ?? ""}`
+			}
 			style={{ touchAction: "pan-y" }}
 		>
 			<Panels
+				sketch={sketch}
 				photos={photos}
 				active={active}
 				hover={hover}
 				setHover={setHover}
 			/>
-			<div className="border-t border-white/8 px-4 pt-4 pb-3 sm:px-6">
+			{sketch && <PenRule seed="roll-rule-strip" />}
+			<div
+				className={
+					sketch
+						? "px-1 pt-4 pb-3"
+						: "border-t border-white/8 px-4 pt-4 pb-3 sm:px-6"
+				}
+			>
 				<div className="max-w-2xl">
 					<ErrorStrip
+						sketch={sketch}
 						photos={photos}
 						active={active}
 						setHover={setHover}
@@ -327,8 +361,19 @@ export function RollCompasses({ className }: { className?: string }) {
 					/>
 				</div>
 			</div>
-			<figcaption className="border-t border-white/8 px-4 py-3 text-[13px] leading-relaxed text-white/55 sm:px-6">
-				<span className="text-[var(--rigi-paper)]">
+			{sketch && <PenRule seed="roll-rule-caption" />}
+			<figcaption
+				className={
+					sketch
+						? "nb-hand px-1 py-3 text-[14px] leading-relaxed text-[var(--nb-pencil)]"
+						: "border-t border-white/8 px-4 py-3 text-[13px] leading-relaxed text-white/55 sm:px-6"
+				}
+			>
+				<span
+					className={
+						sketch ? "text-[var(--nb-ink)]" : "text-[var(--rigi-paper)]"
+					}
+				>
 					The phone's compass was off by {signed(lo)} to {signed(hi)} on one
 					afternoon, around one summit.
 				</span>{" "}
@@ -344,11 +389,13 @@ export function RollCompasses({ className }: { className?: string }) {
 }
 
 function Panels({
+	sketch,
 	photos,
 	active,
 	hover,
 	setHover,
 }: {
+	sketch: boolean;
 	photos: RollPhoto[];
 	active: string;
 	hover: string | null;
@@ -397,18 +444,63 @@ function Panels({
 	);
 
 	return (
-		<div className="px-4 pt-4 sm:px-6 sm:pt-5">
+		<div className={sketch ? "pt-1" : "px-4 pt-4 sm:px-6 sm:pt-5"}>
 			<div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-				<div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-white/55">
-					<Key swatch={<Line color={C.photo} />} label="photo skyline" />
+				<div
+					className={
+						sketch
+							? "nb-hand flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[var(--nb-pencil)]"
+							: "flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] text-white/55"
+					}
+				>
 					<Key
-						swatch={<Line color={C.terrain} dashed />}
+						swatch={
+							<Line
+								color={sketch ? SK.photo : C.photo}
+								sketch={sketch}
+								seed="key-photo"
+							/>
+						}
+						label="photo skyline"
+					/>
+					<Key
+						swatch={
+							<Line
+								color={sketch ? SK.terrain : C.terrain}
+								dashed
+								sketch={sketch}
+								seed="key-terrain"
+							/>
+						}
 						label="terrain skyline"
 					/>
-					<Key swatch={<Line color={C.error} />} label="compass → skyline" />
+					<Key
+						swatch={
+							<Line
+								color={sketch ? SK.error : C.error}
+								sketch={sketch}
+								seed="key-error"
+							/>
+						}
+						label="compass → skyline"
+					/>
 				</div>
-				<label className="flex items-center gap-2 font-mono text-[10.5px] text-white/60">
-					<span className={k < 0.5 ? "text-[var(--rigi-paper)]" : ""}>
+				<label
+					className={
+						sketch
+							? "nb-hand flex items-center gap-2 text-[13px] text-[var(--nb-pencil)]"
+							: "flex items-center gap-2 font-mono text-[10.5px] text-white/60"
+					}
+				>
+					<span
+						className={
+							k < 0.5
+								? sketch
+									? "text-[var(--nb-ink)] underline decoration-[var(--nb-red)] underline-offset-4"
+									: "text-[var(--rigi-paper)]"
+								: ""
+						}
+					>
 						compass
 					</span>
 					<input
@@ -421,18 +513,28 @@ function Panels({
 							played.current = true;
 							setK(Number(e.target.value));
 						}}
-						className="w-32 accent-[var(--rigi-glow)] sm:w-44"
+						className={`w-32 sm:w-44 ${sketch ? "accent-[var(--nb-red)]" : "accent-[var(--rigi-glow)]"}`}
 						aria-label="Place the photos by the phone's compass or by the skyline"
 					/>
-					<span className={k >= 0.5 ? "text-[var(--rigi-paper)]" : ""}>
+					<span
+						className={
+							k >= 0.5
+								? sketch
+									? "text-[var(--nb-ink)] underline decoration-[var(--nb-red)] underline-offset-4"
+									: "text-[var(--rigi-paper)]"
+								: ""
+						}
+					>
 						skyline
 					</span>
 				</label>
 			</div>
 			<div ref={box}>
-				{clusters.map((c) => (
+				{clusters.map((c, index) => (
 					<Panel
 						key={c.cut}
+						sketch={sketch}
+						first={index === 0}
 						cluster={c}
 						bands={bands}
 						ppd={ppd}
@@ -451,6 +553,8 @@ function Panels({
 const ARROW_ROW = 11;
 
 function Panel({
+	sketch,
+	first,
 	cluster: c,
 	bands,
 	ppd,
@@ -459,6 +563,8 @@ function Panel({
 	hover,
 	setHover,
 }: {
+	sketch: boolean;
+	first: boolean;
 	cluster: Cluster;
 	bands: Map<string, [number, number]>;
 	ppd: number;
@@ -504,18 +610,58 @@ function Panel({
 	);
 	const done = k > 0.999;
 	const sel = placed.find((q) => q.p.id === active)?.p;
+	const mono = sketch ? "nb-num" : "font-mono";
+	const arrowId = `roll-${Math.round(c.cut)}`;
 	return (
-		<div className="border-t border-white/8 pt-3 pb-4 first:border-t-0 first:pt-1">
+		<div
+			className={
+				sketch
+					? "pt-3 pb-4"
+					: "border-t border-white/8 pt-3 pb-4 first:border-t-0 first:pt-1"
+			}
+		>
+			{sketch && !first && (
+				<PenRule seed={`${arrowId}-rule`} className="mb-3" />
+			)}
 			<div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
-				<p className="text-[13px] text-[var(--rigi-paper)]">
+				<p
+					className={
+						sketch
+							? "nb-hand text-[16px] text-[var(--nb-ink)]"
+							: "text-[13px] text-[var(--rigi-paper)]"
+					}
+				>
 					Facing {c.direction}
-					{c.region && <span className="text-white/55"> · {c.region}</span>}
+					{c.region && (
+						<span
+							className={sketch ? "text-[var(--nb-pencil)]" : "text-white/55"}
+						>
+							{" "}
+							· {c.region}
+						</span>
+					)}
 				</p>
-				<p className="font-mono text-[10.5px] text-white/50">
+				<p
+					className={
+						sketch
+							? "nb-num text-[10.5px] text-[var(--nb-pencil)]"
+							: "font-mono text-[10.5px] text-white/50"
+					}
+				>
 					{c.photos.length} photo{c.photos.length === 1 ? "" : "s"} · compass
 					off {signed(c.errLo)} … {signed(c.errHi)}
 					{sel && (
-						<span style={{ color: sel.accepted ? C.error : C.rejected }}>
+						<span
+							style={{
+								color: sel.accepted
+									? sketch
+										? SK.error
+										: C.error
+									: sketch
+										? SK.rejected
+										: C.rejected,
+							}}
+						>
 							{" "}
 							· {clock(sel)} {sel.accepted ? signed(errorOf(sel)) : "rejected"}
 						</span>
@@ -550,15 +696,29 @@ function Panel({
 					</defs>
 					{/* compass ghosts: where the phone put each print */}
 					{done &&
-						placed.map(({ p, ghost }) => (
-							<polygon
-								key={`g-${p.id}`}
-								points={pts(ghost.outline)}
-								fill="none"
-								stroke={brandAlpha("paper", p.id === active ? 0.5 : 0.18)}
-								strokeDasharray="3 3"
-							/>
-						))}
+						placed.map(({ p, ghost }) =>
+							sketch ? (
+								<SketchPolyline
+									key={`g-${p.id}`}
+									points={ghost.outline.map(([x, e]) => [X(x), Y(e)])}
+									closed
+									seed={`${arrowId}-ghost-${p.id}`}
+									color="pencil"
+									width={1}
+									opacity={p.id === active ? 0.9 : 0.45}
+									dash="3 4"
+									passes={1}
+								/>
+							) : (
+								<polygon
+									key={`g-${p.id}`}
+									points={pts(ghost.outline)}
+									fill="none"
+									stroke={brandAlpha("paper", p.id === active ? 0.5 : 0.18)}
+									strokeDasharray="3 3"
+								/>
+							),
+						)}
 					{order.map(({ p, now, band }) => {
 						const on = p.id === active;
 						const dim = hover !== null && !on;
@@ -575,12 +735,13 @@ function Panel({
 								style={{ cursor: "pointer" }}
 								opacity={dim ? 0.4 : 1}
 							>
-								{/* an ink rim first, so overlapping prints read as layers */}
+								{/* an ink rim first, so overlapping prints read as layers; in the
+								 * field book it is a paper margin, like a pasted print */}
 								<polygon
 									points={pts(now.outline)}
-									fill={C.ink}
-									stroke={C.ink}
-									strokeWidth={4}
+									fill={sketch ? "var(--nb-paper)" : C.ink}
+									stroke={sketch ? "var(--nb-paper)" : C.ink}
+									strokeWidth={sketch ? 3 : 4}
 									strokeLinejoin="round"
 								/>
 								{now.strips.map((s) => {
@@ -602,54 +763,103 @@ function Panel({
 												href={p.thumb}
 												width={tw}
 												height={th}
-												opacity={p.accepted ? 0.78 : 0.35}
+												opacity={p.accepted ? (sketch ? 0.95 : 0.78) : 0.35}
 											/>
 										</svg>
 									);
 								})}
-								<polygon
-									points={pts(now.outline)}
-									fill="none"
-									stroke={
-										!p.accepted
-											? C.rejected
-											: on
-												? C.terrain
-												: brandAlpha("paper", 0.28)
-									}
-									strokeWidth={on ? 1.5 : 1}
-									strokeDasharray={p.accepted ? undefined : "4 3"}
-								/>
-								{now.skyline.map((run) => (
-									<g key={`${run[0][0]}`}>
-										<polyline
-											points={pts(run)}
-											fill="none"
-											stroke={C.ink}
-											strokeOpacity={0.7}
-											strokeWidth={on ? 5 : 4}
-											strokeLinejoin="round"
-										/>
-										<polyline
-											points={pts(run)}
-											fill="none"
-											stroke={C.photo}
-											strokeWidth={on ? 2.4 : 1.8}
-											strokeLinejoin="round"
-										/>
-									</g>
-								))}
+								{sketch ? (
+									<SketchPolyline
+										points={now.outline.map(([x, e]) => [X(x), Y(e)])}
+										closed
+										seed={`${arrowId}-print-${p.id}`}
+										color={!p.accepted ? "pencil" : on ? "ink" : "pencil"}
+										width={on ? 1.3 : 0.9}
+										opacity={on ? 0.9 : 0.6}
+										dash={p.accepted ? undefined : "4 3"}
+										passes={1}
+										tolerance={0.7}
+									/>
+								) : (
+									<polygon
+										points={pts(now.outline)}
+										fill="none"
+										stroke={
+											!p.accepted
+												? C.rejected
+												: on
+													? C.terrain
+													: brandAlpha("paper", 0.28)
+										}
+										strokeWidth={on ? 1.5 : 1}
+										strokeDasharray={p.accepted ? undefined : "4 3"}
+									/>
+								)}
+								{now.skyline.map((run, runIndex) =>
+									sketch ? (
+										<g key={`${run[0][0]}`}>
+											<polyline
+												points={pts(run)}
+												fill="none"
+												stroke="var(--nb-paper)"
+												strokeOpacity={0.8}
+												strokeWidth={on ? 4.5 : 3.5}
+												strokeLinejoin="round"
+											/>
+											<SketchPolyline
+												points={run.map(([x, e]) => [X(x), Y(e)])}
+												seed={`${arrowId}-sky-${p.id}-${runIndex}`}
+												color={SK.photo}
+												width={on ? 2.2 : 1.6}
+												passes={1}
+												tolerance={0.7}
+											/>
+										</g>
+									) : (
+										<g key={`${run[0][0]}`}>
+											<polyline
+												points={pts(run)}
+												fill="none"
+												stroke={C.ink}
+												strokeOpacity={0.7}
+												strokeWidth={on ? 5 : 4}
+												strokeLinejoin="round"
+											/>
+											<polyline
+												points={pts(run)}
+												fill="none"
+												stroke={C.photo}
+												strokeWidth={on ? 2.4 : 1.8}
+												strokeLinejoin="round"
+											/>
+										</g>
+									),
+								)}
 							</g>
 						);
 					})}
-					<polyline
-						points={pts(terrain)}
-						fill="none"
-						stroke={C.terrain}
-						strokeWidth={1.4}
-						strokeDasharray="6 4"
-						pointerEvents="none"
-					/>
+					{sketch ? (
+						<g pointerEvents="none">
+							<SketchPolyline
+								points={terrain.map(([x, e]) => [X(x), Y(e)])}
+								seed={`${arrowId}-terrain`}
+								color={SK.terrain}
+								width={1.8}
+								dash="6 4"
+								passes={1}
+								tolerance={0.7}
+							/>
+						</g>
+					) : (
+						<polyline
+							points={pts(terrain)}
+							fill="none"
+							stroke={C.terrain}
+							strokeWidth={1.4}
+							strokeDasharray="6 4"
+							pointerEvents="none"
+						/>
+					)}
 					{/* the correction per print, compass → skyline, one row each */}
 					{done &&
 						placed.map(({ p, ghost, now }, i) => {
@@ -658,44 +868,90 @@ function Panel({
 							const x1 = X(ghost.centre[0]);
 							const x2 = X(now.centre[0]);
 							const right = x2 >= x1;
+							const label = `${clock(p)} ${signed(errorOf(p))}${p.accepted ? "" : " · rejected: low confidence"}`;
 							return (
 								<g
 									key={`a-${p.id}`}
 									opacity={hover !== null && !on ? 0.35 : 1}
 									pointerEvents="none"
 								>
-									<line
-										x1={x1}
-										x2={x2}
-										y1={y}
-										y2={y}
-										stroke={p.accepted ? C.error : C.rejected}
-										strokeWidth={on ? 2.2 : 1.5}
-										markerEnd={`url(#roll-arrow-${Math.round(c.cut)})`}
-									/>
-									<text
-										x={right ? x2 + 6 : x2 - 6}
-										y={y}
-										dominantBaseline="central"
-										textAnchor={right ? "start" : "end"}
-										className="font-mono"
-										fontSize={9.5}
-										fill={p.accepted ? C.error : C.rejected}
-									>
-										{clock(p)} {signed(errorOf(p))}
-										{p.accepted ? "" : " · rejected: low confidence"}
-									</text>
+									{sketch ? (
+										<>
+											{Math.abs(x2 - x1) > 6 ? (
+												<PenArrow
+													from={[x1, y]}
+													to={[x2, y]}
+													seed={`${arrowId}-arrow-${p.id}`}
+													color={p.accepted ? SK.error : SK.rejected}
+													width={on ? 2 : 1.4}
+													bend={0.05}
+													head={5}
+												/>
+											) : (
+												<HandDot
+													x={x2}
+													y={y}
+													r={2}
+													seed={`${arrowId}-arrow-${p.id}`}
+													color={p.accepted ? SK.error : SK.rejected}
+												/>
+											)}
+											<HandText
+												x={right ? x2 + 6 : x2 - 6}
+												y={y + 3.5}
+												anchor={right ? "start" : "end"}
+												size={11.5}
+												color={p.accepted ? SK.error : SK.rejected}
+											>
+												{label}
+											</HandText>
+										</>
+									) : (
+										<>
+											<line
+												x1={x1}
+												x2={x2}
+												y1={y}
+												y2={y}
+												stroke={p.accepted ? C.error : C.rejected}
+												strokeWidth={on ? 2.2 : 1.5}
+												markerEnd={`url(#roll-arrow-${Math.round(c.cut)})`}
+											/>
+											<text
+												x={right ? x2 + 6 : x2 - 6}
+												y={y}
+												dominantBaseline="central"
+												textAnchor={right ? "start" : "end"}
+												className="font-mono"
+												fontSize={9.5}
+												fill={p.accepted ? C.error : C.rejected}
+											>
+												{label}
+											</text>
+										</>
+									)}
 								</g>
 							);
 						})}
 					{/* azimuth axis */}
-					<line
-						x1={0}
-						x2={W}
-						y1={H - AXIS + 4}
-						y2={H - AXIS + 4}
-						stroke={brandAlpha("paper", 0.15)}
-					/>
+					{sketch ? (
+						<PenLine
+							from={[0, H - AXIS + 4]}
+							to={[W, H - AXIS + 4]}
+							seed={`${arrowId}-axis`}
+							color="ink"
+							width={1.2}
+							opacity={0.7}
+						/>
+					) : (
+						<line
+							x1={0}
+							x2={W}
+							y1={H - AXIS + 4}
+							y2={H - AXIS + 4}
+							stroke={brandAlpha("paper", 0.15)}
+						/>
+					)}
 					{Array.from({ length: 72 }, (_, i) => i * 5)
 						.map((az) => ({ az, u: wrap360(az - c.cut) }))
 						.filter(({ u }) => u <= c.span)
@@ -706,28 +962,54 @@ function Panel({
 							const major = az % 10 === 0;
 							return (
 								<g key={az}>
-									<line
-										x1={X(u)}
-										x2={X(u)}
-										y1={H - AXIS + 4}
-										y2={H - AXIS + (card ? 11 : major ? 8 : 6)}
-										stroke={brandAlpha(
-											"paper",
-											card ? 0.5 : major ? 0.25 : 0.12,
-										)}
-									/>
-									{(card || az % 20 === 0) && (
-										<text
-											x={X(u)}
-											y={H - AXIS + 20}
-											textAnchor="middle"
-											className="font-mono"
-											fontSize={card ? 10.5 : 9.5}
-											fill={brandAlpha("paper", card ? 0.75 : 0.35)}
-										>
-											{card ?? `${az}°`}
-										</text>
+									{sketch ? (
+										<PenLine
+											from={[X(u), H - AXIS + 4]}
+											to={[X(u), H - AXIS + (card ? 11 : major ? 8 : 6)]}
+											seed={`${arrowId}-tick-${az}`}
+											color="ink"
+											width={card ? 1.2 : 0.8}
+											opacity={card ? 0.9 : major ? 0.6 : 0.4}
+										/>
+									) : (
+										<line
+											x1={X(u)}
+											x2={X(u)}
+											y1={H - AXIS + 4}
+											y2={H - AXIS + (card ? 11 : major ? 8 : 6)}
+											stroke={brandAlpha(
+												"paper",
+												card ? 0.5 : major ? 0.25 : 0.12,
+											)}
+										/>
 									)}
+									{(card || az % 20 === 0) &&
+										(sketch && card ? (
+											<HandText
+												x={X(u)}
+												y={H - AXIS + 22}
+												anchor="middle"
+												size={14}
+												halo={false}
+											>
+												{card}
+											</HandText>
+										) : (
+											<text
+												x={X(u)}
+												y={H - AXIS + 20}
+												textAnchor="middle"
+												className={mono}
+												fontSize={card ? 10.5 : 9.5}
+												fill={
+													sketch
+														? "var(--nb-pencil)"
+														: brandAlpha("paper", card ? 0.75 : 0.35)
+												}
+											>
+												{card ?? `${az}°`}
+											</text>
+										))}
 								</g>
 							);
 						})}
@@ -737,18 +1019,47 @@ function Panel({
 	);
 }
 
-function Line({ color, dashed = false }: { color: string; dashed?: boolean }) {
+/** The pen-drawn inks of the sketch look (the --nb-* tokens the Gipfelbuch page defines). */
+const SK = {
+	photo: "blue",
+	terrain: "brown",
+	error: "red",
+	rejected: "pencil",
+} as const;
+
+function Line({
+	color,
+	dashed = false,
+	sketch = false,
+	seed = "key",
+}: {
+	color: string;
+	dashed?: boolean;
+	sketch?: boolean;
+	seed?: string;
+}) {
 	return (
 		<svg width={18} height={8} aria-hidden="true">
-			<line
-				x1={0}
-				x2={18}
-				y1={4}
-				y2={4}
-				stroke={color}
-				strokeWidth={2}
-				strokeDasharray={dashed ? "4 2" : undefined}
-			/>
+			{sketch ? (
+				<PenLine
+					from={[0, 4]}
+					to={[18, 4]}
+					seed={seed}
+					color={color}
+					width={2}
+					dash={dashed ? "4 3" : undefined}
+				/>
+			) : (
+				<line
+					x1={0}
+					x2={18}
+					y1={4}
+					y2={4}
+					stroke={color}
+					strokeWidth={2}
+					strokeDasharray={dashed ? "4 2" : undefined}
+				/>
+			)}
 		</svg>
 	);
 }
@@ -765,6 +1076,7 @@ function Key({ swatch, label }: { swatch: ReactNode; label: string }) {
 // ---- the compass error, sorted ----
 
 function ErrorStrip({
+	sketch,
 	photos,
 	active,
 	setHover,
@@ -772,6 +1084,7 @@ function ErrorStrip({
 	hi,
 	median,
 }: {
+	sketch: boolean;
 	photos: RollPhoto[];
 	active: string;
 	setHover: (id: string | null) => void;
@@ -786,9 +1099,16 @@ function ErrorStrip({
 	const R = 14;
 	const x = (e: number) => L + ((e + 20) / 35) * (W - L - R);
 	const sorted = [...photos].sort((a, b) => errorOf(a) - errorOf(b));
+	const mono = sketch ? "nb-num" : "font-mono";
 	return (
 		<div ref={box}>
-			<p className="mb-1 font-mono text-[10px] tracking-[0.14em] text-white/45 uppercase">
+			<p
+				className={
+					sketch
+						? "nb-hand mb-1 text-[14px] text-[var(--nb-ink)]"
+						: "mb-1 font-mono text-[10px] tracking-[0.14em] text-white/45 uppercase"
+				}
+			>
 				Compass error per photo
 			</p>
 			<svg
@@ -800,29 +1120,51 @@ function ErrorStrip({
 				aria-label={`Compass error per photo, from ${lo.toFixed(1)} to ${hi.toFixed(1)} degrees`}
 				onPointerLeave={() => setHover(null)}
 			>
-				<line
-					x1={L}
-					x2={W - R}
-					y1={24}
-					y2={24}
-					stroke={brandAlpha("paper", 0.15)}
-				/>
+				{sketch ? (
+					<PenLine
+						from={[L, 24]}
+						to={[W - R, 24]}
+						seed="roll-err-axis"
+						color="ink"
+						width={1.2}
+						opacity={0.8}
+					/>
+				) : (
+					<line
+						x1={L}
+						x2={W - R}
+						y1={24}
+						y2={24}
+						stroke={brandAlpha("paper", 0.15)}
+					/>
+				)}
 				{[-20, -10, 0, 10, 15].map((v) => (
 					<g key={v}>
-						<line
-							x1={x(v)}
-							x2={x(v)}
-							y1={v === 0 ? 8 : 20}
-							y2={v === 0 ? 40 : 28}
-							stroke={brandAlpha("paper", v === 0 ? 0.4 : 0.2)}
-						/>
+						{sketch ? (
+							<PenLine
+								from={[x(v), v === 0 ? 8 : 20]}
+								to={[x(v), v === 0 ? 40 : 28]}
+								seed={`roll-err-tick-${v}`}
+								color="ink"
+								width={v === 0 ? 1.2 : 0.8}
+								opacity={v === 0 ? 0.9 : 0.6}
+							/>
+						) : (
+							<line
+								x1={x(v)}
+								x2={x(v)}
+								y1={v === 0 ? 8 : 20}
+								y2={v === 0 ? 40 : 28}
+								stroke={brandAlpha("paper", v === 0 ? 0.4 : 0.2)}
+							/>
+						)}
 						<text
 							x={x(v)}
 							y={52}
 							textAnchor="middle"
-							className="font-mono"
+							className={mono}
 							fontSize={10}
-							fill={brandAlpha("paper", 0.4)}
+							fill={sketch ? "var(--nb-pencil)" : brandAlpha("paper", 0.4)}
 						>
 							{v === 0 ? "0°" : signed(v, 0)}
 						</text>
@@ -834,6 +1176,46 @@ function ErrorStrip({
 					const prev = sorted[i - 1];
 					const stacked =
 						prev && Math.abs(errorOf(p) - errorOf(prev)) < 0.9 && i % 2;
+					if (sketch) {
+						const cx = x(errorOf(p));
+						const cy = stacked ? 14 : 24;
+						const color = p.accepted ? SK.error : SK.rejected;
+						return (
+							<g
+								key={p.id}
+								onPointerEnter={() => setHover(p.id)}
+								style={{ cursor: "pointer" }}
+							>
+								<circle cx={cx} cy={cy} r={8} fill="transparent" />
+								{p.accepted ? (
+									<HandDot
+										x={cx}
+										y={cy}
+										r={on ? 5.5 : 4}
+										seed={`roll-err-dot-${p.id}`}
+										color={color}
+									/>
+								) : (
+									<PenCircle
+										center={[cx, cy]}
+										radiusX={on ? 6 : 4.5}
+										seed={`roll-err-ring-${p.id}`}
+										color={color}
+										width={1.5}
+									/>
+								)}
+								{on && (
+									<PenCircle
+										center={[cx, cy]}
+										radiusX={9}
+										seed={`roll-err-on-${p.id}`}
+										color="ink"
+										width={1.2}
+									/>
+								)}
+							</g>
+						);
+					}
 					return (
 						<circle
 							key={p.id}
@@ -852,9 +1234,9 @@ function ErrorStrip({
 					x={x(lo)}
 					y={40}
 					textAnchor="start"
-					className="font-mono"
+					className={mono}
 					fontSize={10}
-					fill={C.error}
+					fill={sketch ? "var(--nb-red)" : C.error}
 				>
 					{signed(lo)}
 				</text>
@@ -862,14 +1244,20 @@ function ErrorStrip({
 					x={x(hi)}
 					y={40}
 					textAnchor="end"
-					className="font-mono"
+					className={mono}
 					fontSize={10}
-					fill={C.error}
+					fill={sketch ? "var(--nb-red)" : C.error}
 				>
 					{signed(hi)}
 				</text>
 			</svg>
-			<p className="mt-1 text-[11.5px] leading-snug text-white/45">
+			<p
+				className={
+					sketch
+						? "nb-hand mt-1 text-[13px] leading-snug text-[var(--nb-pencil)]"
+						: "mt-1 text-[11.5px] leading-snug text-white/45"
+				}
+			>
 				Median size {median.toFixed(1)}°: enough to put a name on the wrong
 				summit. The skyline brings it back.
 			</p>

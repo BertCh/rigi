@@ -17,6 +17,7 @@ import { loadRegion } from "#/lib/photos";
 import type { Roll, Viewpoint } from "../types";
 import type { RidgelinePeakInput, ViewpointTerrain } from "./ridgelines";
 import type { RidgeWorkerIn, RidgeWorkerOut } from "./ridgelines.worker";
+import { terrainKey } from "./terrainCodec";
 
 /** Far enough for the big ranges, near enough to keep the full-circle mosaics ~100 MB. */
 const MAX_DISTANCE = 120_000;
@@ -53,15 +54,37 @@ let gpuBroken = false;
 const memo = new Map<string, Promise<ViewpointTerrain>>();
 let queue: Promise<unknown> = Promise.resolve();
 
+/** Terrain baked ahead of time, by terrainKey: null (or a failure) means trace it live. */
+export type BakedTerrainLookup = (
+	key: string,
+) => Promise<ViewpointTerrain | null>;
+let baked: BakedTerrainLookup | null = null;
+
+/** Look viewpoints up here before tracing them (the sample trip ships its terrain, src/lib/demo). */
+export function setBakedTerrain(lookup: BakedTerrainLookup) {
+	baked = lookup;
+}
+
 export function viewpointTerrain(r: TerrainRequest): Promise<ViewpointTerrain> {
-	const key = `${r.lat.toFixed(5)},${r.lon.toFixed(5)},${r.eyeAlt?.toFixed(1) ?? "dem"}`;
+	const key = terrainKey(r);
 	let p = memo.get(key);
 	if (!p) {
-		p = queue.then(() => run(r));
-		queue = p.catch(() => {});
+		const lookup = baked;
+		p = lookup
+			? lookup(key)
+					.catch(() => null)
+					.then((t) => t ?? traced(r))
+			: traced(r);
 		memo.set(key, p);
 		p.catch(() => memo.delete(key));
 	}
+	return p;
+}
+
+/** One live trace at a time (each worker holds ~100 MB of mosaics). */
+function traced(r: TerrainRequest): Promise<ViewpointTerrain> {
+	const p = queue.then(() => run(r));
+	queue = p.catch(() => {});
 	return p;
 }
 

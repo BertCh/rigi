@@ -415,7 +415,10 @@ export function BaselinePage({
 	const progress = state.progress;
 
 	return (
-		<div className="min-h-screen bg-neutral-100 text-neutral-900">
+		<div
+			data-theme="dark"
+			className="min-h-screen bg-neutral-100 text-neutral-900"
+		>
 			<header className="flex items-center justify-between gap-4 border-b border-neutral-200 bg-white px-4 py-2">
 				<div className="flex items-baseline gap-3">
 					<h1 className="text-base font-semibold">Georeferencing baseline</h1>

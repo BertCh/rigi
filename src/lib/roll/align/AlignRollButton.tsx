@@ -142,11 +142,11 @@ export function AlignRollButton({
 						review.length ? `Needs review: ${review.join(", ")}` : undefined
 					}
 				>
-					<span className="inline-flex items-center gap-1 text-violet-200">
+					<span className="inline-flex items-center gap-1 text-violet-200 light:text-[var(--rigi-paper)]">
 						<Check className="size-3.5" /> {s.accepted} aligned
 					</span>
 					{s.needsReview + s.failed > 0 && (
-						<span className="inline-flex items-center gap-1 text-amber-200">
+						<span className="inline-flex items-center gap-1 text-amber-200 light:text-[var(--rigi-lesson)]">
 							<AlertTriangle className="size-3.5" /> {s.needsReview + s.failed}{" "}
 							need{s.needsReview + s.failed === 1 ? "s" : ""} review
 						</span>

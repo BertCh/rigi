@@ -11,17 +11,33 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Rigi brand: Brezine Color Chart swatches (Ascher codes), mirrored in src/brand/khipu.ts */
-  --rigi-ink: #131313; /* LK  Black */
-  --rigi-slate: #2c3337; /* LC  Dark Grayish Blue */
-  --rigi-paper: #f4f4f4; /* W   White */
-  --rigi-glow: #bb8b54; /* YB  Light Yellowish Brown */
-  --rigi-ember: #b15124; /* SB  Brownish Orange */
-  --rigi-umber: #32221a; /* CB  Dark Grayish Brown */
-  --rigi-lesson: #e59e1f; /* SY  Strong Yellow */
-  --rigi-trap: #ee9086; /* PK  Unknown Urton Color */
-  --rigi-result: #8d917a; /* PG  Pale Green */
-  --rigi-negative: #817066; /* MG  Medium Gray */
+  /* Brezine chart swatches (Ascher codes), mirrored in src/brand/khipu.ts BREZINE. Never re-themed. */
+  --khipu-lk: #131313;
+  --khipu-w: #f4f4f4;
+  --khipu-lc: #2c3337;
+  --khipu-lg: #baaf96;
+  --khipu-yb: #bb8b54;
+  --khipu-sb: #b15124;
+  --khipu-cb: #32221a;
+  --khipu-sy: #e59e1f;
+  --khipu-nb: #95500c;
+  --khipu-pk: #ee9086;
+  --khipu-rm: #ab343a;
+  --khipu-pg: #8d917a;
+  --khipu-gg: #575e4e;
+  --khipu-mg: #817066;
+
+  /* Rigi brand roles (dark values; :root[data-theme="light"] below re-inks them) */
+  --rigi-ink: var(--khipu-lk); /* LK  Black */
+  --rigi-slate: var(--khipu-lc); /* LC  Dark Grayish Blue */
+  --rigi-paper: var(--khipu-w); /* W   White */
+  --rigi-glow: var(--khipu-yb); /* YB  Light Yellowish Brown */
+  --rigi-ember: var(--khipu-sb); /* SB  Brownish Orange */
+  --rigi-umber: var(--khipu-cb); /* CB  Dark Grayish Brown */
+  --rigi-lesson: var(--khipu-sy); /* SY  Strong Yellow */
+  --rigi-trap: var(--khipu-pk); /* PK  Unknown Urton Color */
+  --rigi-result: var(--khipu-pg); /* PG  Pale Green */
+  --rigi-negative: var(--khipu-mg); /* MG  Medium Gray */
 
   --sea-ink: #173a40;
   --sea-ink-soft: #416166;
@@ -133,6 +149,53 @@
   --sidebar-ring: oklch(0.442 0.017 285.786);
 }
 
+/* Light theme (WP1 of the light-mode plan). Alpha utilities (text-white/55, bg-black/40, ring-white/10)
+   compile to color-mix(var(--color-white) ...), so swapping --color-white/--color-black flips them all.
+   --color-white is declared in Tailwind's @theme layer, so these unlayered rules win. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --rigi-ink: var(--khipu-w); /* ground */
+  --rigi-paper: var(--khipu-lk); /* text */
+  --rigi-slate: color-mix(in oklab, var(--khipu-lg) 30%, var(--khipu-w));
+  --rigi-glow: var(--khipu-sb);
+  --rigi-ember: var(--khipu-sb);
+  --rigi-umber: var(--khipu-cb);
+  --rigi-lesson: var(--khipu-nb);
+  --rigi-trap: var(--khipu-rm);
+  --rigi-result: var(--khipu-gg);
+  --rigi-negative: var(--khipu-mg);
+  --color-white: var(--khipu-lk);
+  --color-black: var(--khipu-w);
+}
+
+/* <html> in dark mode, and every always-dark island (add data-theme="dark" to the element).
+   The ten roles are set again because a child cannot re-resolve a var() substituted on <html>. */
+[data-theme='dark'] {
+  --rigi-ink: var(--khipu-lk);
+  --rigi-slate: var(--khipu-lc);
+  --rigi-paper: var(--khipu-w);
+  --rigi-glow: var(--khipu-yb);
+  --rigi-ember: var(--khipu-sb);
+  --rigi-umber: var(--khipu-cb);
+  --rigi-lesson: var(--khipu-sy);
+  --rigi-trap: var(--khipu-pk);
+  --rigi-result: var(--khipu-pg);
+  --rigi-negative: var(--khipu-mg);
+  --color-white: #fff; /* Tailwind defaults restored */
+  --color-black: #000;
+}
+
+/* base layer, so utility classes on the same element still win */
+@layer base {
+  [data-theme='dark'] {
+    color: var(--rigi-paper);
+    color-scheme: dark;
+  }
+}
+
+/* light: variant, for the few off-palette colours: applies under the light theme, not inside a dark island */
+@custom-variant light (&:where([data-theme='light'] *):not(:where([data-theme='dark'], [data-theme='dark'] *)));
+
 @theme inline {
   --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
@@ -189,6 +252,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme='light'] body {
+  color: var(--rigi-paper);
+  background-color: var(--rigi-ink);
+}
+
 
 /* Element defaults live in @layer base so Tailwind utilities (e.g. [&_code]:bg-*,
    [&_a]:text-*, transition-*) can override them; unlayered rules beat every utility. */
@@ -204,8 +272,8 @@ body {
   /* The site is dark everywhere (.dark is never applied), so the chip is tuned for dark grounds. */
   code {
     font-size: 0.9em;
-    border: 1px solid rgb(255 255 255 / 0.1);
-    background: rgb(255 255 255 / 0.08);
+    border: 1px solid color-mix(in oklab, var(--color-white) 10%, transparent);
+    background: color-mix(in oklab, var(--color-white) 8%, transparent);
     border-radius: 7px;
     padding: 2px 7px;
   }
@@ -384,12 +452,12 @@ body {
 .mt-range::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in oklab, var(--color-white) 14%, transparent);
 }
 .mt-range::-moz-range-track {
   height: 3px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in oklab, var(--color-white) 14%, transparent);
 }
 .mt-range::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -397,13 +465,13 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.35);
+  background: var(--color-white);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--rigi-glow) 35%, transparent);
 }
 .mt-range::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border: 0;
   border-radius: 999px;
-  background: #fff;
+  background: var(--color-white);
 }

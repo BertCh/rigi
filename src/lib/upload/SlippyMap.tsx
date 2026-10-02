@@ -198,6 +198,7 @@ export function SlippyMap({
 			role="application"
 			aria-label="Map: click to place the camera position"
 			data-testid="slippy-map"
+			data-theme="dark"
 			className={`relative touch-none overflow-hidden rounded-lg bg-[#1a2330] select-none ${onPick ? "cursor-crosshair" : "cursor-grab"} ${className ?? ""}`}
 			style={{ height }}
 			onPointerDown={onPointerDown}

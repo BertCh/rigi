@@ -94,6 +94,16 @@ export async function demoPose(id: string): Promise<Pose | null> {
 	return (await loadDemo()).poses[id]?.pose ?? null;
 }
 
+/** The sample trip's panorama terrain, baked by scripts/demo/bake-pano-terrain.ts (by terrainKey). */
+const PANO_BASE = "/demo/pano";
+let panoIndex: Promise<Record<string, string>> | null = null;
+function bakedTerrainIndex() {
+	panoIndex ??= fetch(`${PANO_BASE}/index.json`)
+		.then((r) => (r.ok ? (r.json() as Promise<Record<string, string>>) : {}))
+		.catch(() => ({}));
+	return panoIndex;
+}
+
 /** Long side (px) of the landing's photo copies (public/demo/photos-1024, from scripts/demo/unpack.mjs). */
 export const DEMO_SMALL_LONG = 1024;
 
@@ -153,10 +163,19 @@ function smallCopyPxPerDeg(meta: PhotoMeta, vfov: number) {
 
 /** The sample trip as a roll. Photos the user has not touched take the bundled pose. */
 export async function loadDemoRoll(opts: DemoRollOptions = {}): Promise<Roll> {
-	const [m, { makeRoll }] = await Promise.all([
-		opts.core ? loadDemoCore() : loadDemo(),
-		import("../roll/roll"),
-	]);
+	const [m, { makeRoll }, { setBakedTerrain }, { decodeTerrain }] =
+		await Promise.all([
+			opts.core ? loadDemoCore() : loadDemo(),
+			import("../roll/roll"),
+			import("../roll/mosaic/viewpointTerrain"),
+			import("../roll/mosaic/terrainCodec"),
+		]);
+	setBakedTerrain(async (key) => {
+		const file = (await bakedTerrainIndex())[key];
+		if (!file) return null;
+		const r = await fetch(`${PANO_BASE}/${file}`);
+		return r.ok ? decodeTerrain(await r.arrayBuffer()) : null;
+	});
 	// copies of the metas: the registered ones (photos.ts) keep the full-size src
 	const metas = opts.smallPhotos ? m.photos.map((p) => ({ ...p })) : m.photos;
 	const roll = makeRoll(DEMO_ROLL_ID, m.name, metas, m.region.id);

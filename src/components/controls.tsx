@@ -130,7 +130,9 @@ export function PanelBand({
 			<span
 				className={cn(
 					"text-[10px] font-bold tracking-[0.2em] uppercase",
-					tone === "muted" ? "text-amber-200/60" : "text-cyan-200/70",
+					tone === "muted"
+						? "text-amber-200/60 light:text-[var(--rigi-lesson)]"
+						: "text-cyan-200/70 light:text-[var(--rigi-glow)]",
 				)}
 			>
 				{label}
@@ -201,7 +203,7 @@ export function Segmented<T extends string>({
 						"flex-1 rounded-md font-medium transition-colors",
 						size === "sm" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs",
 						value === o.value
-							? "bg-white text-slate-900 shadow"
+							? "bg-white text-slate-900 shadow light:text-[var(--rigi-ink)]"
 							: "text-white/60 hover:text-white",
 					)}
 				>
@@ -299,7 +301,8 @@ export function Button({
 				"inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40",
 				variant === "ghost" &&
 					"bg-white/6 text-white/80 ring-1 ring-white/10 hover:bg-white/12",
-				variant === "solid" && "bg-white text-slate-900 hover:bg-white/90",
+				variant === "solid" &&
+					"bg-white text-slate-900 hover:bg-white/90 light:text-[var(--rigi-ink)]",
 				variant === "accent" && "bg-cyan-400 text-slate-950 hover:bg-cyan-300",
 				className,
 			)}

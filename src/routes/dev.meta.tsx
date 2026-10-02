@@ -85,7 +85,7 @@ function Part({
 			<p className="mt-3 mb-8 max-w-2xl text-[15px] leading-relaxed text-white/55">
 				{body}
 			</p>
-			{children}
+			<div data-theme="dark">{children}</div>
 		</section>
 	);
 }

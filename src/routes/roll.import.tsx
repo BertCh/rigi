@@ -16,6 +16,7 @@ import {
 	X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ThemeToggle } from "#/components/site/ThemeToggle";
 import type { PhotoMeta } from "#/lib/photos";
 import {
 	addToIndex,
@@ -375,7 +376,8 @@ function ImportPage() {
 			className="min-h-dvh bg-[var(--rigi-ink)] px-4 pb-16 text-[var(--rigi-paper)] sm:px-8"
 			data-testid="roll-import"
 		>
-			<header className="mx-auto max-w-6xl pt-8 pb-6">
+			<header className="relative mx-auto max-w-6xl pt-8 pb-6">
+				<ThemeToggle className="absolute top-8 right-0" />
 				<Link
 					to="/roll"
 					className="mb-6 inline-flex items-center gap-1.5 text-xs text-white/55 hover:text-[var(--rigi-paper)]"
@@ -455,15 +457,17 @@ function ImportPage() {
 						)}
 						{counts.gps > 0 && <span>{counts.gps} with GPS</span>}
 						{counts.estimate > 0 && (
-							<span className="text-sky-300">
+							<span className="text-sky-300 light:text-[var(--rigi-glow)]">
 								{counts.estimate} placed by time
 							</span>
 						)}
 						{counts.pin > 0 && (
-							<span className="text-emerald-300">{counts.pin} pinned</span>
+							<span className="text-emerald-300 light:text-[var(--rigi-result)]">
+								{counts.pin} pinned
+							</span>
 						)}
 						{counts.none > 0 && (
-							<span className="text-amber-300">
+							<span className="text-amber-300 light:text-[var(--rigi-lesson)]">
 								{counts.none} need a position
 							</span>
 						)}
@@ -471,7 +475,9 @@ function ImportPage() {
 							<span className="text-white/40">{dups} duplicates skipped</span>
 						)}
 						{errors > 0 && (
-							<span className="text-red-300">{errors} failed</span>
+							<span className="text-red-300 light:text-[var(--rigi-trap)]">
+								{errors} failed
+							</span>
 						)}
 						<div className="h-1 min-w-24 flex-1 overflow-hidden rounded-full bg-white/8">
 							<div
@@ -499,7 +505,7 @@ function ImportPage() {
 								/>
 							)}
 							<span className="flex min-w-0 flex-1 items-center gap-1.5 font-semibold text-white/80">
-								<MapPin className="size-3.5 shrink-0 text-red-400" />
+								<MapPin className="size-3.5 shrink-0 text-red-400 light:text-[var(--rigi-trap)]" />
 								<span className="truncate">
 									Click the map where {pinItem.file.name} was taken
 								</span>
@@ -507,7 +513,7 @@ function ImportPage() {
 							{pins.has(pinItem.draft.id) && (
 								<button
 									type="button"
-									className="text-sky-300 hover:underline"
+									className="text-sky-300 light:text-[var(--rigi-glow)] hover:underline"
 									onClick={() => {
 										const next = new Map(pins);
 										next.delete(pinItem.draft.id);
@@ -625,7 +631,7 @@ function ImportPage() {
 								</span>
 							)}
 							{busy === 0 && unplaced.length > 0 && (
-								<span className="text-xs text-amber-300">
+								<span className="text-xs text-amber-300 light:text-[var(--rigi-lesson)]">
 									{unplaced.length} without a position will be left out: click
 									one to place it.
 								</span>
@@ -650,10 +656,10 @@ function ImportPage() {
 					)}
 					{phase.kind === "done" && (
 						<div
-							className="rounded-xl bg-emerald-400/10 p-4 ring-1 ring-emerald-300/25"
+							className="rounded-xl bg-emerald-400/10 p-4 ring-1 ring-emerald-300/25 light:ring-[var(--rigi-result)]/25"
 							data-testid="import-done"
 						>
-							<p className="text-sm font-semibold text-emerald-200">
+							<p className="text-sm font-semibold text-emerald-200 light:text-[var(--rigi-result)]">
 								Saved. Open your roll{phase.links.length === 1 ? "" : "s"}:
 							</p>
 							<div className="mt-3 flex flex-wrap gap-2">
@@ -670,7 +676,10 @@ function ImportPage() {
 								))}
 							</div>
 							{phase.warnings.map((w) => (
-								<p key={w} className="mt-2 text-xs text-amber-300">
+								<p
+									key={w}
+									className="mt-2 text-xs text-amber-300 light:text-[var(--rigi-lesson)]"
+								>
 									{w}
 								</p>
 							))}
@@ -714,11 +723,11 @@ function ItemCard({
 					active
 						? "ring-[var(--rigi-glow)]"
 						: placement?.kind === "none"
-							? "ring-amber-300/40"
+							? "ring-amber-300/40 light:ring-[var(--rigi-lesson)]/40"
 							: "ring-white/8"
 				} ${onPin ? "hover:ring-[var(--rigi-glow)]/60" : ""}`}
 			>
-				<div className="relative aspect-[4/3] bg-black/50">
+				<div data-theme="dark" className="relative aspect-[4/3] bg-black/50">
 					{item.thumbUrl && (
 						<img
 							src={item.thumbUrl}
@@ -747,7 +756,9 @@ function ItemCard({
 						title={item.error ?? item.note}
 					>
 						{item.error ? (
-							<span className="text-red-300">{item.error}</span>
+							<span className="text-red-300 light:text-[var(--rigi-trap)]">
+								{item.error}
+							</span>
 						) : item.note ? (
 							<span className="text-white/40">{item.note}</span>
 						) : (
@@ -764,14 +775,14 @@ function StatusChip({ item }: { item: Item }) {
 	const s = item.status;
 	const cls =
 		s === "saved"
-			? "bg-emerald-400/90 text-black"
+			? "bg-emerald-400/90 text-black light:text-[var(--rigi-paper)]"
 			: s === "error" || s === "save-error"
-				? "bg-red-400/90 text-black"
+				? "bg-red-400/90 text-black light:text-[var(--rigi-paper)]"
 				: s === "duplicate"
 					? "bg-white/20 text-white"
 					: s === "ready"
 						? "bg-black/60 text-white/80"
-						: "bg-[var(--rigi-glow)]/90 text-black";
+						: "bg-[var(--rigi-glow)]/90 text-black light:text-[var(--rigi-ink)]";
 	const Icon =
 		s === "saved"
 			? Check
@@ -793,18 +804,27 @@ function StatusChip({ item }: { item: Item }) {
 function PositionText({ p }: { p?: Placement }) {
 	if (!p) return <span className="text-white/30">…</span>;
 	if (p.kind === "gps") return <span className="text-white/45">GPS</span>;
-	if (p.kind === "pin") return <span className="text-emerald-300">pinned</span>;
+	if (p.kind === "pin")
+		return (
+			<span className="text-emerald-300 light:text-[var(--rigi-result)]">
+				pinned
+			</span>
+		);
 	if (p.kind === "estimate")
 		return (
 			<span
-				className="text-sky-300"
+				className="text-sky-300 light:text-[var(--rigi-glow)]"
 				title={`from ${p.est.from.join(", ")}; ${Math.round(p.est.gapS / 60)} min to the nearest GPS photo`}
 			>
 				{p.est.method === "interpolated" ? "interpolated" : "nearest GPS"} ±
 				{p.est.accuracyM} m
 			</span>
 		);
-	return <span className="text-amber-300">needs a position</span>;
+	return (
+		<span className="text-amber-300 light:text-[var(--rigi-lesson)]">
+			needs a position
+		</span>
+	);
 }
 
 /** "10:02–14:37 (4 h 35 min)" in the photos' own wall-clock time; just the duration across days. */

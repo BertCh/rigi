@@ -699,12 +699,15 @@ Every key Rigi persists. The check fails on any `mt-image:` / `mt-image.` / `mt-
 | `propagate` | localStorage | `mt-image:propagate:v1` | StoredSuggestion map keyed anchor>target | v1 | lib/roll/propagate/store.ts |
 | `rollBasemap` | localStorage | `mt-image:rollBasemap` | UI toggle | none | lib/roll/map/RollMap.tsx |
 | `panoTerrain` | localStorage | `mt-image:roll:pano-terrain` | UI toggle | none | lib/roll/mosaic/PanoramaStrip.tsx |
+| `panoHeight` | localStorage | `mt-image:roll:pano-height` | UI size (px) | none | lib/roll/mosaic/PanoramaStrip.tsx |
 | `viewStyle` | localStorage | `mt-image.viewStyle.v1` | StyleState {v, preset, overrides} | v1 | lib/style/store.ts |
 | `lookLayer` | localStorage | `mt-image.look.layer.<id>` | UI toggle per look layer | none | components/StylePanel.tsx |
 | `lookLinesMore` | localStorage | `mt-image.look.lines-more` | UI toggle | none | components/StylePanel.tsx |
 | `reveal` | localStorage | `rigi.reveal.v1` | RevealConfig | v1 | lib/reveal/config.ts |
+| `theme` | localStorage | `rigi.theme` | ThemeChoice (light \| dark; absent = auto) | none | lib/theme/index.ts |
 | `pickerLog` | localStorage | `rigi.picker.log.v1` | PickerLogEntry[] | v1 | lib/picker/log.ts |
 | `panel` | localStorage | `rigi.panel.<id>` | sidebar section open/closed | none | components/controls.tsx |
+| `gipfelbuchPhoto` | localStorage | `rigi.gipfelbuch.photo` | demo photo id followed through the Gipfelbuch notebook | none | components/gipfelbuch/notebook/useNotebookPhoto.ts |
 | `topoSharp` | localStorage | `rigi:topoSharp` | landing topo board sharp/soft toggle (colon separator predates the rigi. convention; kept so the saved toggle survives) | none | components/site/TopoBoard.tsx |
 | `uploads` | indexedDB | `mt-image-uploads` | PhotoRecord (photos store) + LocalRegion (regions store) | v1 | lib/upload/store.ts |
 | `tileCache` | cacheStorage | `summit-lens-tiles-v1` | DEM / imagery tile bytes (IndexedDB fallback of the same name) (legacy brand kept: renaming would orphan every user's cache) | v1 | lib/cache/tile-cache.ts |

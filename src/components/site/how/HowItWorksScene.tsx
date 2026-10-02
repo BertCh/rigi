@@ -12,6 +12,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { type SurroundBake, SurroundLayer } from "../Surround";
 import {
 	type Angles,
 	camera,
@@ -110,10 +111,14 @@ function useScene(holder: RefObject<HTMLElement | null>, immediate: boolean) {
 export function HowItWorksScene({
 	className,
 	at,
+	surround,
 }: {
 	className?: string;
 	/** Freeze the scene at this time (s), e.g. for screenshots. */
 	at?: number;
+	/** Terrain continuing past the viewport's sides (scripts/demo/bake-surround.ts "how"), shown once
+	 * the pose has snapped: before that the terrain line is still wrong, and the surround would say so. */
+	surround?: SurroundBake;
 }) {
 	const holder = useRef<HTMLDivElement>(null);
 	const scene = useScene(holder, at !== undefined);
@@ -124,17 +129,21 @@ export function HowItWorksScene({
 				className={`aspect-[16/11] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`}
 			/>
 		);
-	return <Stage scene={scene} className={className} at={at} />;
+	return (
+		<Stage scene={scene} className={className} at={at} surround={surround} />
+	);
 }
 
 function Stage({
 	scene,
 	className,
 	at,
+	surround,
 }: {
 	scene: Scene;
 	className?: string;
 	at?: number;
+	surround?: SurroundBake;
 }) {
 	const W = scene.width;
 	const H = scene.height;
@@ -158,11 +167,30 @@ function Stage({
 	const box = useRef<HTMLDivElement>(null);
 	const viewport = useRef<HTMLDivElement>(null);
 	const [viewW, setViewW] = useState(1000);
+	// the viewport's box inside the stage, for the surround laid around it
+	const [frame, setFrame] = useState<{
+		left: number;
+		top: number;
+		width: number;
+		height: number;
+	} | null>(null);
 	useEffect(() => {
 		const el = viewport.current;
-		if (!el) return;
-		const ro = new ResizeObserver(() => setViewW(el.clientWidth));
+		const root = box.current;
+		if (!el || !root) return;
+		const ro = new ResizeObserver(() => {
+			setViewW(el.clientWidth);
+			const a = el.getBoundingClientRect();
+			const b = root.getBoundingClientRect();
+			setFrame({
+				left: a.left - b.left,
+				top: a.top - b.top,
+				width: a.width,
+				height: a.height,
+			});
+		});
 		ro.observe(el);
+		ro.observe(root);
 		return () => ro.disconnect();
 	}, []);
 	const started = useRef(false);
@@ -314,6 +342,7 @@ function Stage({
 		eyeSnap: ramp(t, BEATS[2].t0 + 0.3, 1.2),
 		labelsSolid: ramp(t, BEATS[5].t0 + 0.2, 0.8),
 		accepted: ramp(t, BEATS[5].t0 + 2.2, 0.6),
+		surround: ramp(t, BEATS[5].t0 + 0.6, 1.4),
 		curve:
 			t < T_SWEEP0 ? 0 : Math.min(1, (t - T_SWEEP0) / (T_SWEEP1 - T_SWEEP0)),
 	};
@@ -421,341 +450,355 @@ function Stage({
 	}, [sweep]);
 
 	return (
-		<div
-			ref={box}
-			className={`overflow-hidden rounded-2xl bg-black/30 ring-1 ring-white/10 ${className ?? ""}`}
-		>
-			{/* chapters */}
-			<div className="flex items-center gap-1 border-b border-white/8 px-2 py-2 sm:px-3">
-				<div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none]">
-					{BEATS.map((b, i) => {
-						const t1 = BEATS[i + 1]?.t0 ?? END;
-						const p = Math.max(0, Math.min(1, (t - b.t0) / (t1 - b.t0)));
-						return (
-							<button
-								key={b.key}
-								type="button"
-								onClick={() => seek(i)}
-								className={`group relative shrink-0 rounded-md px-2.5 pt-1.5 pb-2 text-left transition ${i === beat ? "bg-white/8" : "hover:bg-white/5"}`}
-							>
-								<span className="block font-mono text-[9.5px] tracking-[0.14em] text-white/35">
-									0{i + 1}
-								</span>
-								<span
-									className={`block text-[12px] font-medium whitespace-nowrap ${i <= beat ? "text-[var(--rigi-paper)]" : "text-white/40"}`}
+		<div className="relative isolate">
+			{surround && frame && (
+				<SurroundLayer
+					bake={surround}
+					frame={frame}
+					className="-z-10 transition-opacity duration-300"
+					// knocked off by a drag, the terrain line no longer meets it: step back
+					style={{ opacity: vis.surround * (off ? 0.3 : 1) }}
+				/>
+			)}
+			<div
+				ref={box}
+				data-theme="dark"
+				className={`overflow-hidden rounded-2xl bg-black/30 ring-1 ring-white/10 ${className ?? ""}`}
+			>
+				{/* chapters */}
+				<div className="flex items-center gap-1 border-b border-white/8 px-2 py-2 sm:px-3">
+					<div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none]">
+						{BEATS.map((b, i) => {
+							const t1 = BEATS[i + 1]?.t0 ?? END;
+							const p = Math.max(0, Math.min(1, (t - b.t0) / (t1 - b.t0)));
+							return (
+								<button
+									key={b.key}
+									type="button"
+									onClick={() => seek(i)}
+									className={`group relative shrink-0 rounded-md px-2.5 pt-1.5 pb-2 text-left transition ${i === beat ? "bg-white/8" : "hover:bg-white/5"}`}
 								>
-									{b.title}
-								</span>
-								<span className="absolute inset-x-2.5 bottom-1 h-px bg-white/10">
+									<span className="block font-mono text-[9.5px] tracking-[0.14em] text-white/35">
+										0{i + 1}
+									</span>
 									<span
-										className="block h-full bg-[var(--rigi-glow)]"
-										style={{ width: `${p * 100}%` }}
-									/>
-								</span>
-							</button>
-						);
-					})}
-				</div>
-				<button
-					type="button"
-					aria-label={done ? "Replay" : playing ? "Pause" : "Play"}
-					onClick={() => (done ? seek(0) : setPlaying((v) => !v))}
-					className="grid size-8 shrink-0 place-items-center rounded-lg text-white/60 hover:bg-white/8 hover:text-[var(--rigi-paper)]"
-				>
-					{done ? (
-						<RotateCcw className="size-4" />
-					) : playing ? (
-						<Pause className="size-4" />
-					) : (
-						<Play className="size-4" />
-					)}
-				</button>
-			</div>
-
-			{/* the viewport */}
-			<div className="relative">
-				<div
-					ref={viewport}
-					className={`relative overflow-hidden select-none ${done ? "cursor-grab active:cursor-grabbing" : ""}`}
-					style={{ aspectRatio: `${W} / ${VH}`, touchAction: "pan-y" }}
-					onPointerDown={onDown}
-					onPointerMove={onMove}
-					onPointerUp={onUp}
-					onPointerCancel={onUp}
-				>
-					{/* brightness(b) = a black overlay at 1 - b (b <= 1), and it commutes with the
-					    saturate: the photo is filtered once, only the overlay's opacity animates */}
-					<div className="absolute inset-x-0 top-0">
-						<img
-							src={scene.photo}
-							alt="Looking south-east from Niederhorn towards the Eiger, Mönch and Jungfrau"
-							draggable={false}
-							className="block w-full"
-							style={{ filter: "saturate(0.9)" }}
-						/>
-						<div
-							className="absolute inset-0 bg-black"
-							style={{ opacity: 0.08 + 0.2 * vis.photoLine }}
-						/>
+										className={`block text-[12px] font-medium whitespace-nowrap ${i <= beat ? "text-[var(--rigi-paper)]" : "text-white/40"}`}
+									>
+										{b.title}
+									</span>
+									<span className="absolute inset-x-2.5 bottom-1 h-px bg-white/10">
+										<span
+											className="block h-full bg-[var(--rigi-glow)]"
+											style={{ width: `${p * 100}%` }}
+										/>
+									</span>
+								</button>
+							);
+						})}
 					</div>
-					<svg
-						viewBox={`0 0 ${W} ${VH}`}
-						preserveAspectRatio="none"
-						className="absolute inset-0 size-full"
-						aria-hidden="true"
+					<button
+						type="button"
+						aria-label={done ? "Replay" : playing ? "Pause" : "Play"}
+						onClick={() => (done ? seek(0) : setPlaying((v) => !v))}
+						className="grid size-8 shrink-0 place-items-center rounded-lg text-white/60 hover:bg-white/8 hover:text-[var(--rigi-paper)]"
 					>
-						<defs>
-							<clipPath id="how-photo-clip">
-								<rect x="0" y="0" width={W * vis.photoLine} height={VH} />
-							</clipPath>
-							<clipPath id="how-dem-clip">
-								<rect x="0" y="0" width={W * vis.demLine} height={VH} />
-							</clipPath>
-						</defs>
+						{done ? (
+							<RotateCcw className="size-4" />
+						) : playing ? (
+							<Pause className="size-4" />
+						) : (
+							<Play className="size-4" />
+						)}
+					</button>
+				</div>
 
-						{/* gaps between the skylines */}
-						{vis.ticks > 0 &&
-							obs.map((o, i) => {
-								if (i % 3) return null;
-								const r = res[i];
-								if (!Number.isFinite(r)) return null;
-								const a = Math.min(1, Math.abs(r) / 40);
-								return (
-									<line
-										key={o.x}
-										x1={o.x}
-										x2={o.x}
-										y1={o.y}
-										y2={o.y + r * vis.ticks}
-										stroke={Math.abs(r) < 8 ? C.good : C.bad}
-										strokeOpacity={0.35 + 0.6 * a}
-										strokeWidth={1.4}
-										vectorEffect="non-scaling-stroke"
-									/>
-								);
-							})}
-
-						{/* the photo's skyline */}
-						<g clipPath="url(#how-photo-clip)">
-							<path
-								d={photoPath}
-								fill="none"
-								stroke="black"
-								strokeOpacity={0.35}
-								strokeWidth={5}
-								vectorEffect="non-scaling-stroke"
+				{/* the viewport */}
+				<div className="relative">
+					<div
+						ref={viewport}
+						className={`relative overflow-hidden select-none ${done ? "cursor-grab active:cursor-grabbing" : ""}`}
+						style={{ aspectRatio: `${W} / ${VH}`, touchAction: "pan-y" }}
+						onPointerDown={onDown}
+						onPointerMove={onMove}
+						onPointerUp={onUp}
+						onPointerCancel={onUp}
+					>
+						{/* brightness(b) = a black overlay at 1 - b (b <= 1), and it commutes with the
+						    saturate: the photo is filtered once, only the overlay's opacity animates */}
+						<div className="absolute inset-x-0 top-0">
+							<img
+								src={scene.photo}
+								alt="Looking south-east from Niederhorn towards the Eiger, Mönch and Jungfrau"
+								draggable={false}
+								className="block w-full"
+								style={{ filter: "saturate(0.9)" }}
 							/>
-							<path
-								d={photoPath}
-								fill="none"
-								stroke={C.photo}
-								strokeWidth={2.4}
-								strokeLinejoin="round"
-								vectorEffect="non-scaling-stroke"
-							/>
-						</g>
-
-						{/* the terrain's skyline at the current pose */}
-						<g clipPath="url(#how-dem-clip)">
-							{runs.map((run) => {
-								const d = run
-									.map(
-										(p, k) =>
-											`${k ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`,
-									)
-									.join("");
-								return (
-									<g key={`${run[0][0].toFixed(0)}`}>
-										<path
-											d={d}
-											fill="none"
-											stroke="black"
-											strokeOpacity={0.4}
-											strokeWidth={4.5}
-											vectorEffect="non-scaling-stroke"
-										/>
-										<path
-											d={d}
-											fill="none"
-											stroke={C.terrain}
-											strokeWidth={1.8}
-											strokeDasharray={done && !off ? undefined : "7 5"}
-											vectorEffect="non-scaling-stroke"
-										/>
-									</g>
-								);
-							})}
-						</g>
-					</svg>
-
-					{/* peak labels */}
-					{labels.map((l) => {
-						const solid = vis.labelsSolid > 0.5 && !off;
-						const stem = stemPx(viewW < 640, l.lift);
-						return (
 							<div
-								key={l.name}
-								className="pointer-events-none absolute"
-								style={{
-									left: `${(l.x / W) * 100}%`,
-									top: `${(l.y / VH) * 100}%`,
-									opacity: labelsAlpha,
-								}}
-							>
-								<span
-									className="absolute left-0 w-px -translate-x-1/2"
-									style={{
-										bottom: 0,
-										height: stem,
-										background: solid ? C.glow : "rgba(244,244,244,0.5)",
-									}}
-								/>
-								<span
-									className="absolute left-0 size-1.5 -translate-x-1/2 translate-y-1/2 rounded-full"
-									style={{
-										bottom: 0,
-										background: solid ? C.glow : "transparent",
-										border: solid ? "none" : "1px solid rgba(244,244,244,0.7)",
-										boxShadow: solid
-											? `0 0 0 ${4 * (1 - vis.labelsSolid) + 2}px rgba(187,139,84,${0.5 * (1 - vis.labelsSolid) + 0.15})`
-											: "none",
-									}}
-								/>
-								<span
-									className={`absolute left-0 -translate-x-1/2 rounded px-1.5 py-0.5 text-[10.5px] leading-tight font-medium whitespace-nowrap sm:text-[12px] ${solid ? "bg-black/55 text-[var(--rigi-paper)]" : "border border-dashed border-white/40 bg-black/25 text-white/75"}`}
-									style={{ bottom: stem + 2 }}
-								>
-									{l.name}
-									{solid ? (
-										<span className="ml-1 hidden font-mono text-[9.5px] text-white/50 sm:inline">
-											{l.ele}
-										</span>
-									) : (
-										<span className="ml-1 text-white/45">?</span>
-									)}
-								</span>
-							</div>
-						);
-					})}
+								className="absolute inset-0 bg-black"
+								style={{ opacity: 0.08 + 0.2 * vis.photoLine }}
+							/>
+						</div>
+						<svg
+							viewBox={`0 0 ${W} ${VH}`}
+							preserveAspectRatio="none"
+							className="absolute inset-0 size-full"
+							aria-hidden="true"
+						>
+							<defs>
+								<clipPath id="how-photo-clip">
+									<rect x="0" y="0" width={W * vis.photoLine} height={VH} />
+								</clipPath>
+								<clipPath id="how-dem-clip">
+									<rect x="0" y="0" width={W * vis.demLine} height={VH} />
+								</clipPath>
+							</defs>
 
-					{/* legend + mismatch */}
-					<div className="pointer-events-none absolute top-2.5 right-2.5 hidden flex-col items-end gap-1.5 sm:top-3 sm:right-3 sm:flex">
-						{vis.ticks > 0 && (
-							<div className="rounded-lg bg-black/60 px-2.5 py-1.5 text-right backdrop-blur-sm">
-								<div className="font-mono text-[9px] tracking-[0.14em] text-white/45 uppercase">
-									mismatch
-								</div>
+							{/* gaps between the skylines */}
+							{vis.ticks > 0 &&
+								obs.map((o, i) => {
+									if (i % 3) return null;
+									const r = res[i];
+									if (!Number.isFinite(r)) return null;
+									const a = Math.min(1, Math.abs(r) / 40);
+									return (
+										<line
+											key={o.x}
+											x1={o.x}
+											x2={o.x}
+											y1={o.y}
+											y2={o.y + r * vis.ticks}
+											stroke={Math.abs(r) < 8 ? C.good : C.bad}
+											strokeOpacity={0.35 + 0.6 * a}
+											strokeWidth={1.4}
+											vectorEffect="non-scaling-stroke"
+										/>
+									);
+								})}
+
+							{/* the photo's skyline */}
+							<g clipPath="url(#how-photo-clip)">
+								<path
+									d={photoPath}
+									fill="none"
+									stroke="black"
+									strokeOpacity={0.35}
+									strokeWidth={5}
+									vectorEffect="non-scaling-stroke"
+								/>
+								<path
+									d={photoPath}
+									fill="none"
+									stroke={C.photo}
+									strokeWidth={2.4}
+									strokeLinejoin="round"
+									vectorEffect="non-scaling-stroke"
+								/>
+							</g>
+
+							{/* the terrain's skyline at the current pose */}
+							<g clipPath="url(#how-dem-clip)">
+								{runs.map((run) => {
+									const d = run
+										.map(
+											(p, k) =>
+												`${k ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`,
+										)
+										.join("");
+									return (
+										<g key={`${run[0][0].toFixed(0)}`}>
+											<path
+												d={d}
+												fill="none"
+												stroke="black"
+												strokeOpacity={0.4}
+												strokeWidth={4.5}
+												vectorEffect="non-scaling-stroke"
+											/>
+											<path
+												d={d}
+												fill="none"
+												stroke={C.terrain}
+												strokeWidth={1.8}
+												strokeDasharray={done && !off ? undefined : "7 5"}
+												vectorEffect="non-scaling-stroke"
+											/>
+										</g>
+									);
+								})}
+							</g>
+						</svg>
+
+						{/* peak labels */}
+						{labels.map((l) => {
+							const solid = vis.labelsSolid > 0.5 && !off;
+							const stem = stemPx(viewW < 640, l.lift);
+							return (
 								<div
-									className="font-mono text-[17px] leading-none font-semibold tabular-nums"
-									style={{ color: now < 8 ? C.good : C.bad }}
+									key={l.name}
+									className="pointer-events-none absolute"
+									style={{
+										left: `${(l.x / W) * 100}%`,
+										top: `${(l.y / VH) * 100}%`,
+										opacity: labelsAlpha,
+									}}
 								>
-									{now.toFixed(1)}
-									<span className="ml-0.5 text-[10px] text-white/45">px</span>
+									<span
+										className="absolute left-0 w-px -translate-x-1/2"
+										style={{
+											bottom: 0,
+											height: stem,
+											background: solid ? C.glow : "rgba(244,244,244,0.5)",
+										}}
+									/>
+									<span
+										className="absolute left-0 size-1.5 -translate-x-1/2 translate-y-1/2 rounded-full"
+										style={{
+											bottom: 0,
+											background: solid ? C.glow : "transparent",
+											border: solid
+												? "none"
+												: "1px solid rgba(244,244,244,0.7)",
+											boxShadow: solid
+												? `0 0 0 ${4 * (1 - vis.labelsSolid) + 2}px rgba(187,139,84,${0.5 * (1 - vis.labelsSolid) + 0.15})`
+												: "none",
+										}}
+									/>
+									<span
+										className={`absolute left-0 -translate-x-1/2 rounded px-1.5 py-0.5 text-[10.5px] leading-tight font-medium whitespace-nowrap sm:text-[12px] ${solid ? "bg-black/55 text-[var(--rigi-paper)]" : "border border-dashed border-white/40 bg-black/25 text-white/75"}`}
+										style={{ bottom: stem + 2 }}
+									>
+										{l.name}
+										{solid ? (
+											<span className="ml-1 hidden font-mono text-[9.5px] text-white/50 sm:inline">
+												{l.ele}
+											</span>
+										) : (
+											<span className="ml-1 text-white/45">?</span>
+										)}
+									</span>
 								</div>
+							);
+						})}
+
+						{/* legend + mismatch */}
+						<div className="pointer-events-none absolute top-2.5 right-2.5 hidden flex-col items-end gap-1.5 sm:top-3 sm:right-3 sm:flex">
+							{vis.ticks > 0 && (
+								<div className="rounded-lg bg-black/60 px-2.5 py-1.5 text-right backdrop-blur-sm">
+									<div className="font-mono text-[9px] tracking-[0.14em] text-white/45 uppercase">
+										mismatch
+									</div>
+									<div
+										className="font-mono text-[17px] leading-none font-semibold tabular-nums"
+										style={{ color: now < 8 ? C.good : C.bad }}
+									>
+										{now.toFixed(1)}
+										<span className="ml-0.5 text-[10px] text-white/45">px</span>
+									</div>
+								</div>
+							)}
+						</div>
+
+						{/* legend */}
+						{vis.photoLine > 0 && (
+							<div className="pointer-events-none absolute top-2.5 left-2.5 hidden flex-col items-start gap-0.5 sm:top-3 sm:left-3 rounded-lg bg-black/45 px-2 py-1 font-mono text-[9.5px] text-white/70 backdrop-blur-sm sm:flex">
+								{vis.photoLine > 0 && (
+									<span className="flex items-center gap-1.5">
+										<i className="h-0.5 w-4" style={{ background: C.photo }} />
+										photo skyline
+									</span>
+								)}
+								{vis.demLine > 0 && (
+									<span className="flex items-center gap-1.5">
+										<i
+											className="h-0.5 w-4"
+											style={{
+												background: `repeating-linear-gradient(90deg, ${C.terrain} 0 4px, transparent 4px 7px)`,
+											}}
+										/>
+										terrain skyline
+									</span>
+								)}
 							</div>
 						)}
 					</div>
-
-					{/* legend */}
-					{vis.photoLine > 0 && (
-						<div className="pointer-events-none absolute top-2.5 left-2.5 hidden flex-col items-start gap-0.5 sm:top-3 sm:left-3 rounded-lg bg-black/45 px-2 py-1 font-mono text-[9.5px] text-white/70 backdrop-blur-sm sm:flex">
-							{vis.photoLine > 0 && (
-								<span className="flex items-center gap-1.5">
-									<i className="h-0.5 w-4" style={{ background: C.photo }} />
-									photo skyline
-								</span>
-							)}
-							{vis.demLine > 0 && (
-								<span className="flex items-center gap-1.5">
-									<i
-										className="h-0.5 w-4"
-										style={{
-											background: `repeating-linear-gradient(90deg, ${C.terrain} 0 4px, transparent 4px 7px)`,
-										}}
-									/>
-									terrain skyline
-								</span>
-							)}
-						</div>
-					)}
-				</div>
-				{/* caption */}
-				<div className="pointer-events-none border-t border-white/8 bg-black/40 px-3 py-3 sm:absolute sm:inset-x-0 sm:bottom-0 sm:border-0 sm:bg-transparent sm:bg-gradient-to-t sm:from-black/80 sm:via-black/45 sm:to-transparent sm:px-4 sm:pt-10 sm:pb-4">
-					<p
-						key={beat}
-						className="max-w-2xl animate-[how-in_500ms_ease-out] text-[12.5px] leading-snug text-white/90 sm:text-[14.5px]"
-					>
-						<span className="mr-2 font-mono text-[10px] tracking-[0.16em] text-[var(--rigi-glow)] uppercase">
-							{BEATS[beat].title}
-						</span>
-						{captions[BEATS[beat].key]}
-					</p>
-					{done && (
-						<p className="mt-1.5 font-mono text-[10px] text-white/45">
-							Drag the photo sideways to knock the terrain line off. It snaps
-							back.
+					{/* caption */}
+					<div className="pointer-events-none border-t border-white/8 bg-black/40 px-3 py-3 sm:absolute sm:inset-x-0 sm:bottom-0 sm:border-0 sm:bg-transparent sm:bg-gradient-to-t sm:from-black/80 sm:via-black/45 sm:to-transparent sm:px-4 sm:pt-10 sm:pb-4">
+						<p
+							key={beat}
+							className="max-w-2xl animate-[how-in_500ms_ease-out] text-[12.5px] leading-snug text-white/90 sm:text-[14.5px]"
+						>
+							<span className="mr-2 font-mono text-[10px] tracking-[0.16em] text-[var(--rigi-glow)] uppercase">
+								{BEATS[beat].title}
+							</span>
+							{captions[BEATS[beat].key]}
 						</p>
-					)}
+						{done && (
+							<p className="mt-1.5 font-mono text-[10px] text-white/45">
+								Drag the photo sideways to knock the terrain line off. It snaps
+								back.
+							</p>
+						)}
+					</div>
 				</div>
-			</div>
 
-			{/* world + numbers */}
-			<div className="grid gap-px bg-white/8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-				<div className="relative bg-[var(--rigi-ink)]">
-					<WorldView
+				{/* world + numbers */}
+				<div className="grid gap-px bg-white/8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+					<div className="relative bg-[var(--rigi-ink)]">
+						<WorldView
+							scene={scene}
+							state={world}
+							className="aspect-[16/11] w-full sm:aspect-[16/7.4]"
+						/>
+						<div className="pointer-events-none absolute top-2.5 left-3 font-mono text-[9.5px] tracking-[0.14em] text-white/40 uppercase">
+							The camera in the terrain
+						</div>
+						<div className="pointer-events-none absolute right-3 bottom-2 left-3 hidden flex-wrap justify-between gap-x-4 font-mono text-[9.5px] text-white/35 sm:flex">
+							<span>
+								<i
+									className="mr-1 inline-block h-2 w-3 align-middle"
+									style={{ background: "rgba(187,139,84,0.5)" }}
+								/>
+								view
+								{world.uncertainty > 0.05 && (
+									<>
+										<i
+											className="mr-1 ml-3 inline-block h-2 w-3 border border-dashed align-middle"
+											style={{ borderColor: C.bad }}
+										/>
+										compass doubt
+									</>
+								)}
+								{world.footprint > 0.05 && (
+									<>
+										<i
+											className="mr-1 ml-3 inline-block h-0.5 w-3 align-middle"
+											style={{ background: C.terrain }}
+										/>
+										ridges that form the skyline
+									</>
+								)}
+							</span>
+							<span>{scene.dem}</span>
+						</div>
+					</div>
+					<Readout
 						scene={scene}
-						state={world}
-						className="aspect-[16/11] w-full sm:aspect-[16/7.4]"
+						pose={pose}
+						sweep={sweep}
+						coarse={coarse}
+						curve={vis.curve}
+						range={[sweepMin, sweepMax]}
+						accepted={vis.accepted * (off ? 0.25 : 1)}
+						eyeSnap={vis.eyeSnap}
+						mismatch={vis.ticks > 0 ? now : null}
 					/>
-					<div className="pointer-events-none absolute top-2.5 left-3 font-mono text-[9.5px] tracking-[0.14em] text-white/40 uppercase">
-						The camera in the terrain
-					</div>
-					<div className="pointer-events-none absolute right-3 bottom-2 left-3 hidden flex-wrap justify-between gap-x-4 font-mono text-[9.5px] text-white/35 sm:flex">
-						<span>
-							<i
-								className="mr-1 inline-block h-2 w-3 align-middle"
-								style={{ background: "rgba(187,139,84,0.5)" }}
-							/>
-							view
-							{world.uncertainty > 0.05 && (
-								<>
-									<i
-										className="mr-1 ml-3 inline-block h-2 w-3 border border-dashed align-middle"
-										style={{ borderColor: C.bad }}
-									/>
-									compass doubt
-								</>
-							)}
-							{world.footprint > 0.05 && (
-								<>
-									<i
-										className="mr-1 ml-3 inline-block h-0.5 w-3 align-middle"
-										style={{ background: C.terrain }}
-									/>
-									ridges that form the skyline
-								</>
-							)}
-						</span>
-						<span>{scene.dem}</span>
-					</div>
 				</div>
-				<Readout
-					scene={scene}
-					pose={pose}
-					sweep={sweep}
-					coarse={coarse}
-					curve={vis.curve}
-					range={[sweepMin, sweepMax]}
-					accepted={vis.accepted * (off ? 0.25 : 1)}
-					eyeSnap={vis.eyeSnap}
-					mismatch={vis.ticks > 0 ? now : null}
-				/>
+				<style>
+					{
+						"@keyframes how-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}"
+					}
+				</style>
 			</div>
-			<style>
-				{
-					"@keyframes how-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}"
-				}
-			</style>
 		</div>
 	);
 }

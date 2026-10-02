@@ -33,7 +33,10 @@ export function RollCard({
 			data-testid="roll-card"
 			className="group overflow-hidden rounded-xl bg-white/[0.04] ring-1 ring-white/8 transition hover:ring-[var(--rigi-glow)]/50"
 		>
-			<div className="flex h-28 gap-px overflow-hidden bg-black">
+			<div
+				data-theme="dark"
+				className="flex h-28 gap-px overflow-hidden bg-black"
+			>
 				{strip.map((p) => {
 					const src = thumb(p.meta.id);
 					return (

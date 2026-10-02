@@ -11,15 +11,55 @@
 // sweeps; the engine isn't needed, so it stays light on the page.
 
 import { useEffect, useRef } from "react";
+import { type SurroundBake, SurroundLayer } from "./Surround";
+
+// The bloom's ellipse in the photo's box: centred below the bottom edge so the front climbs from the
+// foreground to the skyline. A surround gets the same ellipse in its own box (see `revealAt`).
+const CENTRE = { x: 0.5, y: 1.15 };
+const RADIUS = { x: 1.4, y: 1.2 };
+
+/** The fill and front-band masks for an ellipse given as a radial-gradient shape and position. */
+export function revealMasks(at: string) {
+	const r = "var(--rigi-reveal)";
+	return {
+		fill: `radial-gradient(${at}, #000 calc(${r} - 6%), transparent ${r})`,
+		front: `radial-gradient(${at}, transparent calc(${r} - 9%), #000 calc(${r} - 3%), transparent calc(${r} + 1%))`,
+	};
+}
+
+const pc = (v: number) => `${(v * 100).toFixed(2)}%`;
+
+/** The photo's ellipse, expressed in a canvas holding the photo at `photo` (fractions of it). */
+function revealAt(photo: SurroundBake["photo"]) {
+	return `ellipse ${pc(RADIUS.x * photo.w)} ${pc(RADIUS.y * photo.h)} at ${pc(photo.x + CENTRE.x * photo.w)} ${pc(photo.y + CENTRE.y * photo.h)}`;
+}
+
+/** Mask radius (%) at which every corner of a canvas around the photo is past the front band. */
+function fullRadius(photo: SurroundBake["photo"]) {
+	const xs = [-photo.x / photo.w, (1 - photo.x) / photo.w];
+	const ys = [-photo.y / photo.h, (1 - photo.y) / photo.h];
+	let far = 0;
+	for (const x of xs)
+		for (const y of ys)
+			far = Math.max(
+				far,
+				Math.hypot((x - CENTRE.x) / RADIUS.x, (y - CENTRE.y) / RADIUS.y),
+			);
+	return Math.max(FULL, far * 100 + 12);
+}
+
+const PHOTO_MASKS = revealMasks(
+	`ellipse ${pc(RADIUS.x)} ${pc(RADIUS.y)} at ${pc(CENTRE.x)} ${pc(CENTRE.y)}`,
+);
 
 const CSS = `
 .rigi-reveal-fill {
-	-webkit-mask-image: radial-gradient(ellipse 140% 120% at 50% 115%, #000 calc(var(--rigi-reveal) - 6%), transparent var(--rigi-reveal));
-	mask-image: radial-gradient(ellipse 140% 120% at 50% 115%, #000 calc(var(--rigi-reveal) - 6%), transparent var(--rigi-reveal));
+	-webkit-mask-image: ${PHOTO_MASKS.fill};
+	mask-image: ${PHOTO_MASKS.fill};
 }
 .rigi-reveal-front {
-	-webkit-mask-image: radial-gradient(ellipse 140% 120% at 50% 115%, transparent calc(var(--rigi-reveal) - 9%), #000 calc(var(--rigi-reveal) - 3%), transparent calc(var(--rigi-reveal) + 1%));
-	mask-image: radial-gradient(ellipse 140% 120% at 50% 115%, transparent calc(var(--rigi-reveal) - 9%), #000 calc(var(--rigi-reveal) - 3%), transparent calc(var(--rigi-reveal) + 1%));
+	-webkit-mask-image: ${PHOTO_MASKS.front};
+	mask-image: ${PHOTO_MASKS.front};
 	filter: brightness(1.8) saturate(1.3);
 	mix-blend-mode: screen;
 }
@@ -52,6 +92,8 @@ export function RevealLoop({
 	alt,
 	aspect,
 	className,
+	surround,
+	surroundClassName,
 	photoSet,
 	overlaySet,
 	sizes,
@@ -61,17 +103,23 @@ export function RevealLoop({
 	alt: string;
 	aspect: number;
 	className?: string;
+	/** Baked terrain around the photo; the bloom carries on across it from the same centre. */
+	surround?: SurroundBake;
+	/** Classes for the outer box when there is a surround (its margins, say). */
+	surroundClassName?: string;
 	/** `srcset` of the photo and overlay; same width candidates (and `sizes`) so the masks line up. */
 	photoSet?: string;
 	overlaySet?: string;
 	sizes?: string;
 }) {
+	const box = useRef<HTMLDivElement>(null);
 	const frame = useRef<HTMLDivElement>(null);
-	const layer = useRef<HTMLDivElement>(null);
 	const over = useRef<HTMLImageElement>(null);
+	const full = surround ? fullRadius(surround.photo) : FULL;
 	useEffect(() => {
 		const root = frame.current;
-		const el = layer.current;
+		// the radius and fade live on the outer box so the photo and the surround share one front
+		const el = box.current ?? frame.current;
 		const img = over.current;
 		if (!root || !el || !img) return;
 		// skip the style write when neither value moved: the radius to 0.1% (about 0.25 px of the
@@ -87,11 +135,11 @@ export function RevealLoop({
 			}
 			if (oq !== lastO) {
 				lastO = oq;
-				el.style.opacity = String(o);
+				el.style.setProperty("--rigi-reveal-opacity", String(o));
 			}
 		};
 		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-			set(FULL, 1);
+			set(full, 1);
 			return;
 		}
 		set(0, 1);
@@ -114,12 +162,12 @@ export function RevealLoop({
 			const step = (now: number) => {
 				t0 ||= now;
 				const t = now - t0;
-				if (fromLit && t < FADE_OUT) set(FULL, 1 - t / FADE_OUT);
+				if (fromLit && t < FADE_OUT) set(full, 1 - t / FADE_OUT);
 				else if (t < lead) set(0, 1);
 				else if (t < lead + SWEEP)
-					set(START + (FULL - START) * ease((t - lead) / SWEEP), 1);
+					set(START + (full - START) * ease((t - lead) / SWEEP), 1);
 				else {
-					set(FULL, 1);
+					set(full, 1);
 					raf = 0;
 					state = "done";
 					return;
@@ -168,10 +216,11 @@ export function RevealLoop({
 			root.removeEventListener("pointerenter", enter);
 			root.removeEventListener("pointerleave", leave);
 		};
-	}, []);
-	return (
+	}, [full]);
+	const photoFrame = (
 		<div
 			ref={frame}
+			data-theme="dark"
 			className={`relative overflow-hidden bg-black ${className ?? ""}`}
 			style={{ aspectRatio: aspect }}
 			data-testid="reveal-loop"
@@ -186,7 +235,10 @@ export function RevealLoop({
 				loading="lazy"
 				decoding="async"
 			/>
-			<div ref={layer} className="absolute inset-0">
+			<div
+				className="absolute inset-0"
+				style={{ opacity: "var(--rigi-reveal-opacity)" }}
+			>
 				<img
 					ref={over}
 					src={overlay}
@@ -207,6 +259,17 @@ export function RevealLoop({
 					decoding="async"
 				/>
 			</div>
+		</div>
+	);
+	if (!surround) return photoFrame;
+	return (
+		<div ref={box} className={`relative isolate ${surroundClassName ?? ""}`}>
+			<SurroundLayer
+				bake={surround}
+				className="-z-10"
+				reveal={revealMasks(revealAt(surround.photo))}
+			/>
+			{photoFrame}
 		</div>
 	);
 }

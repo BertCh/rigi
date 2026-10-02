@@ -244,6 +244,7 @@ export function RollMap({
 			onPointerLeave={() => {
 				hovered.current = false;
 			}}
+			data-theme="dark"
 			className={`relative overflow-hidden bg-[#a9c2da] outline-none ${className ?? ""}`}
 			data-testid="roll-map"
 			data-stage={status.stage}

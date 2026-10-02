@@ -116,6 +116,8 @@ type Props = {
 	onSelect: (id: string | null) => void;
 	groupBy: GroupBy;
 	rowHeight?: number;
+	/** False for a selection that should not scroll its tile into view. */
+	followSelection?: (id: string) => boolean;
 };
 
 export function RollGrid({
@@ -125,6 +127,7 @@ export function RollGrid({
 	onSelect,
 	groupBy,
 	rowHeight = 190,
+	followSelection,
 }: Props) {
 	const ref = useRef<HTMLDivElement>(null);
 	const [width, setWidth] = useState(0);
@@ -144,9 +147,10 @@ export function RollGrid({
 	const gap = 4;
 	const target = width < 520 ? Math.round(rowHeight * 0.66) : rowHeight;
 
-	// keep the selected tile on screen when it's selected elsewhere (map, panorama)
+	// keep the selected tile on screen when it's selected elsewhere (map)
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs per selection, not per callback
 	useEffect(() => {
-		if (!selectedId) return;
+		if (!selectedId || followSelection?.(selectedId) === false) return;
 		ref.current
 			?.querySelector(`[data-photo="${CSS.escape(selectedId)}"]`)
 			?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -212,6 +216,7 @@ function Tile({
 		<button
 			type="button"
 			data-photo={p.meta.id}
+			data-theme="dark"
 			onClick={() => onSelect(selected ? null : p.meta.id)}
 			aria-pressed={selected}
 			className={`group relative shrink-0 overflow-hidden rounded-md bg-black text-left outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${

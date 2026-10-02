@@ -626,6 +626,7 @@ function LabDeckSplats() {
 
 	return (
 		<div
+			data-theme="dark"
 			style={{
 				position: "fixed",
 				inset: 0,

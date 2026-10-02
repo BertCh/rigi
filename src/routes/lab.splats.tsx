@@ -479,7 +479,10 @@ function SplatLab() {
 	if (!import.meta.env.DEV)
 		return <p style={{ padding: 16 }}>The splat lab is dev-only.</p>;
 	return (
-		<div style={{ position: "fixed", inset: 0, background: BRAND.ink }}>
+		<div
+			data-theme="dark"
+			style={{ position: "fixed", inset: 0, background: BRAND.ink }}
+		>
 			<canvas
 				ref={canvasRef}
 				style={{ width: "100%", height: "100%", display: "block" }}

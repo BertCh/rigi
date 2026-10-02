@@ -68,6 +68,13 @@ export const STORAGE = {
 		version: null,
 		module: "lib/roll/mosaic/PanoramaStrip.tsx",
 	},
+	panoHeight: {
+		medium: "localStorage",
+		key: "mt-image:roll:pano-height",
+		holds: "UI size (px)",
+		version: null,
+		module: "lib/roll/mosaic/PanoramaStrip.tsx",
+	},
 	viewStyle: {
 		medium: "localStorage",
 		key: "mt-image.viewStyle.v1",
@@ -96,6 +103,13 @@ export const STORAGE = {
 		version: 1,
 		module: "lib/reveal/config.ts",
 	},
+	theme: {
+		medium: "localStorage",
+		key: "rigi.theme",
+		holds: "ThemeChoice (light | dark; absent = auto)",
+		version: null,
+		module: "lib/theme/index.ts",
+	},
 	pickerLog: {
 		medium: "localStorage",
 		key: "rigi.picker.log.v1",
@@ -109,6 +123,13 @@ export const STORAGE = {
 		holds: "sidebar section open/closed",
 		version: null,
 		module: "components/controls.tsx",
+	},
+	gipfelbuchPhoto: {
+		medium: "localStorage",
+		key: "rigi.gipfelbuch.photo",
+		holds: "demo photo id followed through the Gipfelbuch notebook",
+		version: null,
+		module: "components/gipfelbuch/notebook/useNotebookPhoto.ts",
 	},
 	topoSharp: {
 		medium: "localStorage",

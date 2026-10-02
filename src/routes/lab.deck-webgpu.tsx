@@ -176,7 +176,10 @@ function LabDeckWebgpu() {
 		`rounded px-2 py-0.5 ${on ? "bg-sky-700 text-white" : "bg-neutral-800 hover:bg-neutral-700"}`;
 
 	return (
-		<div className="flex h-screen flex-col bg-neutral-950 text-neutral-200">
+		<div
+			data-theme="dark"
+			className="flex h-screen flex-col bg-neutral-950 text-neutral-200"
+		>
 			<div className="flex flex-wrap items-center gap-3 px-3 py-2 text-xs">
 				<span className="font-semibold">deck-webgpu lab</span>
 				<span data-testid="status" data-status={status}>

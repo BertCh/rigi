@@ -6,6 +6,8 @@ import { Link } from "@tanstack/react-router";
 import { Cpu, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RollMapEngine, RollMapStatus } from "#/lib/roll/map/roll-map";
+import { LiveLines } from "./LiveLines";
+import { type Lines, viewOfCamera } from "./lineArt";
 
 // Landing-page live map: the sample trip draped on 3D terrain by the real roll engine, started only
 // once the section scrolls into view, slowly orbiting until someone grabs it. Clicking a camera pin
@@ -136,51 +138,72 @@ export function LiveRollMap({
 	}, [visible]);
 
 	const busy = status && status.stage !== "ready";
+	// the sides: contour lines through the orbiting camera, once the terrain is in; the engine's frame
+	// is centred on the roll, the bake's on the demo viewpoint, so the camera is shifted onto the bake's
+	const linesView = (lines: Lines) => {
+		const e = shown ? eng.current : null;
+		if (!e) return null;
+		const c = e.world.cam;
+		return viewOfCamera(
+			c.position,
+			c.quaternion,
+			c.fov,
+			e.frame.fromGeo(lines.origin.lat, lines.origin.lon, 0),
+		);
+	};
 	return (
-		<div
-			ref={box}
-			className={`relative overflow-hidden bg-[var(--rigi-slate)] ${className ?? ""}`}
-			data-testid="live-roll-map"
-		>
-			{poster && (
-				<img
-					src={poster}
-					alt="The sample trip's photos draped on the 3D terrain"
-					className={`absolute inset-0 size-full object-cover transition-opacity duration-700 ${shown ? "opacity-0" : "opacity-100"}`}
-				/>
-			)}
-			<canvas
-				ref={canvasRef}
-				className={`absolute inset-0 size-full !touch-pan-y transition-opacity duration-700 ${shown ? "opacity-100" : "opacity-0"}`}
+		<div className="relative isolate">
+			<LiveLines
+				src="/demo/surround/live3d-lines.bin"
+				getView={linesView}
+				className="-z-10"
 			/>
-			<div className="pointer-events-none absolute top-3 left-3 flex items-center gap-2 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] text-white/80 backdrop-blur">
-				<Cpu className="size-3.5 text-[var(--rigi-glow)]" />
-				{!status
-					? "Live 3D, rendered locally"
-					: busy
-						? `${STAGE_LABEL[status.stage]}${status.note ? ` · ${status.note}` : ""}`
-						: "Live · drag to orbit · click a pin"}
-			</div>
-			{inPhoto && (
-				<button
-					type="button"
-					onClick={() => {
-						eng.current?.frameOverview(OVERVIEW_M);
-						eng.current?.setAutoRotate(ROTATE_SPEED);
-					}}
-					className="absolute top-3 right-3 flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur hover:text-white"
-				>
-					<Undo2 className="size-3.5" /> Back to overview
-				</button>
-			)}
-			<Link
-				to="/roll/$id"
-				params={{ id: "demo" }}
-				search={{ view: "map" }}
-				className="absolute right-3 bottom-3 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur hover:text-white"
+			<div
+				ref={box}
+				data-theme="dark"
+				className={`relative overflow-hidden bg-[var(--rigi-slate)] ${className ?? ""}`}
+				data-testid="live-roll-map"
 			>
-				Open the full roll →
-			</Link>
+				{poster && (
+					<img
+						src={poster}
+						alt="The sample trip's photos draped on the 3D terrain"
+						className={`absolute inset-0 size-full object-cover transition-opacity duration-700 ${shown ? "opacity-0" : "opacity-100"}`}
+					/>
+				)}
+				<canvas
+					ref={canvasRef}
+					className={`absolute inset-0 size-full !touch-pan-y transition-opacity duration-700 ${shown ? "opacity-100" : "opacity-0"}`}
+				/>
+				<div className="pointer-events-none absolute top-3 left-3 flex items-center gap-2 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] text-white/80 backdrop-blur">
+					<Cpu className="size-3.5 text-[var(--rigi-glow)]" />
+					{!status
+						? "Live 3D, rendered locally"
+						: busy
+							? `${STAGE_LABEL[status.stage]}${status.note ? ` · ${status.note}` : ""}`
+							: "Live · drag to orbit · click a pin"}
+				</div>
+				{inPhoto && (
+					<button
+						type="button"
+						onClick={() => {
+							eng.current?.frameOverview(OVERVIEW_M);
+							eng.current?.setAutoRotate(ROTATE_SPEED);
+						}}
+						className="absolute top-3 right-3 flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur hover:text-white"
+					>
+						<Undo2 className="size-3.5" /> Back to overview
+					</button>
+				)}
+				<Link
+					to="/roll/$id"
+					params={{ id: "demo" }}
+					search={{ view: "map" }}
+					className="absolute right-3 bottom-3 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur hover:text-white"
+				>
+					Open the full roll →
+				</Link>
+			</div>
 		</div>
 	);
 }

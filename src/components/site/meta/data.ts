@@ -30,7 +30,7 @@ export type RollPhoto = {
 	eye: number;
 	prior: Angles;
 	solved: Angles;
-	/** The fail-closed verdict of the CPU solve cascade (public/demo/atlas/index.json). */
+	/** The fail-closed verdict of the CPU solve cascade (public/demo/gipfelbuch/index.json). */
 	accepted: boolean;
 	stage: string | null;
 	confidence: number | null;

@@ -174,7 +174,7 @@ function PresetChips({ value }: { value: PresetId }) {
 							PRESET_IDS.length % 3 === 1 &&
 							"col-span-3",
 						value === id
-							? "bg-white text-slate-900 ring-white"
+							? "bg-white text-slate-900 ring-white light:text-[var(--rigi-ink)]"
 							: "bg-white/6 text-white/65 ring-white/8 hover:text-white",
 					)}
 				>
@@ -507,7 +507,9 @@ function LayerCard({
 					<span
 						className={cn(
 							"rounded px-1 text-[9px] font-semibold tracking-wide uppercase",
-							active ? "bg-cyan-400/15 text-cyan-300" : "text-white/30",
+							active
+								? "bg-cyan-400/15 text-cyan-300 light:text-[var(--rigi-glow)]"
+								: "text-white/30",
 						)}
 					>
 						{active ? "on" : "off"}

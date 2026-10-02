@@ -11,6 +11,7 @@ export function Compare({
 	alt,
 	aspect,
 	className,
+	onMove,
 	beforeSet,
 	afterSet,
 	sizes,
@@ -22,6 +23,8 @@ export function Compare({
 	/** width / height of both images */
 	aspect: number;
 	className?: string;
+	/** Called with the divider position (0 = all after, 1 = all before) whenever it moves. */
+	onMove?: (v: number) => void;
 	/** `srcset` of each image; give both the same width candidates (and `sizes`) so they line up. */
 	beforeSet?: string;
 	afterSet?: string;
@@ -44,6 +47,7 @@ export function Compare({
 			handle.current.style.left = `${v * 100}%`;
 			handle.current.setAttribute("aria-valuenow", String(Math.round(v * 100)));
 		}
+		onMove?.(v);
 	};
 	const move = (clientX: number) => {
 		const r = ref.current?.getBoundingClientRect();
@@ -52,6 +56,7 @@ export function Compare({
 	return (
 		<div
 			ref={ref}
+			data-theme="dark"
 			className={`relative cursor-ew-resize touch-pan-y overflow-hidden select-none ${className ?? ""}`}
 			style={{ aspectRatio: aspect }}
 			onPointerDown={(e) => {

@@ -1,0 +1,25 @@
+{
+	"id": "how",
+	"src": "/demo/surround/how.webp",
+	"width": 3564,
+	"height": 608,
+	"photo": { "x": 0.2727, "y": 0, "w": 0.4545, "h": 1 },
+	"ruler": 0,
+	"ticks": [],
+	"peaks": [
+		{
+			"name": "Ebnefluh / Äbeni Flue",
+			"ele": 3962,
+			"km": 26.3,
+			"x": 0.7316,
+			"y": 0.3382
+		},
+		{
+			"name": "Rotsandnollen",
+			"ele": 2700,
+			"km": 44.5,
+			"x": 0.2105,
+			"y": 0.5028
+		}
+	]
+}

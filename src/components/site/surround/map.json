@@ -1,0 +1,23 @@
+{
+	"id": "map",
+	"src": "/demo/surround/map.webp",
+	"width": 3000,
+	"height": 1250,
+	"fixed": { "w": 2400, "h": 1000 },
+	"mask": true,
+	"photo": { "x": 0.2733, "y": 0.18, "w": 0.4533, "h": 0.64 },
+	"ruler": 0,
+	"ticks": [],
+	"peaks": [
+		{ "name": "Leimere", "ele": 1659, "km": 3.9, "x": 0.7414, "y": 0.336 },
+		{
+			"name": "Wannichnubel",
+			"ele": 1585,
+			"km": 6.7,
+			"x": 0.9235,
+			"y": 0.6039
+		},
+		{ "name": "Bürg", "ele": 696, "km": 6.5, "x": 0.1361, "y": 0.9834 },
+		{ "name": "Spiezberg", "ele": 687, "km": 7.3, "x": 0.0499, "y": 0.7943 }
+	]
+}

@@ -1,4 +1,4 @@
-# Explainer research: making the Rigi atlas pages best-in-class
+# Explainer research: making the Rigi Gipfelbuch pages (formerly the atlas) best-in-class
 
 Date: 2026-10-01. Sources marked (read) were fetched this session. Sources marked (recalled) are cited from prior knowledge and were not re-fetched.
 

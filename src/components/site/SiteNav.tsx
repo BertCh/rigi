@@ -5,12 +5,13 @@
 import { Link } from "@tanstack/react-router";
 import { RigiMark } from "#/brand/RigiMark";
 import { cn } from "#/lib/utils";
+import { ThemeToggle } from "./ThemeToggle";
 
 /** Page chrome shared by the marketing pages: theme tokens on <main> plus the top bar. */
 export const SITE_THEME =
 	"min-h-dvh bg-[var(--rigi-ink)] text-[var(--rigi-paper)]";
 
-export function SiteNav({ active }: { active?: "library" | "atlas" }) {
+export function SiteNav({ active }: { active?: "library" | "gipfelbuch" }) {
 	const item = (on: boolean) =>
 		cn(
 			"rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
@@ -33,9 +34,10 @@ export function SiteNav({ active }: { active?: "library" | "atlas" }) {
 				<Link to="/library" className={item(active === "library")}>
 					My library
 				</Link>
-				<Link to="/atlas" className={item(active === "atlas")}>
-					Atlas
+				<Link to="/gipfelbuch" className={item(active === "gipfelbuch")}>
+					Gipfelbuch
 				</Link>
+				<ThemeToggle />
 			</div>
 		</nav>
 	);

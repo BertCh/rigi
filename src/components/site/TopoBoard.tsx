@@ -12,9 +12,21 @@ import { MapFurniture } from "#/lib/terroir/roll/MapFurniture";
 
 // Landing-page board: the sample trip's photos as cards on the swisstopo map, each tied to where
 // it was taken by a line and a view wedge (its solved heading and field of view). Drag a card to
-// move it, drag the map to pan, click a card to open the photo.
+// move it, drag the map to pan, click a card to open the photo. The cards, their lines and the
+// camera pins sit in a layer that reaches past the map (wide at the sides, a little above and
+// below, never past the window), so cards near the edge cross onto the surrounding plan.
 
 const SHARP_KEY = storageKey("topoSharp");
+const BLEED_SIDE = 160;
+const BLEED_TOP = 20;
+const BLEED_BOTTOM = 64;
+const CARD_GAP = 10;
+
+/** Card footprint in CSS px: the image plus its white frame (p-1.5 pb-5). */
+const cardBox = (aspect: number) => {
+	const w = aspect >= 1 ? 168 : 120;
+	return { w, h: w / aspect + 26 };
+};
 const Z = 14;
 const TILE = 256;
 const WEDGE_M = 1100;
@@ -35,19 +47,27 @@ type Card = { id: string; x: number; y: number; r: number };
 export function TopoBoard({
 	demo,
 	className,
+	onPan,
 }: {
 	demo: DemoManifest;
 	className?: string;
+	/** Called on every map drag move with the pan offset (CSS px), for content that moves with it. */
+	onPan?: (p: { x: number; y: number }) => void;
 }) {
 	const navigate = useNavigate();
 	const ref = useRef<HTMLDivElement>(null);
 	const [size, setSize] = useState({ w: 1100, h: 620 });
+	// how far the card layer may reach left and right of the board without leaving the window
+	const [side, setSide] = useState(BLEED_SIDE);
 	useEffect(() => {
 		const el = ref.current;
 		if (!el) return;
-		const ro = new ResizeObserver(([e]) =>
-			setSize({ w: e.contentRect.width, h: e.contentRect.height }),
-		);
+		const ro = new ResizeObserver(([e]) => {
+			setSize({ w: e.contentRect.width, h: e.contentRect.height });
+			const r = el.getBoundingClientRect();
+			const room = Math.min(r.left, window.innerWidth - r.right) - 8;
+			setSide(Math.max(0, Math.min(BLEED_SIDE, room)));
+		});
 		ro.observe(el);
 		return () => ro.disconnect();
 	}, []);
@@ -74,24 +94,61 @@ export function TopoBoard({
 	}, [demo]);
 
 	// first layout: cards fanned out in the direction each photo looks, in two rings so neighbours
-	// with near-equal headings don't stack
+	// with near-equal headings don't stack; the outer ring straddles the map's edge. Overlapping
+	// cards are then pushed apart and every card is kept inside the bleed area.
 	const [cards, setCards] = useState<Card[]>([]);
 	useEffect(() => {
 		const R = Math.min(size.w, size.h * 1.6) * 0.36;
 		const sorted = [...geo.cams].sort((a, b) => a.yaw - b.yaw);
-		setCards(
-			sorted.map((cam, i) => {
-				const ring = i % 2 ? 0.72 : 1;
-				const a = ((cam.yaw + (i % 3) * 6 - 6) * Math.PI) / 180;
-				return {
+		const placed = sorted.map((cam, i) => {
+			const ring = i % 2 ? 0.72 : 1.18;
+			const a = ((cam.yaw + (i % 3) * 6 - 6) * Math.PI) / 180;
+			return {
+				card: {
 					id: cam.id,
 					x: Math.sin(a) * R * ring * 1.25,
 					y: -Math.cos(a) * R * ring * 0.8,
 					r: ((i * 37) % 11) - 5,
-				};
-			}),
-		);
-	}, [geo, size.w, size.h]);
+				},
+				box: cardBox(cam.aspect),
+			};
+		});
+		const clamp = ({ card, box }: (typeof placed)[number]) => {
+			const mx = size.w / 2 + side - box.w / 2;
+			card.x = Math.max(-mx, Math.min(mx, card.x));
+			card.y = Math.max(
+				-size.h / 2 - BLEED_TOP + box.h / 2,
+				Math.min(size.h / 2 + BLEED_BOTTOM - box.h / 2, card.y),
+			);
+		};
+		for (let it = 0; it < 60; it++) {
+			let moved = false;
+			for (let i = 0; i < placed.length; i++)
+				for (let j = i + 1; j < placed.length; j++) {
+					const a = placed[i];
+					const b = placed[j];
+					const dx = b.card.x - a.card.x;
+					const dy = b.card.y - a.card.y;
+					const ox = (a.box.w + b.box.w) / 2 + CARD_GAP - Math.abs(dx);
+					const oy = (a.box.h + b.box.h) / 2 + CARD_GAP - Math.abs(dy);
+					if (ox <= 0 || oy <= 0) continue;
+					moved = true;
+					// separate along the axis that needs the smaller push
+					if (ox < oy) {
+						const s = (dx < 0 ? -ox : ox) / 2;
+						a.card.x -= s;
+						b.card.x += s;
+					} else {
+						const s = (dy < 0 ? -oy : oy) / 2;
+						a.card.y -= s;
+						b.card.y += s;
+					}
+				}
+			for (const p of placed) clamp(p);
+			if (!moved) break;
+		}
+		setCards(placed.map((p) => p.card));
+	}, [geo, size.w, size.h, side]);
 
 	// Tiles load only once the board is near the viewport (it sits far down the landing page).
 	const [near, setNear] = useState(false);
@@ -115,6 +172,7 @@ export function TopoBoard({
 	// to state on release, so a pointer move never re-renders the tiles, wedges and cards.
 	const panRef = useRef({ x: 0, y: 0 });
 	const layerRef = useRef<HTMLDivElement>(null);
+	const cardLayerRef = useRef<HTMLDivElement>(null);
 	const cardEls = useRef(new Map<string, HTMLButtonElement>());
 	const lineEls = useRef(new Map<string, SVGLineElement>());
 	const [, setPan] = useState(panRef.current);
@@ -147,6 +205,13 @@ export function TopoBoard({
 		};
 		if (ref.current) ref.current.style.cursor = "grabbing";
 		if (id) raise(id);
+		else setPanLayersPromoted(true);
+	};
+	// promote the moving layers only for the length of a pan (no permanent memory cost)
+	const setPanLayersPromoted = (on: boolean) => {
+		const v = on ? "transform" : "";
+		if (layerRef.current) layerRef.current.style.willChange = v;
+		if (cardLayerRef.current) cardLayerRef.current.style.willChange = v;
 	};
 	// hover or grab brings a card to the top of the stack (and it stays there)
 	const raise = (id: string) => {
@@ -162,8 +227,11 @@ export function TopoBoard({
 		if (d.kind === "map") {
 			const p = { x: d.ox + dx, y: d.oy + dy };
 			panRef.current = p;
+			onPan?.(p);
 			if (layerRef.current)
 				layerRef.current.style.transform = `translate(${size.w / 2 + p.x}px, ${size.h / 2 + p.y}px)`;
+			if (cardLayerRef.current)
+				cardLayerRef.current.style.transform = `translate(${side + size.w / 2 + p.x}px, ${BLEED_TOP + size.h / 2 + p.y}px)`;
 			const qx = Math.round(p.x / S) * S;
 			const qy = Math.round(p.y / S) * S;
 			setTilePan((t) => (t.x === qx && t.y === qy ? t : { x: qx, y: qy }));
@@ -176,7 +244,7 @@ export function TopoBoard({
 			const m = cardEls.current.get(c.id);
 			const cam = geo.cams.find((k) => k.id === c.id);
 			if (m && cam) {
-				const w = cam.aspect >= 1 ? 168 : 120;
+				const { w } = cardBox(cam.aspect);
 				m.style.left = `${c.x - w / 2}px`;
 				m.style.top = `${c.y - w / cam.aspect / 2 - 10}px`;
 			}
@@ -190,6 +258,7 @@ export function TopoBoard({
 	const onUp = () => {
 		const d = drag.current;
 		drag.current = null;
+		setPanLayersPromoted(false);
 		if (ref.current) ref.current.style.cursor = "grab";
 		if (d?.kind === "map") setPan({ ...panRef.current });
 		else if (d?.moved) setCards((cs) => [...cs]);
@@ -245,7 +314,8 @@ export function TopoBoard({
 	return (
 		<div
 			ref={ref}
-			className={`relative touch-pan-y overflow-hidden bg-[var(--rigi-paper)] select-none ${className ?? ""}`}
+			data-theme="dark"
+			className={`relative touch-pan-y select-none ${className ?? ""}`}
 			onPointerDown={(e) => onDown(e)}
 			onPointerMove={onMove}
 			onPointerUp={onUp}
@@ -253,138 +323,170 @@ export function TopoBoard({
 			style={{ cursor: "grab" }}
 			data-testid="topo-board"
 		>
-			<div
-				className="absolute"
-				ref={layerRef}
-				style={{ transform: `translate(${ox}px, ${oy}px)` }}
-			>
-				{/* one filter pass over the tile layer instead of one per tile */}
-				<div style={{ filter: "saturate(0.8) contrast(0.95)" }}>
-					{tiles.map((t) => (
-						<img
-							key={t.key}
-							src={t.url}
-							alt=""
-							draggable={false}
-							decoding="async"
-							className="absolute max-w-none"
-							style={{
-								left: t.x,
-								top: t.y,
-								width: S,
-								height: S,
-							}}
-						/>
-					))}
-				</div>
-				<svg
-					className="pointer-events-none absolute overflow-visible"
-					style={{ left: 0, top: 0 }}
-					width={1}
-					height={1}
-					aria-hidden="true"
+			{/* the map, clipped to the board */}
+			<div className="absolute inset-0 overflow-hidden rounded-[inherit] bg-[var(--rigi-paper)]">
+				<div
+					className="absolute"
+					ref={layerRef}
+					style={{ transform: `translate(${ox}px, ${oy}px)` }}
 				>
-					{geo.cams.map((cam) => {
-						const on = active === cam.id;
-						const a0 = ((cam.yaw - cam.hfov / 2) * Math.PI) / 180;
-						const a1 = ((cam.yaw + cam.hfov / 2) * Math.PI) / 180;
-						const r = wedgePx;
-						return (
-							<path
-								key={cam.id}
-								d={`M${cam.x},${cam.y} L${cam.x + Math.sin(a0) * r},${cam.y - Math.cos(a0) * r} A${r},${r} 0 0 1 ${cam.x + Math.sin(a1) * r},${cam.y - Math.cos(a1) * r} Z`}
-								fill={on ? brandAlpha("ember", 0.3) : brandAlpha("ember", 0.08)}
-								stroke={
-									on ? brandAlpha("ember", 0.9) : brandAlpha("ember", 0.25)
-								}
-								strokeWidth={on ? 1.5 : 1}
-								style={{ transition: "fill .2s, stroke .2s" }}
+					{/* one filter pass over the tile layer instead of one per tile */}
+					<div style={{ filter: "saturate(0.8) contrast(0.95)" }}>
+						{tiles.map((t) => (
+							<img
+								key={t.key}
+								src={t.url}
+								alt=""
+								draggable={false}
+								decoding="async"
+								className="absolute max-w-none"
+								style={{
+									left: t.x,
+									top: t.y,
+									width: S,
+									height: S,
+								}}
 							/>
-						);
-					})}
+						))}
+					</div>
+					<svg
+						className="pointer-events-none absolute overflow-visible"
+						style={{ left: 0, top: 0 }}
+						width={1}
+						height={1}
+						aria-hidden="true"
+					>
+						{geo.cams.map((cam) => {
+							const on = active === cam.id;
+							const a0 = ((cam.yaw - cam.hfov / 2) * Math.PI) / 180;
+							const a1 = ((cam.yaw + cam.hfov / 2) * Math.PI) / 180;
+							const r = wedgePx;
+							return (
+								<path
+									key={cam.id}
+									d={`M${cam.x},${cam.y} L${cam.x + Math.sin(a0) * r},${cam.y - Math.cos(a0) * r} A${r},${r} 0 0 1 ${cam.x + Math.sin(a1) * r},${cam.y - Math.cos(a1) * r} Z`}
+									fill={
+										on ? brandAlpha("ember", 0.3) : brandAlpha("ember", 0.08)
+									}
+									stroke={
+										on ? brandAlpha("ember", 0.9) : brandAlpha("ember", 0.25)
+									}
+									strokeWidth={on ? 1.5 : 1}
+									style={{ transition: "fill .2s, stroke .2s" }}
+								/>
+							);
+						})}
+					</svg>
+				</div>
+			</div>
+			{/* cards, lines and pins: clipped a little outside the board so they cross onto the plan */}
+			<div
+				className="pointer-events-none absolute overflow-hidden"
+				style={{
+					top: -BLEED_TOP,
+					bottom: -BLEED_BOTTOM,
+					left: -side,
+					right: -side,
+				}}
+			>
+				<div
+					className="absolute"
+					ref={cardLayerRef}
+					style={{
+						transform: `translate(${side + ox}px, ${BLEED_TOP + oy}px)`,
+					}}
+				>
+					<svg
+						className="absolute overflow-visible"
+						style={{ left: 0, top: 0 }}
+						width={1}
+						height={1}
+						aria-hidden="true"
+					>
+						{cards.map((c) => {
+							const cam = camOf(c.id);
+							if (!cam) return null;
+							return (
+								<line
+									key={c.id}
+									ref={(el) => {
+										if (el) lineEls.current.set(c.id, el);
+										else lineEls.current.delete(c.id);
+									}}
+									x1={cam.x}
+									y1={cam.y}
+									x2={c.x}
+									y2={c.y}
+									stroke={
+										active === c.id
+											? "var(--rigi-ember)"
+											: brandAlpha("umber", 0.45)
+									}
+									strokeWidth={active === c.id ? 2 : 1}
+									strokeDasharray={active === c.id ? undefined : "3 3"}
+								/>
+							);
+						})}
+						{geo.cams.map((cam) => (
+							<circle
+								key={cam.id}
+								cx={cam.x}
+								cy={cam.y}
+								r={active === cam.id ? 6 : 4}
+								fill={BRAND.glow}
+								stroke={BRAND.umber}
+								strokeWidth={1.5}
+							/>
+						))}
+					</svg>
 					{cards.map((c) => {
+						const m = metaOf(c.id);
 						const cam = camOf(c.id);
-						if (!cam) return null;
+						if (!m || !cam) return null;
+						const { w } = cardBox(cam.aspect);
+						const on = active === c.id;
 						return (
-							<line
+							<button
 								key={c.id}
 								ref={(el) => {
-									if (el) lineEls.current.set(c.id, el);
-									else lineEls.current.delete(c.id);
+									if (el) cardEls.current.set(c.id, el);
+									else cardEls.current.delete(c.id);
 								}}
-								x1={cam.x}
-								y1={cam.y}
-								x2={c.x}
-								y2={c.y}
-								stroke={
-									active === c.id
-										? "var(--rigi-ember)"
-										: brandAlpha("umber", 0.45)
+								type="button"
+								aria-label={`Open ${c.id}`}
+								onPointerDown={(e) => onDown(e, c.id)}
+								onPointerEnter={() => !drag.current && raise(c.id)}
+								onPointerLeave={() => !drag.current && setActive(null)}
+								onKeyDown={(e) =>
+									e.key === "Enter" &&
+									navigate({ to: "/photo/$id", params: { id: c.id } })
 								}
-								strokeWidth={active === c.id ? 2 : 1}
-								strokeDasharray={active === c.id ? undefined : "3 3"}
-							/>
+								className="pointer-events-auto absolute cursor-grab rounded-[3px] bg-white p-1.5 pb-5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-[box-shadow,scale] active:cursor-grabbing"
+								style={{
+									left: c.x - w / 2,
+									top: c.y - w / cam.aspect / 2 - 10,
+									width: w,
+									zIndex: z(c.id),
+									rotate: `${on ? 0 : c.r}deg`,
+									scale: on ? "1.06" : "1",
+								}}
+							>
+								<img
+									src={m.thumb}
+									alt=""
+									loading="lazy"
+									decoding="async"
+									draggable={false}
+									className="block w-full"
+									style={{ aspectRatio: cam.aspect }}
+								/>
+								<span className="absolute inset-x-0 bottom-1 text-center font-mono text-[9px] text-black/55">
+									{Math.round(cam.yaw)}° · {fmtTime(m.takenAt, m.tzOffset)}
+								</span>
+							</button>
 						);
 					})}
-					{geo.cams.map((cam) => (
-						<circle
-							key={cam.id}
-							cx={cam.x}
-							cy={cam.y}
-							r={active === cam.id ? 6 : 4}
-							fill={BRAND.glow}
-							stroke={BRAND.umber}
-							strokeWidth={1.5}
-						/>
-					))}
-				</svg>
-				{cards.map((c) => {
-					const m = metaOf(c.id);
-					const cam = camOf(c.id);
-					if (!m || !cam) return null;
-					const w = cam.aspect >= 1 ? 168 : 120;
-					const on = active === c.id;
-					return (
-						<button
-							key={c.id}
-							ref={(el) => {
-								if (el) cardEls.current.set(c.id, el);
-								else cardEls.current.delete(c.id);
-							}}
-							type="button"
-							aria-label={`Open ${c.id}`}
-							onPointerDown={(e) => onDown(e, c.id)}
-							onPointerEnter={() => !drag.current && raise(c.id)}
-							onPointerLeave={() => !drag.current && setActive(null)}
-							onKeyDown={(e) =>
-								e.key === "Enter" &&
-								navigate({ to: "/photo/$id", params: { id: c.id } })
-							}
-							className="absolute cursor-grab rounded-[3px] bg-white p-1.5 pb-5 shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-[box-shadow,scale] active:cursor-grabbing"
-							style={{
-								left: c.x - w / 2,
-								top: c.y - w / cam.aspect / 2 - 10,
-								width: w,
-								zIndex: z(c.id),
-								rotate: `${on ? 0 : c.r}deg`,
-								scale: on ? "1.06" : "1",
-							}}
-						>
-							<img
-								src={m.thumb}
-								alt=""
-								loading="lazy"
-								decoding="async"
-								draggable={false}
-								className="block w-full"
-								style={{ aspectRatio: cam.aspect }}
-							/>
-							<span className="absolute inset-x-0 bottom-1 text-center font-mono text-[9px] text-black/55">
-								{Math.round(cam.yaw)}° · {fmtTime(m.takenAt, m.tzOffset)}
-							</span>
-						</button>
-					);
-				})}
+				</div>
 			</div>
 			<MapFurniture mPerPx={geo.mpp} className="m-2 rounded" />
 			{hiDpi && (

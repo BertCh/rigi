@@ -10,11 +10,13 @@ import {
 } from "@tanstack/react-router";
 import { BRAND } from "#/brand/khipu";
 import { FLAG_NAMES, type FlagSearch, flagSearch } from "#/lib/flags";
+import { THEME_BOOT_SCRIPT } from "#/lib/flags/theme-boot";
+import { ThemeSync } from "#/lib/theme/react";
 
 import appCss from "../styles.css?url";
 
 const FONTS_HREF =
-	"https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap";
+	"https://fonts.googleapis.com/css2?family=Fira+Sans+Condensed:wght@500;600&family=Fira+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap";
 
 export const Route = createRootRoute({
 	// the app's flags (?renderer, ?gpu, ?tiles3d, …; src/lib/flags) are validated here and carried
@@ -69,11 +71,15 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en">
+		<html lang="en" suppressHydrationWarning>
 			<head>
+				{/* first in <head>: sets data-theme before first paint (src/lib/flags/theme-boot.ts) */}
+				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: a constant string literal, no user input */}
+				<script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
 				<HeadContent />
 			</head>
 			<body>
+				<ThemeSync />
 				{children}
 				<Scripts />
 			</body>

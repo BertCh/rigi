@@ -7,7 +7,8 @@
 // compass ruler, elevation ticks and outlines. Behind the photos, a 2D canvas draws the viewpoint's terrain
 // (DEM ridgelines traced from its eye, ridgelines.ts) in the same frame, so the view continues between
 // frames and the photos can be checked against the real skyline; peak names ride on the overlay.
-// Drag pans (wraps at 0/360), wheel zooms (unless zoom={false}), click selects.
+// Drag pans (wraps at 0/360), wheel zooms (unless zoom={false}), click selects. With `resizable`, a
+// grip under the strip sets its height, remembered per browser.
 
 import { Loader2, Maximize2, Mountain } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -44,6 +45,8 @@ type Props = {
 	fitHeight?: boolean;
 	/** Wheel zoom. Off (landing page) the wheel and vertical swipes scroll the page; drag still pans. */
 	zoom?: boolean;
+	/** A grip under the strip resizes it vertically; the height is remembered per browser. */
+	resizable?: boolean;
 };
 
 type Mode = number | "all";
@@ -52,6 +55,13 @@ type View = { az0: number; elc: number; ppd: number };
 const RULER = 22;
 const TERRAIN_FADE_MS = 700;
 const TERRAIN_KEY = storageKey("panoTerrain");
+const HEIGHT_KEY = storageKey("panoHeight");
+const HEIGHT_MIN = 160;
+const HEIGHT_MAX = 1200;
+const HEIGHT_STEP = 20;
+
+const clampHeight = (h: number) =>
+	Math.round(Math.max(HEIGHT_MIN, Math.min(HEIGHT_MAX, h)));
 
 type PeakLabel = ReturnType<typeof drawPeakLabels>[number];
 const MAX_PPD = 80;
@@ -77,8 +87,27 @@ export function PanoramaStrip({
 	height = 300,
 	fitHeight = false,
 	zoom = true,
+	resizable = false,
 }: Props) {
 	const [autoH, setAutoH] = useState<number | null>(null);
+	// user-chosen height (resizable); read after mount so the server render and hydration agree
+	const [userH, setUserH] = useState<number | null>(null);
+	useEffect(() => {
+		if (!resizable) return;
+		try {
+			const h = Number(localStorage.getItem(HEIGHT_KEY));
+			if (h) setUserH(clampHeight(h));
+		} catch {}
+	}, [resizable]);
+	const resize = (h: number | null) => {
+		const next = h == null ? null : clampHeight(h);
+		setUserH(next);
+		try {
+			if (next == null) localStorage.removeItem(HEIGHT_KEY);
+			else localStorage.setItem(HEIGHT_KEY, String(next));
+		} catch {}
+	};
+	const resizeDrag = useRef<{ y: number; h: number } | null>(null);
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const bgRef = useRef<HTMLCanvasElement>(null);
 	const glRef = useRef<HTMLCanvasElement>(null);
@@ -530,6 +559,8 @@ export function PanoramaStrip({
 		? roll.photos.find((p) => p.meta.id === hover.id)
 		: null;
 
+	const stripHeight = (resizable && userH) || (fitHeight && autoH) || height;
+
 	return (
 		<section
 			className={`overflow-hidden rounded-xl bg-white/[0.03] ring-1 ring-white/8 ${className}`}
@@ -592,10 +623,11 @@ export function PanoramaStrip({
 			</div>
 			<div
 				ref={wrapRef}
+				data-theme="dark"
 				role="application"
 				aria-label={`Panorama: drag to pan${zoom ? ", wheel to zoom" : ""}, click a photo to select it`}
 				className={`relative cursor-grab select-none active:cursor-grabbing ${zoom ? "touch-none" : "touch-pan-y"}`}
-				style={{ height: (fitHeight && autoH) || height }}
+				style={{ height: stripHeight }}
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
 				onPointerUp={onPointerUp}
@@ -641,6 +673,44 @@ export function PanoramaStrip({
 					</div>
 				)}
 			</div>
+			{resizable && (
+				// biome-ignore lint/a11y/useSemanticElements: a focusable window splitter, which <hr> cannot be
+				<div
+					role="separator"
+					tabIndex={0}
+					aria-orientation="horizontal"
+					aria-label="Resize panorama"
+					aria-valuemin={HEIGHT_MIN}
+					aria-valuemax={HEIGHT_MAX}
+					aria-valuenow={stripHeight}
+					title="Drag to resize · double-click to reset"
+					data-testid="pano-resize"
+					className="group flex h-3 cursor-ns-resize touch-none items-center justify-center border-t border-white/8 outline-none"
+					onPointerDown={(e) => {
+						resizeDrag.current = { y: e.clientY, h: stripHeight };
+						e.currentTarget.setPointerCapture(e.pointerId);
+					}}
+					onPointerMove={(e) => {
+						const d = resizeDrag.current;
+						if (d) resize(d.h + e.clientY - d.y);
+					}}
+					onPointerUp={() => {
+						resizeDrag.current = null;
+					}}
+					onPointerCancel={() => {
+						resizeDrag.current = null;
+					}}
+					onDoubleClick={() => resize(null)}
+					onKeyDown={(e) => {
+						if (e.key === "ArrowDown") resize(stripHeight + HEIGHT_STEP);
+						else if (e.key === "ArrowUp") resize(stripHeight - HEIGHT_STEP);
+						else return;
+						e.preventDefault();
+					}}
+				>
+					<span className="h-[3px] w-10 rounded-full bg-white/15 transition group-hover:bg-white/40 group-focus-visible:bg-white/70" />
+				</div>
+			)}
 		</section>
 	);
 }

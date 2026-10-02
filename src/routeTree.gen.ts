@@ -13,12 +13,15 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BaselineRouteImport } from './routes/baseline'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as UploadRouteImport } from './routes/upload'
-import { Route as AtlasIndexRouteImport } from './routes/atlas.index'
-import { Route as AtlasConceptRouteImport } from './routes/atlas.$concept'
 import { Route as DevExportRollRouteImport } from './routes/dev.export-roll'
+import { Route as DevGipfelbuchSheetRouteImport } from './routes/dev.gipfelbuch-sheet'
 import { Route as DevGraphRouteImport } from './routes/dev.graph'
 import { Route as DevHowSceneRouteImport } from './routes/dev.how-scene'
 import { Route as DevMetaRouteImport } from './routes/dev.meta'
+import { Route as DevTafelRouteImport } from './routes/dev.tafel'
+import { Route as GipfelbuchIndexRouteImport } from './routes/gipfelbuch.index'
+import { Route as GipfelbuchConceptRouteImport } from './routes/gipfelbuch.$concept'
+import { Route as GipfelbuchPrintRouteImport } from './routes/gipfelbuch.print'
 import { Route as LabDeckSplatsRouteImport } from './routes/lab.deck-splats'
 import { Route as LabDeckWebgpuRouteImport } from './routes/lab.deck-webgpu'
 import { Route as LabGenerateRouteImport } from './routes/lab.generate'
@@ -48,19 +51,14 @@ const UploadRoute = UploadRouteImport.update({
   path: '/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AtlasIndexRoute = AtlasIndexRouteImport.update({
-  id: '/atlas/',
-  path: '/atlas/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AtlasConceptRoute = AtlasConceptRouteImport.update({
-  id: '/atlas/$concept',
-  path: '/atlas/$concept',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DevExportRollRoute = DevExportRollRouteImport.update({
   id: '/dev/export-roll',
   path: '/dev/export-roll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevGipfelbuchSheetRoute = DevGipfelbuchSheetRouteImport.update({
+  id: '/dev/gipfelbuch-sheet',
+  path: '/dev/gipfelbuch-sheet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevGraphRoute = DevGraphRouteImport.update({
@@ -76,6 +74,26 @@ const DevHowSceneRoute = DevHowSceneRouteImport.update({
 const DevMetaRoute = DevMetaRouteImport.update({
   id: '/dev/meta',
   path: '/dev/meta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevTafelRoute = DevTafelRouteImport.update({
+  id: '/dev/tafel',
+  path: '/dev/tafel',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GipfelbuchIndexRoute = GipfelbuchIndexRouteImport.update({
+  id: '/gipfelbuch/',
+  path: '/gipfelbuch/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GipfelbuchConceptRoute = GipfelbuchConceptRouteImport.update({
+  id: '/gipfelbuch/$concept',
+  path: '/gipfelbuch/$concept',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GipfelbuchPrintRoute = GipfelbuchPrintRouteImport.update({
+  id: '/gipfelbuch/print',
+  path: '/gipfelbuch/print',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabDeckSplatsRoute = LabDeckSplatsRouteImport.update({
@@ -124,11 +142,14 @@ export interface FileRoutesByFullPath {
   '/baseline': typeof BaselineRoute
   '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
-  '/atlas/$concept': typeof AtlasConceptRoute
   '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/gipfelbuch-sheet': typeof DevGipfelbuchSheetRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
   '/dev/meta': typeof DevMetaRoute
+  '/dev/tafel': typeof DevTafelRoute
+  '/gipfelbuch/$concept': typeof GipfelbuchConceptRoute
+  '/gipfelbuch/print': typeof GipfelbuchPrintRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -136,7 +157,7 @@ export interface FileRoutesByFullPath {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
-  '/atlas/': typeof AtlasIndexRoute
+  '/gipfelbuch/': typeof GipfelbuchIndexRoute
   '/roll/': typeof RollIndexRoute
 }
 export interface FileRoutesByTo {
@@ -144,11 +165,14 @@ export interface FileRoutesByTo {
   '/baseline': typeof BaselineRoute
   '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
-  '/atlas/$concept': typeof AtlasConceptRoute
   '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/gipfelbuch-sheet': typeof DevGipfelbuchSheetRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
   '/dev/meta': typeof DevMetaRoute
+  '/dev/tafel': typeof DevTafelRoute
+  '/gipfelbuch/$concept': typeof GipfelbuchConceptRoute
+  '/gipfelbuch/print': typeof GipfelbuchPrintRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -156,7 +180,7 @@ export interface FileRoutesByTo {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
-  '/atlas': typeof AtlasIndexRoute
+  '/gipfelbuch': typeof GipfelbuchIndexRoute
   '/roll': typeof RollIndexRoute
 }
 export interface FileRoutesById {
@@ -165,11 +189,14 @@ export interface FileRoutesById {
   '/baseline': typeof BaselineRoute
   '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
-  '/atlas/$concept': typeof AtlasConceptRoute
   '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/gipfelbuch-sheet': typeof DevGipfelbuchSheetRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
   '/dev/meta': typeof DevMetaRoute
+  '/dev/tafel': typeof DevTafelRoute
+  '/gipfelbuch/$concept': typeof GipfelbuchConceptRoute
+  '/gipfelbuch/print': typeof GipfelbuchPrintRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -177,7 +204,7 @@ export interface FileRoutesById {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
-  '/atlas/': typeof AtlasIndexRoute
+  '/gipfelbuch/': typeof GipfelbuchIndexRoute
   '/roll/': typeof RollIndexRoute
 }
 export interface FileRouteTypes {
@@ -187,11 +214,14 @@ export interface FileRouteTypes {
     | '/baseline'
     | '/library'
     | '/upload'
-    | '/atlas/$concept'
     | '/dev/export-roll'
+    | '/dev/gipfelbuch-sheet'
     | '/dev/graph'
     | '/dev/how-scene'
     | '/dev/meta'
+    | '/dev/tafel'
+    | '/gipfelbuch/$concept'
+    | '/gipfelbuch/print'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -199,7 +229,7 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
-    | '/atlas/'
+    | '/gipfelbuch/'
     | '/roll/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -207,11 +237,14 @@ export interface FileRouteTypes {
     | '/baseline'
     | '/library'
     | '/upload'
-    | '/atlas/$concept'
     | '/dev/export-roll'
+    | '/dev/gipfelbuch-sheet'
     | '/dev/graph'
     | '/dev/how-scene'
     | '/dev/meta'
+    | '/dev/tafel'
+    | '/gipfelbuch/$concept'
+    | '/gipfelbuch/print'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -219,7 +252,7 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
-    | '/atlas'
+    | '/gipfelbuch'
     | '/roll'
   id:
     | '__root__'
@@ -227,11 +260,14 @@ export interface FileRouteTypes {
     | '/baseline'
     | '/library'
     | '/upload'
-    | '/atlas/$concept'
     | '/dev/export-roll'
+    | '/dev/gipfelbuch-sheet'
     | '/dev/graph'
     | '/dev/how-scene'
     | '/dev/meta'
+    | '/dev/tafel'
+    | '/gipfelbuch/$concept'
+    | '/gipfelbuch/print'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -239,7 +275,7 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
-    | '/atlas/'
+    | '/gipfelbuch/'
     | '/roll/'
   fileRoutesById: FileRoutesById
 }
@@ -248,11 +284,14 @@ export interface RootRouteChildren {
   BaselineRoute: typeof BaselineRoute
   LibraryRoute: typeof LibraryRoute
   UploadRoute: typeof UploadRoute
-  AtlasConceptRoute: typeof AtlasConceptRoute
   DevExportRollRoute: typeof DevExportRollRoute
+  DevGipfelbuchSheetRoute: typeof DevGipfelbuchSheetRoute
   DevGraphRoute: typeof DevGraphRoute
   DevHowSceneRoute: typeof DevHowSceneRoute
   DevMetaRoute: typeof DevMetaRoute
+  DevTafelRoute: typeof DevTafelRoute
+  GipfelbuchConceptRoute: typeof GipfelbuchConceptRoute
+  GipfelbuchPrintRoute: typeof GipfelbuchPrintRoute
   LabDeckSplatsRoute: typeof LabDeckSplatsRoute
   LabDeckWebgpuRoute: typeof LabDeckWebgpuRoute
   LabGenerateRoute: typeof LabGenerateRoute
@@ -260,7 +299,7 @@ export interface RootRouteChildren {
   PhotoIdRoute: typeof PhotoIdRoute
   RollIdRoute: typeof RollIdRoute
   RollImportRoute: typeof RollImportRoute
-  AtlasIndexRoute: typeof AtlasIndexRoute
+  GipfelbuchIndexRoute: typeof GipfelbuchIndexRoute
   RollIndexRoute: typeof RollIndexRoute
 }
 
@@ -294,25 +333,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UploadRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/atlas/': {
-      id: '/atlas/'
-      path: '/atlas'
-      fullPath: '/atlas/'
-      preLoaderRoute: typeof AtlasIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/atlas/$concept': {
-      id: '/atlas/$concept'
-      path: '/atlas/$concept'
-      fullPath: '/atlas/$concept'
-      preLoaderRoute: typeof AtlasConceptRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/dev/export-roll': {
       id: '/dev/export-roll'
       path: '/dev/export-roll'
       fullPath: '/dev/export-roll'
       preLoaderRoute: typeof DevExportRollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/gipfelbuch-sheet': {
+      id: '/dev/gipfelbuch-sheet'
+      path: '/dev/gipfelbuch-sheet'
+      fullPath: '/dev/gipfelbuch-sheet'
+      preLoaderRoute: typeof DevGipfelbuchSheetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/graph': {
@@ -334,6 +366,34 @@ declare module '@tanstack/react-router' {
       path: '/dev/meta'
       fullPath: '/dev/meta'
       preLoaderRoute: typeof DevMetaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/tafel': {
+      id: '/dev/tafel'
+      path: '/dev/tafel'
+      fullPath: '/dev/tafel'
+      preLoaderRoute: typeof DevTafelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gipfelbuch/': {
+      id: '/gipfelbuch/'
+      path: '/gipfelbuch'
+      fullPath: '/gipfelbuch/'
+      preLoaderRoute: typeof GipfelbuchIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gipfelbuch/$concept': {
+      id: '/gipfelbuch/$concept'
+      path: '/gipfelbuch/$concept'
+      fullPath: '/gipfelbuch/$concept'
+      preLoaderRoute: typeof GipfelbuchConceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gipfelbuch/print': {
+      id: '/gipfelbuch/print'
+      path: '/gipfelbuch/print'
+      fullPath: '/gipfelbuch/print'
+      preLoaderRoute: typeof GipfelbuchPrintRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lab/deck-splats': {
@@ -400,11 +460,14 @@ const rootRouteChildren: RootRouteChildren = {
   BaselineRoute: BaselineRoute,
   LibraryRoute: LibraryRoute,
   UploadRoute: UploadRoute,
-  AtlasConceptRoute: AtlasConceptRoute,
   DevExportRollRoute: DevExportRollRoute,
+  DevGipfelbuchSheetRoute: DevGipfelbuchSheetRoute,
   DevGraphRoute: DevGraphRoute,
   DevHowSceneRoute: DevHowSceneRoute,
   DevMetaRoute: DevMetaRoute,
+  DevTafelRoute: DevTafelRoute,
+  GipfelbuchConceptRoute: GipfelbuchConceptRoute,
+  GipfelbuchPrintRoute: GipfelbuchPrintRoute,
   LabDeckSplatsRoute: LabDeckSplatsRoute,
   LabDeckWebgpuRoute: LabDeckWebgpuRoute,
   LabGenerateRoute: LabGenerateRoute,
@@ -412,7 +475,7 @@ const rootRouteChildren: RootRouteChildren = {
   PhotoIdRoute: PhotoIdRoute,
   RollIdRoute: RollIdRoute,
   RollImportRoute: RollImportRoute,
-  AtlasIndexRoute: AtlasIndexRoute,
+  GipfelbuchIndexRoute: GipfelbuchIndexRoute,
   RollIndexRoute: RollIndexRoute,
 }
 export const routeTree = rootRouteImport

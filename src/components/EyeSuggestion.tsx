@@ -134,7 +134,7 @@ export function EyeSuggestion({
 					<span className="flex-1">{progressText(phase.progress)}</span>
 					<button
 						type="button"
-						className="text-cyan-300 hover:underline"
+						className="text-cyan-300 hover:underline light:text-[var(--rigi-glow)]"
 						onClick={dismiss}
 					>
 						Cancel
@@ -142,7 +142,7 @@ export function EyeSuggestion({
 				</div>
 			)}
 			{phase.kind === "error" && (
-				<p className="text-[11px] text-red-300">
+				<p className="text-[11px] text-red-300 light:text-[var(--rigi-trap)]">
 					Camera position check failed: {phase.error}
 				</p>
 			)}
@@ -177,7 +177,7 @@ function ResultCard({
 	const how = `${r.gpu ? "GPU" : "CPU"} · ${r.eyesMarched} horizons · ${(r.ms / 1000).toFixed(1)} s`;
 	return (
 		<div
-			className="relative space-y-1.5 rounded-lg bg-amber-400/8 p-2.5 text-[11px] leading-snug text-white/75 ring-1 ring-amber-300/25"
+			className="relative space-y-1.5 rounded-lg bg-amber-400/8 p-2.5 text-[11px] leading-snug text-white/75 ring-1 ring-amber-300/25 light:ring-[var(--rigi-lesson)]/25"
 			data-eye-moved={r.moved ? "1" : "0"}
 		>
 			<button
@@ -188,7 +188,7 @@ function ResultCard({
 			>
 				<X className="size-3.5" />
 			</button>
-			<p className="pr-4 text-[10px] font-semibold tracking-wide text-amber-200/90 uppercase">
+			<p className="pr-4 text-[10px] font-semibold tracking-wide text-amber-200/90 uppercase light:text-[var(--rigi-lesson)]">
 				Unverified suggestion
 			</p>
 			{r.moved ? (
@@ -218,7 +218,7 @@ function ResultCard({
 				overlay before keeping it. {how}
 			</p>
 			{stale && (
-				<p className="text-amber-200/80">
+				<p className="text-amber-200/80 light:text-[var(--rigi-lesson)]">
 					The pose changed since this check: run it again to apply.
 				</p>
 			)}

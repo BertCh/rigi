@@ -6,8 +6,10 @@
 // colour codes as encoded by Carrie Brezine in the Harvard Khipu Database, with the hex
 // swatches published by the Khipu Field Guide (khipufieldguide.com/sketchbook/brezine_colors.html).
 //
-// Every brand colour is a chart swatch, named by its Ascher code. The CSS tokens in
-// src/styles.css (--rigi-*) mirror BRAND; keep the two in step.
+// Every brand colour is a chart swatch, named by its Ascher code. BRAND holds the DARK-theme values
+// and is theme-independent (canvas, exports, always-dark islands). The CSS roles in src/styles.css
+// (--rigi-*) are theme-aware: they equal BRAND in dark and BRAND_LIGHT under data-theme="light".
+// For SVG drawn on the page ground use brandVar(), not BRAND.
 
 /** Brezine colour classes (the chart's rows). */
 export type KhipuClass =
@@ -146,4 +148,37 @@ export function brandAlpha(role: BrandRole, a: number): string {
 	const h = BRAND[role];
 	const n = Number.parseInt(h.slice(1), 16);
 	return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/**
+ * Brand roles under the light theme → Ascher code; mirrors `:root[data-theme="light"]` in src/styles.css.
+ * `slate` is CSS-only there (a 30% LG / 70% W mix, not a chart swatch); LG stands in here.
+ */
+export const BRAND_LIGHT_CODES = {
+	ink: "W",
+	slate: "LG",
+	paper: "LK",
+	glow: "SB",
+	ember: "SB",
+	umber: "CB",
+	lesson: "NB",
+	trap: "RM",
+	result: "GG",
+	negative: "MG",
+} as const satisfies Record<BrandRole, AscherCode>;
+
+/** Brand roles → hex under the light theme (slate approximated, see BRAND_LIGHT_CODES). */
+export const BRAND_LIGHT = Object.fromEntries(
+	Object.entries(BRAND_LIGHT_CODES).map(([role, code]) => [
+		role,
+		BREZINE[code].hex,
+	]),
+) as { [R in BrandRole]: string };
+
+/** A theme-aware CSS colour for a brand role, for SVG on the page ground: `var(--rigi-role)`, or a translucent mix. */
+export function brandVar(role: BrandRole, alpha?: number): string {
+	const v = `var(--rigi-${role})`;
+	return alpha === undefined || alpha >= 1
+		? v
+		: `color-mix(in oklab, ${v} ${Math.round(alpha * 100)}%, transparent)`;
 }

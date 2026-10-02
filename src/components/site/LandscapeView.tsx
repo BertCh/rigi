@@ -75,6 +75,7 @@ export function LandscapeView({ children }: { children: ReactNode }) {
 			)}
 			<div
 				ref={box}
+				data-theme="dark"
 				className={
 					full
 						? "relative flex h-full w-full items-center bg-[var(--rigi-ink)]"

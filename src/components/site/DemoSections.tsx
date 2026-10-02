@@ -25,7 +25,11 @@ export function PanoramaSection() {
 	);
 }
 
-export function TopoSection() {
+export function TopoSection({
+	onPan,
+}: {
+	onPan?: (p: { x: number; y: number }) => void;
+}) {
 	const [demo, setDemo] = useState<DemoManifest | null>(null);
 	useEffect(() => {
 		let live = true;
@@ -41,6 +45,7 @@ export function TopoSection() {
 	return demo ? (
 		<TopoBoard
 			demo={demo}
+			onPan={onPan}
 			className="h-[min(640px,75vh)] rounded-2xl ring-1 ring-white/10"
 		/>
 	) : (

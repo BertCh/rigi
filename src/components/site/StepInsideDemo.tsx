@@ -8,6 +8,8 @@ import { Tiles3DCredit } from "#/components/nearfield/Tiles3DCredit";
 import type { Pose } from "#/lib/camera";
 import type { PhotoMeta } from "#/lib/photos";
 import type { Renderer } from "#/lib/renderer";
+import { LiveLines } from "./LiveLines";
+import { type Lines, viewOfCamera } from "./lineArt";
 
 // Landing-page Step Inside: a photo from the sample trip (IMG_7086, Niederhorn) with its near field
 // baked by scripts/demo/bake-step.mjs (the anchored splats and the depth split the Step Inside button
@@ -64,7 +66,7 @@ function bytesFromBase64(b64: string): Uint8Array {
 export function StepInsideDemo({ className }: { className?: string }) {
 	const box = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const engineRef = useRef<Renderer | null>(null);
+	const engineRef = useRef<StepEngine | null>(null);
 	const [visible, setVisible] = useState(false);
 	const [stage, setStage] = useState<string | null>(null);
 	const [stepping, setStepping] = useState(false);
@@ -277,30 +279,45 @@ export function StepInsideDemo({ className }: { className?: string }) {
 	}, [visible]);
 
 	const ready = stage === "ready";
+	// the sides: the photo's ridgelines through the step camera (at the photo's pose until it is up)
+	const stepView = (lines: Lines) => {
+		const cam = ready ? engineRef.current?.stepCamera?.camera : null;
+		return cam
+			? viewOfCamera(cam.position, cam.quaternion, cam.fov)
+			: (lines.rest ?? null);
+	};
 	return (
-		<div
-			ref={box}
-			className={`relative overflow-hidden bg-[var(--rigi-slate)] ${className ?? ""}`}
-			data-testid="step-inside-demo"
-			data-stage={stage ?? ""}
-		>
-			<img
-				src={`${BASE}/photo.jpg`}
-				loading="lazy"
-				decoding="async"
-				alt="A hiker on Niederhorn above Lake Thun, the Bernese Alps behind"
-				className={`absolute inset-0 size-full object-contain transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
+		<div className="relative isolate">
+			<LiveLines
+				src="/demo/surround/step-lines.bin"
+				getView={stepView}
+				className="-z-10"
 			/>
-			<canvas
-				ref={canvasRef}
-				tabIndex={-1}
-				className={`absolute inset-0 size-full !touch-pan-y outline-none transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
-			/>
-			<div className="pointer-events-none absolute top-3 left-3 flex items-center gap-2 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] text-white/80 backdrop-blur">
-				<Cpu className="size-3.5 text-[var(--rigi-glow)]" />
-				{stage ? STAGE[stage] : "Live 3D, rendered locally"}
+			<div
+				ref={box}
+				data-theme="dark"
+				className={`relative overflow-hidden bg-[var(--rigi-slate)] ${className ?? ""}`}
+				data-testid="step-inside-demo"
+				data-stage={stage ?? ""}
+			>
+				<img
+					src={`${BASE}/photo.jpg`}
+					loading="lazy"
+					decoding="async"
+					alt="A hiker on Niederhorn above Lake Thun, the Bernese Alps behind"
+					className={`absolute inset-0 size-full object-contain transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
+				/>
+				<canvas
+					ref={canvasRef}
+					tabIndex={-1}
+					className={`absolute inset-0 size-full !touch-pan-y outline-none transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
+				/>
+				<div className="pointer-events-none absolute top-3 left-3 flex items-center gap-2 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] text-white/80 backdrop-blur">
+					<Cpu className="size-3.5 text-[var(--rigi-glow)]" />
+					{stage ? STAGE[stage] : "Live 3D, rendered locally"}
+				</div>
+				<Tiles3DCredit engineRef={engineRef} stepping={stepping} />
 			</div>
-			<Tiles3DCredit engineRef={engineRef} stepping={stepping} />
 		</div>
 	);
 }

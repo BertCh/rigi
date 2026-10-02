@@ -97,7 +97,7 @@ function FlagRow({
 							className={cn(
 								"flex items-center gap-1 rounded-md px-2 py-1 font-mono text-[10px] ring-1 transition-colors",
 								active
-									? "bg-white text-slate-900 ring-white"
+									? "bg-white text-slate-900 ring-white light:text-[var(--rigi-ink)]"
 									: "bg-white/5 text-white/60 ring-white/10 hover:text-white",
 							)}
 						>
@@ -150,7 +150,7 @@ function FlagRow({
 					{ui.label}
 				</span>
 				{flagSet(ui.name) && (
-					<span className="rounded bg-cyan-400/15 px-1 py-px font-mono text-[9px] text-cyan-200">
+					<span className="rounded bg-cyan-400/15 px-1 py-px font-mono text-[9px] text-cyan-200 light:text-[var(--rigi-glow)]">
 						set
 					</span>
 				)}
@@ -182,7 +182,9 @@ export function AdvancedPanel() {
 	return (
 		<Section
 			title="Experimental & dev"
-			icon={<FlaskConical className="size-3 text-amber-200/60" />}
+			icon={
+				<FlaskConical className="size-3 text-amber-200/60 light:text-[var(--rigi-lesson)]" />
+			}
 			collapse={{ id: "advanced", defaultOpen: false }}
 			summary={
 				active.length
@@ -191,7 +193,7 @@ export function AdvancedPanel() {
 			}
 			aside={
 				active.length > 0 && (
-					<span className="rounded-full bg-amber-300/15 px-1.5 text-[10px] font-semibold text-amber-200">
+					<span className="rounded-full bg-amber-300/15 px-1.5 text-[10px] font-semibold text-amber-200 light:text-[var(--rigi-lesson)]">
 						{active.length} on
 					</span>
 				)

@@ -37,7 +37,7 @@ node scripts/ci/spdx.mjs         # SPDX headers
 npx biome check --write <files>  # format and lint what you changed
 ```
 
-Browser and GPU jobs share one machine-wide queue; run them as `node scripts/gpu/with-render-lock.mjs -- <command>` (the `full` tier does this for you). `AGENTS.md` lists the commands in more detail.
+Develop against `npm run dev` and the fast tier. Browser and GPU checks are not run per change: they run in batches over a chunk of work, and changes land marked browser-unverified until then (see "Testing policy" in `AGENTS.md`). In a batch, browser and GPU jobs share one machine-wide queue; run them as `node scripts/gpu/with-render-lock.mjs -- <command>`, one step at a time (the `full` tier does this for you).
 
 ## Pull requests
 

@@ -20,6 +20,7 @@ import {
 	Wand2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ThemeToggle } from "#/components/site/ThemeToggle";
 import type { Pin } from "#/lib/align";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { useConcordDisplay } from "#/lib/concord/app/useConcordDisplay";
@@ -1355,7 +1356,7 @@ export function PhotoWorkspace({
 
 	return (
 		<div
-			className="flex h-dvh w-full flex-col bg-[#0b0f14] text-white md:flex-row"
+			className="flex h-dvh w-full flex-col bg-[#0b0f14] text-white md:flex-row light:bg-[var(--rigi-ink)]"
 			data-ready={status || error ? undefined : ""}
 			data-renderer={rendererUsed?.renderer}
 			data-renderer-reason={rendererUsed?.reason}
@@ -1363,7 +1364,7 @@ export function PhotoWorkspace({
 			data-verify={verify ?? undefined}
 		>
 			{/* stage */}
-			<div className="relative min-h-0 flex-1">
+			<div className="relative min-h-0 flex-1 bg-[#0b0f14]" data-theme="dark">
 				<header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 p-3">
 					<Link
 						to="/library"
@@ -1640,45 +1641,50 @@ export function PhotoWorkspace({
 
 			{/* panel */}
 			{/* panel: mode switch (sticky) → View → Pose → Experimental & dev → credits (always shown) */}
-			<aside className="flex max-h-[45dvh] w-full shrink-0 flex-col border-white/8 bg-[#10151c] md:max-h-none md:w-80 md:border-l">
+			<aside className="flex max-h-[45dvh] w-full shrink-0 flex-col border-white/8 bg-[#10151c] md:max-h-none md:w-80 md:border-l light:bg-[var(--rigi-slate)]">
 				<div className="min-h-0 flex-1 overflow-y-auto">
-					<div className="sticky top-0 z-10 border-b border-white/8 bg-[#10151c]/95 px-4 pt-4 pb-3 backdrop-blur">
-						<Segmented
-							value={settings.mode}
-							onChange={(mode) => {
-								update({ mode });
-								if (mode === "world") {
-									setTool("inspect");
-									revealRef.current?.stop();
-								}
-							}}
-							options={[
-								{
-									value: "overlay",
-									label: (
-										<span className="flex items-center justify-center gap-1">
-											<Layers className="size-3.5" /> Overlay
-										</span>
-									),
-								},
-								{
-									value: "replace",
-									label: (
-										<span className="flex items-center justify-center gap-1">
-											<Sparkles className="size-3.5" /> Blend
-										</span>
-									),
-								},
-								{
-									value: "world",
-									label: (
-										<span className="flex items-center justify-center gap-1">
-											<MapIcon className="size-3.5" /> In map
-										</span>
-									),
-								},
-							]}
-						/>
+					<div className="sticky top-0 z-10 border-b border-white/8 bg-[#10151c]/95 px-4 pt-4 pb-3 backdrop-blur light:bg-[var(--rigi-slate)]">
+						<div className="flex items-center gap-2">
+							<div className="min-w-0 flex-1">
+								<Segmented
+									value={settings.mode}
+									onChange={(mode) => {
+										update({ mode });
+										if (mode === "world") {
+											setTool("inspect");
+											revealRef.current?.stop();
+										}
+									}}
+									options={[
+										{
+											value: "overlay",
+											label: (
+												<span className="flex items-center justify-center gap-1">
+													<Layers className="size-3.5" /> Overlay
+												</span>
+											),
+										},
+										{
+											value: "replace",
+											label: (
+												<span className="flex items-center justify-center gap-1">
+													<Sparkles className="size-3.5" /> Blend
+												</span>
+											),
+										},
+										{
+											value: "world",
+											label: (
+												<span className="flex items-center justify-center gap-1">
+													<MapIcon className="size-3.5" /> In map
+												</span>
+											),
+										},
+									]}
+								/>
+							</div>
+							<ThemeToggle />
+						</div>
 						<p className="mt-2 text-[11px] leading-relaxed text-white/45">
 							{settings.mode === "overlay" &&
 								"Terrain data drawn onto the photo from the camera’s exact viewpoint."}

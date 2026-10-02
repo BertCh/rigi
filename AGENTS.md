@@ -17,7 +17,12 @@ The regression gate is `scripts/ci/run.mjs`; the check registry is `scripts/ci/c
 - One or a few checks: `node scripts/ci/run.mjs fast --only labels,haze-fit`; `--skip a,b` drops some; `--list` prints every id, tier and command.
 - A single unit check is a plain tsx script, for example `npx tsx src/lib/look/__tests__/labels.check.ts`.
 - Statuses PASS / FAIL / KNOWN / FIXED / SKIP: KNOWN failures are baselined in `scripts/ci/known-failures.json`; SKIP means a gitignored input (`data/`, `public/photos/`) is missing.
-- **Browser and GPU jobs must go through the machine-wide render lock**: `node scripts/gpu/with-render-lock.mjs -- <cmd>`, for example `node scripts/gpu/with-render-lock.mjs -- node scripts/eval-app.mjs --renderer webgpu`. The lock is a FIFO queue shared by every session on the machine; never kill another job to free it. `scripts/ci/run.mjs full` wraps its browser checks in the lock itself.
+- **Testing policy: develop on Vite, test browser/GPU in batches.** Many sessions share one machine, and the render lock serializes every browser job, so per-change browser runs are the main bottleneck.
+  - Per change: fast gates only (`npx tsc --noEmit -p .`, `npx biome check --write <files>`, the relevant `node scripts/ci/run.mjs fast --only …` checks, node/tsx evidence; luma's WebGPU device runs in node over Dawn for compute code). Check visuals by hand in the running `vite dev` server on :3100 (HMR), not with a harness.
+  - Do not run browser harnesses, screenshots, benches or `run.mjs full` for an individual change, and do not take the render lock while implementing. Land the change marked **browser-unverified** and list it for the next batch.
+  - Browser/GPU checks run as one consolidated pass per wave of work (a large chunk of landed commits), when the user asks for it or a coordinator owns it. A regression found there reverts the commit it bisects to. Runtime correctness guards still ship inside the patch.
+  - Exceptions: a user who asks for a browser check now, or a change that cannot be judged any other way (then run one targeted step with `RENDER_LOCK_PRIORITY=1`).
+- **When a batch does run, browser and GPU jobs go through the machine-wide render lock**: `node scripts/gpu/with-render-lock.mjs -- <cmd>`, for example `node scripts/gpu/with-render-lock.mjs -- node scripts/eval-app.mjs --renderer webgpu`. The lock is a FIFO queue shared by every session on the machine; never kill another job to free it, and never pause development for it. Take it per step, never around a script or `;`-chain of steps; use `RENDER_LOCK_EXCLUSIVE=1` only on steps whose timings you report. Launch lock-wrapped jobs in the background and keep coding. `scripts/ci/run.mjs full` wraps its browser checks in the lock itself.
 - Every browser check pins its engine explicitly (`?renderer=` or `--renderer`), so a change of the default never silently changes what a gate measures.
 - Optional pre-push hook for the fast tier: `node scripts/ci/install-hook.mjs`.
 - Upstream drift (needs network and `gh`, not a CI check): `node scripts/upstream/luma-watch.mjs [--json]` reports npm dist-tags, luma master vs the vendor base, the vendored luma PR heads and the watch PRs.
@@ -39,7 +44,7 @@ The regression gate is `scripts/ci/run.mjs`; the check registry is `scripts/ci/c
 ## Merge preparation
 - When asked to "get ready for merge", create a copyable Markdown description of the changes versus `master`.
 - Start it with `Goals` and `Changes` sections, then `Verification`, and risks, follow-ups or other merge-relevant sections when useful.
-- In `Verification`, explicitly call out which checks were run and which could not be run: `npx biome check` on the changed files, `npx tsc --noEmit -p .`, `node scripts/ci/run.mjs fast`, `node scripts/ci/spdx.mjs`, and, for rendering or GPU changes, the relevant full-tier checks run through `scripts/gpu/with-render-lock.mjs`.
+- In `Verification`, explicitly call out which checks were run and which could not be run: `npx biome check` on the changed files, `npx tsc --noEmit -p .`, `node scripts/ci/run.mjs fast`, `node scripts/ci/spdx.mjs`, and, for rendering or GPU changes, whether the relevant full-tier checks have run in a batch pass (through `scripts/gpu/with-render-lock.mjs`) or the change is still browser-unverified.
 - Run the fast tier after the final code and formatting changes and treat it as a required pre-merge gate. Do not rely on a single targeted check as a substitute for it.
 - Say plainly when numbers or parity were not measured; do not report an unverified claim as verified.
 
@@ -57,6 +62,7 @@ The regression gate is `scripts/ci/run.mjs`; the check registry is `scripts/ci/c
 - `src/lib/deck-webgpu` is deck.gl on WebGPU (`WebGpuEngine`, WGSL layers); see its `README.md`. `src/lib/deck` is deck.gl on WebGL2 (`DeckEngine`, GLSL). Features are ported to both: a shader change usually means a GLSL and a WGSL edit, and `scripts/deck-engine-smoke.mjs` checks the two agree (|Δyaw| ≤ 0.5°, label overlap).
 - `src/lib/gpu/core` (see its `README.md`) is the only GPU compute path: `ComputeGraph` over luma's `GPUCommandGraph`, with `defineKernel`/`kernelAsync`, a readback ring and a device pool. Under WebGPU the render device is also the compute device. Add GPU work as a graph, not as a standalone dispatch.
 - `src/lib/flags` is the only reader of URL and harness flags (typed table, `getFlag`, per-realm override `globalThis.__RIGI_FLAGS__ = { gpu: "off" }`). Do not parse `location.search` elsewhere; declare a new flag there.
+- `?theme=auto|light|dark` sets the colour theme (`<html data-theme>`; default `auto` = saved choice, then OS, then dark; harnesses under webdriver render dark unless they pass `?theme=light`). Mark an always-dark island with `data-theme="dark"`; use the `light:` variant for off-palette colours and `brandVar()` for SVG on the page ground (`src/lib/theme`, `src/styles.css`).
 - `vendor/luma`, `vendor/deck`: vendored luma.gl `10.0.0-alpha.2-rigi.3` and deck.gl `9.4.0-rigi.1` (deck master + the luma 10 bump PR #10752 + #10780). They are not first-party code; rebuild instructions are in their READMEs.
 
 ## Renderer selection

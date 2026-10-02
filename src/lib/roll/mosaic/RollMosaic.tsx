@@ -5,7 +5,7 @@
 // The mosaic view of a roll: panorama strip on top, then the justified grid next to a plan-view
 // mini map (stacked when `compact`, e.g. the left half of the split view).
 import { Clock, MapPin } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Roll } from "../types";
 import { PanoramaStrip } from "./PanoramaStrip";
 import { type GroupBy, RollGrid } from "./RollGrid";
@@ -40,6 +40,20 @@ export function RollMosaic({
 				: roll.photos,
 		[roll, visibleIds],
 	);
+	// a pick in the panorama is already in view: the grid shouldn't scroll the page to its tile
+	const panoPick = useRef<string | null>(null);
+	const onPanoSelect = useCallback(
+		(id: string | null) => {
+			panoPick.current = id;
+			onSelect(id);
+		},
+		[onSelect],
+	);
+	const followSelection = useCallback((id: string) => {
+		const fromPano = panoPick.current === id;
+		panoPick.current = null;
+		return !fromPano;
+	}, []);
 	const map = (
 		<RollMiniMap
 			roll={roll}
@@ -55,8 +69,9 @@ export function RollMosaic({
 				roll={roll}
 				photos={photos}
 				selectedId={selectedId}
-				onSelect={onSelect}
+				onSelect={onPanoSelect}
 				height={compact ? 260 : 340}
+				resizable
 			/>
 			<div
 				className={
@@ -113,6 +128,7 @@ export function RollMosaic({
 						selectedId={selectedId}
 						onSelect={onSelect}
 						groupBy={groupBy}
+						followSelection={followSelection}
 						rowHeight={compact ? 150 : 190}
 					/>
 				</div>

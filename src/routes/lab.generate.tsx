@@ -561,6 +561,7 @@ function LabGenerate() {
 		);
 	return (
 		<div
+			data-theme="dark"
 			style={{
 				minHeight: "100vh",
 				background: "#111316",
