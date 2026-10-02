@@ -27,7 +27,7 @@ import {
 	poseToOpenCV,
 } from "../camera";
 import { DEG as D, enuRotation, toEcef, WGS84, wrap360 } from "../geodesy";
-import { mat3ToQuat as quatFromMat3 } from "../linalg";
+import { mul3, mat3ToQuat as quatFromMat3, transpose3 } from "../linalg";
 
 export type { Vec3 };
 
@@ -126,17 +126,8 @@ export type CameraModel = {
 	q_w2c_enu: [number, number, number, number];
 };
 
-export function mat3Mul(a: Mat3, b: Mat3): Mat3 {
-	const o = new Array(9).fill(0) as Mat3;
-	for (let i = 0; i < 3; i++)
-		for (let j = 0; j < 3; j++)
-			o[i * 3 + j] =
-				a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j];
-	return o;
-}
-export function mat3T(a: Mat3): Mat3 {
-	return [a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]];
-}
+export const mat3Mul = (a: Mat3, b: Mat3): Mat3 => mul3(a, b);
+export const mat3T = (a: Mat3): Mat3 => transpose3(a);
 export function mat3Vec(a: Mat3, v: ArrayLike<number>): Vec3 {
 	return [
 		a[0] * v[0] + a[1] * v[1] + a[2] * v[2],

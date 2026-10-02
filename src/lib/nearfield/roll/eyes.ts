@@ -19,6 +19,12 @@
 // Evidence is thin (one usable pair, IMG_7059/IMG_7063): see REPORT.txt. Default off (REFINE_EYES_DEFAULT).
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { Pose } from "../../camera";
+import {
+	rodrigues as linalgRodrigues,
+	solveLinear as linalgSolve,
+	mul3,
+	transpose3,
+} from "../../linalg";
 import { camToEnuMatrix } from "../lift";
 
 export type { Vec3 };
@@ -86,38 +92,11 @@ export type EyePair = {
 };
 
 // ---- small linear algebra ----
-const mat3mul = (a: number[], b: number[]) =>
-	[0, 1, 2].flatMap((i) =>
-		[0, 1, 2].map(
-			(j) =>
-				a[3 * i] * b[j] + a[3 * i + 1] * b[3 + j] + a[3 * i + 2] * b[6 + j],
-		),
-	);
-const tr3 = (a: number[]) => [
-	a[0],
-	a[3],
-	a[6],
-	a[1],
-	a[4],
-	a[7],
-	a[2],
-	a[5],
-	a[8],
-];
+const mat3mul = (a: number[], b: number[]): number[] => mul3(a, b);
+const tr3 = (a: number[]): number[] => transpose3(a);
 
 /** Rotation matrix of a rotation vector (Rodrigues), row-major. */
-export function rodrigues(w: ArrayLike<number>): number[] {
-	const th = Math.hypot(w[0], w[1], w[2]);
-	if (th < 1e-12) return [1, 0, 0, 0, 1, 0, 0, 0, 1];
-	const kx = w[0] / th;
-	const ky = w[1] / th;
-	const kz = w[2] / th;
-	const s = Math.sin(th);
-	const c = 1 - Math.cos(th);
-	const K = [0, -kz, ky, kz, 0, -kx, -ky, kx, 0];
-	const K2 = mat3mul(K, K);
-	return [1, 0, 0, 0, 1, 0, 0, 0, 1].map((v, i) => v + s * K[i] + c * K2[i]);
-}
+export const rodrigues = (w: ArrayLike<number>): number[] => linalgRodrigues(w);
 
 /** Solve A x = b (A n×n row-major, symmetric positive definite-ish) by Gaussian elimination with pivoting. */
 export function solveLinear(
@@ -125,36 +104,8 @@ export function solveLinear(
 	b: number[],
 	n: number,
 ): number[] | null {
-	const M = A.slice();
-	const x = b.slice();
-	for (let c = 0; c < n; c++) {
-		let p = c;
-		for (let r = c + 1; r < n; r++)
-			if (Math.abs(M[r * n + c]) > Math.abs(M[p * n + c])) p = r;
-		if (Math.abs(M[p * n + c]) < 1e-300) return null;
-		if (p !== c) {
-			for (let k = 0; k < n; k++) {
-				const t = M[c * n + k];
-				M[c * n + k] = M[p * n + k];
-				M[p * n + k] = t;
-			}
-			const t = x[c];
-			x[c] = x[p];
-			x[p] = t;
-		}
-		for (let r = c + 1; r < n; r++) {
-			const f = M[r * n + c] / M[c * n + c];
-			if (f === 0) continue;
-			for (let k = c; k < n; k++) M[r * n + k] -= f * M[c * n + k];
-			x[r] -= f * x[c];
-		}
-	}
-	for (let r = n - 1; r >= 0; r--) {
-		let s = x[r];
-		for (let k = r + 1; k < n; k++) s -= M[r * n + k] * x[k];
-		x[r] = s / M[r * n + r];
-	}
-	return x.every(Number.isFinite) ? x : null;
+	const rows = Array.from({ length: n }, (_, r) => A.slice(r * n, r * n + n));
+	return linalgSolve(rows, b);
 }
 
 /** Inverse of a small square matrix (null when singular). */

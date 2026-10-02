@@ -9,13 +9,13 @@
 // numpy's default_rng(0): hypotheses differ from the Python run, the refined optimum is the same.
 
 import { cameraRotationRansacAsync } from "#/lib/pose6dof";
-import type { Mat3 } from "./geometry";
+import type { Mat3F64 } from "./geometry";
 
 export const PX_THRESH = 6.0;
 export const RANSAC_ITERS = 3000;
 
 export type RotationSolve = {
-	R: Mat3;
+	R: Mat3F64;
 	f: number;
 	inliers: Uint8Array;
 	rmse: number | null;

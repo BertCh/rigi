@@ -23,6 +23,7 @@
  */
 import { type Pose, poseToR, rToPose } from "../camera";
 import { DEG as D } from "../geodesy";
+import { mul3, rotationAngle, transpose3 } from "../linalg";
 import type { Mat3 } from "../ontology/core/geometry";
 
 /** 3×3 row-major (the canonical ontology Mat3). */
@@ -30,33 +31,11 @@ export type { Mat3 };
 
 export { poseToR, rToPose };
 
-export function mul3(a: Mat3, b: Mat3): Mat3 {
-	const o = new Array(9).fill(0) as Mat3;
-	for (let i = 0; i < 3; i++)
-		for (let j = 0; j < 3; j++) {
-			let s = 0;
-			for (let k = 0; k < 3; k++) s += a[i * 3 + k] * b[k * 3 + j];
-			o[i * 3 + j] = s;
-		}
-	return o;
-}
-
-export const transpose3 = (a: Mat3): Mat3 => [
-	a[0],
-	a[3],
-	a[6],
-	a[1],
-	a[4],
-	a[7],
-	a[2],
-	a[5],
-	a[8],
-];
+export { mul3, transpose3 };
 
 /** Rotation angle of R in degrees. */
 export function rotAngleDeg(R: Mat3): number {
-	const c = (R[0] + R[4] + R[8] - 1) / 2;
-	return Math.acos(Math.max(-1, Math.min(1, c))) / D;
+	return rotationAngle(R) / D;
 }
 
 /** Relative rotation A-camera → B-camera from two world poses (for tests / cycle checks). */

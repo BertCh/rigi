@@ -29,6 +29,9 @@ export type Mat3 = [
 	number,
 ];
 
+/** Row-major 3×3 as a Float64Array(9): the typed-array form for hot loops (the tuple type is Mat3). */
+export type Mat3F64 = Float64Array;
+
 /** Image size in pixels (always `width`/`height`, never w/h/W/H in public types). */
 export type Size = { width: number; height: number };
 

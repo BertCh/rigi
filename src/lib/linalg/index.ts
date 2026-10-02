@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import type { Vec3 } from "#/lib/ontology/core/geometry";
+import type { Mat3, Vec3 } from "#/lib/ontology/core/geometry";
 // Small dense linear algebra for the solvers: row-major number[][] (n ≤ 12) and, for the
 // Cholesky routines, flat row-major Float64Array.
 
-export type { Vec3 };
+export type { Mat3, Vec3 };
 
 export const dot3 = (a: ArrayLike<number>, b: ArrayLike<number>) =>
 	a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -27,6 +27,86 @@ export const cross3 = (a: ArrayLike<number>, b: ArrayLike<number>): Vec3 => [
 	a[2] * b[0] - a[0] * b[2],
 	a[0] * b[1] - a[1] * b[0],
 ];
+
+// ---- 3×3 (row-major, length 9) ----
+type Out9 = number[] | Float64Array;
+
+/** C = A · B for row-major 3×3. `out` (not aliasing A or B) is filled and returned; without it a Mat3 tuple. */
+export function mul3(a: ArrayLike<number>, b: ArrayLike<number>): Mat3;
+export function mul3<T extends Out9>(
+	a: ArrayLike<number>,
+	b: ArrayLike<number>,
+	out: T,
+): T;
+export function mul3(
+	a: ArrayLike<number>,
+	b: ArrayLike<number>,
+	out: Out9 = new Array(9).fill(0),
+): Out9 {
+	for (let r = 0; r < 3; r++)
+		for (let c = 0; c < 3; c++)
+			out[r * 3 + c] =
+				a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
+	return out;
+}
+
+/** Aᵀ for row-major 3×3; `out` must not alias A. */
+export function transpose3(a: ArrayLike<number>): Mat3;
+export function transpose3<T extends Out9>(a: ArrayLike<number>, out: T): T;
+export function transpose3(
+	a: ArrayLike<number>,
+	out: Out9 = new Array(9).fill(0),
+): Out9 {
+	for (let r = 0; r < 3; r++)
+		for (let c = 0; c < 3; c++) out[c * 3 + r] = a[r * 3 + c];
+	return out;
+}
+
+/** Rodrigues: exp([w]×) as a row-major 3×3 (Taylor branch below 1e-8 rad). `out` is filled and returned. */
+export function expSO3(wx: number, wy: number, wz: number): Mat3;
+export function expSO3<T extends Out9>(
+	wx: number,
+	wy: number,
+	wz: number,
+	out: T,
+): T;
+export function expSO3(
+	wx: number,
+	wy: number,
+	wz: number,
+	out: Out9 = new Array(9).fill(0),
+): Out9 {
+	const th2 = wx * wx + wy * wy + wz * wz;
+	const th = Math.sqrt(th2);
+	let a: number;
+	let b: number;
+	if (th < 1e-8) {
+		a = 1 - th2 / 6;
+		b = 0.5 - th2 / 24;
+	} else {
+		a = Math.sin(th) / th;
+		b = (1 - Math.cos(th)) / th2;
+	}
+	out[0] = 1 - b * (wy * wy + wz * wz);
+	out[1] = -a * wz + b * wx * wy;
+	out[2] = a * wy + b * wx * wz;
+	out[3] = a * wz + b * wx * wy;
+	out[4] = 1 - b * (wx * wx + wz * wz);
+	out[5] = -a * wx + b * wy * wz;
+	out[6] = -a * wy + b * wx * wz;
+	out[7] = a * wx + b * wy * wz;
+	out[8] = 1 - b * (wx * wx + wy * wy);
+	return out;
+}
+
+/** Rotation matrix of a rotation vector w (axis · angle, radians), row-major. */
+export const rodrigues = (w: ArrayLike<number>): Mat3 =>
+	expSO3(w[0], w[1], w[2]);
+
+/** Rotation angle of a row-major 3×3 rotation in radians, acos((tr − 1) / 2) clamped. */
+export function rotationAngle(R: ArrayLike<number>): number {
+	return Math.acos(Math.max(-1, Math.min(1, (R[0] + R[4] + R[8] - 1) / 2)));
+}
 
 /** Solve A x = b by Gaussian elimination with partial pivoting. Returns null if singular. */
 export function solveLinear(A: number[][], b: number[]): number[] | null {

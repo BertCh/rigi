@@ -18,7 +18,7 @@ import {
 } from "./batch";
 import { refinePoseLm } from "./lm";
 import { createRng, sampleDistinct } from "./rng";
-import type { Mat3 } from "./rot3";
+import type { Mat3F64 } from "./rot3";
 
 export type Intrinsics = { fx: number; fy: number; cx: number; cy: number };
 
@@ -54,8 +54,8 @@ export function triad(
 	a2: ArrayLike<number>,
 	b1: ArrayLike<number>,
 	b2: ArrayLike<number>,
-	out: Mat3 = new Float64Array(9),
-): Mat3 {
+	out: Mat3F64 = new Float64Array(9),
+): Mat3F64 {
 	const A = frame(a1, a2);
 	const B = frame(b1, b2);
 	// R = B Aᵀ (frames as columns)

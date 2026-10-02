@@ -9,6 +9,7 @@
 
 import { poseBasis } from "../camera";
 import { DEG as D } from "../geodesy";
+import { gaussJordan } from "../linalg";
 import type { EyeHorizon } from "../pose6dof/eye";
 import type { ImgPeak, WorldPeak } from "./peaks";
 
@@ -241,23 +242,7 @@ function peakEval(
 	return { r, w, cost, pairs: pr, nItems };
 }
 
-function solve4(A: number[][], b: number[]): number[] | null {
-	const n = 4;
-	const M = A.map((row, i) => [...row, b[i]]);
-	for (let c = 0; c < n; c++) {
-		let piv = c;
-		for (let r = c + 1; r < n; r++)
-			if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
-		if (Math.abs(M[piv][c]) < 1e-12) return null;
-		[M[c], M[piv]] = [M[piv], M[c]];
-		for (let r = 0; r < n; r++) {
-			if (r === c) continue;
-			const f = M[r][c] / M[c][c];
-			for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
-		}
-	}
-	return M.map((row, i) => row[n] / row[i]);
-}
+const solve4 = (A: number[][], b: number[]) => gaussJordan(A, b, 1e-12);
 
 export type FitResult = {
 	p: FitParams;

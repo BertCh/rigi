@@ -5,32 +5,29 @@
 // Allocation-light 3×3 rotation helpers on row-major Float64Array(9), for the RANSAC hot loops.
 // Convention: y = R x (R maps the first frame into the second).
 
-export type Mat3 = Float64Array;
+import {
+	expSO3 as linalgExpSO3,
+	mul3 as linalgMul3,
+	transpose3 as linalgTranspose3,
+} from "#/lib/linalg";
+import type { Mat3F64 } from "#/lib/ontology/core/geometry";
 
-export const identity3 = (): Mat3 =>
+export type { Mat3F64 };
+
+export const identity3 = (): Mat3F64 =>
 	new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 
 /** out = A · B (out may not alias A or B). */
-export function mul3(
+export const mul3 = (
 	A: ArrayLike<number>,
 	B: ArrayLike<number>,
-	out: Mat3 = new Float64Array(9),
-): Mat3 {
-	for (let r = 0; r < 3; r++)
-		for (let c = 0; c < 3; c++)
-			out[r * 3 + c] =
-				A[r * 3] * B[c] + A[r * 3 + 1] * B[3 + c] + A[r * 3 + 2] * B[6 + c];
-	return out;
-}
+	out: Mat3F64 = new Float64Array(9),
+): Mat3F64 => linalgMul3(A, B, out);
 
-export function transpose3(
+export const transpose3 = (
 	A: ArrayLike<number>,
-	out: Mat3 = new Float64Array(9),
-): Mat3 {
-	for (let r = 0; r < 3; r++)
-		for (let c = 0; c < 3; c++) out[c * 3 + r] = A[r * 3 + c];
-	return out;
-}
+	out: Mat3F64 = new Float64Array(9),
+): Mat3F64 => linalgTranspose3(A, out);
 
 /** Geodesic angle of a rotation matrix, degrees (run_propagate.rot_angle, stable near 0). */
 export function rotationAngleDeg(R: ArrayLike<number>): number {
@@ -54,34 +51,12 @@ export function rotationDistanceDeg(
 }
 
 /** Rodrigues: out = exp([w]×). */
-export function expSO3(
+export const expSO3 = (
 	wx: number,
 	wy: number,
 	wz: number,
-	out: Mat3 = new Float64Array(9),
-): Mat3 {
-	const th2 = wx * wx + wy * wy + wz * wz;
-	const th = Math.sqrt(th2);
-	let a: number;
-	let b: number;
-	if (th < 1e-8) {
-		a = 1 - th2 / 6;
-		b = 0.5 - th2 / 24;
-	} else {
-		a = Math.sin(th) / th;
-		b = (1 - Math.cos(th)) / th2;
-	}
-	out[0] = 1 - b * (wy * wy + wz * wz);
-	out[1] = -a * wz + b * wx * wy;
-	out[2] = a * wy + b * wx * wz;
-	out[3] = a * wz + b * wx * wy;
-	out[4] = 1 - b * (wx * wx + wz * wz);
-	out[5] = -a * wx + b * wy * wz;
-	out[6] = -a * wy + b * wx * wz;
-	out[7] = a * wx + b * wy * wz;
-	out[8] = 1 - b * (wx * wx + wy * wy);
-	return out;
-}
+	out: Mat3F64 = new Float64Array(9),
+): Mat3F64 => linalgExpSO3(wx, wy, wz, out);
 
 const N4 = new Float64Array(16);
 const V4 = new Float64Array(16);
@@ -146,8 +121,8 @@ const Q = new Float64Array(4);
  */
 export function rotationFromCovariance(
 	S: ArrayLike<number>,
-	out: Mat3 = new Float64Array(9),
-): Mat3 {
+	out: Mat3F64 = new Float64Array(9),
+): Mat3F64 {
 	const xx = S[0];
 	const xy = S[1];
 	const xz = S[2];
@@ -188,8 +163,8 @@ export function kabsch(
 	x: ArrayLike<number>,
 	y: ArrayLike<number>,
 	idx?: ArrayLike<number>,
-	out: Mat3 = new Float64Array(9),
-): Mat3 {
+	out: Mat3F64 = new Float64Array(9),
+): Mat3F64 {
 	const S = new Float64Array(9);
 	const n = idx ? idx.length : x.length / 3;
 	for (let j = 0; j < n; j++) {

@@ -13,10 +13,12 @@ import {
 	type Pose,
 } from "#/lib/camera";
 import { DEG } from "#/lib/geodesy";
+import { expSO3 } from "#/lib/linalg";
+import type { Mat3F64 } from "#/lib/ontology/core/geometry";
 
 export { DEG };
 
-export type Mat3 = Float64Array;
+export type { Mat3F64 };
 
 /** pose_basis: forward, right, up unit vectors (delegates to camera/poseBasis). */
 export function poseBasis(p: Pick<Pose, "yaw" | "pitch" | "roll">) {
@@ -25,7 +27,7 @@ export function poseBasis(p: Pick<Pose, "yaw" | "pitch" | "roll">) {
 }
 
 /** pose_to_R: rows [right, −up, forward] (camera/poseToR as a Float64Array). */
-export function poseToR(p: Pick<Pose, "yaw" | "pitch" | "roll">): Mat3 {
+export function poseToR(p: Pick<Pose, "yaw" | "pitch" | "roll">): Mat3F64 {
 	return Float64Array.from(cameraPoseToR({ ...p, vfov: 0 }));
 }
 
@@ -92,30 +94,8 @@ export const dot = (a: ArrayLike<number>, b: ArrayLike<number>) =>
 	a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 /** Rotation matrix from a rotation vector (Rodrigues). */
-export function rotvecToMatrix(v: ArrayLike<number>): Mat3 {
-	const th = Math.hypot(v[0], v[1], v[2]);
-	if (th < 1e-12) {
-		// first order: I + [v]×
-		return Float64Array.of(1, -v[2], v[1], v[2], 1, -v[0], -v[1], v[0], 1);
-	}
-	const kx = v[0] / th;
-	const ky = v[1] / th;
-	const kz = v[2] / th;
-	const c = Math.cos(th);
-	const s = Math.sin(th);
-	const C = 1 - c;
-	return Float64Array.of(
-		c + kx * kx * C,
-		kx * ky * C - kz * s,
-		kx * kz * C + ky * s,
-		ky * kx * C + kz * s,
-		c + ky * ky * C,
-		ky * kz * C - kx * s,
-		kz * kx * C - ky * s,
-		kz * ky * C + kx * s,
-		c + kz * kz * C,
-	);
-}
+export const rotvecToMatrix = (v: ArrayLike<number>): Mat3F64 =>
+	expSO3(v[0], v[1], v[2], new Float64Array(9));
 
 /** Rotation vector of a rotation matrix (via the quaternion, stable near 0 and π). */
 export function matrixToRotvec(R: ArrayLike<number>): number[] {

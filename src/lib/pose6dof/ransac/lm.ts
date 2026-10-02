@@ -8,7 +8,7 @@
 // parametrisation; translation and log-focal are optional. Robust loss by IRLS:
 //   soft_l1 (scipy least_squares, f_scale), cauchy / huber / truncated (poselib-style), linear.
 import { solveLinear } from "../../linalg";
-import { expSO3, type Mat3, mul3 } from "./rot3";
+import { expSO3, type Mat3F64, mul3 } from "./rot3";
 
 export type Loss = "linear" | "soft_l1" | "cauchy" | "huber" | "truncated";
 
@@ -25,7 +25,7 @@ export type PoseLmOptions = {
 	maxIterations?: number;
 };
 
-export type PoseState = { R: Mat3; t: Float64Array; fx: number; fy: number };
+export type PoseState = { R: Mat3F64; t: Float64Array; fx: number; fy: number };
 
 /** Weight ρ'(r²) for IRLS and the robust cost ρ(r²), with c = scale. */
 function lossOf(loss: Loss, c: number) {
