@@ -10,11 +10,11 @@ import type { SWNE } from "#/lib/ontology/core/geometry";
 // Results are cached in memory and IndexedDB, keyed by a snapped centre so nearby uploads share one
 // region.
 import { getFlag } from "../flags";
-import { parseOsmMetres } from "../geo/peaks";
 import { compactLakes, type LakeGeo } from "../geocam/lakes/compact";
 import { distanceBearing } from "../geodesy";
 import { osmExtractEnabled } from "../licences/config";
 import { namedPeaksInBBox, parseBBox } from "../osm/extract";
+import { parseOsmMetres } from "../osm/metres";
 import { type OsmElement, overpass } from "../overpass";
 import {
 	photos as bundledPhotos,
@@ -63,7 +63,7 @@ export function regionIdFor(lat: number, lon: number) {
 	return `local-region-${a.toFixed(2)}_${b.toFixed(2)}`;
 }
 
-/** OSM `ele` / `prominence` in metres, null if unusable (geo/peaks.ts parseOsmMetres). */
+/** OSM `ele` / `prominence` in metres, null if unusable (osm/metres.ts parseOsmMetres). */
 export const parseMetres = (v: unknown): number | null =>
 	parseOsmMetres(v) ?? null;
 

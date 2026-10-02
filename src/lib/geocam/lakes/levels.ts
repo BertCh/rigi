@@ -16,6 +16,7 @@
 // 2026-09-30 and NOT re-downloaded: treat each as ±0.5 m, and the regulated seasonal range (≈ ±0.5 m;
 // Bodensee, unregulated, ≈ ±1 m) comes on top. Reservoirs are deliberately absent: their level varies by
 // tens of metres (floor.ts also skips water=reservoir).
+import { parseOsmMetres } from "../../osm/metres";
 import type { LakeGeo } from "./compact";
 
 export type LakeLevelRow = { names: string[]; levelM: number; note?: string };
@@ -58,18 +59,10 @@ export const SWISS_LAKE_LEVELS: readonly LakeLevelRow[] = [
 	{ names: ["oeschinensee"], levelM: 1578.0 },
 ];
 
-/** "558", "558 m", "1'234", "4,810" (thousands), "3000 ft" → metres; null if unusable (region.ts parseMetres). */
+/** A lake `ele` in metres (a number, or an OSM tag via osm/metres.ts parseOsmMetres); null if unusable. */
 export function parseEle(v: unknown): number | null {
 	if (typeof v === "number") return Number.isFinite(v) ? v : null;
-	if (typeof v !== "string") return null;
-	let s = v.trim().replace(/[’']/g, "");
-	if (/^\d{1,3},\d{3}(\D|$)/.test(s)) s = s.replace(",", "");
-	s = s.replace(",", ".");
-	const m = s.match(/-?\d+(\.\d+)?/);
-	if (!m) return null;
-	let n = Number.parseFloat(m[0]);
-	if (/ft|feet/i.test(s)) n *= 0.3048;
-	return Number.isFinite(n) ? n : null;
+	return parseOsmMetres(v) ?? null;
 }
 
 /** Lower-case, diacritics stripped, whitespace collapsed ("Vierwaldstättersee" → "vierwaldstattersee"). */
