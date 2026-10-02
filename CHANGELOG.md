@@ -4,6 +4,24 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **Live camera mode `/live` (2026-10-02, browser-unverified).**
+  - `/live` points the phone camera (or a recorded clip via `?liveSource=<url>`, with an optional `.sensors.json` sidecar) at the mountains and draws the peak and terrain overlay on the feed.
+  - Pieces:
+    - pose from device orientation, plus a compact WMM declination;
+    - a per-frame skyline tracker (`src/lib/track`: GPU column scan, robust yaw/pitch/roll solve, sensor-bias Kalman, INIT/TRACK/LOST with async relocalise);
+    - a frame governor.
+  - Every tracked pose is a suggestion until `reports/tracker-gate-draft.md` is signed off and passed. On synthetic skylines the tracker holds 0.20–0.47° median, against about 10° from raw sensors.
+  - Renderers: `setLiveSource`, `setLiveMode` and `setPixelRatioCap` on both engines. The video texture is allocated once, live mode skips the per-photo fits and throttles labels, and a placeholder photo is `src: ""`.
+  - Flags: `live`, `liveFps`, `liveVfov`, `liveSource`, `liveDeclination`, `liveStep`.
+  - `?liveStep=on` (WebGPU) adds live Step Inside:
+    - MoGe-2 `liveFast` (256 tokens, batched heads, `headStopLevel` 3) runs every 4 frames into `src/lib/nearfield/live`, one graph from depth to splats with no CPU readback;
+    - colours refresh from the video every frame.
+  - `src/lib/nn` frame-loop work:
+    - `nn.compile` persistent forwards, `nn.readLater`, elementwise and layerNorm+residual fusion, `nn.scope` profile labels;
+    - a bind-group memo for every graph kernel node;
+    - faster GEMM (about 1.4×), conv (up to 2.7×) and f16 top-k (2.6×) kernels.
+  - New check rows `nn-compile` and `track-synthetic`.
+  - See `reports/realtime-investigation-2026-10-02.md` §6 and `reports/depth-live-2026-10-02.md`.
 - **People volumes in Step Inside, experiment (2026-10-02, browser-unverified).**
   - Under `?nearfield=complete`, each person is closed from a front shell into a volume (`src/lib/nearfield/complete/people.ts`):
     - Poisson silhouette inflation gives the thickness;
