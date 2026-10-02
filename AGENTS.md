@@ -20,6 +20,7 @@ The regression gate is `scripts/ci/run.mjs`; the check registry is `scripts/ci/c
 - **Browser and GPU jobs must go through the machine-wide render lock**: `node scripts/gpu/with-render-lock.mjs -- <cmd>`, for example `node scripts/gpu/with-render-lock.mjs -- node scripts/eval-app.mjs --renderer webgpu`. The lock is a FIFO queue shared by every session on the machine; never kill another job to free it. `scripts/ci/run.mjs full` wraps its browser checks in the lock itself.
 - Every browser check pins its engine explicitly (`?renderer=` or `--renderer`), so a change of the default never silently changes what a gate measures.
 - Optional pre-push hook for the fast tier: `node scripts/ci/install-hook.mjs`.
+- Upstream drift (needs network and `gh`, not a CI check): `node scripts/upstream/luma-watch.mjs [--json]` reports npm dist-tags, luma master vs the vendor base, the vendored luma PR heads and the watch PRs.
 
 ## Examples
 - `examples/` holds standalone luma.gl/deck.gl examples laid out like luma.gl's own (`README.md`, `app.ts` exporting a `create…Scene(parent, options)` factory with `ready`/`diagnostics`/`finalize`, `main.ts`, `index.html`, `mobile-support.ts`, `scripts/visual-smoke.mjs`). See `examples/README.md`.

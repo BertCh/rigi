@@ -8,6 +8,8 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 
 | Tried | Result | Source |
 |---|---|---|
+| luma `GPUFFT1D` for the refine yaw correlation (LF5, 2026-10-01) | Not adopted: capped at 2048 points while the yaw grid is 8192; all FFT work in one `globalInit` is 5.8 ms on the CPU (f64); a 7×2048 GPU batch with readback (0.5–1.2 ms) is slower than the CPU (0.36 ms); luma's own impulse oracle failed on Dawn 0.3. Revisit only with a 4-step decomposition and a measured need | `scripts/gpu/fft-gpgpu-dawn.ts` |
+| luma `GPUVirtualGeometrySelection` / `GPUScene` for terrain LOD (LF5, 2026-10-01) | Design note only: needs a complete static hierarchy, our tile stream is sparse and streamed; the cull gains nothing at 350–390 tiles | `research_notes/luma-frontier-2026-10-01/virtual-geometry-vs-terrain-cull.md` |
 | `?pipeline=` variants `cascade` / `skyfirst` / `wide` vs `current` | cascade median 0.228→0.376°; skyfirst +0.084° and t-final 11.2 s; wide identical. Variants and `pose-policy.ts` removed | [pipeline-ab.md](pipeline-ab.md) |
 | Agreement gates (2-of-3 methods) | None beat cascade alone; 2.3× cost, +1 escalation | [leaderboard.md](leaderboard.md) |
 | Raising the app auto-align confidence bar | Didn't fix IMG_7130 | leaderboard.md |

@@ -4,6 +4,18 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### luma.gl frontier looks and GPU sort (LF2–LF8, 2026-10-01)
+
+All looks are opt-in, default off and byte-identical when off; browser-verified only where noted. Source: `reports/luma-frontier-2026-10-01-late.md`.
+
+- `style.terroir.hatch`: slope-driven Swiss rock hatching along the fall line (from 38°) and scree dots (24–38°), no pack needed; reuses the `pattern.ts` patternFill kernel; WebGL define `TERROIR_HATCH`, WebGPU feature `terHatch` (70b616b). Not browser-run. Check `terroir-hatch`.
+- `style.composite.sketch` (0..1): sketch wobble on ridge, skyline and crease lines; `style.trails.stroke: 'solid'|'pencil'|'glow'` (6108c72). WebGPU checks run; WebGL snippet compile only. Check `strokes`.
+- `style.labels.glow`: glowing summit markers with luma `pointGlow`, photo view only, not in exports; `Renderer.setGlowMarkers` (034856d). One browser run per engine. `selectionOutline` was evaluated and not adopted (no per-peak mask; see `src/lib/deck-webgpu/README.md`).
+- `style.world.water: 'flat'|'waves'`: animated lake waves in the world view on both engines (luma `riverWaterMaterial` wave normals); still under webdriver; SSR skipped (`src/lib/look/water/README.md`) (349d194). Check `water-waves`.
+- `style.world.wind { on, direction, speed, density }`: wind-drift particles over the DEM in the WebGPU world view; advection through `ComputeGraph`; WebGL no-op (9b94e52). One WebGPU browser run. Check `flow`.
+- Splat sort (WebGPU): luma gpgpu `GPUSort` radix replaces the in-house radix passes (order identical on Dawn at 100k–2M splats; about 1.5–2× less GPU time); `?splatSortGpgpu=off` restores the old passes (3eeccc6). Dawn benches `scripts/gpu/splat-sort-gpgpu-dawn.ts`, `scripts/gpu/fft-gpgpu-dawn.ts`.
+- `scripts/upstream/luma-watch.mjs [--json]`: upstream drift report (npm tags, luma master vs the vendor base, vendored PR heads, watch list). Luma workaround re-audit on rigi.3: none retire (e625c33).
+
 ### Terroir pattern fills (2026-10-01)
 
 - New style field `terroir.cover.pattern` (default off, on in the Terroir preset; needs `cover.on` and a pack): scree is drawn as dot stipple (6 m cells), rock as hatching whose line width grows in shade, glacier as sparse crevasse hatching in the ice ink, all anchored in world metres. Port of luma.gl `patternFill` (#3320, master `7289d961`) in `src/lib/terroir/pattern.ts` (GLSL, WGSL and a CPU mirror); its box-filtered stripes and dot fade keep the mean coverage at distance, replacing the aliasing 3 m scree hash speckle when on. New define `TERROIR_PATTERN` (WebGL splice) and feature `terPattern` (deck-webgpu). With the field off the generated GLSL / WGSL is byte-identical (`scripts/terroir/*identity-snap.ts` diffs empty). Browser-unverified. Check: `terroir-pattern` (fast tier).

@@ -265,6 +265,20 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "terroir-hatch",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/terroir/hatch.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "water-waves",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/look/water/__tests__/waves.test.ts"),
+		timeoutS: 120,
+	},
+	{
 		id: "terroir-pack",
 		tier: "fast",
 		group: "look",
