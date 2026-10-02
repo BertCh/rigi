@@ -1,17 +1,19 @@
-# Vendored luma.gl (`10.0.0-alpha.2-rigi.4`)
+# Vendored luma.gl (`10.0.0-alpha.2-rigi.5`)
 
 The app needs luma.gl fixes that are not in a published alpha yet (`WebGPUAdapter.attach()`, the
 device lifecycle fixes, the engine pipeline variant cache, indirect draws and a compute pipeline
-cache fix, compat-mode adapter limits, and a few small compute-API additions). The published `10.0.0-alpha.2` manifests are also broken for npm (yarn `patch:`
+cache fix, compat-mode adapter limits, a few small compute-API additions, and WebGL multisample resolve,
+read-into-target and readback usage hints). The published `10.0.0-alpha.2` manifests are also broken for npm (yarn `patch:`
 protocol on `@math.gl/core`, `~9.4.0-alpha.1` peer ranges). So seven `@luma.gl/*` packages are
 installed from these tarballs (`package.json`: `file:vendor/luma/<name>.tgz`): core, effects,
 engine, gpgpu, shadertools, webgl, webgpu.
 
-The version is `10.0.0-alpha.2-rigi.4`, so npm reinstalls over a cached `10.0.0-alpha.2` and
+The version is `10.0.0-alpha.2-rigi.5`, so npm reinstalls over a cached `10.0.0-alpha.2` and
 `^10.0.0-alpha.2` ranges (deck's) still match. Bump the `rigi.N` suffix on every rebuild.
 
 **Swap to npm when luma publishes these fixes** (all of #3313, #3302, #3287, #3328, #3333, #3334,
-#3330 and #3345, and the PipelineFactory compute-hash fix; #3312 and #3335 are already in luma master):
+#3330 and #3345, and the PipelineFactory compute-hash fix; #3312, #3335 and #3348 are already in luma master;
+the seven `rigi/compute-api` local commits below would be lost and their app users need a replacement):
 point the seven deps at the published version, delete this directory and re-run `npm install`. If
 the published manifests still carry `patch:` deps or `~9.4` peers, the old workaround (`.npmrc`
 `legacy-peer-deps=true` plus `overrides` for every `@luma.gl/*` and `@math.gl/core`) comes back.
@@ -19,10 +21,53 @@ the published manifests still carry `patch:` deps or `~9.4` peers, the old worka
 ## Source
 
 - Repo: https://github.com/visgl/luma.gl
-- Base: luma master `7289d961a9cec6fb10bdfcf4afc5286cb30376e3` ("docs: organize deck visual effects
+- **rigi.5** (2026-10-02). Build commit: `a6af71e567d618b5d4b5524b637982838ba09236` (branch
+  `arch/rigi-vendor-5`, an unofficial build; bundle `~/mt-image-archive/2026-10-02-rigi5/luma-rigi-vendor-5.bundle`).
+  It is the rigi.4 build commit `4cf1099c` (below) plus, in this order:
+  - `8d4f03523`: merge of luma master `16445518e07481991d171d55e96c4ddd5a6d25c6` ("fix(webgpu): declare
+    texture view dimension in compat mode (#3348)", 2026-10-02; also #3347, examples docs only). #3348
+    sets `textureBindingViewDimension` on WebGPU textures, so compat-mode devices bind cube maps as cube
+    views; it is the cube-map half of what we carry from #3345. One add/add conflict in the test
+    `modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts` (#3345 and #3348 both
+    create it): both tests kept. `modules/` src merged clean;
+  - `8cd55ede6`: merge of #3313's moved head `3826c4141d6a19a4e504505837155788423b2c49` (one new commit on
+    top of `2ed6834d`, "fix(webgpu): make attached device teardown idempotent": `WebGPUDevice.destroy()`
+    returns early on a second call). Clean;
+  - three local commits on `rigi/compute-api` (one commit each, spec next to the existing ones; patches
+    in `patches/`), not upstream, not proposed upstream:
+    5. `2010d9f08` WebGL `getWebGLUsage`: a `Buffer.MAP_READ` buffer (pixel pack / readback) gets the
+       `GL.STREAM_READ` usage hint (was `STATIC_DRAW`; Rigi's pre-luma readback code used `STREAM_READ`
+       because of a Chrome + ANGLE slow path). Exported `@internal` for its node spec
+       `modules/webgl/test/adapter/resources/webgl-buffer-usage.node.spec.ts`. Patch `luma-stream-read-2010d9f0.patch`.
+    6. `96133134c` `Buffer.readAsync(byteOffset?, byteLength?, options?: BufferReadOptions)` with
+       `type BufferReadOptions = BufferMapReadOptions & {target?: ArrayBufferView<ArrayBuffer>}`: the bytes
+       are copied into `target` (from its `byteOffset`) and the result is a `Uint8Array` over exactly those
+       bytes of `target` (no new array). WebGL `getBufferSubData` writes straight into it; WebGPU copies the
+       mapped range into it (target checked before mapping, so a too-small target throws `RangeError`
+       without leaving the buffer mapped) and `readAsync` now forwards `waitForSubmittedWork`; null device
+       and `DynamicBuffer` likewise. Exported helper `getBufferReadTarget`. Anyone subclassing `Buffer`
+       outside luma should accept the third argument. Specs: `core/test/adapter/resources/buffer.spec.ts`
+       (all devices), `test-utils/test/null-device/null-buffer-read-target.spec.ts` (node). Patch
+       `luma-read-into-target-96133134.patch`.
+    7. `a6af71e56` WebGL multisampled textures and render pass resolve: a `WEBGLTexture` with
+       `samples > 1` (2d, 1 mip level, no data/handle, else it throws) is a multisample renderbuffer
+       (`renderbufferStorageMultisample`), attachable to framebuffers (`framebufferRenderbuffer`), never
+       sampled/written/read (as on WebGPU); a framebuffer with a multisampled attachment always checks
+       completeness and throws when incomplete (after restoring the previous binding).
+       `RenderPassProps.resolveTargets` (was "WebGPU only") works on WebGL: `WEBGLRenderPass.end()` blits
+       colour attachment `i` into `resolveTargets[i]` (`GL.NEAREST`, full size, scissor test and rasterizer
+       discard disabled inside the pass's pushed state). New `RenderPassProps.depthStencilResolveTarget`,
+       WebGL only (WebGPU throws when set), resolves depth/stencil the same way. With `discard: true` the
+       multisample attachments are invalidated after the resolve (cf. WebGPU storeOp 'discard').
+       Resolve framebuffers are cached per target view on the source framebuffer. Specs:
+       `webgl/test/adapter/helpers/webgl-resolve.node.spec.ts` (node, recorded GL calls) and a browser leg
+       in `webgl/test/adapter/resources/webgl-render-pass.spec.ts`. Patch `luma-webgl-msaa-resolve-a6af71e5.patch`.
+  Watched, not vendored: #3340 (progressive splats, +2.4k lines; the app does not use it yet).
+  Every other vendored PR head was re-checked with `gh` on 2026-10-02 and had not moved; none is merged.
+- **rigi.4** base: luma master `7289d961a9cec6fb10bdfcf4afc5286cb30376e3` ("docs: organize deck visual effects
   examples (#3341)", 2026-10-01). It already contains #3312 (`requiredLimits`, `f17d6fee`) and #3335
   (WebGPU buffer `byteOffset` init).
-- Build commit: `4cf1099c620c351846325c01e5cf304d27169bca` (an unofficial build, branch
+- rigi.4 build commit: `4cf1099c620c351846325c01e5cf304d27169bca` (an unofficial build, branch
   `arch/rigi-vendor-4`, not an upstream release or commit). It is the rigi.3 build commit
   `b1d1256a576bff25362df5873e82e239dba75851` (branch `arch/rigi-vendor-3`) plus the merge of #3345 and
   four local commits (below). The rigi.3 part is, on the base, merged `--no-ff` in this order
@@ -82,6 +127,9 @@ the published manifests still carry `patch:` deps or `~9.4` peers, the old worka
        `luma-render-bundle-msaa-4cf1099c.patch`.
   #3333 and #3334 must travel with #3287: the squashed #3287 moved those fixes out, so rigi.3 without
   them would regress against rigi.2.
+- **Behaviour changes (rigi.5):** WebGL readback buffers (`MAP_READ`) are created `STREAM_READ`; a second
+  `destroy()` of a WebGPU device is a no-op (#3313); compat-mode WebGPU textures declare their binding view
+  dimension (#3348); a WebGL framebuffer with multisampled attachments throws when incomplete.
 - **Behaviour change (#3345):** on a compatibility-mode WebGPU device the adapter's real limits are
   requested instead of the defaults; nothing changes on full-feature devices.
 - **Behaviour change (#3313):** `DeviceProps._ownsHandle` no longer exists. `luma.createDevice()`
@@ -97,7 +145,7 @@ the published manifests still carry `patch:` deps or `~9.4` peers, the old worka
   `DeviceProps.requiredLimits` is typed `Partial<Record<keyof DeviceLimits, number>>` (#3312 as
   merged).
 - Packed manifests are rewritten (the equivalent of upstream branch `rigi/packaging-manifests`,
-  `f1992fd3`, but pinned): `version` is `10.0.0-alpha.2-rigi.4`; every `@luma.gl/*` dependency and
+  `f1992fd3`, but pinned): `version` is `10.0.0-alpha.2-rigi.5`; every `@luma.gl/*` dependency and
   peer is the exact rigi version; `@math.gl/core` (`patch:...` in the source) and `@math.gl/types` are
   pinned to the published `5.0.0-alpha.10` (API-identical to alpha.9 for what luma imports; the yarn
   patch only adds `vec*`/`mat4` namespace exports that the built `dist/` does not import);
@@ -119,34 +167,37 @@ MIT, Copyright (c) vis.gl contributors: see `LICENSE` in this directory (verbati
 ## Checksums (SHA-256)
 
 ```
-a6a89518c64d9f59ee29124c60ad80218c11c26c99add1871a6ee32275e8273e  vendor/luma/luma.gl-core-10.0.0-alpha.2-rigi.4.tgz
-d2c0e2875efe7bec47043e545d688c99646fd9de972eb9af84799d2d0196d24d  vendor/luma/luma.gl-effects-10.0.0-alpha.2-rigi.4.tgz
-1dbe68c8e73579408ad729ce7cd16041e05f842f0ee1a8aa5099de2218dd1e3a  vendor/luma/luma.gl-engine-10.0.0-alpha.2-rigi.4.tgz
-5e2995cde62c2ff56c8e478b4b9badc6bb84d9f7a3f24d26cdb7b955ceff6dfb  vendor/luma/luma.gl-gpgpu-10.0.0-alpha.2-rigi.4.tgz
-55a50a18aa3e62d38bf39928d91e918821fa3c39824b4621b7706b059caecdd6  vendor/luma/luma.gl-shadertools-10.0.0-alpha.2-rigi.4.tgz
-8795e79f5ca892794031ef98bb0dd52fdf0c107203c499bbef3ad14f7dd0ed4f  vendor/luma/luma.gl-webgl-10.0.0-alpha.2-rigi.4.tgz
-a02b44994509ace8cfb5d8614f31ec79d9580295ac8dddb3a9b4dfc6d60f42fe  vendor/luma/luma.gl-webgpu-10.0.0-alpha.2-rigi.4.tgz
+638d06f8cc86773cb8746a880f46d45d16daca5fd600f6700f03937a9b64b49c  vendor/luma/luma.gl-core-10.0.0-alpha.2-rigi.5.tgz
+dee94b6e84265709bb0483da99baccea9be0ef234e51d8015907ef9b07b1325b  vendor/luma/luma.gl-effects-10.0.0-alpha.2-rigi.5.tgz
+3be231d83aca9fa52c7405a3b1dd06677872ee423f38fd12a1f78bc93101782d  vendor/luma/luma.gl-engine-10.0.0-alpha.2-rigi.5.tgz
+5233160e0a7af12aef36a039481d8b47a129784051e925edf2d0ef4c9330716b  vendor/luma/luma.gl-gpgpu-10.0.0-alpha.2-rigi.5.tgz
+00f60fbe31d8617db11ec0e5bd9c03db771bc0b67094d6ebcc30936ec41183b7  vendor/luma/luma.gl-shadertools-10.0.0-alpha.2-rigi.5.tgz
+6e4ce893abb49ae2c962648d2affb5a79ae3a3de2755f33cfc8c959b1dcbe4ee  vendor/luma/luma.gl-webgl-10.0.0-alpha.2-rigi.5.tgz
+489e327a2ee48b70dd7d86662a3b683a49486569ab892eae772285892d1ce587  vendor/luma/luma.gl-webgpu-10.0.0-alpha.2-rigi.5.tgz
 ```
 
 ## Contents
 
 Only `dist/`, `package.json` and `README.md`.
 `src/` and all `*.map` files were stripped (and the `//# sourceMappingURL=` comments removed).
-Sizes: core 161736 B, effects 168140 B, engine 234554 B, gpgpu 1060572 B, shadertools 370494 B, webgl 217677 B, webgpu 84951 B.
+Sizes: core 162502 B, effects 168140 B, engine 234656 B, gpgpu 1060572 B, shadertools 370494 B, webgl 222445 B, webgpu 85260 B.
 
 ## Rebuild
 
 ```sh
 git clone https://github.com/visgl/luma.gl luma-build && cd luma-build
 git checkout 7289d961a9cec6fb10bdfcf4afc5286cb30376e3
-# fastest: git fetch <archive>/luma-rigi-vendor-4.bundle arch/rigi-vendor-4 and check it out (4cf1099c);
+# fastest: git fetch <archive>/2026-10-02-rigi5/luma-rigi-vendor-5.bundle arch/rigi-vendor-5 and check it out (a6af71e5);
+# rigi.5 from rigi.4 (4cf1099c): git merge --no-ff 16445518 (keep both tests in the add/add conflict of
+#   webgpu-compatibility-device.spec.ts), git merge --no-ff 3826c414 (#3313 head), then
+#   git am vendor/luma/patches/luma-{stream-read,read-into-target,webgl-msaa-resolve}-*.patch;
 # from scratch: merge --no-ff, in order, the heads of PRs #3313, #3302, #3287 and #3328 (git fetch origin pull/<n>/head),
 git cherry-pick -x c80b7ce6d0a3c05d7f4541ceff15228139a9b216   # compute hash (vendor/luma/patches/luma-compute-hash-c80b7ce6.patch)
 # then merge --no-ff the heads of #3333, #3334 and #3330 (= b1d1256a, rigi.3), then #3345,
 # then the four rigi/compute-api commits (git am vendor/luma/patches/luma-{clear-buffer,device-submit,map-read-no-wait,render-bundle-msaa}-*.patch)
 # (the repo's pre-commit hook needs yarn on PATH or git commit -n / git am --no-verify)
 corepack yarn install && corepack yarn build
-V=10.0.0-alpha.2-rigi.4             # bump rigi.N
+V=10.0.0-alpha.2-rigi.5             # bump rigi.N
 M=5.0.0-alpha.10                    # published @math.gl pin
 B=<scratch dir>; mkdir -p $B/luma-tgz $B/luma-slim   # pack/slim scratch space (outside /tmp on this machine)
 for m in core effects engine gpgpu shadertools webgl webgpu; do

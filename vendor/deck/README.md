@@ -22,6 +22,14 @@ itself was not modified for this: the rewrite happens in the slim step below. Th
 
 ## Source
 
+**Re-checked 2026-10-02 (luma rigi.5 bump): no change, no rebuild.** The heads of #10752 (`0d8b1664`), #10780
+(`5b51fb26`), #10779 (`d86a3ab9`), #10778 (`2dad1145`), #10782 (`a6cfed18`), #10753 (`3a946828`) and #10776
+(`0a86e725`) have not moved (`gh api repos/visgl/deck.gl/pulls/<n> --jq .head.sha`) and all are still open.
+deck master moved from the base `35854250` to `d1b0ae43` by one commit, "docs(pydeck): add multi-view and
+SplitterWidget examples and docs (#10655)", which touches nothing under `modules/core` or `modules/layers`
+(`gh api repos/visgl/deck.gl/compare/35854250...d1b0ae43`). The rigi.2 tarballs run unchanged on luma
+`10.0.0-alpha.2-rigi.5` (its additions are new optional props/arguments; the deck manifest ranges below match).
+
 Built from a local merge of deck PR #10752 into current deck master, plus luma.gl's deck WebGPU
 fixes and deck PR #10780 (rigi.1), plus the five PRs below (rigi.2):
 
@@ -107,7 +115,7 @@ fixes and deck PR #10780 (rigi.1), plus the five PRs below (rigi.2):
   is empty, and our base is a strict superset of it in those directories (it additionally has #10657, #10713,
   #10731, #10738). The only things 9.4.0 final has that we lack are version bumps, docs, a
   `peerDependencies` change and the luma 9.4 bump, so there is nothing to take from it.
-- Built against `@luma.gl/*@10.0.0-alpha.2` from the deck lockfile (Rigi installs `10.0.0-alpha.2-rigi.4`; the build does not use the rigi luma, same as rigi.1), `@math.gl/*@5.0.0-alpha.9`,
+- Built against `@luma.gl/*@10.0.0-alpha.2` from the deck lockfile (Rigi installs `10.0.0-alpha.2-rigi.5`; the build does not use the rigi luma, same as rigi.1), `@math.gl/*@5.0.0-alpha.9`,
   `@loaders.gl/*@5.0.0-alpha.7` (the deck repo lockfile).
 
 ## Manifest ranges
@@ -115,7 +123,7 @@ fixes and deck PR #10780 (rigi.1), plus the five PRs below (rigi.2):
 Kept from the deck repo and checked with `semver.satisfies`:
 
 - `@luma.gl/*`: `^10.0.0-alpha.2` (core's dependencies) and `~10.0.0-alpha.2` (layers' peers).
-  `10.0.0-alpha.2-rigi.4` (and `-rigi.3`, `-rigi.2`) satisfy both: they are prereleases of `10.0.0` on the same
+  `10.0.0-alpha.2-rigi.5` (and `-rigi.4`, `-rigi.3`, `-rigi.2`) satisfy both: they are prereleases of `10.0.0` on the same
   `[10,0,0]` tuple that sort after `alpha.2`.
 - `@math.gl/*`: `^5.0.0-alpha.9`; `5.0.0-alpha.9` and `5.0.0-alpha.10` both satisfy it.
 - `@loaders.gl/*`: `^5.0.0-alpha.7`.

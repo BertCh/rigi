@@ -1,0 +1,575 @@
+From a6af71e567d618b5d4b5524b637982838ba09236 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 11:38:07 -0400
+Subject: [PATCH] feat(webgl): multisampled textures and render pass resolve
+ targets
+
+WebGL2 has no multisampled textures, so a WEBGLTexture with samples > 1
+(2d, one mip level, no data or handle) is now a multisample renderbuffer
+(renderbufferStorageMultisample). Like a WebGPU multisampled texture it
+can only be a framebuffer attachment (framebufferRenderbuffer) and be
+resolved; a framebuffer with a multisampled attachment always checks
+its completeness (an unsupported sample count throws, after the
+previous framebuffer binding is restored).
+
+RenderPassProps.resolveTargets (was WebGPU only) now works on WebGL:
+WEBGLRenderPass.end() blits each multisampled color attachment into its
+resolve target (GL.NEAREST, full size, scissor test and rasterizer
+discard disabled, inside the pass's pushed state). New WebGL-only
+RenderPassProps.depthStencilResolveTarget resolves the depth/stencil
+attachment the same way; WebGPU throws when it is set. With discard:
+true the multisample attachments are invalidated after the resolve
+(cf. WebGPU storeOp 'discard'). Resolve framebuffers are cached on the
+source framebuffer per target view and dropped with it or when the
+target texture is destroyed.
+---
+ .../core/src/adapter/resources/render-pass.ts | 14 +++-
+ .../src/adapter/helpers/webgl-resolve.ts      | 53 +++++++++++++
+ .../adapter/resources/webgl-framebuffer.ts    | 67 ++++++++++++++--
+ .../adapter/resources/webgl-render-pass.ts    | 67 ++++++++++++++++
+ .../src/adapter/resources/webgl-texture.ts    | 40 +++++++++-
+ .../helpers/webgl-resolve.node.spec.ts        | 77 +++++++++++++++++++
+ .../resources/webgl-render-pass.spec.ts       | 76 ++++++++++++++++++
+ .../adapter/resources/webgpu-render-pass.ts   |  5 ++
+ 8 files changed, 387 insertions(+), 12 deletions(-)
+ create mode 100644 modules/webgl/src/adapter/helpers/webgl-resolve.ts
+ create mode 100644 modules/webgl/test/adapter/helpers/webgl-resolve.node.spec.ts
+
+diff --git a/modules/core/src/adapter/resources/render-pass.ts b/modules/core/src/adapter/resources/render-pass.ts
+index 3cf34ac1e..22ce9a1d1 100644
+--- a/modules/core/src/adapter/resources/render-pass.ts
++++ b/modules/core/src/adapter/resources/render-pass.ts
+@@ -57,8 +57,19 @@ export type RenderPassBindingOptions = {
+ export type RenderPassProps = ResourceProps & {
+   /** Framebuffer specifies which textures to render into. Default gets framebuffer from canvas context. */
+   framebuffer?: Framebuffer | null;
+-  /** Optional single-sample targets receiving resolved multisampled color attachments. WebGPU only. */
++  /**
++   * Optional single-sample targets receiving resolved multisampled color attachments: entry `i`
++   * receives color attachment `i` when the pass ends. WebGPU: the native `resolveTarget`. WebGL:
++   * a `blitFramebuffer` at `end()` (multisampled WebGL textures are renderbuffers, see
++   * `TextureProps.samples`). Resolve targets must match the attachment's format and size.
++   */
+   resolveTargets?: (TextureView | null)[];
++  /**
++   * WebGL only: single-sample target receiving the resolved multisampled depth/stencil attachment
++   * at `end()` (`blitFramebuffer` of the depth and, if the format has it, stencil aspects). WebGPU
++   * has no depth resolve and throws when this is set.
++   */
++  depthStencilResolveTarget?: TextureView | null;
+   /** Control viewport, scissor rect, blend constant and stencil ref */
+   parameters?: RenderPassParameters;
+ 
+@@ -178,6 +189,7 @@ export abstract class RenderPass extends Resource<RenderPassProps> {
+     ...Resource.defaultProps,
+     framebuffer: null,
+     resolveTargets: undefined!,
++    depthStencilResolveTarget: undefined!,
+     parameters: undefined!,
+     clearColor: RenderPass.defaultClearColor,
+     clearColors: undefined!,
+diff --git a/modules/webgl/src/adapter/helpers/webgl-resolve.ts b/modules/webgl/src/adapter/helpers/webgl-resolve.ts
+new file mode 100644
+index 000000000..e7f6b023b
+--- /dev/null
++++ b/modules/webgl/src/adapter/helpers/webgl-resolve.ts
+@@ -0,0 +1,53 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {GL} from '@luma.gl/webgl/constants';
++
++/** One blit of a multisample resolve: which buffer of the source goes into which framebuffer. */
++export type WebGLResolveBlit = {
++  /** Framebuffer holding the single-sample resolve target (bound as DRAW_FRAMEBUFFER). */
++  framebuffer: WebGLFramebuffer;
++  /** `GL.COLOR_BUFFER_BIT`, or `GL.DEPTH_BUFFER_BIT` and/or `GL.STENCIL_BUFFER_BIT`. */
++  mask: number;
++  /** Source color attachment index (read buffer), for a color blit. */
++  colorAttachment?: number;
++};
++
++/**
++ * Resolves a multisampled framebuffer into single-sample framebuffers with `blitFramebuffer`
++ * (WebGL2's only multisample resolve), one blit per target, over the full `width` x `height`
++ * (a multisample blit requires identical source and destination rectangles), `GL.NEAREST`.
++ * Blits are affected by the scissor test and rasterizer discard, so both are disabled for the
++ * duration; the caller restores bindings and enables (luma does it with the render pass state
++ * push/pop). `invalidateAttachments`: attachments of the source to invalidate afterwards (its
++ * multisample contents are not needed any more, so a tiled GPU can skip storing them).
++ */
++export function resolveMultisampleFramebufferWebGL(
++  gl: WebGL2RenderingContext,
++  source: WebGLFramebuffer,
++  width: number,
++  height: number,
++  blits: readonly WebGLResolveBlit[],
++  invalidateAttachments: readonly number[] = []
++): void {
++  gl.disable(GL.SCISSOR_TEST);
++  gl.disable(GL.RASTERIZER_DISCARD);
++  gl.bindFramebuffer(GL.READ_FRAMEBUFFER, source);
++  let readBufferChanged = false;
++  for (const blit of blits) {
++    if (blit.colorAttachment !== undefined) {
++      gl.readBuffer(GL.COLOR_ATTACHMENT0 + blit.colorAttachment);
++      readBufferChanged ||= blit.colorAttachment !== 0;
++    }
++    gl.bindFramebuffer(GL.DRAW_FRAMEBUFFER, blit.framebuffer);
++    gl.blitFramebuffer(0, 0, width, height, 0, 0, width, height, blit.mask, GL.NEAREST);
++  }
++  if (readBufferChanged) {
++    // the read buffer is framebuffer state: leave the source with its default
++    gl.readBuffer(GL.COLOR_ATTACHMENT0);
++  }
++  if (invalidateAttachments.length > 0) {
++    gl.invalidateFramebuffer(GL.READ_FRAMEBUFFER, invalidateAttachments as number[]);
++  }
++}
+diff --git a/modules/webgl/src/adapter/resources/webgl-framebuffer.ts b/modules/webgl/src/adapter/resources/webgl-framebuffer.ts
+index b16fd2287..7216aa69e 100644
+--- a/modules/webgl/src/adapter/resources/webgl-framebuffer.ts
++++ b/modules/webgl/src/adapter/resources/webgl-framebuffer.ts
+@@ -21,6 +21,9 @@ export class WEBGLFramebuffer extends Framebuffer {
+   colorAttachments: WEBGLTextureView[] = [];
+   depthStencilAttachment: WEBGLTextureView | null = null;
+ 
++  /** Single-sample framebuffers that render passes resolve this framebuffer into, per target view. */
++  protected _resolveFramebuffers = new Map<WEBGLTextureView, WEBGLFramebuffer>();
++
+   constructor(device: WebGLDevice, props: FramebufferProps) {
+     super(device, props);
+ 
+@@ -55,6 +58,10 @@ export class WEBGLFramebuffer extends Framebuffer {
+     if (this.handle !== null && this.ownsHandle) {
+       this.gl.deleteFramebuffer(this.handle);
+     }
++    for (const resolveFramebuffer of this._resolveFramebuffers.values()) {
++      resolveFramebuffer.destroy();
++    }
++    this._resolveFramebuffers.clear();
+     super.destroy(); // destroys owned resources etc.
+   }
+ 
+@@ -82,15 +89,50 @@ export class WEBGLFramebuffer extends Framebuffer {
+       this._attachTextureView(attachmentPoint, this.depthStencilAttachment);
+     }
+ 
+-    /** Check the status */
+-    if (this.device.props.debug) {
+-      const status = this.gl.checkFramebufferStatus(GL.FRAMEBUFFER) as GL;
+-      if (status !== GL.FRAMEBUFFER_COMPLETE) {
+-        throw new Error(`Framebuffer ${_getFrameBufferStatus(status)}`);
+-      }
+-    }
++    /** Check the status (always for multisample attachments: their sample counts must be supported) */
++    const isMultisampled = [...this.colorAttachments, this.depthStencilAttachment].some(
++      attachment => attachment && attachment.texture.samples > 1
++    );
++    const status =
++      this.device.props.debug || isMultisampled
++        ? (this.gl.checkFramebufferStatus(GL.FRAMEBUFFER) as GL)
++        : GL.FRAMEBUFFER_COMPLETE;
+ 
+     this.gl.bindFramebuffer(GL.FRAMEBUFFER, prevHandle);
++
++    if (status !== GL.FRAMEBUFFER_COMPLETE) {
++      // the binding is restored first, so a caller that catches this can fall back cleanly
++      throw new Error(`Framebuffer ${_getFrameBufferStatus(status)}`);
++    }
++  }
++
++  /**
++   * The single-sample framebuffer that resolves into `view` (its only attachment, a color or a
++   * depth/stencil one), created on first use and kept until the view's texture is destroyed.
++   * @internal used by WEBGLRenderPass for `resolveTargets` / `depthStencilResolveTarget`
++   */
++  _getResolveFramebuffer(
++    view: WEBGLTextureView,
++    aspect: 'color' | 'depth-stencil'
++  ): WEBGLFramebuffer {
++    for (const [resolveView, resolveFramebuffer] of this._resolveFramebuffers) {
++      if (resolveView.texture.destroyed) {
++        resolveFramebuffer.destroy();
++        this._resolveFramebuffers.delete(resolveView);
++      }
++    }
++    let resolveFramebuffer = this._resolveFramebuffers.get(view);
++    if (!resolveFramebuffer) {
++      resolveFramebuffer = new WEBGLFramebuffer(this.device, {
++        id: `${this.id}-resolve-${this._resolveFramebuffers.size}`,
++        width: this.width,
++        height: this.height,
++        colorAttachments: aspect === 'color' ? [view] : [],
++        depthStencilAttachment: aspect === 'color' ? null : view
++      });
++      this._resolveFramebuffers.set(view, resolveFramebuffer);
++    }
++    return resolveFramebuffer;
+   }
+ 
+   // PRIVATE
+@@ -119,6 +161,17 @@ export class WEBGLFramebuffer extends Framebuffer {
+     const level = textureView.props.baseMipLevel;
+     const layer = textureView.props.baseArrayLayer;
+ 
++    if ((texture.glTarget as GL) === GL.RENDERBUFFER) {
++      // A multisampled WEBGLTexture (samples > 1) is a multisample renderbuffer
++      gl.framebufferRenderbuffer(
++        GL.FRAMEBUFFER,
++        attachment,
++        GL.RENDERBUFFER,
++        texture.handle as unknown as WebGLRenderbuffer
++      );
++      return;
++    }
++
+     gl.bindTexture(texture.glTarget, texture.handle);
+ 
+     switch (texture.glTarget) {
+diff --git a/modules/webgl/src/adapter/resources/webgl-render-pass.ts b/modules/webgl/src/adapter/resources/webgl-render-pass.ts
+index d3b35e794..bd12c0b1b 100644
+--- a/modules/webgl/src/adapter/resources/webgl-render-pass.ts
++++ b/modules/webgl/src/adapter/resources/webgl-render-pass.ts
+@@ -28,6 +28,9 @@ import {withGLParameters} from '../../context/state-tracker/with-parameters';
+ import {setGLParameters} from '../../context/parameters/unified-parameter-api';
+ import {WEBGLQuerySet} from './webgl-query-set';
+ import {WEBGLFramebuffer} from './webgl-framebuffer';
++import type {WEBGLTextureView} from './webgl-texture-view';
++import {resolveMultisampleFramebufferWebGL, type WebGLResolveBlit} from '../helpers/webgl-resolve';
++import {getDepthStencilAttachmentWebGL} from '../converters/webgl-texture-table';
+ import {WEBGLBuffer} from './webgl-buffer';
+ import {WEBGLRenderPipeline} from './webgl-render-pipeline';
+ import {WEBGLTransformFeedback} from './webgl-transform-feedback';
+@@ -105,6 +108,7 @@ export class WEBGLRenderPass extends RenderPass {
+     if (this.destroyed) {
+       return;
+     }
++    this._resolveAttachments();
+     if (this.props.timestampQuerySet && this.props.endTimestampIndex !== undefined) {
+       const webglQuerySet = this.props.timestampQuerySet as WEBGLQuerySet;
+       webglQuerySet.writeTimestamp(this.props.endTimestampIndex);
+@@ -306,6 +310,69 @@ export class WEBGLRenderPass extends RenderPass {
+ 
+   // PRIVATE
+ 
++  /**
++   * Resolves the multisampled attachments into `resolveTargets` / `depthStencilResolveTarget`
++   * (blitFramebuffer; WebGPU resolves natively at the end of the pass). Runs inside the pass's
++   * pushed GL state, so the bindings and enables it changes are restored by popState().
++   * With `discard` the multisample attachments are invalidated afterwards (cf. WebGPU storeOp 'discard').
++   */
++  protected _resolveAttachments(): void {
++    const framebuffer = this.props.framebuffer as WEBGLFramebuffer | null;
++    const resolveTargets = (this.props.resolveTargets || []) as (WEBGLTextureView | null)[];
++    const depthStencilResolveTarget = this.props
++      .depthStencilResolveTarget as WEBGLTextureView | null;
++    if (!framebuffer?.handle || (!resolveTargets.some(Boolean) && !depthStencilResolveTarget)) {
++      return;
++    }
++
++    const blits: WebGLResolveBlit[] = [];
++    resolveTargets.forEach((resolveTarget, colorAttachment) => {
++      if (resolveTarget && framebuffer.colorAttachments[colorAttachment]) {
++        blits.push({
++          framebuffer: framebuffer._getResolveFramebuffer(resolveTarget, 'color').handle,
++          mask: GL.COLOR_BUFFER_BIT,
++          colorAttachment
++        });
++      }
++    });
++    const depthStencilAttachment = framebuffer.depthStencilAttachment;
++    if (depthStencilResolveTarget && depthStencilAttachment) {
++      const attachmentPoint = getDepthStencilAttachmentWebGL(depthStencilAttachment.texture.format);
++      const mask =
++        attachmentPoint === GL.DEPTH_ATTACHMENT
++          ? GL.DEPTH_BUFFER_BIT
++          : attachmentPoint === GL.STENCIL_ATTACHMENT
++            ? GL.STENCIL_BUFFER_BIT
++            : GL.DEPTH_BUFFER_BIT | GL.STENCIL_BUFFER_BIT;
++      blits.push({
++        framebuffer: framebuffer._getResolveFramebuffer(depthStencilResolveTarget, 'depth-stencil')
++          .handle,
++        mask
++      });
++    }
++
++    const invalidateAttachments: number[] = [];
++    if (this.props.discard) {
++      framebuffer.colorAttachments.forEach((_, i) =>
++        invalidateAttachments.push(GL.COLOR_ATTACHMENT0 + i)
++      );
++      if (depthStencilAttachment) {
++        invalidateAttachments.push(
++          getDepthStencilAttachmentWebGL(depthStencilAttachment.texture.format)
++        );
++      }
++    }
++
++    resolveMultisampleFramebufferWebGL(
++      this.device.gl,
++      framebuffer.handle,
++      framebuffer.width,
++      framebuffer.height,
++      blits,
++      invalidateAttachments
++    );
++  }
++
+   /**
+    * Optionally clears depth, color and stencil buffers based on parameters
+    */
+diff --git a/modules/webgl/src/adapter/resources/webgl-texture.ts b/modules/webgl/src/adapter/resources/webgl-texture.ts
+index 9787c3c8e..8e864d8a2 100644
+--- a/modules/webgl/src/adapter/resources/webgl-texture.ts
++++ b/modules/webgl/src/adapter/resources/webgl-texture.ts
+@@ -101,10 +101,39 @@ export class WEBGLTexture extends Texture {
+       throw new Error('Borrowed WebGL textures require a texture handle');
+     }
+ 
+-    this.handle = this.props.handle || this.gl.createTexture();
++    // WebGL2 has no multisampled textures: a multisampled texture is a multisample renderbuffer.
++    // As in WebGPU it can only be a render attachment and be resolved (RenderPassProps.resolveTargets),
++    // never sampled, written, copied or read.
++    const isMultisampled = this.samples > 1;
++    if (isMultisampled) {
++      if (
++        this.props.handle ||
++        this.dimension !== '2d' ||
++        this.mipLevels !== 1 ||
++        this.compressed ||
++        props.data
++      ) {
++        throw new Error(`${this}: a multisampled WebGL texture is 2d, 1 mip level, without data`);
++      }
++      this.glTarget = GL.RENDERBUFFER;
++    }
++
++    this.handle =
++      this.props.handle ||
++      (isMultisampled ? this.gl.createRenderbuffer() : this.gl.createTexture());
+     this.device._setWebGLDebugMetadata(this.handle, this, {spector: this.props});
+ 
+-    if (!this.isHandleBorrowed) {
++    if (isMultisampled) {
++      this.gl.bindRenderbuffer(GL.RENDERBUFFER, this.handle);
++      this.gl.renderbufferStorageMultisample(
++        GL.RENDERBUFFER,
++        this.samples,
++        this.glInternalFormat,
++        this.width,
++        this.height
++      );
++      this.gl.bindRenderbuffer(GL.RENDERBUFFER, null);
++    } else if (!this.isHandleBorrowed) {
+       // Opaque borrowed WebGLTexture handles are binding-only. Allocating storage, uploading
+       // pixels, or changing sampler state would mutate a resource owned outside luma.gl.
+       /**
+@@ -141,7 +170,7 @@ export class WEBGLTexture extends Texture {
+       this.trackReferencedMemory(this.getAllocatedByteLength(), 'Texture');
+     }
+ 
+-    if (!this.isHandleBorrowed) {
++    if (!this.isHandleBorrowed && !isMultisampled) {
+       // Set texture sampler parameters
+       this.setSampler(this.props.sampler);
+     }
+@@ -163,7 +192,10 @@ export class WEBGLTexture extends Texture {
+     this._framebufferAttachmentKey = null;
+ 
+     if (this.handle) {
+-      if (this.ownsHandle) {
++      if (this.ownsHandle && this.glTarget === GL.RENDERBUFFER) {
++        this.gl.deleteRenderbuffer(this.handle);
++        this.trackDeallocatedMemory('Texture');
++      } else if (this.ownsHandle) {
+         this.gl.deleteTexture(this.handle);
+         this.trackDeallocatedMemory('Texture');
+       } else {
+diff --git a/modules/webgl/test/adapter/helpers/webgl-resolve.node.spec.ts b/modules/webgl/test/adapter/helpers/webgl-resolve.node.spec.ts
+new file mode 100644
+index 000000000..e2b55eb69
+--- /dev/null
++++ b/modules/webgl/test/adapter/helpers/webgl-resolve.node.spec.ts
+@@ -0,0 +1,77 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {GL} from '@luma.gl/webgl/constants';
++import {expect, it} from 'vitest';
++import {resolveMultisampleFramebufferWebGL} from '../../../src/adapter/helpers/webgl-resolve';
++
++/** A WebGL2 context stand-in that records the calls the resolve makes. */
++function makeRecordingContext() {
++  const calls: unknown[][] = [];
++  const record =
++    (name: string) =>
++    (...args: unknown[]) => {
++      calls.push([name, ...args]);
++    };
++  const gl = {
++    disable: record('disable'),
++    bindFramebuffer: record('bindFramebuffer'),
++    readBuffer: record('readBuffer'),
++    blitFramebuffer: record('blitFramebuffer'),
++    invalidateFramebuffer: record('invalidateFramebuffer')
++  } as unknown as WebGL2RenderingContext;
++  return {gl, calls};
++}
++
++it('resolveMultisampleFramebufferWebGL blits color and depth like the hand-written resolve', () => {
++  const {gl, calls} = makeRecordingContext();
++  const source = {name: 'ms'} as unknown as WebGLFramebuffer;
++  const colorTarget = {name: 'color'} as unknown as WebGLFramebuffer;
++  const depthTarget = {name: 'depth'} as unknown as WebGLFramebuffer;
++
++  resolveMultisampleFramebufferWebGL(
++    gl,
++    source,
++    640,
++    480,
++    [
++      {framebuffer: colorTarget, mask: GL.COLOR_BUFFER_BIT, colorAttachment: 0},
++      {framebuffer: depthTarget, mask: GL.DEPTH_BUFFER_BIT}
++    ],
++    [GL.COLOR_ATTACHMENT0, GL.DEPTH_ATTACHMENT]
++  );
++
++  expect(calls).toEqual([
++    ['disable', GL.SCISSOR_TEST],
++    ['disable', GL.RASTERIZER_DISCARD],
++    ['bindFramebuffer', GL.READ_FRAMEBUFFER, source],
++    ['readBuffer', GL.COLOR_ATTACHMENT0],
++    ['bindFramebuffer', GL.DRAW_FRAMEBUFFER, colorTarget],
++    ['blitFramebuffer', 0, 0, 640, 480, 0, 0, 640, 480, GL.COLOR_BUFFER_BIT, GL.NEAREST],
++    ['bindFramebuffer', GL.DRAW_FRAMEBUFFER, depthTarget],
++    ['blitFramebuffer', 0, 0, 640, 480, 0, 0, 640, 480, GL.DEPTH_BUFFER_BIT, GL.NEAREST],
++    ['invalidateFramebuffer', GL.READ_FRAMEBUFFER, [GL.COLOR_ATTACHMENT0, GL.DEPTH_ATTACHMENT]]
++  ]);
++});
++
++it('resolveMultisampleFramebufferWebGL restores the read buffer after a non-zero attachment', () => {
++  const {gl, calls} = makeRecordingContext();
++  const source = {} as WebGLFramebuffer;
++  const target = {} as WebGLFramebuffer;
++  resolveMultisampleFramebufferWebGL(gl, source, 2, 2, [
++    {framebuffer: target, mask: GL.COLOR_BUFFER_BIT, colorAttachment: 1}
++  ]);
++  const names = calls.map(call => call[0]);
++  expect(names).toEqual([
++    'disable',
++    'disable',
++    'bindFramebuffer',
++    'readBuffer',
++    'bindFramebuffer',
++    'blitFramebuffer',
++    'readBuffer'
++  ]);
++  expect(calls[3]).toEqual(['readBuffer', GL.COLOR_ATTACHMENT0 + 1]);
++  expect(calls[6]).toEqual(['readBuffer', GL.COLOR_ATTACHMENT0]);
++});
+diff --git a/modules/webgl/test/adapter/resources/webgl-render-pass.spec.ts b/modules/webgl/test/adapter/resources/webgl-render-pass.spec.ts
+index 267027e10..fff185ed7 100644
+--- a/modules/webgl/test/adapter/resources/webgl-render-pass.spec.ts
++++ b/modules/webgl/test/adapter/resources/webgl-render-pass.spec.ts
+@@ -224,3 +224,79 @@ it('WEBGLRenderPass#draw supports attribute-less draws and rejects indexCount wi
+   vertexShader.destroy();
+   fragmentShader.destroy();
+ });
++
++it('WEBGLRenderPass resolves multisampled attachments into resolveTargets', async () => {
++  const device = await getWebGLTestDevice();
++  const {gl} = device;
++  const samples = Math.min(4, gl.getParameter(GL.MAX_SAMPLES) as number);
++  if (samples < 2) {
++    return;
++  }
++
++  const msColor = device.createTexture({format: 'rgba8unorm', width: 4, height: 4, samples});
++  const msDepth = device.createTexture({format: 'depth24plus', width: 4, height: 4, samples});
++  expect(msColor.samples, 'multisampled texture keeps its sample count').toBe(samples);
++  expect(gl.isRenderbuffer(msColor.handle), 'backed by a multisample renderbuffer').toBe(true);
++  const multisampled = device.createFramebuffer({
++    width: 4,
++    height: 4,
++    colorAttachments: [msColor],
++    depthStencilAttachment: msDepth
++  });
++  const resolved = device.createFramebuffer({
++    width: 4,
++    height: 4,
++    colorAttachments: ['rgba8unorm'],
++    depthStencilAttachment: 'depth24plus'
++  });
++
++  // clear the multisampled attachments, resolve them at end(), then read the single-sample target
++  device
++    .beginRenderPass({
++      framebuffer: multisampled,
++      clearColor: [1, 0, 0, 1],
++      clearDepth: 0.25,
++      resolveTargets: [resolved.colorAttachments[0]],
++      depthStencilResolveTarget: resolved.depthStencilAttachment
++    })
++    .end();
++  expect(gl.getError(), 'resolve blits raise no GL error').toBe(GL.NO_ERROR);
++  const pixel = device.readPixelsToArrayWebGL(resolved, {sourceWidth: 1, sourceHeight: 1});
++  expect(Array.from(pixel), 'color resolved into the target').toEqual([255, 0, 0, 255]);
++
++  // a resolve-only pass (load, discard): resolves again and invalidates the multisample storage
++  const invalidated: number[][] = [];
++  const originalInvalidate = gl.invalidateFramebuffer.bind(gl);
++  gl.invalidateFramebuffer = ((target: number, attachments: number[]) => {
++    invalidated.push([...attachments]);
++    return originalInvalidate(target, attachments);
++  }) as typeof gl.invalidateFramebuffer;
++  try {
++    device
++      .beginRenderPass({
++        framebuffer: multisampled,
++        clearColor: false,
++        clearDepth: false,
++        clearStencil: false,
++        discard: true,
++        resolveTargets: [resolved.colorAttachments[0]]
++      })
++      .end();
++  } finally {
++    gl.invalidateFramebuffer = originalInvalidate;
++  }
++  expect(invalidated, 'discard invalidates every multisample attachment').toEqual([
++    [GL.COLOR_ATTACHMENT0, GL.DEPTH_ATTACHMENT]
++  ]);
++  expect(gl.getError(), 'resolve-only pass raises no GL error').toBe(GL.NO_ERROR);
++
++  expect(
++    () => device.createTexture({format: 'rgba8unorm', width: 4, height: 4, samples, mipLevels: 2}),
++    'multisampled textures have one mip level'
++  ).toThrow(/multisampled/);
++
++  multisampled.destroy();
++  resolved.destroy();
++  msColor.destroy();
++  msDepth.destroy();
++});
+diff --git a/modules/webgpu/src/adapter/resources/webgpu-render-pass.ts b/modules/webgpu/src/adapter/resources/webgpu-render-pass.ts
+index 394a85a55..1ce93e7a4 100644
+--- a/modules/webgpu/src/adapter/resources/webgpu-render-pass.ts
++++ b/modules/webgpu/src/adapter/resources/webgpu-render-pass.ts
+@@ -54,6 +54,11 @@ export class WebGPURenderPass extends RenderPass {
+     super(device, props);
+     this.device = device;
+     const {props: renderPassProps} = this;
++    if (renderPassProps.depthStencilResolveTarget) {
++      throw new Error(
++        `${this}: depthStencilResolveTarget is WebGL only (WebGPU has no depth resolve)`
++      );
++    }
+     this.framebuffer =
+       (renderPassProps.framebuffer as WebGPUFramebuffer) ||
+       device.getCanvasContext().getCurrentFramebuffer();
+-- 
+2.44.0
+

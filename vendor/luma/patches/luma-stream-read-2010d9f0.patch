@@ -1,0 +1,82 @@
+From 2010d9f0878a8f4bb56049b155128c35d6f33b11 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Fri, 2 Oct 2026 11:32:25 -0400
+Subject: [PATCH] feat(webgl): MAP_READ buffers get the GL.STREAM_READ usage
+ hint
+
+getWebGLUsage mapped every non-uniform buffer to STATIC_DRAW, so readback
+(pixel pack) buffers created with Buffer.MAP_READ were hinted as draw
+storage. Map MAP_READ to STREAM_READ (written by the GPU, read back once).
+---
+ .../src/adapter/resources/webgl-buffer.ts     | 16 ++++++++++---
+ .../resources/webgl-buffer-usage.node.spec.ts | 24 +++++++++++++++++++
+ 2 files changed, 37 insertions(+), 3 deletions(-)
+ create mode 100644 modules/webgl/test/adapter/resources/webgl-buffer-usage.node.spec.ts
+
+diff --git a/modules/webgl/src/adapter/resources/webgl-buffer.ts b/modules/webgl/src/adapter/resources/webgl-buffer.ts
+index 71d3a115e..5a86d54ca 100644
+--- a/modules/webgl/src/adapter/resources/webgl-buffer.ts
++++ b/modules/webgl/src/adapter/resources/webgl-buffer.ts
+@@ -16,7 +16,7 @@ export class WEBGLBuffer extends Buffer {
+   /** Target in OpenGL defines the type of buffer */
+   readonly glTarget: GL.ARRAY_BUFFER | GL.ELEMENT_ARRAY_BUFFER | GL.UNIFORM_BUFFER;
+   /** Usage is a hint on how frequently the buffer will be updates */
+-  readonly glUsage: GL.STATIC_DRAW | GL.DYNAMIC_DRAW;
++  readonly glUsage: GL.STATIC_DRAW | GL.DYNAMIC_DRAW | GL.STREAM_READ;
+   /** Index type is needed when issuing draw calls, so we pre-compute it */
+   readonly glIndexType: GL.UNSIGNED_SHORT | GL.UNSIGNED_INT = GL.UNSIGNED_SHORT;
+ 
+@@ -230,8 +230,18 @@ function getWebGLTarget(
+   return GL.ARRAY_BUFFER;
+ }
+ 
+-/** @todo usage is not passed correctly */
+-function getWebGLUsage(usage: number): GL.STATIC_DRAW | GL.DYNAMIC_DRAW {
++/**
++ * Returns the WebGL usage hint for a luma.gl buffer usage.
++ * - `Buffer.MAP_READ` marks a readback (pixel pack / transform feedback result) buffer: written by
++ *   the GPU, read by the application, usually once per write. `GL.STREAM_READ` says so; with
++ *   `GL.STATIC_DRAW` some drivers (Chrome + ANGLE) keep the storage on a draw-optimised path and the
++ *   `getBufferSubData` that ends a readback is slower.
++ * @internal exported for tests
++ */
++export function getWebGLUsage(usage: number): GL.STATIC_DRAW | GL.DYNAMIC_DRAW | GL.STREAM_READ {
++  if (usage & Buffer.MAP_READ) {
++    return GL.STREAM_READ;
++  }
+   if (usage & Buffer.INDEX) {
+     return GL.STATIC_DRAW;
+   }
+diff --git a/modules/webgl/test/adapter/resources/webgl-buffer-usage.node.spec.ts b/modules/webgl/test/adapter/resources/webgl-buffer-usage.node.spec.ts
+new file mode 100644
+index 000000000..022ec9595
+--- /dev/null
++++ b/modules/webgl/test/adapter/resources/webgl-buffer-usage.node.spec.ts
+@@ -0,0 +1,24 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {Buffer} from '@luma.gl/core';
++import {GL} from '@luma.gl/webgl/constants';
++import {expect, it} from 'vitest';
++import {getWebGLUsage} from '../../../src/adapter/resources/webgl-buffer';
++
++it('WEBGLBuffer usage hint: MAP_READ readback buffers are STREAM_READ', () => {
++  expect(getWebGLUsage(Buffer.MAP_READ | Buffer.COPY_DST), 'readback buffer').toBe(GL.STREAM_READ);
++  expect(getWebGLUsage(Buffer.MAP_READ), 'MAP_READ alone').toBe(GL.STREAM_READ);
++  expect(
++    getWebGLUsage(Buffer.VERTEX | Buffer.MAP_READ),
++    'MAP_READ wins over VERTEX (a read-back transform feedback output)'
++  ).toBe(GL.STREAM_READ);
++  expect(getWebGLUsage(Buffer.INDEX), 'index').toBe(GL.STATIC_DRAW);
++  expect(getWebGLUsage(Buffer.VERTEX | Buffer.COPY_DST), 'vertex').toBe(GL.STATIC_DRAW);
++  expect(getWebGLUsage(Buffer.UNIFORM | Buffer.COPY_DST), 'uniform').toBe(GL.DYNAMIC_DRAW);
++  expect(getWebGLUsage(Buffer.COPY_DST | Buffer.COPY_SRC), 'copy-only').toBe(GL.STATIC_DRAW);
++  expect(getWebGLUsage(Buffer.MAP_WRITE | Buffer.COPY_SRC), 'MAP_WRITE unchanged').toBe(
++    GL.STATIC_DRAW
++  );
++});
+-- 
+2.44.0
+

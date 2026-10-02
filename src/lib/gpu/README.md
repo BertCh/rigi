@@ -1,6 +1,6 @@
 # src/lib/gpu — WebGPU compute
 
-The compute kernels in this directory run on a luma.gl 10 (vendored `10.0.0-alpha.2-rigi.3`) WebGPU device.
+The compute kernels in this directory run on a luma.gl 10 (vendored `10.0.0-alpha.2-rigi.5`) WebGPU device.
 Under the default WebGPU renderer (`src/lib/deck-webgpu/**`, the default since 2026-10-01) the renderer
 hands its device over with `adoptRenderDevice`, so the kernels run on the render device: one queue,
 and render targets are read without a copy. Under the WebGL fallback (`?renderer=deck`) and in
