@@ -209,17 +209,19 @@ export function StepInsideDemo({ className }: { className?: string }) {
 						| null = null;
 					if (flags.getFlag("peopleBody") === "on") {
 						try {
-							const [body, { createNn }, { imageToRGBA }] = await Promise.all([
+							const [body, { getNn }, { imageToRGBA }] = await Promise.all([
 								import("#/lib/body/back-depth"),
 								import("#/lib/nn"),
 								import("#/lib/nearfield/scene"),
 							]);
+							// GPU only: ViTPose never runs on the page thread's CPU (no WebGPU: keep the inflation)
+							const nn = await getNn("body");
 							const first = complete.completePeople(input);
-							const image = imageToRGBA(img, 2048);
-							if (image && first.instances.length)
+							const image = nn && imageToRGBA(img, 2048);
+							if (nn && image && first.instances.length)
 								backDepth = (
 									await body.prepareBodyBackDepth({
-										nn: await createNn(),
+										nn,
 										image,
 										boxes: body.boxesFromInstances(
 											first.instances,
