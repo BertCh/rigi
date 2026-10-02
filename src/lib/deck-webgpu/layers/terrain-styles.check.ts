@@ -334,6 +334,8 @@ export async function runTerrainStylesCheck(
 				},
 			]);
 	combos.push(
+		["hillshade", { alpine: true, water: true, waves: true }],
+		["imagery", { alpine: true, water: true, waves: true }],
 		["contours", {}],
 		["contours", { tanaka: true }],
 		["elevation", {}],
@@ -349,6 +351,7 @@ export async function runTerrainStylesCheck(
 			...(ft.tanaka ? ["LOOK_TANAKA"] : []),
 			...(ft.atmosphere ? ["LOOK_ATMOSPHERE"] : []),
 			...(ft.water ? ["LOOK_WATER"] : []),
+			...(ft.waves ? ["LOOK_WATER_WAVES"] : []),
 		] as DeckTerrainStyle["defines"];
 		return {
 			...L,

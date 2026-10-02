@@ -28,6 +28,7 @@ import { clearAirOn } from "../look/clear-air";
 import { type LookDefine, terrainDefines } from "../look/look-key";
 import { type RelValues, reliefValues } from "../look/relief/field";
 import { type SunContext, sunDirFromStyle } from "../look/sun";
+import { waterWavesOn } from "../look/water/waves";
 import {
 	hexToLinearLikeThree,
 	hexToRgb01,
@@ -210,6 +211,8 @@ export function deckTerrainStyle(
 	// likewise the photo's clear-air inversion (look/clear-air; never in lookKey: no composite or
 	// overlay program wants it): it exists only in the world view's drape
 	if (mode === "world" && clearAirOn(style)) defines.push("LOOK_CLEARAIR");
+	// animated lake waves: the world view's program only (look/water/waves)
+	if (mode === "world" && waterWavesOn(style)) defines.push("LOOK_WATER_WAVES");
 	const atm =
 		defines.includes("LOOK_ATMOSPHERE") ||
 		(mode === "world" && style.world.sky.mode === "atmosphere");

@@ -71,6 +71,7 @@ import type { SkyMask } from "../look/haze-fit";
 import { drawExportLabels, skylineAt } from "../look/labels";
 import { lookKey } from "../look/look-key";
 import { ReliefController } from "../look/relief/field";
+import { waterWavesAnimate } from "../look/water/waves";
 import { precipitationFor } from "../look/weather/precipitation";
 import { DeckMapCamera, MAP_VIEW_ID } from "../nearfield/deck-map-camera";
 import {
@@ -1263,6 +1264,7 @@ export class DeckEngine implements Renderer {
 		}
 		if (this.world?.controls) this.canvas.style.backgroundColor = ws.sky;
 		this.updateLayers();
+		if (this.world?.controls && waterWavesAnimate(style)) this.kickWorld();
 	}
 
 	/** The terrain uniforms of the current style for one view mode (bands: a band pass). */
@@ -2885,10 +2887,15 @@ export class DeckEngine implements Renderer {
 				this.updateWorldGizmo(w);
 			else if (moved)
 				this.deck.setProps({ viewState: this.viewState() } as never);
+			// animated lake waves (style.world.water, off under webdriver): one redraw a frame
+			const waves = waterWavesAnimate(this.style);
+			if (waves && !moved) this.deck.redraw("water");
 			this.worldStill = moved ? 0 : this.worldStill + 1;
 			// damping settles over some frames; a new drag sends 'change' → kickWorld again
 			this.worldRaf =
-				flying || this.worldStill < 30 ? requestAnimationFrame(step) : 0;
+				flying || waves || this.worldStill < 30
+					? requestAnimationFrame(step)
+					: 0;
 		};
 		this.worldRaf = requestAnimationFrame(step);
 	}

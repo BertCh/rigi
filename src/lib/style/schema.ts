@@ -262,6 +262,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 			amount: unit,
 			floor: num(0.05, 1),
 		}),
+		water: en("flat", "waves"),
 		weather: {
 			k: "union",
 			tag: "mode",

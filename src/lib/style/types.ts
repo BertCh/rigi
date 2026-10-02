@@ -204,6 +204,12 @@ export type WorldStyle = {
 	weather:
 		| { mode: "off" }
 		| { mode: "rain" | "snow"; intensity: number; wind: number };
+	/**
+	 * Lake water in the deck world view (look/water/waves): 'waves' animates the LOOK_WATER lakes
+	 * with luma's riverWaterMaterial wave normals. Needs terrain.albedo { mode: 'alpine', water: true };
+	 * never the photo overlay, still under webdriver.
+	 */
+	water: "flat" | "waves";
 };
 
 /** Photo ⊕ render compositing (overlay and replace). CLASSIC sets no LOOK_* define. */

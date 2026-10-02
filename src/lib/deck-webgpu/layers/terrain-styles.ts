@@ -50,7 +50,8 @@ import { ATM_CURV } from "#/lib/look/atmosphere";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { harmonizeValues } from "#/lib/look/composite";
 import type { ReliefField, ResidentReliefField } from "#/lib/look/relief/field";
-import { WATER_WGSL } from "#/lib/look/water/water";
+import { waterWgsl } from "#/lib/look/water/water";
+import { waterWaveSeconds } from "#/lib/look/water/waves";
 import {
 	type DeckTerrainStyle,
 	deckTerrainStyle,
@@ -189,6 +190,13 @@ export const terrainAtmModule = uniformModule(
 		pad0: "f32",
 		pad1: "f32",
 	},
+);
+
+/** The wave clock of LOOK_WATER_WAVES (look/water/waves.ts); present only in a waves program. */
+export const terrainWaterModule = uniformModule(
+	"terrainWater",
+	"TerrainWaterUniforms",
+	{ time: "f32", pad0: "f32", pad1: "f32", pad2: "f32" },
 );
 
 /** HARM_BLOCK (look/glsl/composite.ts): for the drape port's LOOK_HARMONIZE. */
@@ -557,6 +565,8 @@ export type TerrainStyleFeatures = {
 	atmosphere: boolean;
 	/** LOOK_WATER on top of the alpine tint */
 	water: boolean;
+	/** LOOK_WATER_WAVES: animated lake waves (world view only; absent = off) */
+	waves?: boolean;
 } & TerroirFeatures; // src/lib/terroir/wgsl: absent keys while every terroir switch is off
 
 /** Photo view colour pass only (0 elsewhere, see styleUniforms). After every derivative. */
@@ -708,7 +718,7 @@ export function terrainStyleWGSL(
 			? [terroirWGSL(ft, { relief: ft.relief, water: ft.water })]
 			: []),
 		lit && ft.alpine ? ALPINE_WGSL : "",
-		lit && ft.alpine && ft.water ? WATER_WGSL : "",
+		lit && ft.alpine && ft.water ? waterWgsl(!!ft.waves) : "",
 		style === "contours" && ft.tanaka ? TANAKA_WGSL : "",
 		style === "slopeClass" ? SLOPE_CLASS_WGSL : "",
 		ft.relief && (lit || style === "elevation") ? RELIEF_WGSL : "",
@@ -731,6 +741,11 @@ export function styleFeatures(
 		tanaka: style === "contours" && d.has("LOOK_TANAKA"),
 		atmosphere: lit && d.has("LOOK_ATMOSPHERE") && !!look.atm,
 		water: lit && d.has("LOOK_ALPINE") && d.has("LOOK_WATER"),
+		waves:
+			lit &&
+			d.has("LOOK_ALPINE") &&
+			d.has("LOOK_WATER") &&
+			d.has("LOOK_WATER_WAVES"),
 		...terroirFeatures(
 			style,
 			terroir,
@@ -1099,6 +1114,7 @@ export class TerrainStyles {
 				terrainStyleModule as unknown as ShaderModule,
 				...(ft.relief ? [terrainReliefModule as unknown as ShaderModule] : []),
 				...(terroirOn(ft) ? [terroirUniformModule] : []),
+				...(ft.waves ? [terrainWaterModule as unknown as ShaderModule] : []),
 			],
 			defines: {
 				TERRAIN_SHADING: true,
@@ -1111,6 +1127,16 @@ export class TerrainStyles {
 					terrainStyle: this.styleUniforms(ctx),
 					...(ft.relief ? { terrainRelief: this.reliefUniforms() } : {}),
 					...(terroirOn(ft) ? { terroir: this.terroirUniforms() } : {}),
+					...(ft.waves
+						? {
+								terrainWater: {
+									time: waterWaveSeconds(),
+									pad0: 0,
+									pad1: 0,
+									pad2: 0,
+								},
+							}
+						: {}),
 				},
 				bindings: {
 					...(ft.relief

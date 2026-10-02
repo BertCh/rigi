@@ -150,6 +150,7 @@ import type { SkyMask } from "#/lib/look/haze-fit";
 import { drawExportLabels, skylineAt } from "#/lib/look/labels";
 import { lookKey } from "#/lib/look/look-key";
 import { ReliefController } from "#/lib/look/relief/field";
+import { waterWavesAnimate } from "#/lib/look/water/waves";
 import { DeckMapCamera, MAP_VIEW_ID } from "#/lib/nearfield/deck-map-camera";
 import { type ByteMask, stepMasks } from "#/lib/nearfield/deck-step";
 import {
@@ -1867,6 +1868,7 @@ export class WebGpuEngine implements Renderer {
 		}
 		if (this.world?.controls) this.canvas.style.backgroundColor = ws.sky;
 		this.sync();
+		if (this.world?.controls && waterWavesAnimate(style)) this.kickWorld();
 	}
 
 	private look(mode: DeckStyleMode, bands = false): DeckTerrainStyle {
@@ -3781,9 +3783,15 @@ export class WebGpuEngine implements Renderer {
 				this.schedule("all");
 			}
 			if (this.step?.map?.active) this.syncMapViews();
+			// animated lake waves (style.world.water, off under webdriver): one frame a tick
+			const waves = waterWavesAnimate(this.style);
+			if (waves && !moved && !flying && !gizmo && this.host)
+				this.schedule("all");
 			this.worldStill = moved ? 0 : this.worldStill + 1;
 			this.worldRaf =
-				flying || this.worldStill < 30 ? requestAnimationFrame(step) : 0;
+				flying || waves || this.worldStill < 30
+					? requestAnimationFrame(step)
+					: 0;
 		};
 		this.worldRaf = requestAnimationFrame(step);
 	}

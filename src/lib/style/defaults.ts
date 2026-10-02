@@ -116,6 +116,7 @@ export const CLASSIC: ViewStyle = {
 		projectionTint: { color: [1, 0.85, 0.6], amount: 0 }, // materials.ts:208, :34 (uPhotoTint always 0)
 		drapeHarmonize: 0,
 		clearAir: { mode: "fitted", amount: 0.85, floor: 0.3 },
+		water: "flat",
 		weather: { mode: "off" },
 	},
 	composite: {

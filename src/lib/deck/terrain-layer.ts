@@ -36,6 +36,11 @@ import { REL_BLOCK, REL_LUMA_MODULE } from "../look/glsl/relief";
 import { withSlopeLayer } from "../look/look-key";
 import type { ReliefField } from "../look/relief/field";
 import { WATER_FNS } from "../look/water/water";
+import {
+	WATER_WAVES_BLOCK,
+	WATER_WAVES_FNS,
+	waterWaveSeconds,
+} from "../look/water/waves";
 import { PROVENANCE_COLORS } from "../nearfield/provenance";
 import { type DeckTerrainStyle, deckTerrainStyle } from "../style/deck-apply";
 import { CLASSIC } from "../style/defaults";
@@ -372,6 +377,9 @@ vec3 hypso(float h) {
 ${ALPINE_FNS}
 #endif
 #ifdef LOOK_WATER
+#ifdef LOOK_WATER_WAVES
+${WATER_WAVES_FNS}
+#endif
 ${WATER_FNS}
 #endif
 #ifdef LOOK_TANAKA
@@ -808,6 +816,7 @@ export function terrainShaders(
 		d.includes("LOOK_SLOPE") && SLOPE_LUMA_MODULE,
 		d.includes("LOOK_HARMONIZE") && HARM_BLOCK.lumaModule,
 		d.includes("LOOK_CLEARAIR") && CLEAR_AIR_LUMA_MODULE,
+		d.includes("LOOK_WATER_WAVES") && WATER_WAVES_BLOCK.lumaModule,
 		!!p.terroir?.defines.length && TERROIR_LUMA_MODULE,
 	].filter((m) => !!m);
 	return {
@@ -927,6 +936,13 @@ export function setTerrainShaderProps(
 	if (L.defines.includes("LOOK_HARMONIZE") && p.harmonize && !pass)
 		model.shaderInputs.setProps({
 			[HARM_BLOCK.name]: HARM_BLOCK.pack(p.harmonize),
+		});
+	// animated lakes (world view only): the wave clock, still under webdriver
+	if (L.defines.includes("LOOK_WATER_WAVES") && !pass)
+		model.shaderInputs.setProps({
+			[WATER_WAVES_BLOCK.name]: WATER_WAVES_BLOCK.pack({
+				time: waterWaveSeconds(),
+			}),
 		});
 	if (L.defines.includes("LOOK_CLEARAIR") && !pass)
 		model.shaderInputs.setProps({

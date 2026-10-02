@@ -19,7 +19,8 @@ export type LookDefine =
 	| "LOOK_RELIEF"
 	| "LOOK_SLOPE"
 	| "LOOK_TANAKA"
-	| "LOOK_WATER";
+	| "LOOK_WATER"
+	| "LOOK_WATER_WAVES";
 
 /** Sorted, duplicate-free define list; `lookKey(s).join()` is a stable cache key ('' = classic). */
 export function lookKey(s: ViewStyle): LookDefine[] {

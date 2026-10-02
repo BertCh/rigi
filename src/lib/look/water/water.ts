@@ -10,6 +10,8 @@
 // chunk (deck terrain-layer.ts, after ALPINE_FNS, which supplies rampNoise / rampFbm / rampSrgb) and
 // the WGSL one (deck-webgpu/layers/terrain-styles.ts, after ALPINE_WGSL). Colours are LINEAR.
 
+import { WATER_WAVES_WGSL } from "./waves";
+
 /** Ripple height scale: the normal tilt (rad-ish) at the nearest range, fading with distance. */
 const RIPPLE = "0.035";
 
@@ -33,7 +35,11 @@ vec3 waterShade(vec3 col, float elev, vec2 xy, vec3 n, vec3 view, float range) {
   vec2 q2 = xy / 31.0 + 11.7;
   g += 0.6 * vec2(rampNoise(q2 + vec2(e, 0.0)) - rampNoise(q2 - vec2(e, 0.0)),
                   rampNoise(q2 + vec2(0.0, e)) - rampNoise(q2 - vec2(0.0, e)));
+#ifdef LOOK_WATER_WAVES
+  vec3 nw = normalize(vec3(n.xy - g * amp + waterWaveTilt(xy, wtr_time, range), max(n.z, 1e-3)));
+#else
   vec3 nw = normalize(vec3(n.xy - g * amp, max(n.z, 1e-3)));
+#endif
   // depth tint: shallow turquoise to deep blue-green, patchy (no bathymetry in the DEM)
   float depth = clamp(0.35 + 0.9 * (rampFbm(xy / 380.0) - 0.4), 0.0, 1.0);
   vec3 body = mix(rampSrgb(vec3(0.30, 0.55, 0.58)), rampSrgb(vec3(0.07, 0.24, 0.36)), depth);
@@ -46,8 +52,13 @@ vec3 waterShade(vec3 col, float elev, vec2 xy, vec3 n, vec3 view, float range) {
 }
 `;
 
-/** The WGSL twin; `grad` = fwidth(elev) / |fwidth(xy)| from the caller, as for ts_alpine_albedo. */
-export const WATER_WGSL = /* wgsl */ `
+/**
+ * The WGSL twin; `grad` = fwidth(elev) / |fwidth(xy)| from the caller, as for ts_alpine_albedo.
+ * \`waves\` (LOOK_WATER_WAVES): adds look/water/waves' tilt, which reads \`terrainWater.time\`.
+ */
+export const waterWgsl = (
+	waves: boolean,
+) => /* wgsl */ `${waves ? WATER_WAVES_WGSL : ""}
 fn ts_water_shade(col: vec3<f32>, elev: f32, xy: vec2<f32>, grad: f32, n: vec3<f32>, view: vec3<f32>, range: f32) -> vec3<f32> {
   let m = (1.0 - smoothstep(0.0004, 0.0015, grad)) * (1.0 - smoothstep(2500.0, 2600.0, elev));
   if (m <= 0.0) { return col; }
@@ -59,7 +70,7 @@ fn ts_water_shade(col: vec3<f32>, elev: f32, xy: vec2<f32>, grad: f32, n: vec3<f
   let q2 = xy / 31.0 + 11.7;
   g += 0.6 * vec2<f32>(ts_noise(q2 + vec2<f32>(e, 0.0)) - ts_noise(q2 - vec2<f32>(e, 0.0)),
                        ts_noise(q2 + vec2<f32>(0.0, e)) - ts_noise(q2 - vec2<f32>(0.0, e)));
-  let nw = normalize(vec3<f32>(n.xy - g * amp, max(n.z, 1e-3)));
+  let nw = normalize(vec3<f32>(n.xy - g * amp${waves ? " + ts_water_wave_tilt(xy, terrainWater.time, range)" : ""}, max(n.z, 1e-3)));
   let depth = clamp(0.35 + 0.9 * (ts_fbm(xy / 380.0) - 0.4), 0.0, 1.0);
   let body = mix(ts_srgb(vec3<f32>(0.30, 0.55, 0.58)), ts_srgb(vec3<f32>(0.07, 0.24, 0.36)), depth);
   let cosT = clamp(dot(nw, view), 0.0, 1.0);
@@ -69,3 +80,5 @@ fn ts_water_shade(col: vec3<f32>, elev: f32, xy: vec2<f32>, grad: f32, n: vec3<f
   return mix(col, mix(body, sky, fres), m * 0.95);
 }
 `;
+
+export const WATER_WGSL = waterWgsl(false);
