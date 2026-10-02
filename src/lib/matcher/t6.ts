@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Policy "t6" for ad-hoc two-stage requests (port of tools/matcher/server/t6.py): the T6 stage-1
+// Policy "t6" for ad-hoc two-stage requests (port of tools/matcher/reference/t6.py): the T6 stage-1
 // hypothesis search and the frozen T6 rule (./rule.ts, sha1 292fb74f…), on the app's engine.
 //   stage 1   sky        skyline global search (src/lib/gpu/skyglobal: grid + candidate re-score on the
 //                        luma compute graph, polish on the CPU), top 4
@@ -98,7 +98,7 @@ const p = (pose: Pose): Pose => ({
 	vfov: +pose.vfov,
 });
 
-/** Raw photo evidence + the horizon (render_worker `edges`): the SkyGlobal inputs. */
+/** Raw photo evidence + the horizon (the former render worker's `edges`): the SkyGlobal inputs. */
 async function edges(ctx: MatchContext): Promise<EdgeInputs | null> {
 	const ev = await ctx.engine.matchEvidence();
 	if (!ev) return null;

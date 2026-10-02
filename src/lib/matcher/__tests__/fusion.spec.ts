@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Parity of the ported fused solve (fusion.ts, core.ts, rotation.ts) with the Python reference
-// (tools/matcher/fusion.py, server/fuse.py, server/core.py, match.py) on the synthetic scenarios of
+// (tools/matcher/fusion.py, reference/fuse.py, reference/core.py, match.py) on the synthetic scenarios of
 // fixtures/synth.ts; the reference values are fixtures/fusion.json (make_fixtures.py). Not bit-exact
 // (own LM and RNG): poses within 0.01°, statistics within a few hundredths.
 

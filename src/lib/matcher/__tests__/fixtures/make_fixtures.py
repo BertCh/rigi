@@ -1,7 +1,7 @@
 # Rigi
 # SPDX-License-Identifier: MIT
 # SPDX-FileCopyrightText: Copyright (c) Rigi contributors
-"""Record Python reference outputs (tools/matcher: fusion.py, match.py, server/core.py, server/fuse.py)
+"""Record Python reference outputs (tools/matcher: fusion.py, match.py, reference/core.py, reference/fuse.py)
 on the deterministic synthetic scenarios of synth.py and write fusion.json next to this file.
 
 The TS port of the matcher is tested against fusion.json; synth.spec.ts checks that synth.ts
@@ -22,9 +22,9 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-MATCHER = Path("/Users/robertchristie/Documents/GitHub/mt-image/tools/matcher")
+MATCHER = HERE.parents[4] / "tools" / "matcher"
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(MATCHER / "server"))
+sys.path.insert(0, str(MATCHER / "reference"))
 sys.path.insert(0, str(MATCHER))
 sys.path.insert(0, str(HERE))
 

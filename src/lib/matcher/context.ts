@@ -115,7 +115,7 @@ export const eyeOf = (e: MatchEngine): [number, number, number] => [
 	e.eye.z,
 ];
 
-/** Satellite drape for the views (render_worker: once per page; `limitM` 0 = every tile). */
+/** Satellite drape for the views (the former render worker: once per page; `limitM` 0 = every tile). */
 export async function ensureSatellite(ctx: MatchContext, limitM: number) {
 	const have = ctx.drape;
 	if (have != null && (have === 0 || (limitM !== 0 && limitM <= have))) return;
@@ -142,7 +142,7 @@ function terrainSamples(xyz: Float32Array) {
 }
 
 /**
- * render_worker renderOnce: one offscreen view per pose (satellite RGBA + ENU xyz). A view without any
+ * The former render worker's renderOnce: one offscreen view per pose (satellite RGBA + ENU xyz). A view without any
  * terrain is retried once; with `allowEmpty` it is skipped (narrow fans can be all sky), else it fails.
  */
 export async function renderViews(
@@ -182,7 +182,7 @@ export async function renderViews(
 }
 
 /**
- * render_worker exportSkyline: autoAlign(true) from `prior`, the app's acceptance rule (confidence > 0.2,
+ * The former render worker's exportSkyline: autoAlign(true) from `prior`, the app's acceptance rule (confidence > 0.2,
  * else a near-compass alternative within 4° of the prior's yaw, else the prior), and the fused solve's
  * skyline cue from the edge planes + horizonDirs. null when the engine has no horizon / edge map.
  */
@@ -219,7 +219,7 @@ export async function skylineCue(
 	return skylineFromArrays(ev.w, ev.h, ev.fine, ev.fg, ev.sky, ev.horizon, app);
 }
 
-/** Align runs from several priors (render_worker `align`): the app's autoAlign answer per prior. */
+/** Align runs from several priors (the former render worker's `align`): the app's autoAlign answer per prior. */
 export async function alignRuns(ctx: MatchContext, priors: Pose[]) {
 	const runs: {
 		prior: Pose;

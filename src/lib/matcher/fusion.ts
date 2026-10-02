@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Joint skyline + render-match pose solve with the a-priori HIGH/LOW rule (port of
-// tools/matcher/fusion.py and tools/matcher/server/fuse.py; reports/fusion.md). Same model, constants
+// tools/matcher/fusion.py and tools/matcher/reference/fuse.py; reports/fusion.md). Same model, constants
 // and rule; nothing re-tuned:
 //   params  yaw, pitch, roll (deg), log f; camera centre fixed at the eye.
 //   (a) skyline term: per edge-map column the topmost projected DEM-horizon crossing, associated
@@ -581,7 +581,7 @@ export type FuseResult = {
 	fusionMs: number;
 };
 
-/** server/fuse.fuse: one scenario of fusion.solve_photo on in-memory inputs. */
+/** reference/fuse.fuse: one scenario of fusion.solve_photo on in-memory inputs. */
 export async function fuse(
 	prior: Pose,
 	eye: ArrayLike<number>,

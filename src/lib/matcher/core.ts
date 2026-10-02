@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The render-match building blocks (port of tools/matcher/server/core.py and match.py lift):
+// The render-match building blocks (port of tools/matcher/reference/core.py and match.py lift):
 // lifting render keypoints through a view's xyz buffer, the stale-buffer check, frame coverage, and
 // the legacy v0.1 render-match solve with its heuristic confidence (still used for stage-1 sweeps and
 // as `matchConfidence`).

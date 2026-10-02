@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Render-and-match escalation, in the browser: the former optional Python service (tools/matcher/server,
+// Render-and-match escalation, in the browser: the former optional Python service (removed; reference copies in tools/matcher/reference,
 // :8765) now runs on the page's own engine and GPU (src/lib/matcher). The API is unchanged for callers:
 // everything degrades to `false` / `null` when the matcher is unavailable (no engine bound, keypoint
 // models missing); nothing here throws. "Busy" means another match job is running in this page.

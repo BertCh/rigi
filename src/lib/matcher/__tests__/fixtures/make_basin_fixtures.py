@@ -35,7 +35,7 @@ MATCHER = HERE.parents[4] / "tools" / "matcher"
 if not (MATCHER / "pose6.py").exists():
     MATCHER = Path("/Users/robertchristie/Documents/GitHub/mt-image/tools/matcher")
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(MATCHER / "server"))
+sys.path.insert(0, str(MATCHER / "reference"))
 sys.path.insert(0, str(MATCHER))
 sys.path.insert(0, str(HERE))
 

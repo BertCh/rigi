@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The in-browser render-and-match "service": what tools/matcher/server/app.py did over HTTP, run on the
+// The in-browser render-and-match "service": what the removed service app.py (tools/matcher/reference/README.md) did over HTTP, run on the
 // page's own engine and GPU. "Service up" is now "models available": an engine is bound (the photo
 // workspace binds its engine) and the keypoint models load. Jobs are serialised (one engine, one GPU):
 // a request arriving while one runs waits (the client defers it, as it did on a 503).

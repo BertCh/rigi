@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// One stage-2 verdict from correspondences + the skyline cue (port of tools/matcher/server/app.py
+// One stage-2 verdict from correspondences + the skyline cue (port of the removed service app.py (tools/matcher/reference/README.md)
 // assemble): the legacy render-match solve, upgraded to the fused pose and the a-priori HIGH/LOW rule
 // when `fused`. The output is the service's /match response body (MatchResult in matcher-client.ts).
 

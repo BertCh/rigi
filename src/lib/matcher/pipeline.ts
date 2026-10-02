@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The matcher's request modes (port of tools/matcher/server/app.py match_photo_id and match_adhoc,
+// The matcher's request modes (port of the removed service app.py (tools/matcher/reference/README.md) match_photo_id and match_adhoc,
 // policy v034, the service default), on the app's own engine:
 //   known pose prior  one fused stage: 5-view ±20° fan + the skyline cue from autoAlign at the prior.
 //   ad-hoc            heading / gravity / focal may be missing: stage 1 finds a stage-2 prior (narrow

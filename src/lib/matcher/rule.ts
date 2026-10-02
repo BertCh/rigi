@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // T6 selection policy and confidence rule, an exact port of tools/matcher/stage1/rule.py (frozen) plus the
-// `_veto` response helper of tools/matcher/server/t6.py. Python semantics kept on purpose: `x or 0` maps
+// `_veto` response helper of tools/matcher/reference/t6.py. Python semantics kept on purpose: `x or 0` maps
 // null / undefined / 0 / NaN to 0, `max(key=...)` returns the FIRST maximal element, and `dang` uses the
 // floored modulo (result takes the sign of the divisor).
 import type { Pose } from "#/lib/camera";

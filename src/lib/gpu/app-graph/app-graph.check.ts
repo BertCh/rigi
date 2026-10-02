@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // App graph manifest ↔ code (WAG W0.3), node-only. Every core cachedGraph group used in
-// src/lib/gpu/** and src/lib/deck-webgpu/** is declared in manifest.ts (GPU_MODULES or
+// src/lib/gpu/**, src/lib/deck-webgpu/** and src/lib/matcher/** is declared in manifest.ts (GPU_MODULES or
 // TEST_GRAPH_GROUPS), and every declared group is used. Group arguments are string literals or
 // constants (`const X = "…"` / `const X = OTHER`, resolved in the same file, else in the file a relative
 // import names, else across the scanned tree when unambiguous). Also: island ids valid, ids and groups unique, declared paths exist.
@@ -21,7 +21,7 @@ import {
 } from "./manifest";
 
 const ROOT = join(import.meta.dirname, "../../../..");
-const SCAN = ["src/lib/gpu", "src/lib/deck-webgpu"];
+const SCAN = ["src/lib/gpu", "src/lib/deck-webgpu", "src/lib/matcher"];
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = "") => {
