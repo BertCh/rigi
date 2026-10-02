@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Roll } from "#/lib/roll/types";
 
 // Dev only: bundle an upload roll (IndexedDB photos + regions + per-photo localStorage) into one JSON
@@ -25,6 +25,12 @@ const blobToB64 = (b: Blob) =>
 	});
 
 function ExportRoll() {
+	if (!import.meta.env.DEV) return <p>dev only</p>;
+	return <ExportRollDev />;
+}
+
+// Split from ExportRoll so no hook or IndexedDB read runs outside DEV.
+function ExportRollDev() {
 	const { id } = Route.useSearch();
 	const [rolls, setRolls] = useState<Roll[] | null>(null);
 	const [msg, setMsg] = useState("");
@@ -34,7 +40,13 @@ function ExportRoll() {
 			.then((r) => setRolls(r.rolls))
 			.catch((e) => setMsg(String(e)));
 	}, []);
-	if (!import.meta.env.DEV) return <p>dev only</p>;
+	const urlRef = useRef<string | null>(null);
+	useEffect(
+		() => () => {
+			if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+		},
+		[],
+	);
 
 	const run = async (roll: Roll) => {
 		setMsg("Reading IndexedDB…");
@@ -73,9 +85,11 @@ function ExportRoll() {
 			regions: Object.fromEntries(regions),
 		};
 		const a = document.createElement("a");
-		a.href = URL.createObjectURL(
+		if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+		urlRef.current = URL.createObjectURL(
 			new Blob([JSON.stringify(bundle)], { type: "application/json" }),
 		);
+		a.href = urlRef.current;
 		a.download = `rigi-roll-${roll.id}.json`;
 		a.click();
 		setMsg(`Downloaded ${a.download} (${photos.length} photos)`);

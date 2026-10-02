@@ -255,7 +255,7 @@ export class NearFieldClient {
 	}
 
 	/** POST with health gate + timeout; the Response when ok, else null (never throws). */
-	private async post(
+	async post(
 		path: string,
 		body: FormData,
 		opts: RequestOpts,

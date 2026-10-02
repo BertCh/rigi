@@ -215,6 +215,8 @@ export function PhotoWorkspace({
 		pose: Pose;
 		note: string;
 		prevSaved: Pose | null;
+		/** The moved position was stored (uploads); false = session-only, so poses fitted to it are not saved. */
+		persisted: boolean;
 	} | null>(null);
 	const eyeMoveRef = useRef(eyeMove);
 	eyeMoveRef.current = eyeMove;
@@ -454,7 +456,9 @@ export function PhotoWorkspace({
 			setPoseState(p);
 			engineRef.current?.setPose(p);
 			if (persist) {
-				savePose(photo.id, p);
+				// CR-08: a pose fitted to an unsaved eye move is meaningless once the move is gone (reload)
+				const moved = eyeMoveRef.current;
+				if (!moved || moved.persisted) savePose(photo.id, p);
 				setAlignState("manual");
 				// the user took over: a background second opinion or deferred match must not move the pose any more
 				verifyAbort.current?.abort();
@@ -1091,6 +1095,7 @@ export function PhotoWorkspace({
 			photo: moved,
 			pose: r.pose,
 			prevSaved,
+			persisted,
 			note: `Camera moved ${r.distanceM.toFixed(1)} m by the skyline eye search (unverified${persisted ? "" : ", this session only"})`,
 		});
 	};

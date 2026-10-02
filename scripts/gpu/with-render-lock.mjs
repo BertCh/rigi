@@ -66,6 +66,20 @@ const alive = (pid) => {
 	}
 };
 
+/** Process start time of `pid` (ps lstart), or "" when unknown. Pairs with the pid to detect recycling. */
+const startTime = (pid) => {
+	try {
+		return (
+			spawnSync("ps", ["-o", "lstart=", "-p", String(pid)], {
+				encoding: "utf8",
+			}).stdout ?? ""
+		).trim();
+	} catch {
+		return "";
+	}
+};
+const ownStart = startTime(process.pid);
+
 /** Live owner line of lock dir `dir`, or null when it is free (a dead owner's lock is removed). */
 const holder = (dir) => {
 	if (!existsSync(dir)) return null;
@@ -74,7 +88,15 @@ const holder = (dir) => {
 		held = readFileSync(`${dir}/owner`, "utf8");
 	} catch {}
 	const pid = Number(held.split(" ")[0]);
-	if (pid && !alive(pid)) {
+	// CR-52: a recycled pid is alive but started at another time than the one that took the lock.
+	// The start time lives in a separate `start` file so older scripts still parse `owner` as before;
+	// a lock without one (older script) keeps the pid-only check.
+	let recorded = "";
+	try {
+		recorded = readFileSync(`${dir}/start`, "utf8").trim();
+	} catch {}
+	const recycled = pid && recorded && alive(pid) && startTime(pid) !== recorded;
+	if (pid && (!alive(pid) || recycled)) {
 		rmSync(dir, { recursive: true, force: true });
 		return null;
 	}
@@ -87,6 +109,7 @@ const tryLock = (dir) => {
 		try {
 			mkdirSync(dir, { recursive: false });
 			writeFileSync(`${dir}/owner`, owner);
+			if (ownStart) writeFileSync(`${dir}/start`, ownStart);
 			return true;
 		} catch {
 			if (holder(dir) !== null) return false; // live owner; else the dead one was removed: retry

@@ -111,32 +111,15 @@ export async function inpaint(
 	} = {},
 ): Promise<InpaintResult | null> {
 	const t0 = performance.now();
-	if (!(await nearField.available())) return null;
-	const ctl = new AbortController();
-	const timer = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 120_000);
-	const onAbort = () => ctl.abort();
-	opts.signal?.addEventListener("abort", onAbort, { once: true });
 	try {
 		const fd = new FormData();
 		fd.append("image", await rgbaToPng(rgba, w, h), "view.png");
 		fd.append("mask", await maskToPng(hole, w, h), "mask.png");
 		if (opts.maxSide) fd.append("maxSide", String(opts.maxSide));
 		if (opts.dilate) fd.append("dilate", String(opts.dilate));
-		const r = await fetch(`${nearField.base}/inpaint`, {
-			method: "POST",
-			body: fd,
-			signal: ctl.signal,
-		});
-		if (!r.ok) {
-			const j = await r.json().catch(() => null);
-			console.warn(
-				"[nearfield] /inpaint",
-				r.status,
-				j?.error ?? "",
-				j?.message ?? "",
-			);
-			return null;
-		}
+		// the shared transport: health gate, linked abort signal, timeout that also covers the body
+		const r = await nearField.post("/inpaint", fd, opts, 120_000);
+		if (!r) return null;
 		let meta = {} as InpaintMeta;
 		try {
 			meta = JSON.parse(r.headers.get("X-NearField-Meta") ?? "{}");
@@ -150,12 +133,8 @@ export async function inpaint(
 		}
 		return { rgba: img.data, meta, ms: performance.now() - t0 };
 	} catch (e) {
-		if (!(e instanceof DOMException && e.name === "AbortError"))
-			console.warn("[nearfield] /inpaint failed", e);
+		console.warn("[nearfield] /inpaint failed", e);
 		return null;
-	} finally {
-		clearTimeout(timer);
-		opts.signal?.removeEventListener("abort", onAbort);
 	}
 }
 
@@ -172,25 +151,16 @@ export async function depthWithFov(
 		timeoutMs?: number;
 	} = {},
 ): Promise<NearFieldDepth | null> {
-	if (!(await nearField.available())) return null;
-	const ctl = new AbortController();
-	const timer = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 120_000);
+	const fd = new FormData();
+	fd.append("image", image, "view.png");
+	fd.append("model", opts.model ?? "moge2");
+	fd.append("fovX", fovXDeg.toFixed(4));
+	if (opts.maxSide) fd.append("maxSide", String(opts.maxSide));
+	const r = await nearField.post("/depth", fd, opts, 120_000);
+	if (!r) return null;
 	try {
-		const fd = new FormData();
-		fd.append("image", image, "view.png");
-		fd.append("model", opts.model ?? "moge2");
-		fd.append("fovX", fovXDeg.toFixed(4));
-		if (opts.maxSide) fd.append("maxSide", String(opts.maxSide));
-		const r = await fetch(`${nearField.base}/depth`, {
-			method: "POST",
-			body: fd,
-			signal: ctl.signal,
-		});
-		if (!r.ok) return null;
 		return decodeDepthWire((await r.json()) as NearFieldDepthWire);
 	} catch {
 		return null;
-	} finally {
-		clearTimeout(timer);
 	}
 }

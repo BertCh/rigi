@@ -2025,7 +2025,7 @@ export class DeckEngine implements Renderer {
 		this.flushLayers();
 		await this.geoSrc.render(pose);
 		if (this.disposed) return false;
-		const got = this.geoSrc.pose;
+		const got = this.geoSrc?.pose; // undefined after a context restore dropped the source
 		// a newer pose / mesh change arrived meanwhile: its own refresh takes over
 		if (gen !== this.geoGen || !got || !samePose(got, pose))
 			return this.geometryReady();

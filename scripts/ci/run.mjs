@@ -476,7 +476,13 @@ writeFileSync(
 	),
 );
 
-if (updateBaseline) {
+if (updateBaseline && failed) {
+	// CR-52: a baseline taken from a run with a FAIL would lower the gate to the broken state
+	console.error(
+		`[ci] --update-baseline refused: ${failed} check(s) FAILed in this run; fix them and re-run`,
+	);
+	process.exitCode = 1;
+} else if (updateBaseline) {
 	const b = structuredClone(baseline);
 	const bio = CHECKS.find((c) => c.id === "biome");
 	if (bio.biomeErrors && biomeScope === "all")
