@@ -58,6 +58,7 @@
 		"@luma.gl/webgpu": "file:vendor/luma/luma.gl-webgpu-10.0.0-alpha.2-rigi.6.tgz",
 		"@math.gl/core": "5.0.0-alpha.10",
 		"@math.gl/geospatial": "5.0.0-alpha.9",
+		"@math.gl/proj4": "5.0.0-alpha.10",
 		"@mediapipe/tasks-vision": "1.0.1",
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/react-router": "^1.170.39",
