@@ -13,6 +13,7 @@ import {
 	pickTickColumns,
 	ridePoint,
 	rowAt,
+	settleMs,
 } from "../viz/storyFilm";
 
 const accepted = filmPlan({ accepted: true, names: 3, ticks: 5, pulses: 3 });
@@ -252,5 +253,27 @@ describe("geometry helpers", () => {
 		expect(end[1]).toBeCloseTo(solved[1], 9);
 		const mid = ridePoint(project, prior, solved, 0.5);
 		expect(mid[0]).toBeCloseTo(125, 9);
+	});
+});
+
+describe("stepper stops", () => {
+	it.each([
+		["accepted", accepted],
+		["refused", refused],
+	])("%s: one ms before a beat's end is still that beat, settled", (_, plan) => {
+		plan.beats.forEach((_b, i) => {
+			const ms = settleMs(plan, i);
+			expect(ms).toBe(beatSpan(plan, i)[1] - 1);
+			expect(filmFrame(plan, ms).beat).toBe(i);
+		});
+		// the end itself reports the next beat; the plan's total stays on the last
+		expect(filmFrame(accepted, beatSpan(accepted, 0)[1]).beat).toBe(1);
+		expect(filmFrame(accepted, accepted.total).beat).toBe(3);
+	});
+
+	it("the correct beat settles with the camera turned and its numbers shown", () => {
+		const f = filmFrame(accepted, settleMs(accepted, 2));
+		expect(f.t).toBeCloseTo(1, 3);
+		expect(f.numbers).toBeCloseTo(1, 3);
 	});
 });

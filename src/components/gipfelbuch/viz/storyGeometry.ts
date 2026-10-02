@@ -6,7 +6,9 @@
 // layer table, the heading needle's rule, the arming and commit decisions. No DOM, so they are specced
 // (__tests__/story-geometry.spec.ts).
 
+import { signedDegrees } from "../notebook/notes";
 import type { PhotoLayer } from "./inks";
+import type { GipfelbuchPeak, GipfelbuchPhotoData } from "./real";
 import {
 	beatSpan,
 	type FilmBeatId,
@@ -111,8 +113,12 @@ export function spillCursorFor(
 	yawAt: (t: number) => number,
 	beat: number,
 	t: number,
+	tap?: { az: number; name: string } | null,
 ): { az: number; label: string; layer: PhotoLayer } | null {
 	if (beat < 2) return null;
+	// focus "tap": while the camera has not turned yet, the needle sits on the tapped summit
+	if (tap && beat === 2 && t === 0)
+		return { az: tap.az, label: `tap: ${tap.name}`, layer: "solved" };
 	const az = yawAt(t);
 	return {
 		az,
@@ -194,4 +200,73 @@ export function solvedAlpha(
 		? frame.solvedLine
 		: Math.max(frame.solvedLine, frame.t);
 	return base * (!accepted && frame.beat === lastBeat ? 0.55 : 1);
+}
+
+// --- the per-page focus notes (pure text, from the photo JSON only) --------------
+
+/** Non-null skyline rows in columns [x0, x1). */
+export function countTraced(rows: Rows, x0: number, x1: number): number {
+	let n = 0;
+	for (let x = Math.max(0, Math.floor(x0)); x < Math.min(rows.length, x1); x++)
+		if (rows[x] != null) n++;
+	return n;
+}
+
+/** The note on the traced skyline: the trace page says how many columns and what the bars mean. */
+export const tracedNoteText = (focus: string | undefined, columns: number) =>
+	focus === "trace"
+		? `traced ${columns} columns; tall bars = sure`
+		: "traced skyline";
+
+/** The note on the guessed pose: the phone's sensors on the prior page, its yaw and pitch elsewhere. */
+export const poseNoteText = (
+	d: Pick<GipfelbuchPhotoData, "prior" | "sensor">,
+	focus?: string,
+) =>
+	focus === "prior"
+		? `compass ${d.sensor.heading.toFixed(1)}°, tilt ${d.sensor.pitch.toFixed(1)}°, ${d.sensor.f35.toFixed(0)} mm`
+		: `phone's guess: yaw ${d.prior.yaw.toFixed(1)}°, pitch ${d.prior.pitch.toFixed(1)}°`;
+
+/** The eye-height note (focus "eye"): where the GPS altitude sits against the ground. */
+export function eyeNoteText(d: Pick<GipfelbuchPhotoData, "gps">): string {
+	const { alt, ground, eye } = d.gps;
+	return ground - alt > 20
+		? `GPS ${alt.toFixed(0)} m is ${(ground - alt).toFixed(0)} m under the ground → eye at ${eye.toFixed(0)} m`
+		: `eye at GPS ${eye.toFixed(0)} m, above the ground (${ground.toFixed(0)} m)`;
+}
+
+/** The solved gap readout: one number normally, the whole residual (prior → solved) on the gaps page. */
+export function solvedReadoutText(
+	d: Pick<GipfelbuchPhotoData, "residual">,
+	focus?: string,
+): string {
+	const { prior, solved } = d.residual;
+	return focus === "gaps"
+		? `median ${prior.median.toFixed(1)}→${solved.median.toFixed(1)} px · p90 ${prior.p90.toFixed(0)}→${solved.p90.toFixed(0)} · ≤5 px ${Math.round(prior.within5 * 100)}%→${Math.round(solved.within5 * 100)}%`
+		: `gap ${solved.median.toFixed(1)} px`;
+}
+
+/** The turn's numbers: yaw, pitch, and one extra line on the pages that explain more of the turn. */
+export function turnNumbers(
+	d: Pick<GipfelbuchPhotoData, "solved">,
+	focus?: string,
+): { yaw: string; pitch: string; extra: string | null } {
+	const { delta } = d.solved;
+	return {
+		yaw: `${signedDegrees(delta.yaw)} yaw`,
+		pitch: `${signedDegrees(delta.pitch)} pitch`,
+		extra:
+			focus === "gaps"
+				? `${signedDegrees(delta.roll)} roll · focal ×${delta.focal.toFixed(2)}`
+				: focus === "prior"
+					? `compass off by ${Math.abs(delta.yaw).toFixed(1)}°`
+					: null,
+	};
+}
+
+/** How far a summit moved between the guess and the solve, in working px (null if either is off). */
+export function movedPx(p: Pick<GipfelbuchPeak, "prior" | "solved">) {
+	return p.prior && p.solved
+		? Math.round(Math.hypot(p.solved[0] - p.prior[0], p.solved[1] - p.prior[1]))
+		: null;
 }

@@ -2,23 +2,33 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import type { GipfelbuchPhotoData } from "../viz/real";
 import { filmFrame, filmPlan } from "../viz/storyFilm";
 import {
 	BEAT_LAYERS,
 	beatLabel,
+	countTraced,
+	eyeNoteText,
 	gapTick,
 	hairlineScales,
 	horizonPathAt,
 	horizonRowAt,
+	movedPx,
 	nextArmed,
+	poseNoteText,
 	riderOpacity,
 	scrubMs,
 	shouldCommitT,
 	solvedAlpha,
+	solvedReadoutText,
 	spillCursorFor,
 	stepBeat,
 	tickOpacity,
+	tracedNoteText,
+	turnNumbers,
 	viewShare,
 } from "../viz/storyGeometry";
 
@@ -186,5 +196,70 @@ describe("solvedAlpha", () => {
 		expect(
 			solvedAlpha({ solvedLine: 1, t: 0, beat: 3 }, true, false, 3),
 		).toBeCloseTo(0.55, 5);
+	});
+});
+
+const DEMO = path.resolve(__dirname, "../../../../public/demo/gipfelbuch");
+const read = (id: string) =>
+	JSON.parse(
+		fs.readFileSync(path.join(DEMO, `${id}.json`), "utf8"),
+	) as GipfelbuchPhotoData;
+const demo09 = read("demo-09");
+const demo01 = read("demo-01");
+
+describe("per-page focus notes", () => {
+	it("eye: the GPS altitude under the ground, then the eye height the solve keeps", () => {
+		expect(eyeNoteText(demo09)).toBe(
+			"GPS 1183 m is 730 m under the ground → eye at 1915 m",
+		);
+		// a photo with GPS at the ground says it is above it
+		expect(eyeNoteText(demo01)).toBe(
+			"eye at GPS 1919 m, above the ground (1886 m)",
+		);
+	});
+
+	it("gaps: the readout and the turn's extra numbers come from the residual and delta", () => {
+		expect(solvedReadoutText(demo01, "gaps")).toBe(
+			"median 5.2→2.7 px · p90 13→8 · ≤5 px 47%→74%",
+		);
+		expect(solvedReadoutText(demo01)).toBe("gap 2.7 px");
+		expect(turnNumbers(demo01, "gaps").extra).toBe("−0.5° roll · focal ×1.02");
+		expect(turnNumbers(demo01).extra).toBeNull();
+	});
+
+	it("prior: the sensors, and how far the compass was off", () => {
+		expect(poseNoteText(demo01, "prior")).toBe(
+			"compass 251.4°, tilt -3.1°, 26 mm",
+		);
+		expect(poseNoteText(demo01)).toMatch(/^phone's guess: yaw /);
+		expect(turnNumbers(demo01, "prior").extra).toBe("compass off by 9.3°");
+	});
+
+	it("trace: counts the traced columns inside the crop", () => {
+		const rows = [null, 5, 6, null, 7];
+		expect(countTraced(rows, 0, 5)).toBe(3);
+		expect(countTraced(rows, 2, 4)).toBe(1);
+		expect(tracedNoteText("trace", 3)).toBe(
+			"traced 3 columns; tall bars = sure",
+		);
+		expect(tracedNoteText("gaps", 3)).toBe("traced skyline");
+	});
+
+	it("snap: how far a summit moved", () => {
+		expect(movedPx({ prior: [0, 0], solved: [3, 4] })).toBe(5);
+		expect(movedPx({ prior: null, solved: [3, 4] })).toBeNull();
+	});
+
+	it("tap: the needle sits on the tapped summit until the camera turns", () => {
+		const tap = { az: 123, name: "Niesen" };
+		const yawAt = (t: number) => 10 + 20 * t;
+		expect(spillCursorFor(yawAt, 2, 0, tap)).toEqual({
+			az: 123,
+			label: "tap: Niesen",
+			layer: "solved",
+		});
+		expect(spillCursorFor(yawAt, 2, 0.5, tap)?.label).toBe("…");
+		expect(spillCursorFor(yawAt, 3, 0, tap)?.az).toBe(10);
+		expect(spillCursorFor(yawAt, 1, 0, tap)).toBeNull();
 	});
 });

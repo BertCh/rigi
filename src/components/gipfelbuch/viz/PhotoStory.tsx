@@ -15,6 +15,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { cn } from "#/lib/utils";
 import { KrokiTitle } from "../notebook/carto";
 import { HandDot, PenArrow, PenCircle, SketchPath } from "../notebook/Ink";
@@ -56,23 +57,31 @@ import {
 	pickTickColumns,
 	ridePoint,
 	type StoryFocus,
+	settleMs,
 } from "./storyFilm";
 import {
 	BEAT_LAYERS,
 	beatLabel,
+	countTraced,
+	eyeNoteText,
 	gapTick,
 	HOVER_REPLAY_MS,
 	hairlineScales,
 	horizonPathAt,
 	horizonRowAt,
+	movedPx,
 	nextArmed,
+	poseNoteText,
 	riderOpacity,
 	scrubMs,
 	shouldCommitT,
 	solvedAlpha,
+	solvedReadoutText,
 	spillCursorFor,
 	stepBeat,
 	tickOpacity,
+	tracedNoteText,
+	turnNumbers,
 	viewShare,
 } from "./storyGeometry";
 
@@ -97,26 +106,30 @@ const PAPER = "var(--gb-paper, #f6f4ef)";
 /** Label size in working px (800 wide): about 13–17 CSS px across the wide track. */
 const LABEL = 14;
 const MAX_GUESSES = 4;
+const MAX_GUESSES_SNAP = 6;
 const GUESS_GAP = 130;
 const TICKS_WIDE = 11;
 const TICKS_NARROW = 7;
 const NARROW_PX = 640;
 
-const inFrame = (d: GipfelbuchPhotoData, q: [number, number] | null) =>
-	!!q &&
-	q[0] >= 0 &&
-	q[0] <= d.photo.width &&
-	q[1] >= 0 &&
-	q[1] <= d.photo.height;
+/** A crop rectangle in working px: [x0, y0, x1, y1]. */
+type Rect = readonly [number, number, number, number];
+
+const inRect = (r: Rect, q: [number, number] | null) =>
+	!!q && q[0] >= r[0] && q[0] <= r[2] && q[1] >= r[1] && q[1] <= r[3];
 
 /** Rough hand-capitals width (px) of a name at `size`, for strikes and edge clamping. */
 const nameWidth = (name: string, size: number) => name.length * size * 0.66;
 
-/** Up to four guessed names, the most prominent first, kept apart along x. */
-function pickGuesses(d: GipfelbuchPhotoData): GipfelbuchPeak[] {
+/** Up to `max` guessed names inside the crop, the most prominent first, kept apart along x. */
+function pickGuesses(
+	d: GipfelbuchPhotoData,
+	rect: Rect,
+	max = MAX_GUESSES,
+): GipfelbuchPeak[] {
 	const out: GipfelbuchPeak[] = [];
 	const candidates = d.peaks
-		.filter((p) => p.labelled && inFrame(d, p.prior))
+		.filter((p) => p.labelled && inRect(rect, p.prior))
 		.sort((a, b) => b.el - a.el);
 	for (const p of candidates) {
 		const x = (p.prior as [number, number])[0];
@@ -126,26 +139,37 @@ function pickGuesses(d: GipfelbuchPhotoData): GipfelbuchPeak[] {
 			)
 		)
 			out.push(p);
-		if (out.length >= MAX_GUESSES) break;
+		if (out.length >= max) break;
 	}
 	return out;
 }
 
-/** The peak whose prior and solved marks are both in frame, highest first: the arc's endpoints. */
-function pickAnchor(d: GipfelbuchPhotoData): GipfelbuchPeak | null {
+/** The peak inside the crop whose prior and solved marks are both in it, highest first: the arc's endpoints. */
+function pickAnchor(d: GipfelbuchPhotoData, rect: Rect): GipfelbuchPeak | null {
 	return (
 		d.peaks
-			.filter((p) => p.labelled && inFrame(d, p.prior) && inFrame(d, p.solved))
+			.filter(
+				(p) => p.labelled && inRect(rect, p.prior) && inRect(rect, p.solved),
+			)
 			.sort((a, b) => b.el - a.el)[0] ?? null
 	);
 }
 
-/** The most confident traced column in the left part of the frame, for the "traced" note. */
-function pickTraced(d: GipfelbuchPhotoData): [number, number] | null {
+/** The most confident traced column in the left part of the crop, for the "traced" note. */
+function pickTraced(
+	d: GipfelbuchPhotoData,
+	rect: Rect,
+): [number, number] | null {
 	const { rows, weight } = d.skyline;
+	const [x0, y0, x1, y1] = rect;
+	const from = Math.round(x0 + (x1 - x0) * 0.06);
+	const to = x0 + (x1 - x0) * 0.4;
 	let best = -1;
-	for (let x = Math.round(d.photo.width * 0.06); x < d.photo.width * 0.4; x++)
-		if (rows[x] != null && (best < 0 || weight[x] > weight[best])) best = x;
+	for (let x = from; x < to; x++) {
+		const y = rows[x];
+		if (y == null || y < y0 || y > y1) continue;
+		if (best < 0 || weight[x] > weight[best]) best = x;
+	}
 	return best < 0 ? null : [best + 0.5, rows[best] as number];
 }
 
@@ -169,6 +193,7 @@ interface FilmNodes {
 	tap: El | null;
 	poseNote: El | null;
 	tracedNote: El | null;
+	eyeNote: El | null;
 	readoutPrior: El | null;
 	readoutSolved: El | null;
 	numbers: El | null;
@@ -176,15 +201,23 @@ interface FilmNodes {
 	ticks: (El | null)[];
 	strikes: (El | null)[];
 	pulses: (El | null)[];
+	moved: (El | null)[];
 	names: (El | null)[];
 	riders: (El | null)[];
 	hairs: (El | null)[];
 }
 type SingleNode = Exclude<
 	keyof FilmNodes,
-	"ticks" | "strikes" | "pulses" | "names" | "riders" | "hairs"
+	"ticks" | "strikes" | "pulses" | "moved" | "names" | "riders" | "hairs"
 >;
-type ListNode = "ticks" | "strikes" | "pulses" | "names" | "riders" | "hairs";
+type ListNode =
+	| "ticks"
+	| "strikes"
+	| "pulses"
+	| "moved"
+	| "names"
+	| "riders"
+	| "hairs";
 
 const newNodes = (): FilmNodes => ({
 	wrap: null,
@@ -203,6 +236,7 @@ const newNodes = (): FilmNodes => ({
 	tap: null,
 	poseNote: null,
 	tracedNote: null,
+	eyeNote: null,
 	readoutPrior: null,
 	readoutSolved: null,
 	numbers: null,
@@ -210,6 +244,7 @@ const newNodes = (): FilmNodes => ({
 	ticks: [],
 	strikes: [],
 	pulses: [],
+	moved: [],
 	names: [],
 	riders: [],
 	hairs: [],
@@ -316,13 +351,14 @@ function applyFrame(c: FilmCtx, n: FilmNodes, f: FilmFrame) {
 	attr(n.priorClip, "width", (x1 - x0) * f.priorWipe);
 	attr(n.skylineClip, "width", (x1 - x0) * f.skylineWipe);
 	opacityOf(n.priorGroup, 1 - 0.65 * f.priorGhost);
-	const hasMoving = !!bake?.horizon;
+	// the bake belongs to this photo or it is no bake (a previous photo's can linger while the next loads)
+	const hasMoving = !!bake?.horizon && bake.id === d.id;
 	opacityOf(n.solvedGroup, solvedAlpha(f, hasMoving, accepted, lastBeat));
 	opacityOf(n.weightGroup, f.weight);
 
 	// derived: the DEM horizon at the pose in between, and the ticks that ride on it
 	const points =
-		hasMoving && bake && f.t > 0 && f.t < 1
+		hasMoving && bake && f.moving > 0.001
 			? horizonPoints(bake, d, poseAt(d, f.t))
 			: null;
 	const path = horizonPathAt(points, geom.x0, geom.x1);
@@ -381,7 +417,13 @@ function applyFrame(c: FilmCtx, n: FilmNodes, f: FilmFrame) {
 		attr(el, "transform", `translate(${s.x.toFixed(2)} ${s.y.toFixed(2)})`);
 		opacityOf(el, s.opacity);
 	});
-	opacityOf(n.poseNote, f.poseNote);
+	// the pose note is a number tied to the guess: it ghosts with it (and returns in a refused story)
+	opacityOf(n.poseNote, f.poseNote * (1 - f.priorGhost));
+	opacityOf(n.eyeNote, f.poseNote);
+	if (accepted)
+		c.riders.forEach((_, i) => {
+			opacityOf(n.moved[i], Math.min(1, 2 * (f.pulses[i] ?? 0)));
+		});
 	opacityOf(n.tracedNote, f.tracedNote);
 	opacityOf(n.readoutPrior, f.readoutPrior);
 	opacityOf(n.readoutSolved, f.readoutSolved);
@@ -425,11 +467,19 @@ const Film = memo(function Film({
 	const accepted = plan.accepted;
 	const focus = plan.focus;
 	const sz = LABEL * k;
-	const traced = useMemo(() => pickTraced(d), [d]);
+	const traced = useMemo(
+		() => pickTraced(d, [x0, y0, x1, y1]),
+		[d, x0, y0, x1, y1],
+	);
+	const tracedColumns = useMemo(
+		() => countTraced(d.skyline.rows, x0, x1),
+		[d, x0, x1],
+	);
+	const turn = turnNumbers(d, focus);
 	const priorPath = useMemo(() => rowsPath(d.priorRows, 12), [d]);
 	const skylinePath = useMemo(() => rowsPath(d.skyline.rows, 8), [d]);
 	const solvedPath = useMemo(() => rowsPath(d.solvedRows, 12), [d]);
-	const hasMoving = !!bake?.horizon;
+	const hasMoving = !!bake?.horizon && bake.id === d.id;
 	const reg = (key: SingleNode) => (el: El | null) => {
 		(nodes.current[key] as El | null) = el;
 	};
@@ -795,15 +845,47 @@ const Film = memo(function Film({
 						</g>
 					);
 				})}
+				{accepted &&
+					focus === "snap" &&
+					riders.map((p, i) => {
+						const px = movedPx(p);
+						return (
+							px != null && (
+								<g
+									key={p.name}
+									ref={regAt("moved", i)}
+									data-film="moved"
+									opacity={Math.min(1, 2 * (f0.pulses[i] ?? 0))}
+								>
+									<HandLabel
+										x={(p.solved as [number, number])[0]}
+										y={(p.solved as [number, number])[1] + 17 * k}
+										anchor="middle"
+										size={sz - 2 * k}
+										color={SOLVED_PEAK_INK}
+									>
+										{`moved ${px} px`}
+									</HandLabel>
+								</g>
+							)
+						);
+					})}
 				{layout.length > 0 && (
-					<g ref={reg("poseNote")} opacity={f0.poseNote}>
+					<g ref={reg("poseNote")} opacity={f0.poseNote * (1 - f0.priorGhost)}>
 						<HandLabel
 							x={x0 + 8 * k}
 							y={y1 - 12 * k}
 							size={sz - k}
 							color={PRIOR_INK}
 						>
-							{`phone's guess: yaw ${d.prior.yaw.toFixed(1)}°, pitch ${d.prior.pitch.toFixed(1)}°`}
+							{poseNoteText(d, focus)}
+						</HandLabel>
+					</g>
+				)}
+				{focus === "eye" && (
+					<g ref={reg("eyeNote")} opacity={f0.poseNote}>
+						<HandLabel x={x0 + 8 * k} y={y1 - 28 * k} size={sz - k} color={INK}>
+							{eyeNoteText(d)}
 						</HandLabel>
 					</g>
 				)}
@@ -824,7 +906,7 @@ const Film = memo(function Film({
 							size={sz - k}
 							color={INK}
 						>
-							traced skyline
+							{tracedNoteText(focus, tracedColumns)}
 						</HandLabel>
 					</g>
 				)}
@@ -842,10 +924,10 @@ const Film = memo(function Film({
 					<HandLabel
 						x={x0 + 8 * k}
 						y={y0 + 22 * k}
-						size={sz + k}
+						size={focus === "gaps" ? sz : sz + k}
 						color={SOLVED_INK}
 					>
-						{`gap ${d.residual.solved.median.toFixed(1)} px`}
+						{solvedReadoutText(d, focus)}
 					</HandLabel>
 				</g>
 				<g ref={reg("numbers")} opacity={f0.numbers}>
@@ -856,7 +938,7 @@ const Film = memo(function Film({
 						size={sz + 2 * k}
 						color={RED}
 					>
-						{`${signedDegrees(d.solved.delta.yaw)} yaw`}
+						{turn.yaw}
 					</HandLabel>
 					<HandLabel
 						x={mx}
@@ -865,8 +947,19 @@ const Film = memo(function Film({
 						size={sz - k}
 						color={RED}
 					>
-						{`${signedDegrees(d.solved.delta.pitch)} pitch`}
+						{turn.pitch}
 					</HandLabel>
+					{turn.extra && (
+						<HandLabel
+							x={mx}
+							y={top + 32 * k}
+							anchor="middle"
+							size={sz - k}
+							color={RED}
+						>
+							{turn.extra}
+						</HandLabel>
+					)}
 				</g>
 				<g ref={reg("verdict")} data-film="verdict" opacity={f0.verdict}>
 					<HandLabel
@@ -1004,20 +1097,34 @@ function PhotoStoryInner({
 		return () => ro.disconnect();
 	}, []);
 
-	// the script for this photo
+	// the script for this photo; the crop is keyed on its values (a page may pass an inline array)
+	const cropKey = crop?.join(",");
 	const geom = useMemo<Geom | null>(() => {
 		if (!data) return null;
-		const [x0, y0, x1, y1] = crop ?? [
-			0,
-			0,
-			data.photo.width,
-			data.photo.height,
-		];
+		const [x0, y0, x1, y1] = cropKey
+			? (cropKey.split(",").map(Number) as [number, number, number, number])
+			: [0, 0, data.photo.width, data.photo.height];
 		return { x0, y0, x1, y1, k: (x1 - x0) / data.photo.width };
-	}, [data, crop]);
-	const guesses = useMemo(() => (data ? pickGuesses(data) : []), [data]);
+	}, [data, cropKey]);
+	const guesses = useMemo(
+		() =>
+			data && geom
+				? pickGuesses(
+						data,
+						[geom.x0, geom.y0, geom.x1, geom.y1],
+						focus === "snap" ? MAX_GUESSES_SNAP : MAX_GUESSES,
+					)
+				: [],
+		[data, geom, focus],
+	);
 	const riders = useMemo(() => guesses.filter((p) => p.solved), [guesses]);
-	const anchor = useMemo(() => (data ? pickAnchor(data) : null), [data]);
+	const anchor = useMemo(
+		() =>
+			data && geom
+				? pickAnchor(data, [geom.x0, geom.y0, geom.x1, geom.y1])
+				: null,
+		[data, geom],
+	);
 	const tickCols = useMemo(
 		() =>
 			data && geom
@@ -1034,13 +1141,15 @@ function PhotoStoryInner({
 	);
 	const layout = useMemo<GuessLayout[]>(() => {
 		if (!data || !geom) return [];
-		const { width: W, height: H } = data.photo;
 		const size = LABEL * geom.k;
 		return guesses.map((p) => {
 			const [x, y] = p.prior as [number, number];
 			const w = nameWidth(p.name, size);
-			const tx = Math.min(W - w / 2 - 6, Math.max(w / 2 + 6, x));
-			const ty = Math.min(y + 40 * geom.k, H - 10);
+			const tx = Math.min(
+				geom.x1 - w / 2 - 6,
+				Math.max(geom.x0 + w / 2 + 6, x),
+			);
+			const ty = Math.min(y + 40 * geom.k, geom.y1 - 10);
 			return { p, x, y, tx, ty, w };
 		});
 	}, [data, geom, guesses]);
@@ -1055,6 +1164,8 @@ function PhotoStoryInner({
 			}),
 		[data, focus, guesses, tickCols, riders],
 	);
+	// a stable signature: only a new photo, verdict or focus restarts the film
+	const planSig = `${data?.id ?? ""}|${data?.solved.accepted ?? ""}|${focus ?? ""}`;
 	const f0 = useMemo(() => filmFrame(plan, plan.total), [plan]);
 
 	// the clock: a ref, no per-frame React state
@@ -1076,11 +1187,12 @@ function PhotoStoryInner({
 		at: 0,
 	});
 	const [beat, setBeat] = useState(plan.beats.length - 1);
-	const [spillT, setSpillT] = useState(1);
 	const ctx = useRef<FilmCtx | null>(null);
+	// the bake of another photo (still loading in) is no bake
+	const ownBake = data && bake && bake.id === data.id ? bake : null;
 	ctx.current =
 		data && geom
-			? { d: data, plan, bake, geom, layout, riders, anchor, tickCols }
+			? { d: data, plan, bake: ownBake, geom, layout, riders, anchor, tickCols }
 			: null;
 	const playbackRef = useRef(playback);
 	playbackRef.current = playback;
@@ -1104,7 +1216,6 @@ function PhotoStoryInner({
 		if (force || shouldCommitT(st.t, f.t, st.at, now)) {
 			st.t = f.t;
 			st.at = now;
-			setSpillT(f.t);
 			storyRef.current?.setT(f.t, { instant: true });
 		}
 	};
@@ -1117,7 +1228,10 @@ function PhotoStoryInner({
 			const m = mode.current;
 			const c = ctx.current;
 			if (!m.playing || !armed.current || !c) return;
-			msRef.current += Math.min(50, now - lastNow.current);
+			msRef.current = Math.max(
+				0,
+				msRef.current + Math.max(0, Math.min(50, now - lastNow.current)),
+			);
 			lastNow.current = now;
 			if (!m.auto || playbackRef.current === "once") {
 				const stop = m.stopAt ?? c.plan.total;
@@ -1144,7 +1258,14 @@ function PhotoStoryInner({
 			cancelAnimationFrame(raf.current);
 			raf.current = 0;
 		};
-	}, [plan, data]);
+	}, [planSig]);
+	// the layout counts changed (the phone breakpoint): keep the clock, redraw the current frame
+	const prevTotal = useRef(plan.total);
+	useIsomorphicLayoutEffect(() => {
+		if (msRef.current >= prevTotal.current) msRef.current = plan.total;
+		prevTotal.current = plan.total;
+		render.current();
+	}, [plan]);
 	// the bake arriving changes how the moving line is drawn: redraw the current frame
 	useIsomorphicLayoutEffect(() => {
 		if (bake) render.current();
@@ -1198,17 +1319,24 @@ function PhotoStoryInner({
 		io.observe(el);
 		return () => io.disconnect();
 	}, []);
-	// print: the settled frame, whatever was playing
+	// print: the settled frame, committed to the DOM before the snapshot; afterwards the reader's state
+	const printed = useRef<{
+		mode: typeof mode.current;
+		ms: number;
+	} | null>(null);
 	useEffect(() => {
 		const before = () => {
+			printed.current = { mode: { ...mode.current }, ms: msRef.current };
 			mode.current = { auto: false, playing: false, stopAt: null };
 			msRef.current = ctx.current?.plan.total ?? 0;
-			render.current(true);
+			flushSync(() => render.current(true));
 		};
 		const after = () => {
-			if (!motion.current) return;
-			mode.current = { auto: true, playing: true, stopAt: null };
-			msRef.current = 0;
+			const saved = printed.current;
+			printed.current = null;
+			if (!saved) return;
+			mode.current = saved.mode;
+			msRef.current = saved.ms;
 			render.current(true);
 			start.current();
 		};
@@ -1224,7 +1352,9 @@ function PhotoStoryInner({
 	const goBeat = (i: number) => {
 		const c = ctx.current;
 		if (!c) return;
-		const [s, e] = beatSpan(c.plan, i);
+		const [s] = beatSpan(c.plan, i);
+		// settle one ms before the end: at the end the strict beat lookup already reports the next beat
+		const e = settleMs(c.plan, i);
 		armed.current = true;
 		if (!motion.current) {
 			mode.current = { auto: false, playing: false, stopAt: null };
@@ -1263,6 +1393,8 @@ function PhotoStoryInner({
 	const tabs = useRef<(HTMLButtonElement | null)[]>([]);
 	const railRef = useRef<HTMLDivElement>(null);
 	const scrubbing = useRef(false);
+	// the caption is announced politely: freeze it while the reader drags, release on pointer up
+	const [frozenBeat, setFrozenBeat] = useState<number | null>(null);
 	const scrubTo = (clientX: number) => {
 		const c = ctx.current;
 		const rail = railRef.current;
@@ -1281,10 +1413,22 @@ function PhotoStoryInner({
 		? `${data.id}: the solved pose written on the photo. The phone's guess is struck in red.`
 		: "The solved pose written on the photo.";
 	const beatId = plan.beats[Math.min(beat, plan.beats.length - 1)].id;
+	const captionId =
+		plan.beats[Math.min(frozenBeat ?? beat, plan.beats.length - 1)].id;
 	const lastBeat = plan.beats.length - 1;
-	const cursor = data
-		? spillCursorFor((t) => poseAt(data, t).yaw, beat, spillT)
-		: null;
+	const spillT = story?.t ?? 1;
+	const tapTarget = useMemo(
+		() =>
+			focus === "tap" && anchor ? { az: anchor.az, name: anchor.name } : null,
+		[focus, anchor],
+	);
+	const cursor = useMemo(
+		() =>
+			data
+				? spillCursorFor((t) => poseAt(data, t).yaw, beat, spillT, tapTarget)
+				: null,
+		[data, beat, spillT, tapTarget],
+	);
 	const side = useMemo(() => ({ t: spillT }), [spillT]);
 	const hair0 = hairlineScales(f0, plan.beats.length);
 	return (
@@ -1338,6 +1482,7 @@ function PhotoStoryInner({
 										goBeat(to);
 										tabs.current[to]?.focus();
 									}}
+									tabIndex={n === beat ? 0 : -1}
 									aria-pressed={n === beat}
 									className={cn(
 										"gb-caps relative min-w-0 px-3 pt-1.5 pb-2 text-left text-[13px] leading-[16px] transition-colors motion-reduce:transition-none",
@@ -1384,17 +1529,20 @@ function PhotoStoryInner({
 					style={{ touchAction: "pan-y" }}
 					onPointerDown={(e) => {
 						scrubbing.current = true;
+						setFrozenBeat(beat);
 						e.currentTarget.setPointerCapture?.(e.pointerId);
 						scrubTo(e.clientX);
 					}}
 					onPointerMove={(e) => scrubbing.current && scrubTo(e.clientX)}
 					onPointerUp={(e) => {
 						scrubbing.current = false;
+						setFrozenBeat(null);
 						e.currentTarget.releasePointerCapture?.(e.pointerId);
 						render.current(true);
 					}}
 					onPointerCancel={() => {
 						scrubbing.current = false;
+						setFrozenBeat(null);
 					}}
 				>
 					{plan.beats.map((b, n) => (
@@ -1440,7 +1588,7 @@ function PhotoStoryInner({
 										riders={riders}
 										anchor={anchor}
 										tickCols={tickCols}
-										bake={bake}
+										bake={ownBake}
 									/>
 								)
 							}
@@ -1451,7 +1599,7 @@ function PhotoStoryInner({
 					className="nb-hand mt-3 min-h-[2.8em] text-[19px] leading-[23px] text-[var(--gb-pencil,var(--gb-ink))]"
 					aria-live="polite"
 				>
-					{data ? stepCaption(data, beatId) : "…"}
+					{data ? stepCaption(data, captionId) : "…"}
 				</p>
 			</div>
 		</Figure>

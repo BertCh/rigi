@@ -343,6 +343,15 @@ export function beatSpan(plan: FilmPlan, i: number): [number, number] {
 	return [b.start, b.end];
 }
 
+/**
+ * Where a stepper stop settles beat `i`: one ms before its end, because the beat lookup is strict
+ * (`t < end`), so `end` itself already reports the next beat. `plan.total` stays the static frame.
+ */
+export function settleMs(plan: FilmPlan, i: number): number {
+	const [start, end] = beatSpan(plan, i);
+	return Math.max(start, end - 1);
+}
+
 /** The y of a polyline (sorted by x or not) at column `x`, by linear interpolation; null off its ends. */
 export function rowAt(
 	points: readonly [number, number][],
