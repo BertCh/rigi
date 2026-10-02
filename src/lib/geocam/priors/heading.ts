@@ -55,7 +55,9 @@ export function headingDeclination(
 /**
  * Range and value for a manual heading control (deg). With a prior heading the control spans
  * prior ± halfWidth and the yaw is unwrapped next to the prior, so a solved yaw of 2° under a
- * 358° compass shows as 362° instead of being clamped to the range's low end. Without one
+ * 358° compass shows as 362° instead of being clamped to the range's low end. A yaw farther than
+ * halfWidth from the prior widens the range to include it, so it is never clamped either (a clamped
+ * value jumps the pose to the range edge on the first touch). Without one
  * (`prior` null: heading unknown) it spans the full circle and shows yaw in [0, 360).
  */
 export function headingControlWindow(
@@ -64,9 +66,10 @@ export function headingControlWindow(
 	halfWidth = 40,
 ): { min: number; max: number; value: number } {
 	if (prior == null) return { min: 0, max: 360, value: wrap360(yaw) };
+	const value = prior + wrap180(yaw - prior);
 	return {
-		min: prior - halfWidth,
-		max: prior + halfWidth,
-		value: prior + wrap180(yaw - prior),
+		min: Math.min(prior - halfWidth, value),
+		max: Math.max(prior + halfWidth, value),
+		value,
 	};
 }

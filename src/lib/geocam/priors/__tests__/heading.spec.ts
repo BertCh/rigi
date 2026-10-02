@@ -136,6 +136,25 @@ describe("headingControlWindow", () => {
 				expect(w.value - prior).toBeCloseTo(off, 9);
 			}
 	});
+	it("widens the range to a yaw beyond halfWidth instead of clamping it", () => {
+		// a solve 80° off the compass: the range reaches the value, so the first touch does not jump the pose
+		expect(headingControlWindow(120, 200)).toEqual({
+			min: 80,
+			max: 200,
+			value: 200,
+		});
+		expect(headingControlWindow(120, 10)).toEqual({
+			min: 10,
+			max: 160,
+			value: 10,
+		});
+		// across north: 2° under a 300° compass unwraps to 362°, past the 340° edge
+		expect(headingControlWindow(300, 2)).toEqual({
+			min: 260,
+			max: 362,
+			value: 362,
+		});
+	});
 	it("uses the full circle when the heading is unknown", () => {
 		expect(headingControlWindow(null, -10)).toEqual({
 			min: 0,

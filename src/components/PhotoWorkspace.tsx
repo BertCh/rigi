@@ -131,6 +131,7 @@ import { Tiles3DCredit } from "./nearfield/Tiles3DCredit";
 import { useStepInside } from "./nearfield/useStepInside";
 import { AdvancedPanel } from "./panel/AdvancedPanel";
 import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
+import { dragPose, wheelVfov } from "./workspace/poseControls";
 
 // Every backend loads on demand, so /photo downloads only the one it runs (src/lib/renderer-select.ts
 // picks it): the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts) where WebGPU passes the probe, the
@@ -250,6 +251,13 @@ export function PhotoWorkspace({
 		frac: 0,
 	});
 	const [error, setError] = useState<string | null>(null);
+	/** A short-lived message in the header (a failed Save image); clears itself. */
+	const [notice, setNotice] = useState<string | null>(null);
+	useEffect(() => {
+		if (!notice) return;
+		const t = setTimeout(() => setNotice(null), 6000);
+		return () => clearTimeout(t);
+	}, [notice]);
 	// the engine that actually runs ([data-renderer]); a WebGpuEngine that failed to start sets
 	// rendererFallback, which re-mounts the canvas (keyed on it) and re-runs the engine effect on WebGL deck
 	const [rendererUsed, setRendererUsed] = useState<RendererChoice | null>(null);
@@ -498,7 +506,7 @@ export function PhotoWorkspace({
 			try {
 				return make();
 			} catch (e) {
-				setError(`WebGL unavailable: ${(e as Error).message}`);
+				setError(`${name} renderer unavailable: ${(e as Error).message}`);
 				return null;
 			}
 		};
@@ -1000,17 +1008,16 @@ export function PhotoWorkspace({
 		const { u, v } = norm(e);
 		if (drag.current && pose) {
 			const d = drag.current;
-			const w = stageSize.w || 1;
-			const hfov = hfovFromAspect(d.pose.vfov, aspect);
-			const dx = e.clientX - d.x;
-			const dy = e.clientY - d.y;
-			if (d.shift) setPose({ ...d.pose, roll: d.pose.roll + dx * 0.05 });
-			else
-				setPose({
-					...d.pose,
-					yaw: d.pose.yaw - (dx / w) * hfov,
-					pitch: d.pose.pitch + (dy / stageSize.h) * d.pose.vfov,
-				});
+			setPose(
+				dragPose(
+					d.pose,
+					e.clientX - d.x,
+					e.clientY - d.y,
+					{ width: stageSize.w, height: stageSize.h },
+					aspect,
+					d.shift,
+				),
+			);
 			return;
 		}
 		if (tool === "inspect" && settings.mode === "replace") {
@@ -1061,11 +1068,7 @@ export function PhotoWorkspace({
 
 	const onWheel = (e: React.WheelEvent) => {
 		if (tool !== "align" || !pose) return;
-		const vfov = Math.min(
-			100,
-			Math.max(5, pose.vfov * (1 + e.deltaY * 0.0006)),
-		);
-		setPose({ ...pose, vfov });
+		setPose({ ...pose, vfov: wheelVfov(pose.vfov, e.deltaY) });
 	};
 
 	const runAlign = (fromPrior: boolean) => {
@@ -1107,12 +1110,29 @@ export function PhotoWorkspace({
 						setAlignNote(up.note);
 					});
 				})
-				.catch(() => {});
+				.catch((e) => {
+					if (ctl.signal.aborted || e?.name === "AbortError") return;
+					console.warn("[align]", e);
+					if (engineRef.current === eng)
+						setAlignNote("Auto-align failed; the pose is unchanged");
+				});
 			return;
 		}
 		setTimeout(async () => {
-			const res = await eng.autoAlign(fromPrior);
-			if (!res || engineRef.current !== eng) return;
+			let res: Awaited<ReturnType<Renderer["autoAlign"]>> = null;
+			try {
+				res = await eng.autoAlign(fromPrior);
+			} catch (e) {
+				console.warn("[align]", e);
+			}
+			if (engineRef.current !== eng) return;
+			// no fit (or a failure): say so instead of leaving "Aligning…" up; the pose is untouched
+			if (!res) {
+				setAlignNote(
+					`${fromPrior ? "Auto-align" : "Refine"} found no fit; the pose is unchanged`,
+				);
+				return;
+			}
 			// Auto-align is an unverified guess; Refine keeps the user's own (or an accepted) pose theirs, but is
 			// not verified when the sensors are missing
 			const save = !fromPrior && startEndorsed && !eng.unknowns.any;
@@ -1180,7 +1200,8 @@ export function PhotoWorkspace({
 			});
 			downloadBlob(r.blob, r.filename);
 		} catch (e) {
-			setAlignNote(`Image not saved: ${(e as Error).message}`);
+			console.warn("[export]", e);
+			setNotice(`Image not saved: ${(e as Error).message}`);
 		}
 	};
 
@@ -1463,6 +1484,11 @@ export function PhotoWorkspace({
 						watermark={shared ? SHARE_WATERMARK : undefined}
 					/>
 				</header>
+				{notice && (
+					<output className="absolute top-12 right-3 z-20 rounded-lg bg-black/60 px-2.5 py-1.5 text-[11px] text-red-300 backdrop-blur">
+						{notice}
+					</output>
+				)}
 				{shared && <Watermark />}
 
 				<div ref={stageRef} className="absolute inset-0">
