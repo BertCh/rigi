@@ -1,0 +1,470 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+/* Furniture of the Landeskarte sheet. Tokens (Brezine roles) live on the .landeskarte root, which
+ * createFurniture() puts on its host. No outlines around sections and no coloured shadows: space
+ * and a soft paper veil separate things, strokes are used only for map lines. */
+
+.landeskarte {
+  --lk-paper: #f4f4f4;
+  --lk-ink: #131313;
+  --lk-brown: #95500c;
+  --lk-rock: #2b2724;
+  --lk-water: #30626b;
+  --lk-water-fill: #3f7fb3;
+  --lk-red: #bf2233;
+  --lk-navy: #002f55;
+  --lk-yellow: #ffdb8b;
+  --lk-amber: #e59e1f;
+  --lk-veil: color-mix(in srgb, var(--lk-paper) 80%, transparent);
+  --lk-font-sans: "Fira Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --lk-font-condensed: "Fira Sans Condensed", "Fira Sans", "Arial Narrow", system-ui, sans-serif;
+  --lk-font-serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  --lk-font-mono: "Fira Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  position: relative;
+}
+
+.lk-furniture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--lk-ink);
+  font: 400 12px / 1.3 var(--lk-font-sans);
+  opacity: var(--lk-fur-reveal, 1);
+  --lk-edge: var(--lk-neatline-inset, 26px);
+}
+
+.lk-furniture [hidden] {
+  display: none;
+}
+
+.lk-num {
+  font-family: var(--lk-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* SVG: neatline, ticks, labels */
+.lk-fur-svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.lk-fur-neatline {
+  fill: none;
+  stroke: var(--lk-ink);
+  stroke-width: 0.6;
+  stroke-opacity: 0.7;
+}
+
+.lk-fur-corner,
+.lk-fur-tick,
+.lk-fur-cross {
+  fill: none;
+  stroke: var(--lk-ink);
+  stroke-linecap: butt;
+}
+
+.lk-fur-corner {
+  stroke-width: 1.4;
+}
+
+.lk-fur-tick {
+  stroke-width: 0.8;
+}
+
+.lk-fur-cross {
+  stroke-width: 0.6;
+  stroke-opacity: 0.55;
+}
+
+.lk-fur-label {
+  font: 400 11px var(--lk-font-mono);
+  font-variant-numeric: tabular-nums;
+  fill: var(--lk-ink);
+  /* A paper halo keeps the grid numbers legible over any terrain. */
+  paint-order: stroke;
+  stroke: var(--lk-paper);
+  stroke-width: 3px;
+  stroke-opacity: 0.85;
+  stroke-linejoin: round;
+}
+
+/* Cartouche */
+.lk-cartouche {
+  position: absolute;
+  left: calc(var(--lk-edge) + 14px);
+  top: calc(var(--lk-edge) + 14px);
+  padding: 8px 12px;
+  background: var(--lk-veil);
+  font-family: var(--lk-font-serif);
+  line-height: 1.15;
+}
+
+.lk-cartouche-name {
+  display: block;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.lk-cartouche-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 400;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* North arrow */
+.lk-north {
+  position: absolute;
+  right: calc(var(--lk-edge) + 18px);
+  top: calc(var(--lk-edge) + 14px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--lk-veil);
+}
+
+.lk-north-label {
+  font: 600 12px var(--lk-font-sans);
+}
+
+.lk-north-half-ink {
+  fill: var(--lk-ink);
+}
+
+.lk-north-half-paper {
+  fill: var(--lk-paper);
+  stroke: var(--lk-ink);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+}
+
+/* Legend and elevation key */
+.lk-legend {
+  position: absolute;
+  left: calc(var(--lk-edge) + 14px);
+  bottom: calc(var(--lk-edge) + 14px);
+  max-width: 220px;
+  padding: 10px 12px;
+  background: var(--lk-veil);
+}
+
+.lk-legend-title {
+  margin: 0 0 6px;
+  font: 600 11px var(--lk-font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lk-legend-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.lk-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.lk-legend-item svg {
+  flex: none;
+}
+
+.lk-legend-light {
+  margin: 8px 0 0;
+  font-size: 11px;
+  font-style: italic;
+}
+
+.lk-key {
+  margin-top: 8px;
+}
+
+.lk-key-title {
+  margin: 0 0 3px;
+  font-size: 11px;
+}
+
+.lk-key svg {
+  display: block;
+  width: 100%;
+  height: 8px;
+}
+
+.lk-key-labels {
+  position: relative;
+  height: 14px;
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.lk-key-labels span {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 10px;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.lk-key-labels span:first-child {
+  transform: none;
+}
+
+.lk-key-labels span:last-child {
+  transform: translateX(-100%);
+}
+
+/* Legend glyphs follow the inks of the layers. */
+.lk-g-contour-index {
+  stroke: var(--lk-brown);
+  stroke-width: 1.4;
+  fill: none;
+}
+
+.lk-g-contour-minor {
+  stroke: var(--lk-brown);
+  stroke-width: 0.6;
+  fill: none;
+}
+
+.lk-g-rock {
+  stroke: var(--lk-rock);
+  stroke-width: 0.9;
+  fill: none;
+}
+
+.lk-g-scree {
+  fill: var(--lk-rock);
+}
+
+.lk-g-lake {
+  fill: var(--lk-water-fill);
+  fill-opacity: 0.55;
+  stroke: none;
+}
+
+.lk-g-trail {
+  stroke: var(--lk-amber);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.lk-g-trail-mountain {
+  stroke: var(--lk-rock);
+  stroke-dasharray: 5 2;
+}
+
+.lk-g-trail-alpine {
+  stroke: #2c6fb0;
+  stroke-width: 2;
+  stroke-dasharray: 1.5 2;
+}
+
+.lk-g-station {
+  fill: none;
+  stroke: var(--lk-red);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.lk-g-peak {
+  fill: var(--lk-navy);
+}
+
+.lk-g-shadow {
+  fill: var(--lk-navy);
+  fill-opacity: 0.35;
+}
+
+.lk-g-fog {
+  fill: none;
+  stroke: var(--lk-water);
+  stroke-opacity: 0.6;
+  stroke-width: 1.4;
+}
+
+/* Scale bar */
+.lk-scale {
+  position: absolute;
+  right: calc(var(--lk-edge) + 18px);
+  bottom: calc(var(--lk-edge) + 104px);
+  padding: 6px 8px;
+  background: var(--lk-veil);
+}
+
+.lk-scale-bar {
+  display: flex;
+  height: 5px;
+  box-shadow: 0 0 0 0.6px var(--lk-ink);
+}
+
+.lk-scale-ink {
+  background: var(--lk-ink);
+}
+
+.lk-scale-paper {
+  background: var(--lk-paper);
+}
+
+.lk-scale-labels {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-size: 11px;
+}
+
+.lk-scale-labels span:nth-child(2) {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.lk-scale-labels span:last-child {
+  margin-right: -0.6em;
+}
+
+/* Blatt box and imprint */
+.lk-blatt {
+  position: absolute;
+  right: calc(var(--lk-edge) + 18px);
+  bottom: calc(var(--lk-edge) + 30px);
+  padding: 6px 10px;
+  background: var(--lk-veil);
+  text-align: right;
+}
+
+.lk-blatt-title {
+  margin: 0;
+  font: 600 13px var(--lk-font-sans);
+}
+
+.lk-blatt-line {
+  margin: 1px 0 0;
+  font-size: 11px;
+}
+
+.lk-imprint {
+  position: absolute;
+  right: calc(var(--lk-edge) + 18px);
+  bottom: calc(var(--lk-edge) + 8px);
+  margin: 0;
+  font: 400 11px var(--lk-font-sans);
+  text-align: right;
+  color: var(--lk-ink);
+  paint-order: stroke;
+  -webkit-text-stroke: 3px color-mix(in srgb, var(--lk-paper) 80%, transparent);
+}
+
+/* Wegweiser plate: yellow with an amber rim, black Fira Sans Condensed, pointed end. The rim is
+ * the outer shape and the plate its inset, so no stroke or shadow is involved. */
+.lk-wegweiser {
+  --lk-point: 22px;
+  position: absolute;
+  display: inline-block;
+  padding: 3px;
+  background: var(--lk-amber, #e59e1f);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--lk-point)) 0,
+    100% 50%,
+    calc(100% - var(--lk-point)) 100%,
+    0 100%
+  );
+  color: #000;
+  font: 500 13px / 1.25 var(--lk-font-condensed, "Fira Sans Condensed", sans-serif);
+  pointer-events: none;
+}
+
+.lk-wegweiser-body {
+  min-width: 190px;
+  padding: 7px calc(var(--lk-point) + 6px) 7px 10px;
+  background: var(--lk-yellow, #ffdb8b);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--lk-point) + 2px) 0,
+    100% 50%,
+    calc(100% - var(--lk-point) + 2px) 100%,
+    0 100%
+  );
+}
+
+.lk-wegweiser.lk-dim {
+  opacity: 0.6;
+}
+
+.lk-wegweiser-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 3px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.lk-wegweiser-time {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lk-wegweiser-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.lk-wegweiser-line .lk-num {
+  font-size: 11px;
+}
+
+/* Phones: keep the sheet readable by dropping the small print first. */
+@media (max-width: 640px) {
+  .lk-furniture {
+    --lk-edge: var(--lk-neatline-inset, 26px);
+  }
+
+  .lk-imprint,
+  .lk-key,
+  .lk-legend-light {
+    display: none;
+  }
+
+  .lk-cartouche-name {
+    font-size: 22px;
+  }
+
+  .lk-cartouche-meta {
+    font-size: 12px;
+  }
+
+  .lk-legend {
+    max-width: 160px;
+    padding: 6px 8px;
+  }
+
+  .lk-blatt {
+    bottom: calc(var(--lk-edge) + 8px);
+  }
+
+  .lk-scale {
+    bottom: calc(var(--lk-edge) + 82px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lk-furniture {
+    transition: opacity 400ms ease-out;
+  }
+}

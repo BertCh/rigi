@@ -1,0 +1,535 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+/* Swiss style: Fira Sans, tabular numerals, one grid of 8 px, no outlines around sections.
+   Brezine roles: ink #131313, route red #bf2233 is the single accent and marks the active state
+   only (selected segment, ruler thumb, pressed toggles). */
+
+.lk-controls,
+.lk-drawer {
+  --lk-ink: #131313;
+  --lk-muted: #131313a6;
+  --lk-hairline: #1313132e;
+  --lk-paper: #f4f4f4e6;
+  --lk-accent: #bf2233;
+  --lk-gutter: 16px;
+  font-family: "Fira Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--lk-ink);
+}
+
+.lk-controls {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px var(--lk-gutter) 12px;
+  background: var(--lk-paper);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.lk-controls button,
+.lk-drawer button,
+.lk-drawer summary {
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lk-controls :focus-visible,
+.lk-drawer :focus-visible {
+  outline: 2px solid var(--lk-ink);
+  outline-offset: 2px;
+}
+
+.lk-muted {
+  color: var(--lk-muted);
+}
+
+/* Rows ------------------------------------------------------------------------------------ */
+
+.lk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+
+.lk-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 16px;
+}
+
+.lk-group-label {
+  color: var(--lk-muted);
+  white-space: nowrap;
+}
+
+/* Plan | Panorama ---------------------------------------------------------------------- */
+
+.lk-segmented {
+  display: inline-flex;
+  gap: 24px;
+}
+
+.lk-segment {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 6px 0 4px;
+  min-height: 32px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--lk-muted);
+  cursor: pointer;
+  /* The active mark is a 2 px rule under the word, not a box. */
+  border-bottom: 2px solid transparent;
+}
+
+.lk-segment[aria-checked="true"] {
+  color: var(--lk-ink);
+  font-weight: 600;
+  border-bottom-color: var(--lk-accent);
+}
+
+/* Clock and sun arc ---------------------------------------------------------------------- */
+
+.lk-clock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lk-clock-main {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.lk-clock-time {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  min-width: 3.1ch;
+}
+
+.lk-clock-zone {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--lk-muted);
+}
+
+.lk-sun-line {
+  display: block;
+  font-size: 12px;
+  white-space: pre;
+}
+
+.lk-arc {
+  flex: none;
+  overflow: visible;
+}
+
+.lk-arc-horizon {
+  stroke: var(--lk-hairline);
+  stroke-width: 1;
+}
+
+.lk-arc-path {
+  stroke: var(--lk-ink);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.lk-arc-sun {
+  fill: var(--lk-ink);
+}
+
+/* Time ruler ------------------------------------------------------------------------------ */
+
+.lk-ruler {
+  position: relative;
+  box-sizing: border-box;
+  height: 52px;
+  /* Horizontal drags scrub the sun, vertical drags still scroll the page. */
+  touch-action: pan-y;
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Half a label of room at both ends of the track. */
+  padding: 0 12px;
+  margin: 0 -12px;
+}
+
+.lk-track {
+  position: relative;
+  height: 100%;
+}
+
+.lk-ruler-svg {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lk-night {
+  stroke: var(--lk-hairline);
+  stroke-width: 1;
+}
+
+.lk-day {
+  stroke: var(--lk-ink);
+  stroke-width: 2;
+}
+
+.lk-tick {
+  stroke: var(--lk-ink);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.lk-tick-label {
+  font-size: 11px;
+  fill: var(--lk-muted);
+}
+
+.lk-tick-label-zoom {
+  fill: var(--lk-ink);
+}
+
+.lk-bracket {
+  stroke: var(--lk-ink);
+  stroke-width: 1;
+}
+
+.lk-bracket-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--lk-ink);
+}
+
+.lk-photo {
+  stroke: var(--lk-ink);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.lk-thumb {
+  position: absolute;
+  top: 12px;
+  bottom: 14px;
+  width: 0;
+  pointer-events: none;
+}
+
+/* A red hairline with a small triangular head: the active state of the ruler. */
+.lk-thumb::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--lk-accent);
+}
+
+.lk-thumb::after {
+  content: "";
+  position: absolute;
+  left: -5px;
+  bottom: -5px;
+  border: 5px solid transparent;
+  border-top: 0;
+  border-bottom: 6px solid var(--lk-accent);
+}
+
+.lk-ruler:focus-visible {
+  outline-offset: 0;
+}
+
+/* Tools row ------------------------------------------------------------------------------- */
+
+.lk-toggle,
+.lk-action {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 6px 0;
+  min-height: 32px;
+  cursor: pointer;
+  color: var(--lk-muted);
+}
+
+.lk-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* A 6 px square before the word: filled red when on, a hairline square when off. */
+.lk-toggle::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  box-sizing: border-box;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--lk-hairline);
+}
+
+.lk-toggle[aria-pressed="true"] {
+  color: var(--lk-ink);
+}
+
+.lk-toggle[aria-pressed="true"]::before {
+  background: var(--lk-accent);
+  box-shadow: none;
+}
+
+.lk-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lk-action {
+  color: var(--lk-ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.lk-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lk-horizon {
+  gap: 0 12px;
+}
+
+.lk-k-value {
+  min-width: 5ch;
+  text-align: right;
+}
+
+.lk-range {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 120px;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* Never take horizontal pans from the page's vertical scroll gesture. */
+  touch-action: pan-y;
+}
+
+.lk-range::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--lk-ink);
+}
+
+.lk-range::-moz-range-track {
+  height: 1px;
+  background: var(--lk-ink);
+}
+
+.lk-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 2px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 0;
+  border: 0;
+  background: var(--lk-ink);
+}
+
+.lk-range::-moz-range-thumb {
+  width: 2px;
+  height: 14px;
+  border-radius: 0;
+  border: 0;
+  background: var(--lk-ink);
+}
+
+.lk-range:active::-webkit-slider-thumb {
+  background: var(--lk-accent);
+}
+
+.lk-range:active::-moz-range-thumb {
+  background: var(--lk-accent);
+}
+
+/* Drawers: Zahlen and Beweis --------------------------------------------------------------- */
+
+.lk-drawer {
+  box-sizing: border-box;
+  padding: 4px var(--lk-gutter);
+  background: var(--lk-paper);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.lk-drawer > summary {
+  display: block;
+  padding: 6px 0;
+  min-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.lk-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lk-drawer > summary::after {
+  content: "+";
+  margin-left: 8px;
+  color: var(--lk-muted);
+}
+
+.lk-drawer[open] > summary::after {
+  content: "\2212";
+}
+
+.lk-drawer-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  padding: 4px 0 12px;
+}
+
+.lk-column {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.lk-peak-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.lk-numbers {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 16px;
+  row-gap: 2px;
+  margin: 0;
+}
+
+.lk-numbers dt {
+  color: var(--lk-muted);
+}
+
+.lk-numbers dd {
+  margin: 0;
+  text-align: right;
+}
+
+.lk-numbers.lk-empty dd {
+  color: var(--lk-muted);
+}
+
+.lk-cursor-line {
+  margin: 8px 0 0;
+  min-height: 1.35em;
+}
+
+.lk-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-bottom: 6px;
+}
+
+.lk-badge {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.lk-badge-label {
+  color: var(--lk-muted);
+}
+
+.lk-badge-value {
+  font-weight: 600;
+}
+
+.lk-hud-stats,
+.lk-hud-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.lk-hud-error {
+  margin: 0 0 8px;
+  color: var(--lk-accent);
+}
+
+.lk-hud-error:empty {
+  display: none;
+}
+
+.lk-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.lk-table th,
+.lk-table td {
+  padding: 2px 0;
+  text-align: left;
+  font-weight: 400;
+}
+
+.lk-table th {
+  color: var(--lk-muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lk-table td:last-child,
+.lk-table th:last-child {
+  text-align: right;
+}
+
+@media (max-width: 560px) {
+  .lk-row-top {
+    gap: 8px;
+  }
+
+  .lk-clock-time {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-controls *,
+  .lk-drawer * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

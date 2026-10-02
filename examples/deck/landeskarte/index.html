@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- Rigi -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- SPDX-FileCopyrightText: Copyright (c) Rigi contributors -->
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>Landeskarte Abendlicht · Rigi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400&family=Fira+Sans+Condensed:wght@500;700&family=Fira+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap"
+    >
+  </head>
+  <body>
+    <header class="sheet-head">
+      <p class="eyebrow">LUMA.GL + DECK.GL</p>
+      <h1>Landeskarte Abendlicht</h1>
+      <p class="lede">
+        Das Niederhorn über dem Thunersee als Blatt der Landeskarte. Es hebt sich zum
+        Gipfelpanorama, beleuchtet von der echten Sonne des 7. September 2026, mit Schatten aus
+        einer GPU-Horizontkarte.
+      </p>
+      <label class="backend"
+        >Renderer<select id="backend">
+          <option value="webgpu">WebGPU</option>
+          <option value="webgl">WebGL2</option>
+        </select></label
+      >
+    </header>
+    <main class="sheet">
+      <div
+        id="scene"
+        role="img"
+        aria-label="Niederhorn und Thunersee als Landeskarte, mit Hebung ins Gipfelpanorama"
+      ></div>
+      <div id="controls"></div>
+      <div id="drawers"></div>
+    </main>
+    <footer class="sheet-foot">
+      <p id="status" role="status">Gelände wird geladen …</p>
+      <p class="credits">
+        Gelände <a href="https://mapterhorn.com/attribution">© Mapterhorn</a> (swisstopo,
+        Copernicus) · Gipfel und Wege
+        <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>
+        (ODbL) · Schrift Fira und Source Serif (OFL) · Farben Brezine · Die zwölf Standorte sind
+        gelöste Kameraposen (solved), nicht verifizierte Messungen.
+      </p>
+    </footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

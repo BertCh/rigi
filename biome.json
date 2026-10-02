@@ -18,6 +18,7 @@
 			"vite.config.ts",
 			"examples/**",
 			"!examples/**/dist",
+			"!examples/**/data/*.json",
 			"!src/routeTree.gen.ts",
 			"!src/styles.css",
 			"!**/node_modules",

@@ -1,0 +1,195 @@
+/* Rigi
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+ */
+
+/* The page is the paper of the sheet: #f4f4f4 at 90 % over #ffdb8b at 10 %, as in the canvas.
+   One 8 px grid, a 12 column measure, no outlines around sections and no coloured shadows. */
+
+:root {
+  --paper: #f5f2ea;
+  --ink: #131313;
+  --muted: #131313a6;
+  --accent: #bf2233;
+  --gutter: 16px;
+  --measure: 1280px;
+  --font-sans: "Fira Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+}
+
+html {
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 15px / 1.45 var(--font-sans);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
+
+.sheet-head,
+.sheet,
+.sheet-foot {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+}
+
+/* Header: a 12 column grid. Eyebrow and title on the left, the lede in the middle, the renderer
+   select aligned right on the same baseline grid. */
+.sheet-head {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--gutter);
+  row-gap: 4px;
+  align-items: end;
+  padding-top: 24px;
+  padding-bottom: 16px;
+}
+
+.eyebrow {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+h1 {
+  grid-column: 1 / span 5;
+  margin: 0;
+  font: 600 clamp(28px, 3.4vw, 40px) / 1.05 var(--font-serif);
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  grid-column: 6 / span 5;
+  margin: 0;
+  max-width: 60ch;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.backend {
+  grid-column: 11 / span 2;
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.backend select {
+  font: 500 13px var(--font-sans);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #13131340;
+  border-radius: 0;
+  padding: 2px 0;
+}
+
+.backend select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* The sheet: the canvas is the hero. Its box is the neatline's host; the furniture is drawn inside. */
+#scene {
+  position: relative;
+  width: 100%;
+  height: clamp(420px, 72vh, 820px);
+  overflow: hidden;
+  background: var(--paper);
+  /* The page scrolls with the wheel and vertical swipes: nothing on the canvas captures them. */
+  touch-action: pan-y;
+}
+
+#scene canvas {
+  touch-action: pan-y;
+}
+
+.lk-plate-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lk-plate-host .lk-wegweiser {
+  right: 56px;
+  top: 150px;
+}
+
+#controls {
+  margin-top: 0;
+}
+
+#drawers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--gutter);
+  align-items: start;
+  margin-top: 8px;
+}
+
+.sheet-foot {
+  padding-top: 16px;
+  padding-bottom: 32px;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--gutter);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#status {
+  grid-column: 1 / span 3;
+  margin: 0;
+}
+
+.credits {
+  grid-column: 4 / -1;
+  margin: 0;
+  max-width: 100ch;
+}
+
+@media (max-width: 760px) {
+  .sheet-head,
+  .sheet-foot {
+    display: block;
+  }
+
+  .lede {
+    margin-top: 8px;
+  }
+
+  .backend {
+    margin-top: 8px;
+    align-items: flex-start;
+  }
+
+  #scene {
+    height: clamp(360px, 62vh, 620px);
+  }
+
+  #drawers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .credits {
+    margin-top: 8px;
+  }
+}
