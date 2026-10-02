@@ -67,7 +67,8 @@ export function writeRingUniforms(buffer: Buffer, setup: RingSetup): void {
 /**
  * Builds, compiles (async, so the first frame never waits on pipeline creation) and uploads the
  * ring graph. `eyeHeight` passed to `run` is the lens altitude above sea level in metres. Peaks
- * farther than 45 km are reported invisible (`peakMarginDeg` -90).
+ * farther than 45 km, or whose ray leaves the mosaic before the peak, are reported invisible
+ * (`peakMarginDeg` -90).
  */
 export async function createRingGraph(
   device: Device,

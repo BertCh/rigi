@@ -23,6 +23,8 @@ export const MAX_TILES = 180;
 const DEG = Math.PI / 180;
 const VERTICES_PER_EDGE = GRID_SEGMENTS + 1;
 const MAX_CONCURRENT_REQUESTS = 6;
+/** Matches the example's texture array depth (`MAX_TILE_LAYERS` in app.ts). */
+const DEFAULT_MAX_LAYERS = 256;
 /** The quadtree starts at zoom 6 (about 400 km wide), which covers the 150 km panorama radius. */
 const START_ZOOM = 6;
 
@@ -270,12 +272,20 @@ export function makeLoadedTile(key: TileKey, layer: number, rgba: Uint8Array): L
   return {...key, layer, rgba, elevations: getVertexElevations(rgba)};
 }
 
-export type TileStreamerStats = {requested: number; loaded: number; failed: number};
+/** `dropped` counts tiles that arrived after every texture layer was taken, and are not drawn. */
+export type TileStreamerStats = {
+  requested: number;
+  loaded: number;
+  failed: number;
+  dropped: number;
+};
 
 export type TileStreamerOptions = {
   /** Replaces the network fetch, for tests and offline use. */
   fetchRgba?: (key: TileKey, signal: AbortSignal) => Promise<Uint8Array>;
   concurrency?: number;
+  /** Texture array depth: layers are never recycled, so tiles beyond this are dropped and counted. */
+  maxLayers?: number;
 };
 
 /**
@@ -284,7 +294,7 @@ export type TileStreamerOptions = {
  * never refetches a tile already requested. Layers are assigned in arrival order.
  */
 export class TileStreamer {
-  readonly stats: TileStreamerStats = {requested: 0, loaded: 0, failed: 0};
+  readonly stats: TileStreamerStats = {requested: 0, loaded: 0, failed: 0, dropped: 0};
   /** Every tile delivered so far, in layer order. */
   readonly tiles: LoadedTile[] = [];
 
@@ -292,6 +302,7 @@ export class TileStreamer {
   private readonly signal: AbortSignal;
   private readonly fetchRgba: (key: TileKey, signal: AbortSignal) => Promise<Uint8Array>;
   private readonly concurrency: number;
+  private readonly maxLayers: number;
   private readonly seen = new Set<string>();
   private queue: TileKey[] = [];
   private active = 0;
@@ -305,6 +316,7 @@ export class TileStreamer {
     this.signal = signal;
     this.fetchRgba = options.fetchRgba ?? fetchTileRgba;
     this.concurrency = options.concurrency ?? MAX_CONCURRENT_REQUESTS;
+    this.maxLayers = options.maxLayers ?? DEFAULT_MAX_LAYERS;
   }
 
   request(keys: TileKey[]): void {
@@ -337,7 +349,10 @@ export class TileStreamer {
   private finish(key: TileKey, rgba: Uint8Array): void {
     this.active--;
     try {
-      if (!this.signal.aborted) {
+      if (!this.signal.aborted && this.tiles.length >= this.maxLayers) {
+        // The terrain layer skips tiles past its texture depth: count them instead of a silent hole.
+        this.stats.dropped++;
+      } else if (!this.signal.aborted) {
         const tile = makeLoadedTile(key, this.tiles.length, rgba);
         this.tiles.push(tile);
         this.stats.loaded++;

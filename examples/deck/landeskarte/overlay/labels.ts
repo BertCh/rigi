@@ -14,6 +14,7 @@
 import {type Layer} from '@deck.gl/core';
 import {LineLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import {curvatureDrop, REFRACTION_K} from '../geo/geodesy';
+import {NEATLINE_INSET} from '../ui/furniture';
 import type {ENU, Frame, LakeLabel, Peak, PeakTier, PlacedLabel, RGB, SceneMode} from '../types';
 import {
   ALTITUDE_STYLE,
@@ -58,6 +59,12 @@ export type PlaceLabelsInput = {
 };
 
 const VIEWPORT_MARGIN = 4;
+/**
+ * Inset of the label viewport from the canvas edge: the neatline plus a gap, so a name box never
+ * touches the neatline or the tick numbers in its margin. The anchor point of a dot may sit
+ * closer (VIEWPORT_MARGIN); callers should use this value for their own anchor inset too.
+ */
+export const LABEL_VIEWPORT_INSET = NEATLINE_INSET + 8;
 /** Safety on the estimated text width; a measured width needs less. */
 const WIDTH_SAFETY = 1.05;
 /** Gap between the symbol and the text in the plan, pixels. */
@@ -258,10 +265,10 @@ export function placeLabels(input: PlaceLabelsInput): PlacedLabel[] {
 
   const accepts = (item: Item, candidate: Candidate, box: Rect): boolean => {
     if (
-      box.x0 < VIEWPORT_MARGIN ||
-      box.x1 > viewport.width - VIEWPORT_MARGIN ||
-      box.y0 < VIEWPORT_MARGIN ||
-      box.y1 > viewport.height - VIEWPORT_MARGIN
+      box.x0 < LABEL_VIEWPORT_INSET ||
+      box.x1 > viewport.width - LABEL_VIEWPORT_INSET ||
+      box.y0 < LABEL_VIEWPORT_INSET ||
+      box.y1 > viewport.height - LABEL_VIEWPORT_INSET
     ) {
       return false;
     }

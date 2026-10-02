@@ -4,11 +4,23 @@
 
 # Landeskarte Abendlicht
 
-The Niederhorn above Lake Thun as a Swiss Landeskarte sheet that lifts into a summit panorama and ends exactly on the solved frame of a photo taken there on 7 September 2026. Drag the time ruler and the real sun of that day moves across the relief, with cast shadows from a GPU horizon map (a luma.gl `GPUCommandGraph` on WebGPU, a CPU twin in a worker on WebGL2). Open a station to see where the camera stood, what the solver made of it and how far the photo's skyline sits from the DEM horizon.
+The Niederhorn above Lake Thun as a Swiss Landeskarte sheet that lifts into a summit panorama, where the real sun of 7 September 2026 moves across the relief and casts shadows as you drag the time ruler.
+
+The panorama's last frame is the solved camera pose of a photo taken there. The cast shadows come from a horizon map computed by a luma.gl `GPUCommandGraph` on WebGPU, or by a CPU twin in a worker on WebGL2. Open a station to see where the camera stood, what the solver made of it and how far the photo's skyline sits from the DEM horizon.
 
 The examples resolve `@luma.gl/*` and `@deck.gl/*` from this repository's vendored tarballs (`vendor/`), so run them from this repository (after `npm install` at the root); they are not meant to be copied out on their own.
 
 Run `npm start` from this folder, or `node scripts/examples.mjs start deck/landeskarte` from the repository root. Select the backend with `?backend=webgpu` or `?backend=webgl`; without a query the example uses WebGPU when an adapter is available and WebGL2 otherwise. Other query flags: `?mode=plan|panorama`, `?t=HH:MM` (CEST wall clock, freezes the capture, no reveal), `?reveal=off`.
+
+The gallery thumbnail (`thumbnail.jpg`, 480 by 320, the plan sheet with the Mapterhorn credit in frame) is rendered by `scripts/make-thumbnail.mjs` under the render lock; it is not committed yet and has to be regenerated and checked in before the gallery card shows an image.
+
+## Scene API
+
+`createLandeskarteScene(parent, options)` (`app.ts`) builds the scene in `parent` and returns it; `main.ts` also stores it on `window.landeskarteScene` for the smoke test.
+
+- Options: the usual luma/deck device options (`backend`, canvas and device props, see `deck-example-device.ts`), plus `mode` (`'plan'` or `'panorama'`), `minutes` (UTC minutes since 2026-09-07T00:00Z), `reveal` (play the load reveal; off under webdriver and reduced motion), `onUpdate(diagnostics)` after each redraw, and three additions to the example contract: `controlsHost` and `drawersHost` (DOM hosts for the ruler, the layer switches and the two drawers; without them the scene is headless) and `onStatus(text)` (loading status lines).
+- Returned: `deck`, `ready` (resolves when the first sheet is drawn, the reveal has started and the horizon map, shaded field and skyline ring have settled or a 120 s bound passed), `diagnostics`, `waitForFrame()`, `setMode(mode)` (resolves after the flight's last frame; a flight that is superseded or finalized resolves too), `setMinutes(utcMinutes)`, `setRefraction(k)`, `selectStation(id | null)`, `setLayer(name, on)`, `runParity()`, `snapshot()` (PNG `Blob` of the canvas; several calls may be pending) and `finalize()` (idempotent; settles every pending promise).
+- Diagnostics, read by the smoke test: `frames`, `backend` (`'webgpu'`, `'webgl'` or `''`), `error`, `finalized`, `tilesRequested`, `tilesLoaded`, `tilesFailed`, `computeBackend` (`'graph'`, `'cpu-twin'` or `'none'`), `shadowPasses`, `graphNodeMs`, `parity` (a `ParityReport`, with the sun-hours and ring comparisons in `sunHours` and `ring` on WebGPU), `labelsPlaced`, `stationsLoaded`, `revealDone`, and beyond the spec's list `mode`, `minutes`, `sunAzimuth`, `sunElevation` and `pose` (the exact final pose of the last flight).
 
 ## How it works
 
@@ -34,7 +46,7 @@ The sky (`layers/sky-layer.ts`) is a full-screen layer drawn first that rebuilds
 
 One curvature convention everywhere: `up = elevation - (1 - k) (e^2 + n^2) / 2R`, `R = 6371008.8`, `k = 0.13`. The same `1 - k` goes to the terrain, the Nebelmeer, the trails, the labels and the ring. With the flat/curved switch off, `k = 1`.
 
-Only the tiles of the current view's quadtree selection are drawn, so zoom levels never overlap. Labels, trails and stations are ordinary deck.gl `TextLayer`, `PathLayer`, `LineLayer` and `ScatterplotLayer` layers. Names and markers live in a second pixel-space `OrthographicView` selected by a `layerFilter` on the `screen-` id prefix, positioned by a CPU mirror of the viewport (`projectToScreen`, agreeing with deck's `viewport.project` to 2e-13 px). Trails are draped on the loaded DEM in world metres. deck.gl's `pixels` width units are one world unit per pixel in a perspective view, so trail widths are metres scaled by the distance from the eye (a width of n px at distance d is n times 2 tan(vfov / 2) / height times d). Everything on the page around the canvas (neatline, LV95 graticule ticks, scale bar from the camera's metres per pixel, a legend that lists only what is drawn, north arrow, imprint, the ruler) is DOM and SVG.
+Only the tiles of the current view's quadtree selection are drawn, sorted by zoom, x and y so the draw order never depends on network arrival; while part of a new selection is still loading the previous tiles stay for at most 4 s, which can briefly overlap two zoom levels. The selection is made again when the canvas aspect changes. Labels, trails and stations are ordinary deck.gl `TextLayer`, `PathLayer`, `LineLayer` and `ScatterplotLayer` layers. Names and markers live in a second pixel-space `OrthographicView` selected by a `layerFilter` on the `screen-` id prefix, positioned by a CPU mirror of the viewport (`projectToScreen`, agreeing with deck's `viewport.project` to 2e-13 px). Trails are draped on the loaded DEM in world metres. deck.gl's `pixels` width units are one world unit per pixel in a perspective view, so trail widths are metres scaled by the distance from the eye (a width of n px at distance d is n times 2 tan(vfov / 2) / height times d). Everything on the page around the canvas (neatline, LV95 graticule ticks, scale bar from the camera's metres per pixel, a legend that lists only what is drawn, north arrow, imprint, the ruler) is DOM and SVG.
 
 ### The light pipeline
 
@@ -42,6 +54,7 @@ Two graphs share one z11 Terrarium mosaic (7 by 7 tiles, 94 km wide) centred on 
 
 - **Ring** (WebGPU): `decode-terrarium`, then `march-horizon` (2048 azimuth bins, 5 m to 45 km from the summit eye, `(h - h_eye) / d - d (1 - k) / 2R`), then `peak-visibility` (one thread per peak). The eye is the DEM plus 1.6 m (the photo's lens sits 45 m below the DEM at the Niederhorn top, so a ring from the lens itself would be blocked by the ground at its feet). Its output feeds the label visibility (names are only placed where the summit clears the skyline) and the optional skyline overlay.
 - **Shadow** (WebGPU): `decode-terrarium` over a 1024 by 1024 window (26.8 km), then `horizon-map`: 16 azimuths by 256 geometric samples from 26 m to 12 km, u16 angles over [-0.25, pi/2] rad, 33.5 MiB, one azimuth per dispatch with an awaited submit in between so no single submit runs long. On every sun change `shade-at-time` looks up and interpolates the horizon between azimuths, applies a smoothstep penumbra of 0.27 degrees and writes a byte buffer that is copied to an `r8unorm` texture (the buffer row pitch is 256 bytes). `ambient-field` (sky-view factor) runs once. `sun-hours` accumulates the 288 five-minute table steps in f32 and is read back once for the cursor read-out.
+- **Shadow field in use.** The field is only drawn after its first shade at the real sun, so the kernel's placeholder sun (-10 degrees, everything shadowed) never shows.
 - **CPU twin** (WebGL2, no compute): the same 16 by 256 horizon map at 256 by 256 texels (stride 4) in a worker, with `Math.fround` in the kernel's operation order, then the same shade on every `setSun`, written with `texture.writeData`. The twin is also the checkable specification of the kernels: `checks/parity.check.ts` compares it to a direct double-precision march.
 - **One consumer.** The terrain fragment shader only ever samples a `ShadowField` (shadow plus ambient), whichever side filled it, so it never branches on the backend. If compute fails the field is null and the terrain draws without cast shadow.
 
@@ -80,7 +93,9 @@ What was run, and what was not. Nothing here is a claim about other machines or 
 
 ### Photo skylines
 
-Each of the twelve photos carries two skylines baked as world directions through its solved pose (`data/photo-skylines.json`, geometry only, no pixels): the boundary of a neural sky segmentation (U2-Net-P, MIT, xiongzhu666/Sky-Segmentation-and-Post-processing, run offline with onnxruntime-web, with MediaPipe selfie_multiclass_256 masks, Apache-2.0, used only to drop columns that touch a person) and Rigi's classical colour-model detector as the secondary line. The "Skyline (ML)" layer draws them on the panorama; selecting a station adds the station's median and 90th percentile residual against the ring's DEM horizon to its Wegweiser plate. `checks/skyline.check.ts` measures them offline, the median of |photo skyline - DEM horizon| in degrees (solved poses, so this is agreement with the solver, not independent ground truth):
+Baking cannot be reproduced from this repository alone: `scripts/bake-skylines.mjs` reads the private demo photos (`public/demo/photos/demo-NN.jpg`), the solved-pose JSON (`public/demo/gipfelbuch/`), the people masks and the U2-Net-P ONNX model in `public/models/` (the file name carries a hash; run the script from the repository root with `onnxruntime-web` and `@napi-rs/canvas` installed). `data/photo-skylines.json` is shipped as-is and the script is provenance, not a build step.
+
+Each of the twelve photos carries two skylines baked as world directions through its solved pose (`data/photo-skylines.json`, geometry only, no pixels): the boundary of a neural sky segmentation (U2-Net-P, MIT, xiongzhu666/Sky-Segmentation-and-Post-processing, run offline with onnxruntime-web (the baking script needs the private demo photos and the model weights, see below), with MediaPipe selfie_multiclass_256 masks, Apache-2.0, used only to drop columns that touch a person) and Rigi's classical colour-model detector as the secondary line. The "Skyline (ML)" layer draws them on the panorama; selecting a station adds the station's median and 90th percentile residual against the ring's DEM horizon to its Wegweiser plate. `checks/skyline.check.ts` measures them offline, the median of |photo skyline - DEM horizon| in degrees (solved poses, so this is agreement with the solver, not independent ground truth):
 
 | Photo | confidence | ML - DEM median (p90) | classical - DEM median (p90) |
 |---|---|---|---|
@@ -97,7 +112,7 @@ Each of the twelve photos carries two skylines baked as world directions through
 | demo-11 | 0.84 | 0.360 (1.17) | 0.353 (0.98) |
 | demo-12 | 0.97 | 0.334 (1.10) | 0.350 (1.06) |
 
-The check asserts that among photos with confidence at least 0.7 the worst ML median stays under 1 degree (it is 0.36). The two photos below 0.7 confidence are the two with the largest residuals, which is what a pose error should look like.
+The check asserts that among photos with confidence at least 0.7 the worst ML median stays under 1 degree (it is 0.36). The two photos below 0.7 confidence have the two largest median residuals (p90 is not ordered the same way: demo-04 classical is 6.92 at confidence 0.79). This is agreement between the photo's skyline and the solver's pose, not independent evidence of a pose error.
 
 ## Upstream notes
 
@@ -124,10 +139,10 @@ The check asserts that among photos with confidence at least 0.7 the worst ML me
 
 ## Data and licences
 
-- **Terrain**: [Mapterhorn](https://mapterhorn.com) Terrarium WebP tiles (`https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`), mainly swisstopo swissALTI3D (Swiss OGD) and Copernicus GLO-30 here; see [mapterhorn.com/attribution](https://mapterhorn.com/attribution). Credit: (c) Mapterhorn.
+- **Terrain**: [Mapterhorn](https://mapterhorn.com) Terrarium WebP tiles (`https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`; the Terrarium elevation encoding, `R * 256 + G + B / 256 - 32768` m, was defined by Mapzen's terrain tiles), mainly swisstopo swissALTI3D (Swiss Open Government Data, credit "swisstopo") and Copernicus GLO-30 here; see [mapterhorn.com/attribution](https://mapterhorn.com/attribution). Credit in the page: (c) Mapterhorn. Copernicus notice, to be kept with the data: "(c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved". Check the Mapterhorn attribution page for the current wording before publishing.
 - **Summits and trails**: OpenStreetMap contributors, available under the [ODbL](https://www.openstreetmap.org/copyright). `data/peaks-niederhorn.json` and `data/trails-niederhorn.json` are derivative extracts and are offered under the ODbL.
 - **Stations and skylines**: pose-solver output on photos taken by the project author on 2026-09-07, geometry only. No photo pixel ships. Solved poses are not ground truth.
-- **U2-Net-P** (sky segmentation): MIT, (c) xiongzhu666, from Sky-Segmentation-and-Post-processing; used offline to bake `data/photo-skylines.json`. MediaPipe selfie_multiclass_256: Apache-2.0, Google, masks only used to drop columns.
+- **U2-Net-P** (sky segmentation): the architecture and original weights are U2-Net by Qin et al. ([xuebinqin/U-2-Net](https://github.com/xuebinqin/U-2-Net), Apache-2.0); the converted model comes from xiongzhu666/Sky-Segmentation-and-Post-processing (MIT, (c) xiongzhu666). The weights are not part of this example's files (they sit in `public/models/` of the Rigi repository); each notice stays with the file. Used offline to bake `data/photo-skylines.json`. MediaPipe selfie_multiclass_256: Apache-2.0, Google, masks only used to drop columns.
 - **Fonts**: Fira Sans, Fira Sans Condensed and Fira Mono (SIL OFL 1.1, The Mozilla Foundation and Telefonica S.A.), Source Serif 4 (SIL OFL 1.1, Adobe), loaded from Google Fonts with a system fallback stack.
-- **Palette**: the ink, contour, water, rock, peak and Wegweiser colours follow the Brezine colour chart roles, with `#bf2233` kept as the single accent for the selected state.
+- **Palette**: the ink, contour, water, rock, peak and Wegweiser colours take their role-to-colour assignments from the Brezine colour chart as recorded in the Rigi repository (`src/brand/khipu.ts`); no artwork or data of the chart is copied, and I did not verify a public source link or its licence. `#bf2233` is kept as the single accent for the selected state.
 - Code: MIT, (c) Rigi contributors.

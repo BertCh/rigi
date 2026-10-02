@@ -89,6 +89,11 @@ export function attachOrbitControls(
       ArrowUp: [0, -1],
       ArrowDown: [0, 1]
     };
+    // Escape releases focus so keyboard users are never trapped on the canvas.
+    if (event.key === 'Escape') {
+      canvas.blur();
+      return;
+    }
     const direction = keys[event.key];
     if (!direction) return;
     event.preventDefault();
@@ -103,6 +108,24 @@ export function attachOrbitControls(
   const previousTouchAction = canvas.style.touchAction;
   canvas.style.touchAction = 'pan-y';
   if (!canvas.hasAttribute('tabindex')) canvas.tabIndex = 0;
+  const previousOutline = canvas.style.outline;
+  const previousOutlineOffset = canvas.style.outlineOffset;
+  const hadKeyShortcuts = canvas.hasAttribute('aria-keyshortcuts');
+  if (!hadKeyShortcuts)
+    canvas.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown ArrowLeft ArrowRight Escape');
+  // Visible keyboard focus ring (pointer focus stays ring-free via :focus-visible).
+  const onFocus = () => {
+    if (canvas.matches(':focus-visible')) {
+      canvas.style.outline = '2px solid #131313';
+      canvas.style.outlineOffset = '-2px';
+    }
+  };
+  const onBlur = () => {
+    canvas.style.outline = previousOutline;
+    canvas.style.outlineOffset = previousOutlineOffset;
+  };
+  canvas.addEventListener('focus', onFocus);
+  canvas.addEventListener('blur', onBlur);
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerEnd);
@@ -110,6 +133,10 @@ export function attachOrbitControls(
   canvas.addEventListener('keydown', onKeyDown);
   return () => {
     canvas.style.touchAction = previousTouchAction;
+    onBlur();
+    if (!hadKeyShortcuts) canvas.removeAttribute('aria-keyshortcuts');
+    canvas.removeEventListener('focus', onFocus);
+    canvas.removeEventListener('blur', onBlur);
     canvas.removeEventListener('pointerdown', onPointerDown);
     canvas.removeEventListener('pointermove', onPointerMove);
     canvas.removeEventListener('pointerup', onPointerEnd);

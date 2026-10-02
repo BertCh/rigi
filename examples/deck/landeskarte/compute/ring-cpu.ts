@@ -21,7 +21,10 @@ export const RING_MAXIMUM_DISTANCE = 45_000;
 export const RING_DEFAULT_BINS = 2048;
 /** A peak this far below the horizon in front of it still counts as visible, degrees. */
 export const RING_PEAK_TOLERANCE_DEG = 0.1;
-/** `peakMarginDeg` of a peak beyond `RING_MAXIMUM_DISTANCE`: it is reported invisible. */
+/**
+ * `peakMarginDeg` of a peak beyond `RING_MAXIMUM_DISTANCE`, or whose ray leaves the mosaic before
+ * the peak: it is reported invisible.
+ */
 export const RING_OUT_OF_RANGE_MARGIN_DEG = -90;
 
 /** Inputs shared bit for bit by the GPU graph and the twin. Every scalar is an f32 value. */
@@ -259,6 +262,7 @@ export function marchPeaksCpu(heights: Float32Array, setup: RingSetup): RingPeak
     const limit = round(distance - setup.peakSkirt);
     let blocker = round(-1e30);
     let blockerDistance = 0;
+    let leftMosaic = false;
     for (let index = 0; index < setup.sampleCount; index++) {
       const sampleDistance = setup.samples[2 * index];
       if (sampleDistance >= limit) break;
@@ -270,13 +274,17 @@ export function marchPeaksCpu(heights: Float32Array, setup: RingSetup): RingPeak
         sampleDistance,
         setup.samples[2 * index + 1]
       );
-      if (Number.isNaN(tangent)) break;
+      if (Number.isNaN(tangent)) {
+        // The line of sight ran off the DEM before reaching the peak: it was never fully tested.
+        leftMosaic = true;
+        break;
+      }
       if (tangent > blocker) {
         blocker = tangent;
         blockerDistance = sampleDistance;
       }
     }
-    const outOfRange = distance > lastDistance ? 1 : 0;
+    const outOfRange = leftMosaic || distance > lastDistance ? 1 : 0;
     raw.set([peakTangent, blocker, outOfRange, blockerDistance], peak * 4);
   }
   return raw;

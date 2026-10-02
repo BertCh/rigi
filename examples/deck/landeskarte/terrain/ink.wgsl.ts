@@ -172,6 +172,14 @@ fn lk_ink(elevM: f32, fwidthElev: f32, slope: f32, aspect: f32, shade: f32, rang
   return vec4<f32>(color * alpha, alpha);
 }
 
+// Metres per pixel snapped to half-octave steps. fwidth is constant per 2x2 quad and differs a
+// little between quads; dividing a position of thousands of metres by it would move the pattern
+// by whole cells at every quad border. The snapped scale is the same for neighbouring pixels, so
+// the pattern is stable (stroke and dot sizes vary by at most about 19 % within a level).
+fn lk_snapScale(metresPerPixel: f32) -> f32 {
+  return exp2(floor(log2(max(metresPerPixel, 0.0001)) * 2.0 + 0.5) * 0.5);
+}
+
 // Rock hachure: short strokes running down the fall line, denser on shaded faces (3 px period)
 // than on lit ones (5 px), only on steep ground. The fall direction is quantised to 16 sectors,
 // because the raw DEM aspect jitters and would shred the stripes into noise; the sector seams
@@ -180,7 +188,7 @@ fn lk_ink(elevM: f32, fwidthElev: f32, slope: f32, aspect: f32, shade: f32, rang
 fn lk_hachure(posEnu: vec2<f32>, fwidthPos: f32, aspect: f32, slope: f32, shade: f32)
     -> vec4<f32> {
   let steep = smoothstep(LK_HACHURE_SLOPE_LO, LK_HACHURE_SLOPE_HI, slope);
-  let metresPerPixel = max(fwidthPos, 0.0001);
+  let metresPerPixel = lk_snapScale(fwidthPos);
   let sectorAngle = 6.2831853 / LK_HACHURE_SECTORS;
   let angle = floor(aspect / sectorAngle + 0.5) * sectorAngle;
   // Aspect is a compass azimuth: the fall direction in (east, north) is (sin, cos).
@@ -214,7 +222,7 @@ fn lk_scree(posEnu: vec2<f32>, fwidthPos: f32, slope: f32, elevM: f32) -> vec4<f
   let belt = smoothstep(LK_SCREE_SLOPE_LO, LK_SCREE_SLOPE_MID_LO, slope)
     * (1.0 - smoothstep(LK_SCREE_SLOPE_MID_HI, LK_SCREE_SLOPE_HI, slope))
     * smoothstep(LK_SCREE_ELEV_LO, LK_SCREE_ELEV_HI, elevM);
-  let grid = posEnu / (max(fwidthPos, 0.0001) * LK_SCREE_PITCH);
+  let grid = posEnu / (lk_snapScale(fwidthPos) * LK_SCREE_PITCH);
   let cell = floor(grid);
   let local = fract(grid);
   let dotAt = vec2<f32>(0.3 + 0.4 * lk_hash(cell, 21u), 0.3 + 0.4 * lk_hash(cell, 22u));

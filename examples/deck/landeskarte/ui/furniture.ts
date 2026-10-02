@@ -334,14 +334,31 @@ function applyJitter(node: HTMLElement | SVGElement, id: string): void {
 // Legend glyphs: one tiny SVG per symbol, in the same inks the layers use.
 // ---------------------------------------------------------------------------------------------
 
+/** Contours switch ink like the map: soil brown, rock black above the rock belt, blue on ice. */
+function contourGlyph(weight: 'index' | 'minor'): SVGElement[] {
+  return [
+    ['soil', 'M1 8 H10'],
+    ['rock', 'M10 8 H19'],
+    ['ice', 'M19 8 H27']
+  ].map(([ink, d]) => svgEl('path', {d}, `lk-g-contour-${weight} lk-g-contour-${ink}`));
+}
+
+/** White casing under 2:1 dashes, as the trail layer cuts them (60 m dash, 30 m gap). */
+function dashedTrailGlyph(kind: 'mountain' | 'alpine'): SVGElement[] {
+  return [
+    svgEl('path', {d: 'M1 8 H27'}, 'lk-g-trail-casing'),
+    svgEl('path', {d: 'M1 8 H27'}, `lk-g-trail lk-g-trail-${kind}`)
+  ];
+}
+
 const LEGEND: Record<SymbolId, {label: string; draw: () => SVGElement[]}> = {
   'contour-index': {
     label: 'Höhenkurve 100 m',
-    draw: () => [svgEl('path', {d: 'M1 8 H27'}, 'lk-g-contour-index')]
+    draw: () => contourGlyph('index')
   },
   'contour-minor': {
     label: 'Höhenkurve 20 m',
-    draw: () => [svgEl('path', {d: 'M1 8 H27'}, 'lk-g-contour-minor')]
+    draw: () => contourGlyph('minor')
   },
   rock: {
     label: 'Fels',
@@ -371,11 +388,11 @@ const LEGEND: Record<SymbolId, {label: string; draw: () => SVGElement[]}> = {
   },
   'trail-mountain': {
     label: 'Bergwanderweg',
-    draw: () => [svgEl('path', {d: 'M1 8 H27'}, 'lk-g-trail lk-g-trail-mountain')]
+    draw: () => dashedTrailGlyph('mountain')
   },
   'trail-alpine': {
     label: 'Alpinwanderweg',
-    draw: () => [svgEl('path', {d: 'M1 8 H27'}, 'lk-g-trail lk-g-trail-alpine')]
+    draw: () => dashedTrailGlyph('alpine')
   },
   station: {
     // The open triangle of the stations: a camera standpoint, not a closed marker.
@@ -469,7 +486,11 @@ export function renderWegweiser(station: Station, cest: string): HTMLElement {
 
 const KEY_LOW = 500;
 const KEY_HIGH = 3000;
-const KEY_TICKS = [500, 1500, 3000];
+const KEY_TICKS = [500, 1000, 1500, 2000, 2500, 3000];
+/** Every other tick carries a label. */
+const KEY_LABELLED = new Set([1000, 2000, 3000]);
+const KEY_WIDTH = 196;
+const KEY_BAR_HEIGHT = 12;
 const SCALE_MAX_PX = 140;
 const GRID_MIN_PX = 96;
 
@@ -521,9 +542,9 @@ export function createFurniture(host: HTMLElement): Furniture {
   const legendLight = el('p', 'lk-legend-light');
   const key = el('div', 'lk-key');
   const keySvg = svgEl('svg', {
-    viewBox: '0 0 160 8',
-    width: 160,
-    height: 8,
+    viewBox: `0 0 ${KEY_WIDTH} ${KEY_BAR_HEIGHT + 4}`,
+    width: KEY_WIDTH,
+    height: KEY_BAR_HEIGHT + 4,
     preserveAspectRatio: 'none'
   });
   const gradient = svgEl('linearGradient', {id: 'lk-key-gradient', x1: 0, x2: 1, y1: 0, y2: 0});
@@ -532,11 +553,29 @@ export function createFurniture(host: HTMLElement): Furniture {
   }
   keySvg.append(
     svgEl('defs'),
-    svgEl('rect', {x: 0, y: 0, width: 160, height: 8, fill: 'url(#lk-key-gradient)'})
+    svgEl('rect', {
+      x: 0,
+      y: 0,
+      width: KEY_WIDTH,
+      height: KEY_BAR_HEIGHT,
+      fill: 'url(#lk-key-gradient)'
+    })
   );
   keySvg.firstElementChild?.append(gradient);
   const keyLabels = el('div', 'lk-key-labels');
   for (const tick of KEY_TICKS) {
+    const x = ((tick - KEY_LOW) / (KEY_HIGH - KEY_LOW)) * KEY_WIDTH;
+    keySvg.append(
+      svgEl(
+        'path',
+        {
+          d: `M${x} ${KEY_BAR_HEIGHT - 3} V${KEY_BAR_HEIGHT + 3}`,
+          'vector-effect': 'non-scaling-stroke'
+        },
+        'lk-key-tick'
+      )
+    );
+    if (!KEY_LABELLED.has(tick)) continue;
     const label = el('span', 'lk-num', formatThousands(tick));
     label.style.left = `${((tick - KEY_LOW) / (KEY_HIGH - KEY_LOW)) * 100}%`;
     keyLabels.append(label);

@@ -15,6 +15,7 @@ import {createRingGraph} from './compute/ring-graph';
 import {compareParity, marchCellF64} from './compute/parity';
 import {createCpuShadowSource, shadeAtTimeCpu} from './compute/cpu-twins';
 import {createShadowGraph} from './compute/shadow-graph';
+import {azimuthBlend, SUN_FLOOR_RAD} from './compute/shadow-shaders';
 import {
   dequantizeAngle,
   HORIZON_MAP_AZIMUTHS,
@@ -108,6 +109,11 @@ const REVEAL_MS = 2600;
 const NUMBER_OF_RING_BINS = 2048;
 /** The panorama pose never rises: it is a lens at the origin. */
 const SKYLINE_COLUMN_STEP = 4;
+/** How long the previous selection's tiles may stay drawn while the new one is incomplete. */
+const CARRY_OVER_MS = 4000;
+/** Sun-hours kernel against its CPU sum (byte-quantised lit fraction on the CPU side). */
+const SUN_HOURS_TOLERANCE_HOURS = 0.05;
+const RING_TOLERANCE_DEG = 0.01;
 const SHADOW_FIELD_SIZE_GPU = 1024;
 
 const LAYER_DEFAULTS: Record<LayerName, boolean> = {
@@ -206,6 +212,10 @@ export function createLandeskarteScene(
   let drawnTiles = [] as LoadedTile[];
   let drawnSource: unknown = null;
   let drawnWanted: unknown = null;
+  /** True once the previous mode's tiles may no longer stay drawn under a stalled selection. */
+  let carryOverExpired = false;
+  let carryOverTimer: ReturnType<typeof setTimeout> | undefined;
+  let drawnCarryOver = false;
   let tilesSnapshot = [] as ReturnType<TileStreamer['tiles']['slice']>;
   let tilesDirtyAt = 0;
   let placedLabels: PlacedLabel[] = [];
@@ -225,7 +235,13 @@ export function createLandeskarteScene(
   let numbersPanel = null as NumbersPanel | null;
   let hud = null as Hud | null;
   let plateHost = null as HTMLElement | null;
-  let snapshotRequest: ((canvas: HTMLCanvasElement) => void) | null = null;
+  let snapshotRequests: {run(canvas: HTMLCanvasElement): void; fail(error: Error): void}[] = [];
+  /** Resolves the promise of the setMode call whose flight is running (or was superseded). */
+  let settleFlight: (() => void) | null = null;
+  let tileResizeTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastTileAspect = 0;
+  let shadowShaded = false;
+  let computeSettled: Promise<void> = Promise.resolve();
 
   const diagnostics: Diagnostics = {
     frames: 0,
@@ -235,6 +251,7 @@ export function createLandeskarteScene(
     tilesRequested: 0,
     tilesLoaded: 0,
     tilesFailed: 0,
+    tilesDropped: 0,
     computeBackend: 'none',
     shadowPasses: 0,
     graphNodeMs: {},
@@ -253,6 +270,7 @@ export function createLandeskarteScene(
     tilesRequested: {get: () => streamer.stats.requested, enumerable: true},
     tilesLoaded: {get: () => streamer.stats.loaded, enumerable: true},
     tilesFailed: {get: () => streamer.stats.failed, enumerable: true},
+    tilesDropped: {get: () => streamer.stats.dropped, enumerable: true},
     shadowPasses: {get: () => horizonPasses + shadowShades, enumerable: true}
   });
 
@@ -266,10 +284,14 @@ export function createLandeskarteScene(
     rejectReady = reject;
   });
 
-  const streamer = new TileStreamer(() => {
-    tilesDirtyAt = performance.now();
-    scheduleRender();
-  }, abortController.signal);
+  const streamer = new TileStreamer(
+    () => {
+      tilesDirtyAt = performance.now();
+      scheduleRender();
+    },
+    abortController.signal,
+    {maxLayers: MAX_TILE_LAYERS}
+  );
 
   const deviceProps = getDeckExampleProps(options);
   const deck = new Deck({
@@ -295,15 +317,19 @@ export function createLandeskarteScene(
     onResize: size => {
       width = Math.max(size.width, 1);
       height = Math.max(size.height, 1);
+      requestTilesForNewAspect();
       scheduleRender();
     },
     onAfterRender: () => {
       diagnostics.frames++;
-      if (snapshotRequest) {
-        const request = snapshotRequest;
-        snapshotRequest = null;
+      if (snapshotRequests.length > 0) {
+        const requests = snapshotRequests;
+        snapshotRequests = [];
         const canvas = deck.getCanvas();
-        if (canvas) request(canvas);
+        for (const request of requests) {
+          if (canvas) request.run(canvas);
+          else request.fail(new Error('snapshot: no canvas'));
+        }
       }
       const callbacks = pendingFrames;
       pendingFrames = [];
@@ -325,6 +351,7 @@ export function createLandeskarteScene(
   }
 
   function waitForFrame(): Promise<void> {
+    if (diagnostics.finalized) return Promise.resolve();
     return new Promise(resolve => {
       pendingFrames.push(resolve);
       // Render now, not on the next rAF: the frame this promise waits for must show the new state.
@@ -357,6 +384,11 @@ export function createLandeskarteScene(
     };
   }
 
+  /** The field is shown only after its first shade at the real sun: the kernel's default sun is -10 degrees. */
+  function isShadowShown(): boolean {
+    return shadowShaded && Boolean(shadowSource?.field);
+  }
+
   function applySunToShadow(): void {
     const sun = getSun();
     diagnostics.sunAzimuth = sun.azimuth;
@@ -369,25 +401,59 @@ export function createLandeskarteScene(
 
   // Tiles -------------------------------------------------------------------------------------
   function requestTilesFor(target: ViewPose, drawn = true): void {
-    const keys = selectTiles(frame, target, {aspect: width / height});
-    if (drawn) wantedTileIds = new Set(keys.map(key => tileId(key.z, key.x, key.y)));
+    lastTileAspect = width / height;
+    const keys = selectTiles(frame, target, {aspect: lastTileAspect});
+    if (drawn) {
+      wantedTileIds = new Set(keys.map(key => tileId(key.z, key.x, key.y)));
+      // The carry-over of the previous selection is bounded: a tile that never arrives must not
+      // keep two zoom levels overlapping for ever.
+      carryOverExpired = false;
+      clearTimeout(carryOverTimer);
+      carryOverTimer = setTimeout(() => {
+        carryOverExpired = true;
+        scheduleRender();
+      }, CARRY_OVER_MS);
+    }
     streamer.request(keys);
   }
 
-  /** After a pan or look-around, ask for the tiles the new view needs (debounced). */
+  /** The view's aspect changed (layout settled, window resized): select the tiles again. */
+  function requestTilesForNewAspect(): void {
+    if (Math.abs(width / height - lastTileAspect) < 0.02 || lastTileAspect === 0) return;
+    clearTimeout(tileResizeTimer);
+    tileResizeTimer = setTimeout(() => {
+      if (!diagnostics.finalized && !flying) requestTilesFor(pose);
+    }, 200);
+  }
+
   /**
-   * The loaded tiles of the wanted selection. While part of it is still loading, the previously
-   * drawn tiles stay too, so a pan never opens a hole (briefly two zoom levels overlap).
+   * The loaded tiles of the wanted selection, sorted by z, x, y so the draw order (and with it the
+   * colour on a shared seam) does not depend on network arrival order. While part of the selection
+   * is still loading, the previously drawn tiles stay too, so a pan never opens a hole (briefly
+   * two zoom levels overlap); that carry-over ends when the stream drains or after CARRY_OVER_MS.
    */
   function getDrawnTiles(): LoadedTile[] {
-    if (drawnSource === tilesSnapshot && drawnWanted === wantedTileIds) return drawnTiles;
-    const loaded = tilesSnapshot.filter(tile => wantedTileIds.has(tileId(tile.z, tile.x, tile.y)));
-    const complete = loaded.length >= wantedTileIds.size;
+    const carrying = drawnCarryOver && !carryOverExpired;
+    if (
+      drawnSource === tilesSnapshot &&
+      drawnWanted === wantedTileIds &&
+      carrying === drawnCarryOver
+    )
+      return drawnTiles;
+    const loaded = tilesSnapshot
+      .filter(tile => wantedTileIds.has(tileId(tile.z, tile.x, tile.y)))
+      .sort((a, b) => a.z - b.z || a.x - b.x || a.y - b.y);
+    const drained = streamer.stats.loaded + streamer.stats.failed >= streamer.stats.requested;
+    const complete = loaded.length >= wantedTileIds.size || drained || carryOverExpired;
     if (complete || drawnTiles.length === 0) {
       drawnTiles = loaded;
+      drawnCarryOver = false;
     } else {
       const kept = new Set(loaded);
-      drawnTiles = [...loaded, ...drawnTiles.filter(tile => !kept.has(tile))];
+      drawnTiles = [...loaded, ...drawnTiles.filter(tile => !kept.has(tile))].sort(
+        (a, b) => a.z - b.z || a.x - b.x || a.y - b.y
+      );
+      drawnCarryOver = true;
     }
     drawnSource = tilesSnapshot;
     drawnWanted = wantedTileIds;
@@ -410,25 +476,67 @@ export function createLandeskarteScene(
     return Math.max(frame.origin.h, getMosaicGroundHeight(mosaic!, frame) + 1.6);
   }
 
-  async function refreshRing(): Promise<void> {
-    if (!mosaic || peaks.length === 0) return;
+  let ringInFlight: Promise<void> | null = null;
+  let ringDirty = false;
+
+  /** Latest wins: calls during a run coalesce into one follow-up run with the newest inputs. */
+  function refreshRing(): Promise<void> {
+    if (!mosaic || peaks.length === 0) return Promise.resolve();
+    if (ringInFlight) {
+      ringDirty = true;
+      return ringInFlight;
+    }
+    ringInFlight = (async () => {
+      do {
+        ringDirty = false;
+        await runRingOnce();
+      } while (ringDirty && !diagnostics.finalized);
+    })().finally(() => {
+      ringInFlight = null;
+    });
+    return ringInFlight;
+  }
+
+  async function runRingOnce(): Promise<void> {
     const serial = ++ringSerial;
     const effectiveK = curved ? refractionK : 1;
     // The ring is the skyline from the summit lens, whatever the camera is doing.
     const eyeHeight = getRingEyeHeight();
+    let result: RingResult | null = null;
     try {
-      const result = ringGraph
+      result = ringGraph
         ? await ringGraph.run(effectiveK, eyeHeight)
-        : computeRingCpu(mosaic, frame, peaks, effectiveK, eyeHeight, NUMBER_OF_RING_BINS);
-      if (serial !== ringSerial || diagnostics.finalized) return;
-      ring = result;
-      collectNodeTimes();
-      controls?.setLayerAvailable('ring', true);
-      if (selectedStationId && !flying) showPlate(selectedStationId);
-      scheduleRender();
+        : computeRingCpu(mosaic!, frame, peaks, effectiveK, eyeHeight, NUMBER_OF_RING_BINS);
     } catch (error) {
       console.warn('Landeskarte: ring failed', error);
+      if (ringGraph && !diagnostics.finalized) {
+        // A lost device or a failed readback: fall back to the CPU twin once.
+        console.warn('Landeskarte: ring graph dropped, using the CPU twin');
+        const broken = ringGraph;
+        ringGraph = null;
+        try {
+          broken.destroy();
+        } catch {}
+        try {
+          result = computeRingCpu(
+            mosaic!,
+            frame,
+            peaks,
+            effectiveK,
+            eyeHeight,
+            NUMBER_OF_RING_BINS
+          );
+        } catch (cpuError) {
+          console.warn('Landeskarte: ring CPU twin failed', cpuError);
+        }
+      }
     }
+    if (!result || serial !== ringSerial || diagnostics.finalized) return;
+    ring = result;
+    collectNodeTimes();
+    controls?.setLayerAvailable('ring', true);
+    if (selectedStationId && !flying) showPlate(selectedStationId);
+    scheduleRender();
   }
 
   function collectNodeTimes(): void {
@@ -496,7 +604,7 @@ export function createLandeskarteScene(
     if (layerState.trails) symbols.push('trail-hiking', 'trail-mountain', 'trail-alpine');
     if (layerState.stations) symbols.push('station');
     if (layerState.labels) symbols.push('peak');
-    if (layerState.shadows && mode === 'panorama' && shadowSource?.field) symbols.push('shadow');
+    if (layerState.shadows && mode === 'panorama' && isShadowShown()) symbols.push('shadow');
     if (layerState.nebelmeer) symbols.push('nebelmeer');
     return symbols;
   }
@@ -524,7 +632,7 @@ export function createLandeskarteScene(
       hazeStrength: 1,
       panoramaMix: mix,
       revealProgress,
-      shadowEnabled: layerState.shadows && shadowSource?.field ? 1 : 0,
+      shadowEnabled: layerState.shadows && isShadowShown() ? 1 : 0,
       layerMask,
       shadowOriginEast: 0,
       shadowOriginNorth: 0,
@@ -567,7 +675,7 @@ export function createLandeskarteScene(
         coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
         tiles: getDrawnTiles(),
         uniforms: getTerrainUniforms(),
-        shadowField: shadowSource?.field ?? null,
+        shadowField: isShadowShown() ? (shadowSource?.field ?? null) : null,
         maxLayers: MAX_TILE_LAYERS
       })
     ];
@@ -592,11 +700,12 @@ export function createLandeskarteScene(
     }
     if (layerState.trails && trails.length > 0) {
       // A new closure per tile snapshot: the trail layer re-drapes when it changes.
-      if (trailSampler.tiles !== tilesSnapshot) {
-        const snapshot = tilesSnapshot;
+      // Sampled on the drawn tiles, so trails sit on the surface that is on screen.
+      const drawnForTrails = getDrawnTiles();
+      if (trailSampler.tiles !== drawnForTrails) {
         trailSampler = {
-          tiles: snapshot,
-          sample: (lat, lon) => sampleHeight(snapshot, frame, lat, lon)
+          tiles: drawnForTrails,
+          sample: (lat, lon) => sampleHeight(drawnForTrails, frame, lat, lon)
         };
       }
       layers.push(
@@ -680,10 +789,12 @@ export function createLandeskarteScene(
 
   function render(): void {
     if (diagnostics.finalized || !device) return;
-    // Re-snapshot the tile list (and with it the trail drape) at most every 150 ms while it grows.
+    // Re-snapshot the tile list (and with it the trail drape) at most every 150 ms while it grows,
+    // and at once when the stream has drained, so the settled frame never waits on a timer.
     if (tilesSnapshot.length !== streamer.tiles.length) {
       const now = performance.now();
-      if (now - tilesDirtyAt > 150 || tilesSnapshot.length === 0) {
+      const drained = streamer.stats.loaded + streamer.stats.failed >= streamer.stats.requested;
+      if (drained || now - tilesDirtyAt > 150 || tilesSnapshot.length === 0) {
         tilesSnapshot = streamer.tiles.slice();
       } else {
         setTimeout(scheduleRender, 160);
@@ -737,6 +848,8 @@ export function createLandeskarteScene(
     });
   }
 
+  const cursorHorizonCache = new Map<number, number[]>();
+
   /** Sun hours, first and last light of the field cell under the cursor (CEST strings). */
   function getCursorState(): NumbersState['cursor'] {
     const field = shadowSource?.field;
@@ -752,30 +865,37 @@ export function createLandeskarteScene(
       metersPerPixel: mosaic.metersPerPixel
     };
     const window = shadowSource!.window;
-    const horizon: number[] = [];
-    for (let index = 0; index < HORIZON_MAP_AZIMUTHS; index++) {
-      horizon.push(
-        marchCellF64(
-          terrain,
-          window,
-          column,
-          row,
-          (index / HORIZON_MAP_AZIMUTHS) * 2 * Math.PI,
-          HORIZON_MAP_SAMPLES
-        )
-      );
+    // The f64 horizons of a cell are cached: the cursor moves much faster than the cell changes.
+    const cellKey = row * field.size + column;
+    let horizon = cursorHorizonCache.get(cellKey);
+    if (!horizon) {
+      horizon = [];
+      for (let index = 0; index < HORIZON_MAP_AZIMUTHS; index++) {
+        horizon.push(
+          marchCellF64(
+            terrain,
+            window,
+            column,
+            row,
+            (index / HORIZON_MAP_AZIMUTHS) * 2 * Math.PI,
+            HORIZON_MAP_SAMPLES
+          )
+        );
+      }
+      if (cursorHorizonCache.size >= 256) cursorHorizonCache.clear();
+      cursorHorizonCache.set(cellKey, horizon);
     }
     let first = Number.NaN;
     let last = Number.NaN;
     let litMinutes = 0;
     const step = sunTable.length > 1 ? sunTable[1].minutes - sunTable[0].minutes : 5;
     for (const sample of sunTable) {
-      const position = ((sample.azimuth / 360) * HORIZON_MAP_AZIMUTHS) % HORIZON_MAP_AZIMUTHS;
-      const low = Math.floor(position);
-      const blend = position - low;
-      const horizonRad =
-        horizon[low] * (1 - blend) + horizon[(low + 1) % HORIZON_MAP_AZIMUTHS] * blend;
-      if (sample.elevation > (horizonRad * 180) / Math.PI && sample.elevation > -0.5) {
+      // The kernels' rule: the azimuth blend of the map and a sun floor of SUN_FLOOR_RAD. The
+      // smoothstep penumbra is centred on the horizon, so "lit >= 0.5" is "sun above horizon".
+      const {low, high, blend} = azimuthBlend(sample.azimuth);
+      const horizonRad = horizon[low] * (1 - blend) + horizon[high] * blend;
+      const sunRad = (sample.elevation * Math.PI) / 180;
+      if (sunRad > horizonRad && sunRad > SUN_FLOOR_RAD) {
         if (Number.isNaN(first)) first = sample.minutes;
         last = sample.minutes + step;
         litMinutes += step;
@@ -827,12 +947,20 @@ export function createLandeskarteScene(
       ringSettled = refreshRing();
     }
     const source = shadowSource;
+    // Shade at the real sun as soon as the horizon map exists, before the ring settles, so the
+    // field is never drawn at its placeholder sun.
+    await source.ready;
+    if (diagnostics.finalized || source !== shadowSource) return;
+    if (source.field) {
+      applySunToShadow();
+      shadowShaded = true;
+      scheduleRender();
+    }
     // Publish the compute backend only when the skyline ring has settled too: the labels depend on it.
-    await Promise.all([source.ready, ringSettled]);
+    await ringSettled;
     if (diagnostics.finalized || source !== shadowSource) return;
     if (source.field) {
       diagnostics.computeBackend = source.field.backend;
-      applySunToShadow();
       controls?.setLayerAvailable('shadows', true);
       source
         .sunHours(sunTable)
@@ -894,6 +1022,38 @@ export function createLandeskarteScene(
             }
           });
           report.subject = 'horizon-map GPU graph vs CPU twin';
+          // The shipped SUN_HOURS kernel against a CPU sum on the same (GPU) horizon map. The
+          // SHADE_AT_TIME and AMBIENT kernels have no readback on ShadowSource yet: not covered.
+          const gpuHours = await gpuSource.sunHours(sunTable);
+          if (gpuHours.length === smallWindow.size * smallWindow.size && sunTable.length > 1) {
+            const stepHours = (sunTable[1].minutes - sunTable[0].minutes) / 60;
+            const cpuHours = new Float32Array(gpuHours.length);
+            for (const sample of sunTable) {
+              const lit = shadeAtTimeCpu(
+                gpuMap,
+                smallWindow,
+                HORIZON_MAP_AZIMUTHS,
+                sample.azimuth,
+                sample.elevation
+              );
+              for (let cell = 0; cell < lit.length; cell++) {
+                cpuHours[cell] += (lit[cell] / 255) * stepHours;
+              }
+            }
+            let maxHours = 0;
+            let overHours = 0;
+            for (let cell = 0; cell < cpuHours.length; cell++) {
+              const difference = Math.abs(cpuHours[cell] - gpuHours[cell]);
+              maxHours = Math.max(maxHours, difference);
+              if (difference > SUN_HOURS_TOLERANCE_HOURS) overHours++;
+            }
+            report.sunHours = {
+              maxAbsHours: maxHours,
+              toleranceHours: SUN_HOURS_TOLERANCE_HOURS,
+              overTolerance: overHours,
+              total: cpuHours.length
+            };
+          }
         } finally {
           gpuSource.destroy();
         }
@@ -948,20 +1108,23 @@ export function createLandeskarteScene(
     } finally {
       cpuSource.destroy();
     }
-    if (ring && mosaic && ringGraph) {
-      const twin = computeRingCpu(
-        mosaic,
-        frame,
-        peaks,
-        curved ? refractionK : 1,
-        getRingEyeHeight(),
-        NUMBER_OF_RING_BINS
-      );
+    if (ringGraph) {
+      // Both sides are run now with the same k and eye height, whatever `ring` holds.
+      const effectiveK = curved ? refractionK : 1;
+      const eyeHeight = getRingEyeHeight();
+      const gpuRing = await ringGraph.run(effectiveK, eyeHeight);
+      const twin = computeRingCpu(base, frame, peaks, effectiveK, eyeHeight, NUMBER_OF_RING_BINS);
       let worst = 0;
       for (let bin = 0; bin < twin.bins; bin++) {
-        worst = Math.max(worst, Math.abs(twin.elevationDeg[bin] - ring.elevationDeg[bin]));
+        worst = Math.max(worst, Math.abs(twin.elevationDeg[bin] - gpuRing.elevationDeg[bin]));
       }
-      console.info(`Landeskarte: ring GPU vs CPU twin max ${worst.toExponential(2)} deg`);
+      report.ring = {
+        maxAbsDeg: worst,
+        toleranceDeg: RING_TOLERANCE_DEG,
+        bins: twin.bins,
+        refractionK: effectiveK,
+        eyeHeight
+      };
     }
     diagnostics.parity = report;
     scheduleRender();
@@ -980,11 +1143,17 @@ export function createLandeskarteScene(
   }
 
   function setMode(next: SceneMode): Promise<void> {
+    if (diagnostics.finalized) return Promise.resolve();
     if (next === mode && !flying) return waitForFrame();
     flight?.cancel();
+    // The superseded call resolves now: its flight will never report done.
+    const superseded = settleFlight;
+    settleFlight = null;
+    superseded?.();
     const target = next === 'panorama' ? getPanoramaPose() : makePlanPose();
     mode = next;
     controls?.setMode(next);
+    updateCanvasLabel();
     requestTilesFor(target);
     selectedPeakId = null;
     const duration = reducedMotion ? 0 : automated ? FLIGHT_MS_AUTOMATED : FLIGHT_MS;
@@ -992,6 +1161,7 @@ export function createLandeskarteScene(
     furniture?.setReveal(0);
     clearPlate();
     return new Promise(resolve => {
+      settleFlight = resolve;
       flight = createFlight(
         clonePose(pose),
         target,
@@ -1009,6 +1179,7 @@ export function createLandeskarteScene(
           if (mode === 'panorama') void refreshRing();
           furniture?.setReveal(1);
           if (selectedStationId) showPlate(selectedStationId);
+          settleFlight = null;
           waitForFrame().then(resolve);
         }
       );
@@ -1048,6 +1219,7 @@ export function createLandeskarteScene(
   }
 
   function setMinutes(value: number): Promise<void> {
+    if (diagnostics.finalized) return Promise.resolve();
     minutes = clampMinutes(value);
     controls?.setMinutes(minutes);
     applySunToShadow();
@@ -1068,19 +1240,23 @@ export function createLandeskarteScene(
   }
 
   function snapshot(): Promise<Blob> {
+    if (diagnostics.finalized) return Promise.reject(new Error('snapshot: scene finalized'));
     return new Promise((resolve, reject) => {
-      snapshotRequest = canvas => {
-        // Copy inside the frame callback: a WebGPU canvas is only readable until it presents.
-        const copy = document.createElement('canvas');
-        copy.width = canvas.width;
-        copy.height = canvas.height;
-        const context = copy.getContext('2d')!;
-        context.drawImage(canvas, 0, 0);
-        copy.toBlob(
-          blob => (blob ? resolve(blob) : reject(new Error('snapshot failed'))),
-          'image/png'
-        );
-      };
+      snapshotRequests.push({
+        fail: reject,
+        run: canvas => {
+          // Copy inside the frame callback: a WebGPU canvas is only readable until it presents.
+          const copy = document.createElement('canvas');
+          copy.width = canvas.width;
+          copy.height = canvas.height;
+          const context = copy.getContext('2d')!;
+          context.drawImage(canvas, 0, 0);
+          copy.toBlob(
+            blob => (blob ? resolve(blob) : reject(new Error('snapshot failed'))),
+            'image/png'
+          );
+        }
+      });
       scheduleRender();
       deck.redraw('landeskarte snapshot');
     });
@@ -1113,7 +1289,7 @@ export function createLandeskarteScene(
       const east = pose.eye[0] + unit[0] * distance;
       const north = pose.eye[1] + unit[1] * distance;
       const {lat, lon} = frame.toGeo([east, north, 0]);
-      const ground = sampleHeight(tilesSnapshot, frame, lat, lon);
+      const ground = sampleHeight(getDrawnTiles(), frame, lat, lon);
       if (ground === null) continue;
       const rayUp =
         pose.eye[2] + unit[2] * distance - curvatureDrop(Math.hypot(east, north), refractionK);
@@ -1134,6 +1310,7 @@ export function createLandeskarteScene(
       const id = layerState.stations
         ? await pickStation(deck as never, x, y).catch(() => null)
         : null;
+      if (diagnostics.finalized) return;
       const canvas = deck.getCanvas();
       if (canvas) canvas.style.cursor = id ? 'pointer' : '';
       updateNumbers();
@@ -1154,6 +1331,7 @@ export function createLandeskarteScene(
     const stationId = layerState.stations
       ? await pickStation(deck as never, x, y).catch(() => null)
       : null;
+    if (diagnostics.finalized) return;
     if (stationId) {
       await selectStation(stationId === selectedStationId ? null : stationId);
       return;
@@ -1269,8 +1447,13 @@ export function createLandeskarteScene(
       controls?.setStations(stations);
       attachInput();
       applySunToShadow();
+      // The layout may have settled while the data loaded: select tiles for the real size.
+      width = Math.max(parent.clientWidth, 1);
+      height = Math.max(parent.clientHeight, 1);
       requestTilesFor(pose);
-      void startCompute();
+      computeSettled = startCompute().catch(error => {
+        console.warn('Landeskarte: compute failed', error);
+      });
       // Wait for the first batch so the reveal starts on a drawn sheet.
       const deadline = performance.now() + 90_000;
       while (
@@ -1289,13 +1472,39 @@ export function createLandeskarteScene(
       scheduleRender();
       await waitForFrame();
       startReveal();
+      // The horizon map, the shaded field and the skyline ring are part of "ready" (bounded).
+      await Promise.race([computeSettled, new Promise(resolve => setTimeout(resolve, 120_000))]);
       await waitForFrame();
     })()
   ]);
 
+  let keyHint = null as HTMLElement | null;
+
+  /** The canvas is the interactive element: it carries the role, the name (per mode) and the key hint. */
+  function updateCanvasLabel(): void {
+    const canvas = deck.getCanvas();
+    if (!canvas) return;
+    canvas.setAttribute('role', 'application');
+    canvas.setAttribute('aria-roledescription', 'Landeskarte');
+    canvas.setAttribute(
+      'aria-label',
+      mode === 'plan'
+        ? 'Niederhorn und Thunersee als Landeskarte, Planansicht'
+        : 'Gipfelpanorama vom Niederhorn mit Horizont und Schatten'
+    );
+  }
+
   function attachInput(): void {
     const canvas = deck.getCanvas();
     if (!canvas) return;
+    keyHint = document.createElement('span');
+    keyHint.id = 'lk-key-hint';
+    keyHint.className = 'lk-sr-only';
+    keyHint.textContent =
+      'Pfeiltasten verschieben die Ansicht, Escape verlässt die Karte. Steuerung der Tageszeit im Bedienfeld.';
+    parent.append(keyHint);
+    canvas.setAttribute('aria-describedby', keyHint.id);
+    updateCanvasLabel();
     detachControls = attachOrbitControls(canvas, {
       getPose: () => pose,
       setPose,
@@ -1323,7 +1532,19 @@ export function createLandeskarteScene(
       diagnostics.finalized = true;
       abortController.abort();
       flight?.cancel();
+      flight = null;
       clearTimeout(tileRequestTimer);
+      clearTimeout(tileResizeTimer);
+      clearTimeout(carryOverTimer);
+      // Nothing may hang on a scene that is gone: settle the pending promises.
+      settleFlight?.();
+      settleFlight = null;
+      const frameWaiters = pendingFrames;
+      pendingFrames = [];
+      for (const waiter of frameWaiters) waiter();
+      const snapshotWaiters = snapshotRequests;
+      snapshotRequests = [];
+      for (const request of snapshotWaiters) request.fail(new Error('snapshot: scene finalized'));
       const canvas = deck.getCanvas();
       canvas?.removeEventListener('pointermove', onPointerMove);
       canvas?.removeEventListener('pointerdown', onPointerDown);
@@ -1332,6 +1553,9 @@ export function createLandeskarteScene(
       controls?.destroy();
       furniture?.destroy();
       plateHost?.remove();
+      keyHint?.remove();
+      numbersPanel?.element.remove();
+      hud?.element.remove();
       shadowSource?.destroy();
       ringGraph?.destroy();
       deck.finalize();

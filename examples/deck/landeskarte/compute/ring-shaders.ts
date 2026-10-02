@@ -147,7 +147,7 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
 /**
  * Node 3: one invocation per peak marches along the peak's own ray (not a bin) up to two DEM pixels
  * short of the summit and records the strongest blocker. Output per peak (vec4): peak tangent,
- * blocker tangent, 1 when the peak is beyond the ray table (else 0), blocker distance. The
+ * blocker tangent, 1 when the peak is beyond the ray table or its ray left the mosaic before the peak (else 0), blocker distance. The
  * visible/hidden decision is made on the CPU in degrees (see makeRingResult).
  */
 export const PEAK_VISIBILITY_WGSL = /* wgsl */ `\
@@ -170,6 +170,7 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
   let limit = distance - uniforms.peakSkirt;
   var blocker = -1.0e30;
   var blockerDistance = 0.0;
+  var leftMosaic = false;
   for (var sampleIndex = 0u; sampleIndex < uniforms.sampleCount; sampleIndex++) {
     let sample = samples[sampleIndex];
     if (sample.x >= limit) {
@@ -177,6 +178,8 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
     }
     let result = sampleTangent(direction, sample.x, sample.y);
     if (result.y < 0.5) {
+      // The line of sight ran off the DEM before reaching the peak: it was never fully tested.
+      leftMosaic = true;
       break;
     }
     if (result.x > blocker) {
@@ -184,7 +187,7 @@ fn main(@builtin(global_invocation_id) invocation: vec3<u32>) {
       blockerDistance = sample.x;
     }
   }
-  let outOfRange = select(0.0, 1.0, distance > samples[uniforms.sampleCount - 1u].x);
+  let outOfRange = select(0.0, 1.0, leftMosaic || distance > samples[uniforms.sampleCount - 1u].x);
   peakResults[peak] = vec4<f32>(peakTangent, blocker, outOfRange, blockerDistance);
 }
 `;

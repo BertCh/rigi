@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Builds the CPU twin's horizon map off the main thread. 256^2 cells x 16 azimuths x 256 samples is
-// about 2.7e8 bilinear taps, so it runs in row chunks and reports progress between them.
+// about 2.7e8 bilinear taps, so it runs off the main thread in one pass (no progress messages).
 
-import {computeHorizonRowsCpu} from './cpu-twins';
+import {computeHorizonRowsCpu} from './horizon-cpu';
 import type {ShadowWorkerRequest, ShadowWorkerResponse} from './cpu-twins';
 
 type WorkerScope = {
@@ -21,7 +21,6 @@ scope.onmessage = event => {
   for (let row = 0; row < window.size; row += chunkRows) {
     const end = Math.min(row + chunkRows, window.size);
     computeHorizonRowsCpu(terrain, window, azimuths, samples, row, end, map);
-    scope.postMessage({type: 'progress', rows: end});
   }
   scope.postMessage({type: 'done', map, ms: performance.now() - start}, [map.buffer]);
 };

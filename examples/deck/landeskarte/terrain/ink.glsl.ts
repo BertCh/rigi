@@ -59,10 +59,18 @@ vec4 lk_ink(float elevM, float fwidthElev, float slope, float aspect, float shad
   return vec4(color * alpha, alpha);
 }
 
+// Metres per pixel snapped to half-octave steps. fwidth is constant per 2x2 quad and differs a
+// little between quads; dividing a position of thousands of metres by it would move the pattern
+// by whole cells at every quad border. The snapped scale is the same for neighbouring pixels, so
+// the pattern is stable (stroke and dot sizes vary by at most about 19 % within a level).
+float lk_snapScale(float metresPerPixel) {
+  return exp2(floor(log2(max(metresPerPixel, 0.0001)) * 2.0 + 0.5) * 0.5);
+}
+
 // Rock hachure: fall-line strokes, 16 aspect sectors, denser on shaded faces.
 vec4 lk_hachure(vec2 posEnu, float fwidthPos, float aspect, float slope, float shade) {
   float steep = smoothstep(LK_HACHURE_SLOPE_LO, LK_HACHURE_SLOPE_HI, slope);
-  float metresPerPixel = max(fwidthPos, 0.0001);
+  float metresPerPixel = lk_snapScale(fwidthPos);
   float sectorAngle = 6.2831853 / LK_HACHURE_SECTORS;
   float angle = floor(aspect / sectorAngle + 0.5) * sectorAngle;
   vec2 fall = vec2(sin(angle), cos(angle));
@@ -92,7 +100,7 @@ vec4 lk_scree(vec2 posEnu, float fwidthPos, float slope, float elevM) {
   float belt = smoothstep(LK_SCREE_SLOPE_LO, LK_SCREE_SLOPE_MID_LO, slope)
     * (1.0 - smoothstep(LK_SCREE_SLOPE_MID_HI, LK_SCREE_SLOPE_HI, slope))
     * smoothstep(LK_SCREE_ELEV_LO, LK_SCREE_ELEV_HI, elevM);
-  vec2 grid = posEnu / (max(fwidthPos, 0.0001) * LK_SCREE_PITCH);
+  vec2 grid = posEnu / (lk_snapScale(fwidthPos) * LK_SCREE_PITCH);
   vec2 cell = floor(grid);
   vec2 local = fract(grid);
   vec2 dotAt = vec2(0.3 + 0.4 * lk_hash(cell, 21u), 0.3 + 0.4 * lk_hash(cell, 22u));

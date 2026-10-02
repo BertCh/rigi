@@ -225,6 +225,16 @@ export type ParityReport = {
   flipsWithinUlpBand: boolean;
   cpuMs: number;
   gpuMs: number;
+  /** SUN_HOURS kernel against a CPU sum on the same horizon map (WebGPU only). */
+  sunHours?: {maxAbsHours: number; toleranceHours: number; overTolerance: number; total: number};
+  /** Ring graph against its CPU twin, run with the same k and eye height (WebGPU only). */
+  ring?: {
+    maxAbsDeg: number;
+    toleranceDeg: number;
+    bins: number;
+    refractionK: number;
+    eyeHeight: number;
+  };
 };
 
 export type LayerName =
@@ -264,6 +274,8 @@ export type Diagnostics = {
   tilesRequested: number;
   tilesLoaded: number;
   tilesFailed: number;
+  /** Tiles that arrived after every texture-array layer was taken (not drawn). */
+  tilesDropped: number;
   computeBackend: 'graph' | 'cpu-twin' | 'none';
   shadowPasses: number;
   graphNodeMs: Record<string, number>;

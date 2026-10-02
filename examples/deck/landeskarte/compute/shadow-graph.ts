@@ -143,6 +143,12 @@ export function createShadowGraph(
     ambient: createFieldTexture('ambient-field')
   };
 
+  // Known approximation: the field uses the east-west metres per pixel for both axes. The mosaic is
+  // Web Mercator on an ellipsoid, which is not conformal, so true north-south ground scale is
+  // N / M (about 1.003 at 46.7 N) times larger; over the 13 km half-window that is about 40 m
+  // (about 1.6 texels) of northing at the window edge, and the same relative error in ray length.
+  // Fixing it needs a north scale in Mosaic and ShadowField (types.ts) and in the terrain shader's
+  // field lookup, so ring-cpu.ts (which has both scales) and the shadow field stay a known gap.
   const pixelsPerMeter = Math.fround(1 / mosaic.metersPerPixel);
   const sizeMeters = size * stride * mosaic.metersPerPixel;
   const fieldOriginEnu: [number, number] = [
@@ -189,12 +195,9 @@ export function createShadowGraph(
   /** Resolves once the GPU has finished everything submitted so far. */
   const waitForGpu = (buffer: Buffer) => buffer.readAsync(0, 4);
 
-  const yieldToRenderer = () =>
-    new Promise<void>(resolve =>
-      typeof requestAnimationFrame === 'function'
-        ? requestAnimationFrame(() => resolve())
-        : setTimeout(resolve, 0)
-    );
+  // A macrotask, not requestAnimationFrame: rAF never fires in a hidden tab, which would leave
+  // `ready` pending. The awaited readAsync already bounds each submit, so this only lets frames run.
+  const yieldToRenderer = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
   function createEncoder(id: string, profile = true) {
     return device.createCommandEncoder({id, timeProfilingQuerySet: profile ? querySet : null});
@@ -204,16 +207,28 @@ export function createShadowGraph(
     const {decodeUniforms, horizonUniforms} = buffers;
     decodeUniforms.write(new Uint32Array([mosaic.width, mosaic.height, 0, 0]));
 
-    decodeGraph = await createDecodeGraph(device, buffers, mosaic).compileAsync();
-    horizonGraph = await createHorizonGraph(device, buffers, size).compileAsync();
-    shadeGraph = await createShadeGraph(device, buffers, size).compileAsync();
-    if (destroyed) return;
+    // destroy() may land while a compile is pending, when it still sees a null graph: a graph that
+    // finishes compiling after that is released here, or its kernels would leak.
+    const compile = async <Parameters>(
+      graph: GPUCommandGraph<Parameters>
+    ): Promise<CompiledGPUCommandGraph<Parameters>> => {
+      const compiled = await graph.compileAsync();
+      if (destroyed) {
+        compiled.destroy();
+        throw new Error('shadow graph destroyed during compile');
+      }
+      return compiled;
+    };
+    decodeGraph = await compile(createDecodeGraph(device, buffers, mosaic));
+    horizonGraph = await compile(createHorizonGraph(device, buffers, size));
+    shadeGraph = await compile(createShadeGraph(device, buffers, size));
 
     const decodeEncoder = createEncoder('shadow-decode');
     const decodeEncoding = decodeGraph.encode(decodeEncoder, {parameters: {}});
     device.submit(decodeEncoder.finish());
     await waitForGpu(buffers.heights);
     await recordRows(decodeEncoding, 'shadow');
+    if (destroyed) return;
     // Heights are decoded once; the pixels are the largest buffer, so give them back.
     buffers.pixels.destroy();
     decodeGraph.destroy();

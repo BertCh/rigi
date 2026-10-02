@@ -5,7 +5,7 @@
 // Swiss Wanderweg symbology as deck.gl PathLayers in world (ENU) coordinates.
 //
 //   hiking (T1)                  solid yellow
-//   mountain hiking (T2, T3)     red dashes on a white casing (the white-red-white blaze)
+//   mountain hiking (T2, T3)     rock-black dashes on a white casing
 //   alpine hiking (T4 to T6)     blue dashes on a white casing (white-blue-white)
 //   unclassified                 thin grey dashes
 //
@@ -24,7 +24,7 @@ const INK_RED: [number, number, number, number] = [191, 34, 51, 255];
 const INK_ROCK: [number, number, number, number] = [43, 39, 36, 255];
 const INK_BLUE: [number, number, number, number] = [44, 111, 176, 255];
 const INK_GREY: [number, number, number, number] = [122, 118, 112, 235];
-const CASING: [number, number, number, number] = [255, 255, 255, 235];
+const CASING: [number, number, number, number] = [255, 255, 255, 180];
 
 /** Height above the sampled terrain, so a path is not buried by the coarser far-field mesh. */
 const LIFT_METERS = 3;
@@ -156,11 +156,11 @@ function buildSegments(trails: PreparedTrail[]): Segment[] {
         segments.push({
           path: trail.points,
           color: CASING,
-          casingWidth: [4.8, 5.4],
-          inkWidth: [4.8, 5.4],
+          casingWidth: [3.8, 4.2],
+          inkWidth: [3.8, 4.2],
           cased: false
         });
-        for (const path of dashPolyline(trail.points, 110, 55)) {
+        for (const path of dashPolyline(trail.points, 60, 30)) {
           segments.push({
             path,
             color,

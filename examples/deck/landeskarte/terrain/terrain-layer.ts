@@ -119,7 +119,19 @@ export class TerrainLayer extends Layer<TerrainLayerProps> {
         shadowTexture: fallbackShadow,
         ambientTexture: fallbackAmbient
       },
-      parameters: {depthCompare: 'less-equal', depthWriteEnabled: true, cullMode: 'none'}
+      parameters: {
+        depthCompare: 'less-equal',
+        depthWriteEnabled: true,
+        cullMode: 'none',
+        // The shader returns premultiplied colour, on both backends.
+        blend: true,
+        blendColorOperation: 'add',
+        blendColorSrcFactor: 'one',
+        blendColorDstFactor: 'one-minus-src-alpha',
+        blendAlphaOperation: 'add',
+        blendAlphaSrcFactor: 'one',
+        blendAlphaDstFactor: 'one-minus-src-alpha'
+      }
     });
     this.setState({
       model,
@@ -347,10 +359,12 @@ fn getTilePosition(tileLatitudes: vec3<f32>, tileLongitudes: vec2<f32>, tileLaye
   let layerIndex = i32(tileLayer + 0.5);
   let uv = gridPosition.xy;
   let center = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, uv);
-  let east = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, uv + vec2<f32>(GRID_STEP, 0.0)).xyz;
-  let west = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, uv - vec2<f32>(GRID_STEP, 0.0)).xyz;
-  let south = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, uv + vec2<f32>(0.0, GRID_STEP)).xyz;
-  let north = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, uv - vec2<f32>(0.0, GRID_STEP)).xyz;
+  // Neighbours are clamped to the tile so edge vertices use one-sided differences: positions are
+  // not extrapolated past the tile while the clamped DEM read cannot follow them.
+  let east = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, clamp(uv + vec2<f32>(GRID_STEP, 0.0), vec2<f32>(0.0), vec2<f32>(1.0))).xyz;
+  let west = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, clamp(uv - vec2<f32>(GRID_STEP, 0.0), vec2<f32>(0.0), vec2<f32>(1.0))).xyz;
+  let south = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, clamp(uv + vec2<f32>(0.0, GRID_STEP), vec2<f32>(0.0), vec2<f32>(1.0))).xyz;
+  let north = getTilePosition(tileLatitudes, tileLongitudes, layerIndex, clamp(uv - vec2<f32>(0.0, GRID_STEP), vec2<f32>(0.0), vec2<f32>(1.0))).xyz;
   var position = center.xyz;
   if (gridPosition.z > 0.5) {
     // Skirt depth grows with tile size: 2 % of the tile width.
@@ -466,7 +480,7 @@ fn compositeInk(color: vec3<f32>, ink: vec4<f32>) -> vec3<f32> {
     let hazed = lk_atmosphere(color, eyeHeight, elevation, rangeM, toCamera / max(rangeM, 1.0), normalize(terrain.sunDirection), terrain.sunColor, terrain.hazeStrength);
     color = mix(color, hazed, panorama);
   }
-  return vec4<f32>(color, layer.opacity);
+  return vec4<f32>(color * layer.opacity, layer.opacity);
 }
 `;
 
@@ -537,10 +551,11 @@ void main() {
   int layerIndex = int(tileLayer + 0.5);
   vec2 uv = gridPosition.xy;
   vec3 center = getTilePosition(layerIndex, uv);
-  vec3 east = getTilePosition(layerIndex, uv + vec2(GRID_STEP, 0.0));
-  vec3 west = getTilePosition(layerIndex, uv - vec2(GRID_STEP, 0.0));
-  vec3 south = getTilePosition(layerIndex, uv + vec2(0.0, GRID_STEP));
-  vec3 north = getTilePosition(layerIndex, uv - vec2(0.0, GRID_STEP));
+  // Neighbours clamped to the tile: one-sided differences on the edge (see the WGSL copy).
+  vec3 east = getTilePosition(layerIndex, clamp(uv + vec2(GRID_STEP, 0.0), vec2(0.0), vec2(1.0)));
+  vec3 west = getTilePosition(layerIndex, clamp(uv - vec2(GRID_STEP, 0.0), vec2(0.0), vec2(1.0)));
+  vec3 south = getTilePosition(layerIndex, clamp(uv + vec2(0.0, GRID_STEP), vec2(0.0), vec2(1.0)));
+  vec3 north = getTilePosition(layerIndex, clamp(uv - vec2(0.0, GRID_STEP), vec2(0.0), vec2(1.0)));
   vec3 position = center;
   if (gridPosition.z > 0.5) {
     float tileWidth = terrain.primeVerticalRadius * terrain.originCosLatitude * (tileLongitudes.y - tileLongitudes.x);
@@ -669,7 +684,7 @@ void main() {
     vec3 hazed = lk_atmosphere(color, eyeHeight, elevation, rangeM, toCamera / max(rangeM, 1.0), normalize(terrain.sunDirection), terrain.sunColor, terrain.hazeStrength);
     color = mix(color, hazed, panorama);
   }
-  fragColor = vec4(color, layer.opacity);
+  fragColor = vec4(color * layer.opacity, layer.opacity);
   DECKGL_FILTER_COLOR(fragColor, geometry);
 }
 `;
