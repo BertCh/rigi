@@ -5,6 +5,7 @@
 import { Link } from "@tanstack/react-router";
 import { Cpu, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { MapAttribution } from "#/lib/licences/MapAttribution";
 import type { RollMapEngine, RollMapStatus } from "#/lib/roll/map/roll-map";
 import { LiveLines } from "./LiveLines";
 import { type Lines, viewOfCamera } from "./lineArt";
@@ -44,6 +45,10 @@ export function LiveRollMap({
 	const [status, setStatus] = useState<RollMapStatus | null>(null);
 	const [shown, setShown] = useState(false);
 	const [inPhoto, setInPhoto] = useState<string | null>(null);
+	// the roll's centre, for the data credit (src/lib/licences)
+	const [center, setCenter] = useState<{ lat: number; lon: number } | null>(
+		null,
+	);
 	const eng = useRef<RollMapEngine | null>(null);
 	const onScreen = useRef(false);
 
@@ -95,6 +100,7 @@ export function LiveRollMap({
 			// the landing's 1024 px copies (the engine works at 1024 px anyway), no trails
 			const roll = await loadDemoRoll({ core: true, smallPhotos: true });
 			if (!live) return;
+			setCenter(roll.center);
 			engine = new RollMapEngine(canvas, roll, {
 				overviewM: OVERVIEW_M,
 				// baked people masks (scripts/demo/bake-people-masks.mjs): no MediaPipe download
@@ -203,6 +209,16 @@ export function LiveRollMap({
 				>
 					Open the full roll →
 				</Link>
+				{center && (
+					<MapAttribution
+						lat={center.lat}
+						lon={center.lon}
+						radiusKm={30}
+						imagery="satellite"
+						compact
+						className="right-auto bottom-3 left-3"
+					/>
+				)}
 			</div>
 		</div>
 	);

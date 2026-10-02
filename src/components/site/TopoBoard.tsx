@@ -6,6 +6,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BRAND, brandAlpha } from "#/brand/khipu";
 import type { DemoManifest } from "#/lib/demo";
+import { SWISSTOPO_CREDIT } from "#/lib/licences/attribution";
 import { pixelkarteUrl } from "#/lib/licences/imagery";
 import { storageKey } from "#/lib/ontology/core/storage";
 import { MapFurniture } from "#/lib/terroir/roll/MapFurniture";
@@ -531,8 +532,17 @@ export function TopoBoard({
 					Sharp map
 				</button>
 			)}
-			<span className="pointer-events-none absolute right-2 bottom-2 rounded bg-white/75 px-1.5 py-0.5 text-[10px] text-black/60">
-				Map © swisstopo
+			<span className="absolute right-2 bottom-2 rounded bg-white/75 px-1.5 py-0.5 text-[10px] text-black/60">
+				Map ©{" "}
+				<a
+					href={SWISSTOPO_CREDIT.href}
+					target="_blank"
+					rel="noreferrer"
+					title={SWISSTOPO_CREDIT.licence}
+					onPointerDown={(e) => e.stopPropagation()}
+				>
+					{SWISSTOPO_CREDIT.label}
+				</a>
 			</span>
 		</div>
 	);

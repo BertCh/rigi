@@ -15,7 +15,7 @@ import type { PhotoMeta } from "#/lib/photos";
 import { unprojectDir } from "#/lib/pose";
 import type { Renderer } from "#/lib/renderer";
 import { geoidUndulation } from "#/lib/tiles3d/geoid";
-import { composeAnnotatedPng } from "./annotate";
+import { composeAnnotatedPng, DEFAULT_ATTRIBUTION } from "./annotate";
 import { buildCameraModel, type CameraModel } from "./camera";
 import { buildColmapZip } from "./colmap";
 import { buildGeoJson, type GeoJsonPeak } from "./geojson";
@@ -352,6 +352,9 @@ export async function exportFromEngine(
 			return { blob: text(JSON.stringify(fc)), filename, notes };
 		}
 		case "png": {
+			// Google's Map Tiles policies: display only, no export (NOTICE.md, src/lib/licences)
+			if (showsGoogleTiles(engine))
+				throw new Error(GOOGLE_TILES_EXPORT_BLOCKED);
 			const rendered = await engine.exportImage(opts.withLabels ?? true);
 			if (!rendered) throw new Error("render failed");
 			if (engine.settings.mode === "world")
@@ -363,10 +366,7 @@ export async function exportFromEngine(
 					blob: await composeAnnotatedPng(bmp, [], {
 						title,
 						watermark: opts.watermark,
-						// opt-in (?attrib=full): per-source credits instead of DEFAULT_ATTRIBUTION
-						...(fullAttribution()
-							? { attribution: engineAttribution(engine) }
-							: {}),
+						attribution: exportAttribution(engine),
 					}),
 					filename,
 					notes,
@@ -376,6 +376,26 @@ export async function exportFromEngine(
 			}
 		}
 	}
+}
+
+export const GOOGLE_TILES_EXPORT_BLOCKED =
+	"Google 3D Tiles are display-only: leave Step Inside or turn 3D Tiles off to save an image";
+
+/** True while Step Inside draws Google 3D tiles (their policies forbid export). */
+export function showsGoogleTiles(engine: Renderer): boolean {
+	return /\bGoogle\b/.test(engine.tiles3dAttribution?.() ?? "");
+}
+
+/**
+ * The PNG footer: DEFAULT_ATTRIBUTION (classic) or the per-source line (?attrib=full), plus the
+ * 3D tiles' own credit line (src/lib/tiles3d) while Step Inside draws them.
+ */
+export function exportAttribution(engine: Renderer): string {
+	const base = fullAttribution()
+		? engineAttribution(engine)
+		: DEFAULT_ATTRIBUTION;
+	const tiles = engine.tiles3dAttribution?.();
+	return tiles ? `${base} · 3D: ${tiles}` : base;
 }
 
 /** Compact per-source credit line for the engine's current view (src/lib/licences). */

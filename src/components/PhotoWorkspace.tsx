@@ -28,6 +28,7 @@ import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { useConcordDisplay } from "#/lib/concord/app/useConcordDisplay";
 import type { WebGpuEngine } from "#/lib/deck-webgpu/engine";
 import { ExportMenu } from "#/lib/export/ExportMenu";
+import { downloadBlob, exportFromEngine } from "#/lib/export/engine-export";
 import { getFlag } from "#/lib/flags";
 import {
 	type EyeSearchResult,
@@ -1140,13 +1141,17 @@ export function PhotoWorkspace({
 	const exportImage = async () => {
 		// a reveal in flight would be baked into the file: finish it first
 		revealRef.current?.stop();
-		const blob = await engineRef.current?.exportImage(showPeaks);
-		if (!blob) return;
-		const a = document.createElement("a");
-		a.href = URL.createObjectURL(blob);
-		a.download = `${photo.id}-${settings.mode}.${blob.type === "image/png" ? "png" : "jpg"}`;
-		a.click();
-		setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+		const engine = engineRef.current;
+		if (!engine) return;
+		// the same annotated PNG as Export → PNG, so the data credits (N2) are always in the file
+		try {
+			const r = await exportFromEngine(engine, "png", {
+				withLabels: showPeaks,
+			});
+			downloadBlob(r.blob, r.filename);
+		} catch (e) {
+			setAlignNote(`Image not saved: ${(e as Error).message}`);
+		}
 	};
 
 	// exports need the FINAL pose: status clears after autoAlign, but a pending second opinion may still move it

@@ -22,7 +22,7 @@ import {
 	inSwissBBox,
 } from "./imagery";
 
-export type CreditKind = "dem" | "imagery" | "map" | "osm";
+export type CreditKind = "dem" | "imagery" | "map" | "osm" | "tiles3d";
 
 export interface Credit {
 	id: string;
@@ -226,6 +226,45 @@ export const ESRI_CREDIT: Credit = {
 };
 
 /**
+ * Step Inside 3D Tiles (src/lib/tiles3d, ?tiles3d=). The per-tile copyrights come from the tiles
+ * themselves (Renderer.tiles3dAttribution(), shown by Tiles3DCredit with the Google Maps logo);
+ * these rows name the provider so every credit surface lists the source. Google's Map Tiles
+ * policies forbid export, so image exports refuse while Google tiles are on screen.
+ */
+export const GOOGLE_3D_TILES_CREDIT: Credit = {
+	id: "google-3d-tiles",
+	kind: "tiles3d",
+	label: "Google",
+	href: "https://developers.google.com/maps/documentation/tile/policies",
+	licence: "Google Map Tiles API policies: display only, no export or analysis",
+};
+
+export const SWISSTOPO_3D_TILES_CREDIT: Credit = {
+	id: "swisstopo-3d-tiles",
+	kind: "tiles3d",
+	label: "swisstopo",
+	href: SWISSTOPO_CREDIT.href,
+	licence: "OGD, commercial use with attribution",
+};
+
+/** The ?tiles3d values (src/lib/flags); "off" = no 3D tiles on screen. */
+export type Tiles3dSource =
+	| "off"
+	| "buildings"
+	| "swisstopo"
+	| "google"
+	| "all";
+
+/** The 3D-tiles provider credits for a ?tiles3d value. */
+export function tiles3dCredits(source: Tiles3dSource | undefined): Credit[] {
+	if (!source || source === "off") return [];
+	const out: Credit[] = [];
+	if (source !== "google") out.push(SWISSTOPO_3D_TILES_CREDIT);
+	if (source === "google" || source === "all") out.push(GOOGLE_3D_TILES_CREDIT);
+	return out;
+}
+
+/**
  * The classic credit line. The Esri part is the credit Esri names for World Imagery
  * ("Sources: Esri, Maxar, Earthstar Geographics, and the GIS User Community"; reports/licences.md).
  */
@@ -242,6 +281,8 @@ export interface AttributionQuery {
 	provider?: ImageryProviderId;
 	/** OSM-derived labels / trails shown. Default true. */
 	osm?: boolean;
+	/** 3D tiles on screen (Step Inside with ?tiles3d=); pass only while they are drawn. Default none. */
+	tiles3d?: Tiles3dSource;
 }
 
 function viewBBox(lat: number, lon: number, km: number): BBox {
@@ -285,6 +326,7 @@ export function attributionFor(q: AttributionQuery): Credit[] {
 		out.push({ ...OSM_CREDIT, kind: "map" });
 	}
 	if (q.osm !== false && !out.some((c) => c.id === "osm")) out.push(OSM_CREDIT);
+	out.push(...tiles3dCredits(q.tiles3d));
 	return out;
 }
 
@@ -308,7 +350,32 @@ export function attributionLine(
 		);
 	if (cs.some((c) => c.id === "osm"))
 		parts.push("© OpenStreetMap contributors");
+	const tiles = cs.filter((c) => c.kind === "tiles3d");
+	if (tiles.length) parts.push(`3D © ${tiles.map((c) => c.label).join(", ")}`);
 	return parts.join(" · ");
+}
+
+export interface CreditGroups {
+	/** Mapterhorn first, then the national DEM producers. */
+	dem: Credit[];
+	/** Imagery or map tiles (never OSM). */
+	imagery: Credit[];
+	/** "Map" when the drape is a map style, else "Imagery". */
+	imageryNoun: "Map" | "Imagery";
+	osm: Credit | null;
+	tiles3d: Credit[];
+}
+
+/** Credits split into the groups every credit surface shows, in display order. */
+export function groupCredits(credits: readonly Credit[]): CreditGroups {
+	const img = credits.filter((c) => c.kind === "imagery" || c.kind === "map");
+	return {
+		dem: credits.filter((c) => c.kind === "dem"),
+		imagery: img.filter((c) => c.id !== "osm"),
+		imageryNoun: img.some((c) => c.kind === "map") ? "Map" : "Imagery",
+		osm: credits.find((c) => c.id === "osm") ?? null,
+		tiles3d: credits.filter((c) => c.kind === "tiles3d"),
+	};
 }
 
 /** True when the per-source credit should replace the classic fixed line (`?attrib=full`). */
