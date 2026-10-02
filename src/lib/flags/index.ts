@@ -54,8 +54,9 @@ export const FLAG_SCHEMA = {
 	/** master kill switch for every kernel below */
 	gpu: onOff("on"),
 	/**
-	 * skyline detector (geo/skyline.ts detectSkylineAsync): the per-pixel feature, prior and sky-model
-	 * images on the GPU (src/lib/gpu/skyline). off = the CPU detectSkyline (also under ?gpu=off). On by
+	 * skyline detector (geo/skyline.ts detectSkylineAsync): the whole detector (feature images, sky-model
+	 * fits, Viterbi, column finish) on the GPU in one graph (src/lib/gpu/skyline). off = the CPU
+	 * detectSkyline (also under ?gpu=off). On by
 	 * default since the 2026-10-02 node A/B (unknown-pose cascade, GT-12 60 + wild dev 17 decisions,
 	 * 0 changed; the earlier IMG_6958 flip is refinePose chaos, research_notes/wave5/skyline-gpu-flip.md).
 	 */

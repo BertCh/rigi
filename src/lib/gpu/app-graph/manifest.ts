@@ -543,18 +543,21 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		paths: [
 			"src/lib/gpu/skyline/index.ts",
 			"src/lib/gpu/skyline/skyline.wgsl.ts",
+			"src/lib/gpu/skyline/detect.wgsl.ts",
 		],
 		groups: ["skyline"],
 		realms: ["worker:unknown-pose", "worker:eye"],
 		cadence: "per photo",
 		resources: [
 			"photo planes (rgba, pooled import)",
-			"features, prior, sky-model cost images (transients)",
+			"features, prior, sky-model images, Viterbi unary / backpointers (transients)",
 		],
-		readbacks: ["cost images for the CPU Viterbi + sky-model refit"],
-		status: "opt-in",
+		readbacks: [
+			"rows + weight (2 x w floats) and, with returnSky, the sky plane as bytes",
+		],
+		status: "default",
 		notes:
-			"detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default on: 0 of 77 unknown-pose decisions changed in the 2026-10-02 node A/B)",
+			"detectSkylineAsync: feature images, sky-model fits (f32 IRLS), Viterbi (truncated-window DP) and the column part of the finish run on the GPU in one graph (CPU column tail); flag skylineGpu (default on: 0 of 77 unknown-pose decisions changed in the 2026-10-02 node A/B, GPU cost images and full-graph arms)",
 	},
 	{
 		id: "sky-model",

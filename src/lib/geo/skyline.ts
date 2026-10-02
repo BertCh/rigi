@@ -228,8 +228,8 @@ export function heuristicSky(f: Features, n: number) {
 }
 
 /** Low-order polynomial basis in normalised image coordinates. */
-const NB = 8;
-function basis(u: number, v: number, out: Float64Array) {
+export const NB = 8;
+export function basis(u: number, v: number, out: Float64Array) {
 	out[0] = 1;
 	out[1] = u;
 	out[2] = v;
@@ -382,7 +382,7 @@ export function modelSky(f: Features, w: number, h: number, m: SkyModel) {
 	return s;
 }
 
-const FAR_ABOVE = 0.2;
+export const FAR_ABOVE = 0.2;
 
 /**
  * Viterbi over rows. Returns the boundary row per column (0 = no sky at the
@@ -480,11 +480,11 @@ export function viterbi(
 	return bound;
 }
 
-type ResolvedSkylineOptions = Required<
+export type ResolvedSkylineOptions = Required<
 	Omit<SkylineOptions, "returnSky" | "minWeight" | "refinePasses">
 >;
 
-function resolveOptions(h: number, opts: SkylineOptions) {
+export function resolveOptions(h: number, opts: SkylineOptions) {
 	const o: ResolvedSkylineOptions = {
 		belowBand: opts.belowBand ?? Math.max(8, Math.round(h * 0.15)),
 		aboveBand: opts.aboveBand ?? Math.max(8, Math.round(h * 0.2)),
@@ -501,12 +501,12 @@ function resolveOptions(h: number, opts: SkylineOptions) {
 }
 
 /** Seed weight of the first sky-model fit: the heuristic prior, favouring the top. */
-const seedWeightOf =
+export const seedWeightOf =
 	(prior: Float32Array, h: number) => (_x: number, y: number, i: number) =>
 		prior[i] * (1 - y / h) ** 6;
 
 /** Seed weight of a refit: the sky just above the current boundary. */
-const refitWeightOf =
+export const refitWeightOf =
 	(prior: Float32Array, bound: Int32Array, o: ResolvedSkylineOptions) =>
 	(x: number, y: number, i: number) => {
 		const d = bound[x] - y;
@@ -592,18 +592,25 @@ export async function detectSkylineAsync(
 	return detectSkyline(img, opts);
 }
 
-function finishSkyline(
-	f: Features,
+/** Rows each side of the boundary that finishSkyline's weight looks at (skipping the blurred edge). */
+export const SKYLINE_FINISH_WIN = 12;
+
+/**
+ * Per-column part of finishSkyline (needs only the column's own pixels): the sub-pixel boundary row
+ * (parabola through the edge response) and the raw confidence (edge contrast × polarity × sky above /
+ * terrain below). Columns with no usable boundary get NaN and weight 0. The GPU runs this per column
+ * (src/lib/gpu/skyline), the continuity / trend tail below on the CPU.
+ */
+export function skylineColumnPart(
+	f: Pick<Features, "edge" | "step">,
 	sky: Float32Array,
 	bound: Int32Array,
 	w: number,
 	h: number,
-	minWeight: number,
-	returnSky: boolean,
-): SkylineObservation {
+) {
 	const rows = new Float32Array(w).fill(Number.NaN);
 	const weight = new Float32Array(w);
-	const win = 12;
+	const win = SKYLINE_FINISH_WIN;
 	for (let x = 0; x < w; x++) {
 		const yb = bound[x];
 		if (yb < win + 2 || yb > h - win) continue;
@@ -630,7 +637,20 @@ function finishSkyline(
 		weight[x] =
 			contrast * polarity * smoothstep(0.3, 0.8, sAbove) * (1 - sBelow);
 	}
+	return { rows, weight };
+}
 
+/**
+ * Column-only tail of finishSkyline, in place on `rows` / `weight` (from skylineColumnPart): continuity
+ * runs, trend medians, the minWeight cut and the NaN rules. Needs no image data.
+ */
+export function finishSkylineColumns(
+	rows: Float32Array,
+	weight: Float32Array,
+	w: number,
+	h: number,
+	minWeight: number,
+) {
 	// Continuity: split into runs at jumps; short runs (cloud fragments,
 	// wires, posts) and short runs sticking up above both neighbours (heads,
 	// spikes) are down-weighted.
@@ -680,12 +700,27 @@ function finishSkyline(
 		if (weight[x] < minWeight) rows[x] = Number.NaN;
 		if (Number.isNaN(rows[x])) weight[x] = 0;
 	}
+}
 
+/** The sky probability plane as bytes (round(clamp01(s) · 255)). */
+export function packSkyBytes(sky: Float32Array, n: number) {
+	const s8 = new Uint8Array(n);
+	for (let i = 0; i < n; i++) s8[i] = Math.round(clamp01(sky[i]) * 255);
+	return s8;
+}
+
+function finishSkyline(
+	f: Features,
+	sky: Float32Array,
+	bound: Int32Array,
+	w: number,
+	h: number,
+	minWeight: number,
+	returnSky: boolean,
+): SkylineObservation {
+	const { rows, weight } = skylineColumnPart(f, sky, bound, w, h);
+	finishSkylineColumns(rows, weight, w, h, minWeight);
 	const out: SkylineObservation = { width: w, height: h, rows, weight };
-	if (returnSky) {
-		const s8 = new Uint8Array(w * h);
-		for (let i = 0; i < w * h; i++) s8[i] = Math.round(clamp01(sky[i]) * 255);
-		out.sky = s8;
-	}
+	if (returnSky) out.sky = packSkyBytes(sky, w * h);
 	return out;
 }

@@ -5,6 +5,7 @@
 // Node check (no GPU): detectSkylineWith with CPU stages is identical to detectSkyline (the stage split
 // the GPU path plugs into), the per-row polynomial table of the GPU model kernel evaluates to the CPU's
 // modelSky polynomial, and detectSkylineAsync falls back to the CPU result when ?skylineGpu is off.
+import { setFlagOverride } from "#/lib/flags";
 import {
 	computeFeatures,
 	detectSkyline,
@@ -108,11 +109,12 @@ if (model) {
 	expect(worst < 1e-5, `row table vs basis polynomial (max ${worst})`);
 }
 
-// flag off (default): the async detector is the CPU detector
+// flag pinned off: the async detector is the CPU detector
+setFlagOverride("skylineGpu", "off");
 const viaAsync = await detectSkylineAsync(img);
 expect(
 	same(ref.rows, viaAsync.rows),
-	"detectSkylineAsync (off) = detectSkyline",
+	"detectSkylineAsync (flag off) = detectSkyline",
 );
 
 if (failures) {

@@ -6,7 +6,9 @@
 // in node, on a native WebGPU device (Dawn, the `webgpu` npm package; not an app dependency):
 //   (mkdir /tmp/dawn && cd /tmp/dawn && npm i webgpu@0.3.0)
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/gpu/skyline-dawn.ts --set gt12|wild [--ids a,b] [--width 800] [--out f.json]
-// Per photo: (1) the feature images and the heuristic prior, GPU vs CPU (max / mean abs difference);
+// Per photo: (0) timing, median of --runs (default 5, noisy on a shared machine) of the CPU detector, the old
+// hybrid (GPU cost images + CPU fits / Viterbi: detectSkylineWith over openSkylineGpu) and the whole-graph
+// detectSkylineGpu; (1) the feature images and the heuristic prior, GPU vs CPU (max / mean abs difference);
 // (2) modelSky for the SAME fitted model on both sides; (3) the full detector: row / weight differences of
 // detectSkylineGpu vs detectSkyline (columns where finiteness differs, max and median |d row|, max |d weight|).
 // --set wild is the dev half of tools/bench/split.json only (photos() of the unknown-pose gate).
@@ -18,6 +20,7 @@ import type { Device } from "@luma.gl/core";
 import {
 	computeFeatures,
 	detectSkyline,
+	detectSkylineWith,
 	fitSkyModel,
 	heuristicSky,
 	modelSky,
@@ -35,6 +38,18 @@ const opt = (k: string, d: string | null = null) => {
 };
 const width = Number(opt("width", "800"));
 const out = opt("out");
+const runs = Number(opt("runs", "5"));
+const median = (v: number[]) => [...v].sort((a, b) => a - b)[v.length >> 1];
+async function timed<T>(fn: () => Promise<T> | T) {
+	const ms: number[] = [];
+	let last: T | undefined;
+	for (let i = 0; i < runs; i++) {
+		const t = performance.now();
+		last = await fn();
+		ms.push(performance.now() - t);
+	}
+	return { ms: median(ms), last: last as T };
+}
 
 async function dawnDevice(): Promise<Device | null> {
 	const dir = process.env.DAWN_DIR;
@@ -129,13 +144,22 @@ async function main() {
 		const img = await loadRGBA(file, width);
 		const { width: w, height: h } = img;
 		const n = w * h;
-		const t0 = performance.now();
-		const cpu = detectSkyline(img);
-		const tCpu = performance.now() - t0;
-		const t1 = performance.now();
-		const gpu = await detectSkylineGpu(img);
-		const tGpu = performance.now() - t1;
+		const cpuT = await timed(() => detectSkyline(img));
+		const cpu = cpuT.last;
+		const tCpu = cpuT.ms;
+		const gpuT = await timed(() => detectSkylineGpu(img));
+		const gpu = gpuT.last;
+		const tGpu = gpuT.ms;
 		if (!gpu) throw new Error("no compute device");
+		const hybridT = await timed(async () => {
+			const sess = await openSkylineGpu(device, img);
+			try {
+				return await detectSkylineWith(img, {}, sess.stages);
+			} finally {
+				sess.dispose();
+			}
+		});
+		const tHybrid = hybridT.ms;
 		// cost images, same input
 		const f = computeFeatures(img);
 		const prior = heuristicSky(f, n);
@@ -166,14 +190,19 @@ async function main() {
 			id: e.id,
 			w,
 			h,
-			ms: { cpu: Math.round(tCpu), gpu: Math.round(tGpu) },
+			ms: {
+				cpu: Math.round(tCpu),
+				hybrid: Math.round(tHybrid),
+				gpu: Math.round(tGpu),
+			},
+			hybridRows: rowStats(cpu, hybridT.last),
 			feat,
 			skyDiff,
 			...stats,
 		};
 		rows.push(rec);
 		console.log(
-			`${e.id} ${w}x${h} feat max rgb ${feat.rgb.max.toExponential(1)} tex ${feat.tex.max.toExponential(1)} edge ${feat.edge.max.toExponential(1)} prior ${feat.prior.max.toExponential(1)} sky ${skyDiff?.max.toExponential(1)} | rows finite ${stats.finiteCpu}/${stats.cols} mismatch ${stats.finiteMismatch} max ${stats.maxRow.toExponential(2)} med ${stats.medianRow.toExponential(2)} dW ${stats.maxWeight.toExponential(2)} | ${rec.ms.cpu}/${rec.ms.gpu} ms`,
+			`${e.id} ${w}x${h} feat max rgb ${feat.rgb.max.toExponential(1)} tex ${feat.tex.max.toExponential(1)} edge ${feat.edge.max.toExponential(1)} prior ${feat.prior.max.toExponential(1)} sky ${skyDiff?.max.toExponential(1)} | rows finite ${stats.finiteCpu}/${stats.cols} mismatch ${stats.finiteMismatch} max ${stats.maxRow.toExponential(2)} med ${stats.medianRow.toExponential(2)} dW ${stats.maxWeight.toExponential(2)} | ms cpu ${rec.ms.cpu} hybrid ${rec.ms.hybrid} gpu ${rec.ms.gpu}`,
 		);
 	}
 	if (out) {

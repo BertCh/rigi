@@ -177,8 +177,8 @@ export const FLAG_UI: FlagUI[] = [
 	},
 	{
 		name: "skylineGpu",
-		label: "Skyline cost images",
-		help: "Photo skyline detector: the per-pixel feature and sky-probability images on the GPU. Default on; off runs the CPU detector.",
+		label: "Skyline detector",
+		help: "Photo skyline detector on the GPU (features, sky-model fits, Viterbi). Default on; off runs the CPU detector.",
 		group: "compute",
 		options: ONOFF,
 	},

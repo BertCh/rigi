@@ -2,18 +2,24 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// GPU skyline cost images: the per-pixel stages of geo/skyline.ts detectSkyline (feature images, the
-// heuristic sky prior, and the sky-model probability) as two ComputeGraphs (group "skyline"). The sky-model
-// fits (f64 IRLS) and the Viterbi passes stay on the CPU; detectSkylineGpu feeds them through
-// detectSkylineWith. The CPU path is the reference (f32 here vs f64 arithmetic there): ?skylineGpu=off.
+// GPU skyline detector. detectSkylineGpu runs the whole of geo/skyline.ts detectSkyline as ONE ComputeGraph
+// per (w, h, gradient, refinePasses) (group "skyline"): feature images and prior, then per stage the sky-model
+// fit (IRLS: per-workgroup partial sums + one solve workgroup, 4 iterations), the model image, the Viterbi
+// unary costs, the single-workgroup DP with backtrack, and finally the per-column part of finishSkyline. One
+// submit, one readback: rows + weight (2·w floats) and, with returnSky, the sky plane as bytes. The
+// continuity / trend tail (finishSkylineColumns) runs on the CPU on those columns. The CPU detectSkyline is
+// the reference (f32 here against f64 fits there): ?skylineGpu=off.
+// openSkylineGpu is the older diagnostic path (feature graph with readbacks, stages for detectSkylineWith),
+// kept for the Dawn scripts that compare the cost images and measure the old CPU-fit hybrid.
 // The five box blurs are luma GPUConvolution nodes (direct strategy, zero boundary, all-ones kernel; a y blur
 // is one conv per plane through byteOffset views) followed by a FIX kernel that adds the clamp-to-edge
 // correction and divides by 2r+1, so the sums agree with the CPU boxBlur to f32 rounding, not bit for bit.
 import type { Device } from "@luma.gl/core";
 import {
-	detectSkylineWith,
 	type Features,
+	finishSkylineColumns,
 	type RGBALike,
+	resolveOptions,
 	type SkylineObservation,
 	type SkylineOptions,
 	type SkylineStages,
@@ -23,6 +29,7 @@ import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import {
 	type BindKind,
 	defineKernel,
+	release,
 	storage,
 	uniform,
 } from "#/lib/gpu/core/kernel";
@@ -30,6 +37,19 @@ import { GPUConvolution, type GraphBufferHandle } from "#/lib/gpu/core/luma";
 import { withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
 import { getComputeDevice } from "#/lib/gpu/device";
+import {
+	SKYLINE_COLUMN,
+	SKYLINE_DP,
+	SKYLINE_FIT_PARTIAL,
+	SKYLINE_FIT_WG,
+	SKYLINE_MODEL_G,
+	SKYLINE_MODEL_WORDS,
+	SKYLINE_PACK,
+	SKYLINE_UNARY,
+	skylineFitAccumLayout,
+	skylineFitAccumSource,
+	skylineFitSolveSource,
+} from "./detect.wgsl";
 import { addSobelMagnitude } from "./raster-edges";
 import {
 	SKYLINE_EDGE,
@@ -40,7 +60,7 @@ import {
 	SKYLINE_UNPACK,
 	skylineBlurFixSource,
 } from "./skyline.wgsl";
-import { packSkylineParams } from "./uniforms";
+import { packSkylineDetect, packSkylineParams } from "./uniforms";
 
 const GROUP = "skyline";
 const WG = 256;
@@ -96,7 +116,70 @@ const K_MODEL = def("model", SKYLINE_MODEL, [
 	["sky", "storage"],
 ]);
 
+const sKernel = (id: string, src: string, names: [string, BindKind][]) =>
+	def(id, src, [["prm", "uniform"], ...names]);
+const K_FIT_ACCUM = (["seed", "refit"] as const).flatMap((kind) =>
+	([true, false] as const).map((first) => {
+		const seed = kind === "seed";
+		const names = skylineFitAccumLayout(seed, first).slice(1);
+		return [
+			`${kind}-${first ? 0 : 1}`,
+			sKernel(
+				`fit-${kind}-${first ? "first" : "next"}`,
+				skylineFitAccumSource(seed, first),
+				names.map(
+					(n) => [n, n === "partials" ? "storage" : RO] as [string, BindKind],
+				),
+			),
+		] as const;
+	}),
+);
+const fitAccumKernel = new Map(K_FIT_ACCUM);
+const K_FIT_SOLVE = [true, false].map((first) =>
+	sKernel(
+		`fit-solve-${first ? "first" : "next"}`,
+		skylineFitSolveSource(first),
+		[
+			["partials", RO],
+			["model", "storage"],
+		],
+	),
+);
+const K_MODEL_G = sKernel("model-g", SKYLINE_MODEL_G, [
+	["rgb", RO],
+	["tex", RO],
+	["model", RO],
+	["fallback", RO],
+	["sky", "storage"],
+]);
+const K_UNARY = sKernel("unary", SKYLINE_UNARY, [
+	["sky", RO],
+	["edge", RO],
+	["cumA", "storage"],
+	["cumB", "storage"],
+	["unary", "storage"],
+]);
+const K_DP = sKernel("dp", SKYLINE_DP, [
+	["unary", RO],
+	["dp", "storage"],
+	["back", "storage"],
+	["bound", "storage"],
+]);
+const K_COLUMN = sKernel("column", SKYLINE_COLUMN, [
+	["sky", RO],
+	["edge", RO],
+	["stp", RO],
+	["bound", RO],
+	["out", "storage"],
+]);
+const K_PACK = sKernel("pack", SKYLINE_PACK, [
+	["sky", RO],
+	["packed", "storage"],
+]);
+
 type Params = Record<string, never>;
+/** Run parameters of the whole-detector graph: read the packed sky plane back. */
+type DetectParams = { sky: boolean };
 const F4 = 4;
 /** GPUBufferUsage.UNIFORM | COPY_DST */
 const UNIFORM_COPY_DST = 0x40 | 0x08;
@@ -109,22 +192,26 @@ const UNIFORM_COPY_DST = 0x40 | 0x08;
  */
 export type SkylineGradient = "central" | "sobel";
 
-function buildFeatureGraph(
-	g: ComputeGraph<Params>,
+function buildFeatureGraph<P>(
+	g: ComputeGraph<P>,
 	w: number,
 	h: number,
 	gradient: SkylineGradient,
+	/** "import": outputs are imported buffers the caller reads; "transient": they stay in the graph. */
+	outputs: "import" | "transient" = "import",
 ) {
 	const n = w * h;
 	const imp = (id: string, bytes: number, usage?: number) =>
 		g.importBuffer(id, bytes, undefined, usage);
 	const prm = imp("prm", 32, UNIFORM_COPY_DST);
 	const rgba = imp("rgba", n * F4);
-	const rgb = imp("rgb", 3 * n * F4);
-	const tex = imp("tex", n * F4);
-	const edge = imp("edge", n * F4);
-	const stp = imp("stp", n * F4);
-	const prior = imp("prior", n * F4);
+	const out = (id: string, bytes: number) =>
+		outputs === "import" ? imp(id, bytes) : g.transientBuffer(id, bytes);
+	const rgb = out("rgb", 3 * n * F4);
+	const tex = out("tex", n * F4);
+	const edge = out("edge", n * F4);
+	const stp = out("stp", n * F4);
+	const prior = out("prior", n * F4);
 	const p0 = g.transientBuffer("p0", 3 * n * F4);
 	const t1 = g.transientBuffer("t1", 3 * n * F4);
 	const cs = g.transientBuffer("cs", 3 * n * F4);
@@ -210,6 +297,7 @@ function buildFeatureGraph(
 		bindings: { prm, rgb, tex, prior },
 		workgroups: wg1,
 	});
+	return { prm, rgba, rgb, tex, edge, stp, prior };
 }
 
 function buildModelGraph(g: ComputeGraph<Params>, w: number, h: number) {
@@ -353,23 +441,227 @@ export async function openSkylineGpu(
 	}
 }
 
+/** Fit iterations per sky-model fit (fitSkyModel's loop). */
+const FIT_ITERATIONS = 4;
+const FIT_STEP = 4;
+
+/** Why the whole-detector graph cannot run for this shape on `device` (undefined: it can). */
+export function skylineDetectUnsupported(device: Device, w: number, h: number) {
+	const base = skylineGpuUnsupported(device, w, h);
+	if (base) return base;
+	const ns = h + 1;
+	const lim = device.limits;
+	const samples = Math.ceil(w / FIT_STEP) * Math.ceil(h / FIT_STEP);
+	if (
+		Math.ceil(samples / SKYLINE_FIT_WG) > lim.maxComputeWorkgroupsPerDimension
+	)
+		return "fit over maxComputeWorkgroupsPerDimension";
+	if (
+		w * ns * F4 > lim.maxStorageBufferBindingSize ||
+		ns * w * F4 > lim.maxBufferSize
+	)
+		return "Viterbi columns over maxStorageBufferBindingSize";
+	if (
+		lim.maxComputeWorkgroupSizeX < WG ||
+		lim.maxComputeInvocationsPerWorkgroup < WG
+	)
+		return "workgroup size over device limits";
+	// the fit workgroup keeps 62 · 64 f32 in shared memory
+	if (
+		lim.maxComputeWorkgroupStorageSize <
+		SKYLINE_FIT_PARTIAL * SKYLINE_FIT_WG * F4
+	)
+		return "fit over maxComputeWorkgroupStorageSize";
+	if (w < 1 || h < 1) return "empty image";
+	return undefined;
+}
+
 /**
- * detectSkyline with the cost images on the GPU compute device; null when there is no device (the caller
- * takes the CPU path). Throws on a GPU error (detectSkylineAsync catches and falls back).
+ * The whole detector as one graph: features (transients) → per stage [fit ×4 → model image → unary →
+ * DP + backtrack] for the seed and each refit → finish columns + packed sky → one read node.
+ */
+function buildDetectGraph(
+	g: ComputeGraph<DetectParams>,
+	w: number,
+	h: number,
+	gradient: SkylineGradient,
+	refinePasses: number,
+) {
+	const n = w * h;
+	const ns = h + 1;
+	const { prm, rgba, rgb, tex, edge, stp, prior } = buildFeatureGraph(
+		g,
+		w,
+		h,
+		gradient,
+		"transient",
+	);
+	const sprm = g.importBuffer("sprm", 64, undefined, UNIFORM_COPY_DST);
+	const samples = Math.ceil(w / FIT_STEP) * Math.ceil(h / FIT_STEP);
+	const nwg = Math.ceil(samples / SKYLINE_FIT_WG);
+	const tb = (id: string, bytes: number) => g.transientBuffer(id, bytes);
+	const partials = tb("partials", nwg * SKYLINE_FIT_PARTIAL * F4);
+	const cumA = tb("cumA", ns * w * F4);
+	const cumB = tb("cumB", ns * w * F4);
+	const unary = tb("unary", ns * w * F4);
+	const dp = tb("dp", 2 * ns * F4);
+	const back = tb("back", ns * w * F4);
+	let last = "prior";
+	const chain = (id: string) => {
+		const dependsOn = [last];
+		last = id;
+		return dependsOn;
+	};
+	let prevSky: GraphBufferHandle = prior;
+	let prevBound: GraphBufferHandle | undefined;
+	for (let s = 0; s <= refinePasses; s++) {
+		const seed = s === 0;
+		const model = tb(`model${s}`, SKYLINE_MODEL_WORDS * F4);
+		for (let it = 0; it < FIT_ITERATIONS; it++) {
+			const first = it === 0;
+			const spec = fitAccumKernel.get(
+				`${seed ? "seed" : "refit"}-${first ? 0 : 1}`,
+			);
+			if (!spec) throw new Error("skyline fit kernel");
+			const id = `fit${s}-${it}`;
+			g.addKernel({
+				id,
+				spec,
+				bindings: {
+					prm: sprm,
+					rgb,
+					prior,
+					...(seed ? {} : { bound: prevBound as GraphBufferHandle }),
+					...(first ? {} : { model }),
+					partials,
+				},
+				workgroups: [nwg],
+				dependsOn: chain(id),
+			});
+			const sid = `solve${s}-${it}`;
+			g.addKernel({
+				id: sid,
+				spec: K_FIT_SOLVE[first ? 0 : 1],
+				bindings: { prm: sprm, partials, model },
+				workgroups: [1],
+				dependsOn: chain(sid),
+			});
+		}
+		const sky = tb(`sky${s}`, n * F4);
+		g.addKernel({
+			id: `model${s}`,
+			spec: K_MODEL_G,
+			bindings: { prm: sprm, rgb, tex, model, fallback: prevSky, sky },
+			workgroups: [Math.ceil(n / WG)],
+			dependsOn: chain(`model${s}`),
+		});
+		g.addKernel({
+			id: `unary${s}`,
+			spec: K_UNARY,
+			bindings: { prm: sprm, sky, edge, cumA, cumB, unary },
+			workgroups: [Math.ceil(w / 64)],
+			dependsOn: chain(`unary${s}`),
+		});
+		const bound = tb(`bound${s}`, w * F4);
+		g.addKernel({
+			id: `dp${s}`,
+			spec: K_DP,
+			bindings: { prm: sprm, unary, dp, back, bound },
+			workgroups: [1],
+			dependsOn: chain(`dp${s}`),
+		});
+		prevSky = sky;
+		prevBound = bound;
+	}
+	const cols = tb("cols", 2 * w * F4);
+	const packedBytes = Math.ceil(n / 4) * 4;
+	const packed = tb("packed", packedBytes);
+	g.addKernel({
+		id: "column",
+		spec: K_COLUMN,
+		bindings: {
+			prm: sprm,
+			sky: prevSky,
+			edge,
+			stp,
+			bound: prevBound as GraphBufferHandle,
+			out: cols,
+		},
+		workgroups: [Math.ceil(w / 64)],
+		dependsOn: chain("column"),
+	});
+	g.addKernel({
+		id: "pack",
+		spec: K_PACK,
+		bindings: { prm: sprm, sky: prevSky, packed },
+		workgroups: [Math.ceil(n / 4 / WG)],
+		dependsOn: chain("pack"),
+	});
+	g.readNode(
+		"read",
+		[cols, { buffer: packed, size: (p) => (p.sky ? packedBytes : 0) }],
+		{ dependsOn: ["column", "pack"] },
+	);
+	return { prm, sprm, rgba };
+}
+
+/**
+ * detectSkyline on the GPU compute device: one graph run (see buildDetectGraph) and a CPU column tail;
+ * null when there is no device or refinePasses is not 0, 1 or 2 (the caller takes the CPU path). Throws on a
+ * GPU error (detectSkylineAsync catches and falls back).
  */
 export async function detectSkylineGpu(
 	img: RGBALike,
 	opts: SkylineOptions = {},
 	gradient: SkylineGradient = "central",
 ): Promise<SkylineObservation | null> {
+	const { width: w, height: h } = img;
+	const { o, refinePasses, minWeight, returnSky } = resolveOptions(h, opts);
+	if (!(refinePasses === 0 || refinePasses === 1 || refinePasses === 2))
+		return null;
 	const device = await getComputeDevice();
 	if (!device) return null;
 	return withLease(GROUP, async () => {
-		const session = await openSkylineGpu(device, img, gradient);
+		const why = skylineDetectUnsupported(device, w, h);
+		if (why) throw new Error(`skyline GPU: ${why}`);
+		const n = w * h;
+		const { graph } = cachedGraph<DetectParams, void>(
+			device,
+			GROUP,
+			`detect-${w}x${h}-p${refinePasses}${gradient === "sobel" ? "-sobel" : ""}`,
+			(g) => {
+				buildDetectGraph(g, w, h, gradient, refinePasses);
+			},
+		);
+		await graph.compileAsync();
+		const words = new Uint32Array(n);
+		new Uint8Array(words.buffer).set(img.data.subarray(0, 4 * n));
+		const rgba = storage(device, words);
+		const prm = uniform(device, packSkylineParams(w, h, 0));
+		const sprm = uniform(
+			device,
+			packSkylineDetect(w, h, {
+				belowBand: Math.round(o.belowBand),
+				aboveBand: Math.round(o.aboveBand),
+				edgeWeight: o.edgeWeight,
+				jumpCost: o.jumpCost,
+				jumpCap: o.jumpCap,
+			}),
+		);
 		try {
-			return await detectSkylineWith(img, opts, session.stages);
+			const { reads } = await graph.run(
+				{ sky: returnSky },
+				{ buffers: { prm, sprm, rgba } },
+			);
+			const [colBuf, skyBuf] = reads.read;
+			const rows = new Float32Array(colBuf.slice(0, w * F4));
+			const weight = new Float32Array(colBuf.slice(w * F4, 2 * w * F4));
+			finishSkylineColumns(rows, weight, w, h, minWeight);
+			const out: SkylineObservation = { width: w, height: h, rows, weight };
+			if (returnSky) out.sky = new Uint8Array(skyBuf.slice(0, n));
+			return out;
 		} finally {
-			session.dispose();
+			release(rgba, prm, sprm);
 		}
 	});
 }
