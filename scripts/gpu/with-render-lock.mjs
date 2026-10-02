@@ -15,7 +15,8 @@
 // "bench"; RENDER_LOCK_EXCLUSIVE=0 opts out) takes every slot.
 // The lock and queue live outside any tree (RIGI_RENDER_LOCK_DIR, default ~/.cache/rigi), so
 // sandbox clones and copies of this script all share one queue.
-// It also waits for memory headroom before starting (see tm_locks.py).
+// It also waits for memory headroom before starting (see tm_locks.py; bounded by
+// RENDER_LOCK_MEM_WAIT_S, default 600, after which the job starts anyway with a warning).
 // Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/eval-app.mjs IMG_6958
 import { spawn, spawnSync } from "node:child_process";
 import {
@@ -36,6 +37,11 @@ const QUEUE = join(DIR, "render-queue");
 const LAST_START = join(DIR, "render-last-start");
 const SLOTS = Math.max(1, Number(process.env.RENDER_LOCK_SLOTS) || 3);
 const MIN_FREE = Number(process.env.RENDER_LOCK_MIN_FREE) || 40;
+// CR-52: a lock dir without a parseable owner pid is reclaimed once it is this old (a live owner
+// writes `owner` within milliseconds of the mkdir, so a fresh ownerless dir is left alone)
+const OWNERLESS_GRACE_MS = Number(
+	process.env.RENDER_LOCK_OWNERLESS_GRACE_MS ?? 10_000,
+);
 const SETTLE_MS = Number(process.env.RENDER_LOCK_SETTLE_MS ?? 20_000);
 // slot 0 keeps the single-lock name, so a holder from the one-slot script still blocks slot 0
 const slotDir = (i) => join(DIR, i ? `render-lock-${i}` : "render-lock");
@@ -88,6 +94,18 @@ const holder = (dir) => {
 		held = readFileSync(`${dir}/owner`, "utf8");
 	} catch {}
 	const pid = Number(held.split(" ")[0]);
+	if (!Number.isInteger(pid) || pid <= 0) {
+		// CR-52: ownerless (owner file missing/empty/malformed): stale once past the grace period
+		let age = 0;
+		try {
+			age = Date.now() - statSync(dir).mtimeMs;
+		} catch {
+			return null; // vanished meanwhile
+		}
+		if (age < OWNERLESS_GRACE_MS) return held || "?";
+		rmSync(dir, { recursive: true, force: true });
+		return null;
+	}
 	// CR-52: a recycled pid is alive but started at another time than the one that took the lock.
 	// The start time lives in a separate `start` file so older scripts still parse `owner` as before;
 	// a lock without one (older script) keeps the pid-only check.

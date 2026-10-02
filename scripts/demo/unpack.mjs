@@ -10,6 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { poseEntry } from "./unpack-lib.mjs";
 
 const args = process.argv.slice(2);
 const opt = (k, d) => {
@@ -61,12 +62,8 @@ for (const p of kept) {
 		region: REGION,
 		local,
 	});
-	if (p.poseSource !== "prior")
-		poses[id] = {
-			pose: p.pose,
-			source: p.poseSource,
-			confidence: p.confidence,
-		};
+	const entry = poseEntry(p);
+	if (entry) poses[id] = entry;
 }
 
 const src = Object.values(bundle.regions).filter(Boolean);

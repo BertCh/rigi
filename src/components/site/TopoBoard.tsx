@@ -9,6 +9,13 @@ import type { DemoManifest } from "#/lib/demo";
 import { pixelkarteUrl } from "#/lib/licences/imagery";
 import { storageKey } from "#/lib/ontology/core/storage";
 import { MapFurniture } from "#/lib/terroir/roll/MapFurniture";
+import {
+	BLEED_BOTTOM,
+	BLEED_TOP,
+	clampCardPosition,
+	normaliseCardPosition,
+	restoreCardPosition,
+} from "./topo-layout";
 
 // Landing-page board: the sample trip's photos as cards on the swisstopo map, each tied to where
 // it was taken by a line and a view wedge (its solved heading and field of view). Drag a card to
@@ -18,8 +25,6 @@ import { MapFurniture } from "#/lib/terroir/roll/MapFurniture";
 
 const SHARP_KEY = storageKey("topoSharp");
 const BLEED_SIDE = 160;
-const BLEED_TOP = 20;
-const BLEED_BOTTOM = 64;
 const CARD_GAP = 10;
 
 /** Card footprint in CSS px: the image plus its white frame (p-1.5 pb-5). */
@@ -97,6 +102,9 @@ export function TopoBoard({
 	// with near-equal headings don't stack; the outer ring straddles the map's edge. Overlapping
 	// cards are then pushed apart and every card is kept inside the bleed area.
 	const [cards, setCards] = useState<Card[]>([]);
+	// cards the visitor has dragged, as fractions of the board size (CR-W6: a resize, e.g. a phone
+	// rotating, re-runs the fan-out layout but keeps these where the user put them)
+	const draggedNorm = useRef(new Map<string, { x: number; y: number }>());
 	useEffect(() => {
 		const R = Math.min(size.w, size.h * 1.6) * 0.36;
 		const sorted = [...geo.cams].sort((a, b) => a.yaw - b.yaw);
@@ -114,12 +122,9 @@ export function TopoBoard({
 			};
 		});
 		const clamp = ({ card, box }: (typeof placed)[number]) => {
-			const mx = size.w / 2 + side - box.w / 2;
-			card.x = Math.max(-mx, Math.min(mx, card.x));
-			card.y = Math.max(
-				-size.h / 2 - BLEED_TOP + box.h / 2,
-				Math.min(size.h / 2 + BLEED_BOTTOM - box.h / 2, card.y),
-			);
+			const p = clampCardPosition(card, box, { w: size.w, h: size.h }, side);
+			card.x = p.x;
+			card.y = p.y;
 		};
 		for (let it = 0; it < 60; it++) {
 			let moved = false;
@@ -146,6 +151,13 @@ export function TopoBoard({
 				}
 			for (const p of placed) clamp(p);
 			if (!moved) break;
+		}
+		for (const { card, box } of placed) {
+			const norm = draggedNorm.current.get(card.id);
+			if (!norm) continue;
+			const p = restoreCardPosition(norm, box, { w: size.w, h: size.h }, side);
+			card.x = p.x;
+			card.y = p.y;
 		}
 		setCards(placed.map((p) => p.card));
 	}, [geo, size.w, size.h, side]);
@@ -255,13 +267,25 @@ export function TopoBoard({
 			}
 		}
 	};
-	const onUp = () => {
+	const endDrag = () => {
 		const d = drag.current;
 		drag.current = null;
 		setPanLayersPromoted(false);
 		if (ref.current) ref.current.style.cursor = "grab";
 		if (d?.kind === "map") setPan({ ...panRef.current });
-		else if (d?.moved) setCards((cs) => [...cs]);
+		else if (d?.moved) {
+			const c = cards.find((k) => k.id === d.id);
+			if (c) draggedNorm.current.set(c.id, normaliseCardPosition(c, size));
+			setCards((cs) => [...cs]);
+		}
+		return d;
+	};
+	// a cancelled pointer (the browser took the touch over for scrolling) ends the drag but is not a click
+	const onCancel = () => {
+		endDrag();
+	};
+	const onUp = () => {
+		const d = endDrag();
 		if (d?.kind === "card" && d.id && !d.moved)
 			navigate({ to: "/photo/$id", params: { id: d.id } });
 	};
@@ -319,7 +343,7 @@ export function TopoBoard({
 			onPointerDown={(e) => onDown(e)}
 			onPointerMove={onMove}
 			onPointerUp={onUp}
-			onPointerCancel={onUp}
+			onPointerCancel={onCancel}
 			style={{ cursor: "grab" }}
 			data-testid="topo-board"
 		>

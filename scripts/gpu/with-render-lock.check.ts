@@ -5,8 +5,16 @@
 // CR-02: killing with-render-lock.mjs must also kill the job it wraps (and the job's own children).
 // Uses a private temp RIGI_RENDER_LOCK_DIR and a private legacy-lock path, never the shared ~/.cache/rigi
 // queue, and a harmless `sleep` as the job. Usage: npx tsx scripts/gpu/with-render-lock.check.ts
-import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	utimesSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -86,11 +94,88 @@ async function runCase(signal: NodeJS.Signals): Promise<string[]> {
 	return failures;
 }
 
-const failures = [...(await runCase("SIGTERM")), ...(await runCase("SIGINT"))];
+/** CR-52: an ownerless / malformed lock dir is reclaimed once stale, but not while it is fresh. */
+async function runOwnerlessCase(
+	label: string,
+	ownerText: string | null,
+	ageSeconds: number,
+	expectReclaimed: boolean,
+): Promise<string[]> {
+	const dir = mkdtempSync(join(tmpdir(), "rigi-lock-check-"));
+	const lock = join(dir, "render-lock");
+	mkdirSync(lock);
+	if (ownerText !== null) writeFileSync(join(lock, "owner"), ownerText);
+	const then = new Date(Date.now() - ageSeconds * 1000);
+	utimesSync(lock, then, then);
+	const marker = join(dir, "ran");
+	const wrapperProcess = spawn(
+		process.execPath,
+		[wrapper, "--", "sh", "-c", `echo ok > ${marker}`],
+		{
+			stdio: "ignore",
+			env: {
+				...process.env,
+				RIGI_RENDER_LOCK_DIR: dir,
+				RIGI_LEGACY_RENDER_LOCK: join(dir, "no-legacy", ".render-lock"),
+				RENDER_LOCK_SLOTS: "1",
+				RENDER_LOCK_EXCLUSIVE: "0",
+				RENDER_LOCK_OWNERLESS_GRACE_MS: "5000",
+				RENDER_LOCK_MEM_WAIT_S: "1",
+			},
+		},
+	);
+	const ran = await waitFor(
+		() => existsSync(marker),
+		expectReclaimed ? 30_000 : 2500,
+	);
+	wrapperProcess.kill("SIGKILL");
+	rmSync(dir, { recursive: true, force: true });
+	if (ran === expectReclaimed) return [];
+	return [
+		`${label}: lock ${expectReclaimed ? "was not reclaimed" : "was reclaimed too early"}`,
+	];
+}
+
+/** CR-52: the memory-headroom wait gives up after RENDER_LOCK_MEM_WAIT_S and starts the job. */
+function runMemoryTimeoutCase(): string[] {
+	if (spawnSync("memory_pressure", { stdio: "ignore" }).error) return []; // not macOS
+	const started = Date.now();
+	const r = spawnSync(
+		"python3",
+		[resolve(import.meta.dirname, "tm_locks.py"), "sh", "-c", "exit 7"],
+		{
+			encoding: "utf8",
+			timeout: 30_000,
+			env: {
+				...process.env,
+				RENDER_LOCK_MEM_MIN_FREE: "101", // never satisfiable
+				RENDER_LOCK_MEM_WAIT_S: "1",
+				RENDER_LOCK_MEM_POLL_S: "0.2",
+			},
+		},
+	);
+	const failures: string[] = [];
+	if (r.status !== 7)
+		failures.push(`memory wait: job not started (status ${r.status})`);
+	if (!/timed out/.test(r.stderr ?? ""))
+		failures.push("memory wait: no timeout warning");
+	if (Date.now() - started > 20_000)
+		failures.push("memory wait: took too long");
+	return failures;
+}
+
+const failures = [
+	...(await runCase("SIGTERM")),
+	...(await runCase("SIGINT")),
+	...(await runOwnerlessCase("ownerless stale", null, 3600, true)),
+	...(await runOwnerlessCase("malformed owner stale", "garbage", 3600, true)),
+	...(await runOwnerlessCase("ownerless fresh", null, 0, false)),
+	...runMemoryTimeoutCase(),
+];
 if (failures.length) {
 	console.error(failures.join("\n"));
 	process.exit(1);
 }
 console.log(
-	"with-render-lock: SIGTERM and SIGINT kill the job group and free the slot",
+	"with-render-lock: SIGTERM and SIGINT kill the job group and free the slot; stale ownerless locks are reclaimed; the memory wait is bounded",
 );
