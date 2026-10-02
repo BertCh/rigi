@@ -13,9 +13,6 @@ import type { DType } from "../types";
 import { ENTRY, type KernelCall, unaryExpr } from "./k-elementwise";
 import { grid1d, nnKernel } from "./wgsl";
 
-export const TILE = 64;
-const TK = 16;
-
 /** Fused epilogue activation (applied after the bias). */
 export type Epilogue = { op: UnaryPrim; alpha: number; beta: number } | null;
 
@@ -23,6 +20,18 @@ const actFn = (e: Epilogue) =>
 	e
 		? `fn act(v: f32, al: f32, be: f32) -> f32 { return ${unaryExpr(e.op)}; }\n`
 		: "fn act(v: f32, al: f32, be: f32) -> f32 { return v; }\n";
+
+/** Output tile: BM × BN per 256-thread workgroup (4 × 4 per thread), K steps of BK. */
+export type GemmTile = { BM: number; BN: number; BK: number };
+
+/** The tile for M rows: narrow-M tiles keep small-Cout convs from wasting the 64-row tile. */
+export function gemmTile(M: number): GemmTile {
+	if (M <= 16) return { BM: 16, BN: 256, BK: 8 };
+	if (M <= 32) return { BM: 32, BN: 128, BK: 16 };
+	return { BM: 64, BN: 64, BK: 16 };
+}
+
+const tileKey = (t: GemmTile) => `${t.BM}x${t.BN}x${t.BK}`;
 
 /**
  * GEMM body. The op supplies (as WGSL): `fn setup(z: u32)` (sets private bases), `fn loadA(m, k)`,
@@ -35,56 +44,61 @@ function gemmSource(
 	aMajor: "k" | "m",
 	bMajor: "k" | "n",
 	ep: Epilogue,
+	t: GemmTile,
 ): string {
+	const { BM, BN, BK } = t;
+	const TY = BM / 4;
+	const TX = BN / 4;
 	const aIdx =
 		aMajor === "k"
-			? "let ak = e % 16u; let am = e / 16u;"
-			: "let am = e % 64u; let ak = e / 64u;";
+			? `let ak = e % ${BK}u; let am = e / ${BK}u;`
+			: `let am = e % ${BM}u; let ak = e / ${BM}u;`;
 	const bIdx =
 		bMajor === "n"
-			? "let bn = e % 64u; let bk = e / 64u;"
-			: "let bk = e % 16u; let bn = e / 16u;";
+			? `let bn = e % ${BN}u; let bk = e / ${BN}u;`
+			: `let bk = e % ${BK}u; let bn = e / ${BK}u;`;
 	return `
-var<workgroup> As: array<f32, ${TILE * TK}>;
-var<workgroup> Bs: array<f32, ${TILE * TK}>;
+var<workgroup> As: array<f32, ${BM * BK}>;
+var<workgroup> Bs: array<f32, ${BN * BK}>;
 var<private> gM: u32;
 var<private> gN: u32;
 var<private> gK: u32;
 ${actFn(ep)}
 ${ops}
-@compute @workgroup_size(16, 16)
+@compute @workgroup_size(${TX}, ${TY})
 fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   gM = mu(0u); gN = mu(1u); gK = mu(2u);
   let al = mf(3u);
   let be = mf(4u);
   setup(wid.z);
-  let m0 = wid.y * ${TILE}u;
-  let n0 = wid.x * ${TILE}u;
-  let tid = lid.y * 16u + lid.x;
+  let m0 = wid.y * ${BM}u;
+  let n0 = wid.x * ${BN}u;
+  let tid = lid.y * ${TX}u + lid.x;
   var acc: array<vec4<f32>, 4>;
   let kTotal = mu(2u);
-  for (var k0 = 0u; k0 < kTotal; k0 += ${TK}u) {
-    for (var i = 0u; i < 4u; i++) {
-      let e = tid + i * 256u;
+  for (var k0 = 0u; k0 < kTotal; k0 += ${BK}u) {
+    for (var e = tid; e < ${BM * BK}u; e += 256u) {
       ${aIdx}
       let gm = m0 + am;
       let gk = k0 + ak;
       var va = 0.0;
       if (gm < gM && gk < gK) { va = loadA(gm, gk); }
-      As[ak * 64u + am] = va;
+      As[ak * ${BM}u + am] = va;
+    }
+    for (var e = tid; e < ${BN * BK}u; e += 256u) {
       ${bIdx}
       let gk2 = k0 + bk;
       let gn = n0 + bn;
       var vb = 0.0;
       if (gk2 < gK && gn < gN) { vb = loadB(gk2, gn); }
-      Bs[bk * 64u + bn] = vb;
+      Bs[bk * ${BN}u + bn] = vb;
     }
     workgroupBarrier();
-    for (var k = 0u; k < ${TK}u; k++) {
-      let a = vec4<f32>(As[k * 64u + lid.y * 4u], As[k * 64u + lid.y * 4u + 1u],
-        As[k * 64u + lid.y * 4u + 2u], As[k * 64u + lid.y * 4u + 3u]);
-      let b = vec4<f32>(Bs[k * 64u + lid.x * 4u], Bs[k * 64u + lid.x * 4u + 1u],
-        Bs[k * 64u + lid.x * 4u + 2u], Bs[k * 64u + lid.x * 4u + 3u]);
+    for (var k = 0u; k < ${BK}u; k++) {
+      let ab = k * ${BM}u + lid.y * 4u;
+      let bb = k * ${BN}u + lid.x * 4u;
+      let a = vec4<f32>(As[ab], As[ab + 1u], As[ab + 2u], As[ab + 3u]);
+      let b = vec4<f32>(Bs[bb], Bs[bb + 1u], Bs[bb + 2u], Bs[bb + 3u]);
       acc[0] += a.x * b;
       acc[1] += a.y * b;
       acc[2] += a.z * b;
@@ -163,16 +177,17 @@ fn store(m: u32, n: u32, v: f32, al: f32, be: f32) {
 		{ name: "b", dtype: db },
 		...(dbias ? [{ name: "bias", dtype: dbias }] : []),
 	];
+	const t = gemmTile(M);
 	const spec = nnKernel(
-		`matmul${transB ? "-tb" : ""}${dbias ? "-bias" : ""}${epKey(ep)}`,
+		`matmul${transB ? "-tb" : ""}${dbias ? "-bias" : ""}${epKey(ep)}-${tileKey(t)}`,
 		inputs,
 		["out"],
-		gemmSource(ops, "k", transB ? "k" : "n", ep),
+		gemmSource(ops, "k", transB ? "k" : "n", ep, t),
 	);
 	return {
 		spec,
 		meta,
-		wg: [Math.ceil(N / TILE), Math.ceil(M / TILE), Z],
+		wg: [Math.ceil(N / t.BN), Math.ceil(M / t.BM), Z],
 	};
 }
 
@@ -335,16 +350,17 @@ fn store(m: u32, n: u32, v: f32, al: f32, be: f32) {
 		...(dt.b ? [{ name: "bias", dtype: dt.b }] : []),
 	];
 	// cig / cog are baked into the source (constant folding of the hot divisions)
+	const t = gemmTile(M);
 	const spec = nnKernel(
-		`${kind}-gemm-${cig}-${cog}${dt.b ? "-bias" : ""}${dt.mask ? "-mask" : ""}${epKey(ep)}`,
+		`${kind}-gemm-${cig}-${cog}${dt.b ? "-bias" : ""}${dt.mask ? "-mask" : ""}${epKey(ep)}-${tileKey(t)}`,
 		inputs,
 		["out"],
-		gemmSource(ops, "k", "n", ep),
+		gemmSource(ops, "k", "n", ep, t),
 	);
 	return {
 		spec,
 		meta: convMeta(p, ep, M, N, K),
-		wg: [Math.ceil(N / TILE), Math.ceil(M / TILE), p.N * p.groups],
+		wg: [Math.ceil(N / t.BN), Math.ceil(M / t.BM), p.N * p.groups],
 	};
 }
 
